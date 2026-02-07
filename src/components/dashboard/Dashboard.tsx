@@ -118,9 +118,9 @@ export function Dashboard({
           status={getMoicStatus()}
         />
         <MetricCard
-          label={isNetCash ? "Net Cash" : "Leverage"}
-          value={isNetCash ? formatMoney(netCashAmount) : formatMultiple(metrics.netDebtToEbitda)}
-          subValue={isNetCash ? "Cash > Debt" : "Net Debt/EBITDA"}
+          label="Leverage"
+          value={isNetCash ? 'Net Cash' : formatMultiple(metrics.netDebtToEbitda)}
+          subValue={isNetCash ? formatMoney(netCashAmount) + ' excess' : 'Net Debt/EBITDA'}
           status={getLeverageStatus()}
         />
         <MetricCard
