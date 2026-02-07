@@ -7,6 +7,7 @@ import { EventPhase } from '../phases/EventPhase';
 import { AllocatePhase } from '../phases/AllocatePhase';
 import { RestructurePhase } from '../phases/RestructurePhase';
 import { InstructionsModal } from '../ui/InstructionsModal';
+import { AnnualReportModal } from '../ui/AnnualReportModal';
 
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
 
@@ -19,6 +20,7 @@ interface GameScreenProps {
 export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: GameScreenProps) {
   const [showInstructions, setShowInstructions] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showAnnualReports, setShowAnnualReports] = useState(false);
 
   const {
     holdcoName,
@@ -46,6 +48,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     hasRestructured,
     bankruptRound,
     holdcoAmortizationThisRound,
+    roundHistory,
     advanceToEvent,
     advanceToAllocate,
     endRound,
@@ -252,6 +255,15 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         <div className="flex items-center gap-3">
           <span className="text-2xl">🏛️</span>
           <h1 className="text-xl font-bold">{holdcoName}</h1>
+          {roundHistory && roundHistory.length > 0 && (
+            <button
+              onClick={() => setShowAnnualReports(true)}
+              className="text-text-muted hover:text-text-secondary transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
+              title="Annual Reports"
+            >
+              Reports
+            </button>
+          )}
           <button
             onClick={() => setShowInstructions(true)}
             className="text-text-muted hover:text-text-secondary transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
@@ -312,6 +324,14 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
       <div className="flex-1 overflow-auto">
         {renderPhase()}
       </div>
+
+      {/* Annual Reports Modal */}
+      {showAnnualReports && (
+        <AnnualReportModal
+          roundHistory={roundHistory ?? []}
+          onClose={() => setShowAnnualReports(false)}
+        />
+      )}
 
       {/* Reset Confirmation Modal */}
       {showResetConfirm && (

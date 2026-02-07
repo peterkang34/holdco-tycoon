@@ -308,6 +308,34 @@ describe('determineIntegrationOutcome', () => {
     // Low quality should fail more often
     expect(failCount).toBeGreaterThan(10);
   });
+
+  it('should produce more failures with subTypeMatch=false', () => {
+    let failMatchCount = 0;
+    let failMismatchCount = 0;
+    const biz = generateBusiness('healthcare', 1, 3);
+
+    for (let i = 0; i < 500; i++) {
+      if (determineIntegrationOutcome(biz, undefined, false, true) === 'failure') failMatchCount++;
+      if (determineIntegrationOutcome(biz, undefined, false, false) === 'failure') failMismatchCount++;
+    }
+    // Mismatch should produce more failures due to -0.20 penalty
+    expect(failMismatchCount).toBeGreaterThan(failMatchCount);
+  });
+
+  it('should not penalize when subTypeMatch is undefined (default)', () => {
+    let failDefault = 0;
+    let failMatch = 0;
+    const biz = generateBusiness('healthcare', 1, 3);
+
+    for (let i = 0; i < 500; i++) {
+      if (determineIntegrationOutcome(biz) === 'failure') failDefault++;
+      if (determineIntegrationOutcome(biz, undefined, false, true) === 'failure') failMatch++;
+    }
+    // Should be roughly similar (both without penalty)
+    const ratio = failDefault / Math.max(failMatch, 1);
+    expect(ratio).toBeGreaterThan(0.5);
+    expect(ratio).toBeLessThan(2.0);
+  });
 });
 
 describe('calculateSynergies', () => {
@@ -332,6 +360,34 @@ describe('calculateSynergies', () => {
     const tuckInSyn = calculateSynergies('success', 1000, true);
     const standaloneSyn = calculateSynergies('success', 1000, false);
     expect(tuckInSyn).toBeGreaterThan(standaloneSyn);
+  });
+
+  it('should halve synergies when subTypeMatch is false', () => {
+    const matched = calculateSynergies('success', 1000, false);
+    const mismatched = calculateSynergies('success', 1000, false, false);
+    expect(mismatched).toBe(Math.round(matched * 0.5));
+  });
+
+  it('should not affect synergies when subTypeMatch is true', () => {
+    const defaultSyn = calculateSynergies('success', 1000, true);
+    const matchedSyn = calculateSynergies('success', 1000, true, true);
+    expect(matchedSyn).toBe(defaultSyn);
+  });
+
+  it('should halve tuck-in synergies on sub-type mismatch', () => {
+    const matched = calculateSynergies('success', 1000, true);
+    const mismatched = calculateSynergies('success', 1000, true, false);
+    expect(mismatched).toBe(Math.round(matched * 0.5));
+    expect(mismatched).toBeGreaterThan(0);
+  });
+
+  it('should halve negative synergies on sub-type mismatch (less damage)', () => {
+    const matchedFailure = calculateSynergies('failure', 1000, false);
+    const mismatchedFailure = calculateSynergies('failure', 1000, false, false);
+    // Both negative, but mismatched should be closer to 0
+    expect(matchedFailure).toBeLessThan(0);
+    expect(mismatchedFailure).toBeLessThan(0);
+    expect(Math.abs(mismatchedFailure)).toBeLessThan(Math.abs(matchedFailure));
   });
 });
 

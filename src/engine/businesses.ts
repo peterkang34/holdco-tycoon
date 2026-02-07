@@ -225,7 +225,8 @@ function calculateTuckInDiscount(quality: QualityRating): number {
 export function determineIntegrationOutcome(
   acquiredBusiness: Omit<Business, 'id' | 'acquisitionRound' | 'improvements' | 'status'>,
   targetPlatform?: Business,
-  hasSharedServices?: boolean
+  hasSharedServices?: boolean,
+  subTypeMatch?: boolean
 ): IntegrationOutcome {
   let successProbability = 0.5; // Base 50% chance
 
@@ -242,6 +243,11 @@ export function determineIntegrationOutcome(
   // Same sector synergies (if platform exists)
   if (targetPlatform && targetPlatform.sectorId === acquiredBusiness.sectorId) {
     successProbability += 0.15;
+  }
+
+  // Sub-type mismatch penalty (e.g., dental + behavioral health)
+  if (subTypeMatch === false) {
+    successProbability -= 0.20;
   }
 
   // Shared services help integration
@@ -269,7 +275,8 @@ export function determineIntegrationOutcome(
 export function calculateSynergies(
   outcome: IntegrationOutcome,
   acquiredEbitda: number,
-  isTuckIn: boolean
+  isTuckIn: boolean,
+  subTypeMatch?: boolean
 ): number {
   // Synergies are a % of the acquired business EBITDA
   let synergyRate: number;
@@ -284,6 +291,11 @@ export function calculateSynergies(
     case 'failure':
       synergyRate = isTuckIn ? -0.05 : -0.10; // Failed integrations hurt
       break;
+  }
+
+  // Sub-type mismatch halves synergies (both positive and negative)
+  if (subTypeMatch === false) {
+    synergyRate *= 0.5;
   }
 
   return Math.round(acquiredEbitda * synergyRate);

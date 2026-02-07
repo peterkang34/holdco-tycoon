@@ -160,8 +160,9 @@ export function AllocatePhase({
     if (!selectedDeal) return null;
 
     const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening || !distressRestrictions.canTakeDebt);
-    const availablePlatformsForDeal = getPlatformsForSector(selectedDeal.business.sectorId);
-    const canTuckIn = selectedDeal.acquisitionType === 'tuck_in' && availablePlatformsForDeal.length > 0;
+    const availablePlatformsForDeal = getPlatformsForSector(selectedDeal.business.sectorId)
+      .filter(p => p.platformScale < 3); // Exclude platforms at max scale
+    const canTuckIn = availablePlatformsForDeal.length > 0;
 
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
@@ -192,12 +193,16 @@ export function AllocatePhase({
             </button>
           </div>
 
-          {/* Tuck-in Platform Selection */}
+          {/* Tuck-in / Platform Integration Selection */}
           {canTuckIn && (
             <div className="bg-accent-secondary/10 border border-accent-secondary/30 rounded-lg p-4 mb-6">
-              <h4 className="font-bold text-accent-secondary mb-2">Tuck-In Acquisition</h4>
+              <h4 className="font-bold text-accent-secondary mb-2">
+                {selectedDeal.acquisitionType === 'tuck_in' ? 'Tuck-In Acquisition' : 'Platform Integration'}
+              </h4>
               <p className="text-sm text-text-secondary mb-3">
-                This business can be tucked into an existing platform for synergies and multiple expansion.
+                {selectedDeal.acquisitionType === 'tuck_in'
+                  ? 'This business can be tucked into an existing platform for synergies and multiple expansion.'
+                  : 'This business can be integrated into an existing platform in the same sector for synergies and multiple expansion.'}
               </p>
               <label className="block text-sm text-text-muted mb-2">Select Platform:</label>
               <select
@@ -212,11 +217,32 @@ export function AllocatePhase({
                   </option>
                 ))}
               </select>
-              {selectedTuckInPlatform && (
-                <p className="text-xs text-accent mt-2">
-                  Synergies and multiple expansion will be calculated upon acquisition.
-                </p>
-              )}
+              {selectedTuckInPlatform && (() => {
+                const platform = availablePlatformsForDeal.find(p => p.id === selectedTuckInPlatform);
+                const subTypeMatch = platform?.subType === selectedDeal.business.subType;
+                return (
+                  <div className="mt-2 space-y-1">
+                    {subTypeMatch ? (
+                      <p className="text-xs text-green-400 flex items-center gap-1">
+                        <span>&#10003;</span> Same sub-type ({selectedDeal.business.subType}) — full synergies expected
+                      </p>
+                    ) : (
+                      <p className="text-xs text-yellow-400 flex items-center gap-1">
+                        <span>&#9888;</span> Different sub-types ({platform?.subType} + {selectedDeal.business.subType}) — reduced synergies
+                      </p>
+                    )}
+                    <p className="text-xs text-accent">
+                      Synergies and multiple expansion will be calculated upon acquisition.
+                    </p>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+          {/* Max scale warning */}
+          {getPlatformsForSector(selectedDeal.business.sectorId).length > 0 && availablePlatformsForDeal.length === 0 && (
+            <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-6 text-sm text-text-muted">
+              Platform at maximum scale (3/3) — acquiring as standalone only
             </div>
           )}
 
@@ -1307,7 +1333,7 @@ export function AllocatePhase({
                       <option value="">Select business...</option>
                       {activeBusinesses.filter(b => !b.parentPlatformId).map(biz => (
                         <option key={biz.id} value={biz.id}>
-                          {SECTORS[biz.sectorId].emoji} {biz.name} ({formatMoney(biz.ebitda)})
+                          {SECTORS[biz.sectorId].emoji} {biz.name} — {biz.subType} ({formatMoney(biz.ebitda)})
                         </option>
                       ))}
                     </select>
@@ -1328,7 +1354,7 @@ export function AllocatePhase({
                         .filter(b => b.sectorId === mergeSelection.first?.sectorId && b.id !== mergeSelection.first?.id && !b.parentPlatformId)
                         .map(biz => (
                           <option key={biz.id} value={biz.id}>
-                            {biz.name} ({formatMoney(biz.ebitda)})
+                            {biz.name} — {biz.subType} ({formatMoney(biz.ebitda)})
                           </option>
                         ))}
                     </select>
@@ -1339,6 +1365,18 @@ export function AllocatePhase({
                   <>
                     <div className="card bg-white/5 mb-6">
                       <h4 className="font-bold mb-3">Merger Preview</h4>
+
+                      {/* Sub-type match indicator */}
+                      {mergeSelection.first.subType === mergeSelection.second.subType ? (
+                        <div className="bg-green-900/20 border border-green-500/30 rounded-lg px-3 py-2 mb-4 text-sm text-green-400 flex items-center gap-2">
+                          <span>&#10003;</span> Same sub-type ({mergeSelection.first.subType}) — full synergies expected
+                        </div>
+                      ) : (
+                        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg px-3 py-2 mb-4 text-sm text-yellow-400 flex items-center gap-2">
+                          <span>&#9888;</span> Different sub-types ({mergeSelection.first.subType} + {mergeSelection.second.subType}) — reduced synergies
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>
                           <p className="text-text-muted">Combined EBITDA</p>

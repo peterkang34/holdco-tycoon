@@ -14,6 +14,7 @@ import {
   SectorId,
   DealSizePreference,
   IntegrationOutcome,
+  RoundHistoryEntry,
 } from '../engine/types';
 import {
   createStartingBusiness,
@@ -152,6 +153,7 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   creditTighteningRoundsRemaining: 0,
   inflationRoundsRemaining: 0,
   metricsHistory: [],
+  roundHistory: [],
   actionsThisRound: [],
   debtPaymentThisRound: 0,
   cashBeforeDebtPayments: 0,
@@ -418,6 +420,23 @@ export const useGameStore = create<GameStore>()(
         const newRound = state.round + 1;
         const gameOver = newRound > TOTAL_ROUNDS || gameOverFromBankruptcy;
 
+        // Persist round history snapshot
+        const roundHistoryEntry: RoundHistoryEntry = {
+          round: state.round,
+          actions: state.actionsThisRound,
+          chronicle: state.yearChronicle ?? null,
+          event: state.currentEvent ? {
+            type: state.currentEvent.type,
+            title: state.currentEvent.title,
+            description: state.currentEvent.description,
+          } : null,
+          metrics: endMetrics,
+          businessCount: updatedBusinesses.filter(b => b.status === 'active').length,
+          cash: state.cash,
+          totalDebt: state.totalDebt,
+        };
+        const newRoundHistory = [...(state.roundHistory ?? []), roundHistoryEntry];
+
         if (!gameOver) {
           // Advance to collect phase atomically — compute debt payments in the same set()
           // to avoid a brief flash where cash/phase are stale.
@@ -478,12 +497,14 @@ export const useGameStore = create<GameStore>()(
             businesses: collectBusinesses,
             round: newRound,
             metricsHistory: [...state.metricsHistory, historyEntry],
+            roundHistory: newRoundHistory,
             gameOver: false,
             bankruptRound,
             covenantBreachRounds: newCovenantBreachRounds,
             requiresRestructuring,
             phase: 'collect' as GamePhase,
             currentEvent: null,
+            yearChronicle: null,
             metrics: endMetrics,
             focusBonus: calculateSectorFocusBonus(collectBusinesses),
             cash: newCash,
@@ -497,12 +518,14 @@ export const useGameStore = create<GameStore>()(
             businesses: updatedBusinesses,
             round: newRound,
             metricsHistory: [...state.metricsHistory, historyEntry],
+            roundHistory: newRoundHistory,
             gameOver: true,
             bankruptRound,
             covenantBreachRounds: newCovenantBreachRounds,
             requiresRestructuring,
             phase: 'collect' as GamePhase,
             currentEvent: null,
+            yearChronicle: null,
             metrics: endMetrics,
             focusBonus: calculateSectorFocusBonus(updatedBusinesses),
           });
@@ -575,9 +598,12 @@ export const useGameStore = create<GameStore>()(
         // Check if shared services are active (helps integration)
         const hasSharedServices = state.sharedServices.filter(s => s.active).length > 0;
 
+        // Check sub-type compatibility
+        const subTypeMatch = platform.subType === deal.business.subType;
+
         // Determine integration outcome
-        const outcome = determineIntegrationOutcome(deal.business, platform, hasSharedServices);
-        const synergies = calculateSynergies(outcome, deal.business.ebitda, true);
+        const outcome = determineIntegrationOutcome(deal.business, platform, hasSharedServices, subTypeMatch);
+        const synergies = calculateSynergies(outcome, deal.business.ebitda, true, subTypeMatch);
 
         // Create the bolt-on business record
         const boltOnId = generateBusinessId();
@@ -694,9 +720,12 @@ export const useGameStore = create<GameStore>()(
         // Check if shared services help
         const hasSharedServices = state.sharedServices.filter(s => s.active).length > 0;
 
+        // Check sub-type compatibility
+        const subTypeMatch = biz1.subType === biz2.subType;
+
         // Integration outcome for merger
-        const outcome = determineIntegrationOutcome(biz2, biz1, hasSharedServices);
-        const synergies = calculateSynergies(outcome, biz1.ebitda + biz2.ebitda, false);
+        const outcome = determineIntegrationOutcome(biz2, biz1, hasSharedServices, subTypeMatch);
+        const synergies = calculateSynergies(outcome, biz1.ebitda + biz2.ebitda, false, subTypeMatch);
 
         // Combined entity
         const combinedEbitda = biz1.ebitda + biz2.ebitda + synergies;
@@ -1541,6 +1570,7 @@ export const useGameStore = create<GameStore>()(
         creditTighteningRoundsRemaining: state.creditTighteningRoundsRemaining,
         inflationRoundsRemaining: state.inflationRoundsRemaining,
         metricsHistory: state.metricsHistory,
+        roundHistory: state.roundHistory,
         actionsThisRound: state.actionsThisRound, // M-14: Persist actions for acquisition limit tracking
         debtPaymentThisRound: state.debtPaymentThisRound,
         cashBeforeDebtPayments: state.cashBeforeDebtPayments,

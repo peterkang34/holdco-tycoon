@@ -297,6 +297,17 @@ export interface HistoricalMetrics {
   investedCapital: number;
 }
 
+export interface RoundHistoryEntry {
+  round: number;
+  actions: GameAction[];
+  chronicle: string | null;
+  event: { type: EventType; title: string; description: string } | null;
+  metrics: Metrics;
+  businessCount: number;
+  cash: number;
+  totalDebt: number;
+}
+
 export interface GameState {
   // Meta
   holdcoName: string;
@@ -341,6 +352,7 @@ export interface GameState {
 
   // History
   metricsHistory: HistoricalMetrics[];
+  roundHistory: RoundHistoryEntry[];
 
   // Scoring
   actionsThisRound: GameAction[];

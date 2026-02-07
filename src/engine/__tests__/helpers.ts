@@ -130,6 +130,7 @@ export function createMockGameState(overrides: Partial<GameState> = {}): GameSta
     creditTighteningRoundsRemaining: 0,
     inflationRoundsRemaining: 0,
     metricsHistory: [],
+    roundHistory: [],
     actionsThisRound: [],
     debtPaymentThisRound: 0,
     cashBeforeDebtPayments: 0,
