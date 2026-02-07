@@ -11,6 +11,8 @@ interface CollectPhaseProps {
   totalDebt: number;
   interestRate: number;
   sharedServicesCost: number;
+  round: number;
+  yearChronicle?: string | null;
   onContinue: () => void;
 }
 
@@ -52,6 +54,8 @@ export function CollectPhase({
   totalDebt,
   interestRate,
   sharedServicesCost,
+  round,
+  yearChronicle,
   onContinue
 }: CollectPhaseProps) {
   const [expandedBusiness, setExpandedBusiness] = useState<string | null>(null);
@@ -79,9 +83,18 @@ export function CollectPhase({
   return (
     <div className="max-w-4xl mx-auto p-6">
       <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold mb-2">Cash Flow Collection</h2>
+        <h2 className="text-2xl font-bold mb-2">Year {round} — Cash Flow Collection</h2>
         <p className="text-text-secondary">EBITDA converts to Free Cash Flow after deductions</p>
       </div>
+
+      {/* Year Chronicle */}
+      {yearChronicle && (
+        <div className="card mb-6 bg-gradient-to-r from-accent/10 to-transparent border-l-4 border-accent">
+          <p className="text-sm italic text-text-primary leading-relaxed">
+            {yearChronicle}
+          </p>
+        </div>
+      )}
 
       {/* EBITDA to FCF Summary */}
       <div className="card mb-6 bg-white/5">

@@ -26,6 +26,14 @@ import {
   enhanceDealsWithAI,
   generateSourcedDeals,
 } from '../engine/businesses';
+import {
+  generateEventNarrative,
+  getFallbackEventNarrative,
+  isAIEnabled,
+  generateBusinessUpdate,
+  generateYearChronicle,
+} from '../services/aiGeneration';
+import { formatMoney } from '../engine/types';
 import { resetUsedNames } from '../data/names';
 import { initializeSharedServices, MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES } from '../data/sharedServices';
 import {
@@ -91,6 +99,12 @@ interface GameStore extends GameState {
 
   // AI enhancement
   triggerAIEnhancement: () => Promise<void>;
+  fetchEventNarrative: () => Promise<void>;
+  generateBusinessStories: () => Promise<void>;
+  generateYearChronicle: () => Promise<void>;
+
+  // Year chronicle
+  yearChronicle: string | null;
 
   // Platform helpers
   getPlatforms: () => Business[];
@@ -967,6 +981,159 @@ export const useGameStore = create<GameStore>()(
           set({ dealPipeline: enhancedDeals });
         } catch (error) {
           console.error('AI enhancement failed:', error);
+        }
+      },
+
+      fetchEventNarrative: async () => {
+        const state = get();
+        const event = state.currentEvent;
+
+        if (!event || event.narrative) return; // Already has narrative or no event
+
+        // Skip quiet years
+        if (event.type === 'global_quiet') return;
+
+        try {
+          // Try AI generation first
+          const narrative = await generateEventNarrative(
+            event.type,
+            event.effect,
+            `Holdco with ${state.businesses.filter(b => b.status === 'active').length} portfolio companies`
+          );
+
+          if (narrative) {
+            set({
+              currentEvent: { ...event, narrative },
+            });
+          } else {
+            // Use fallback
+            const fallbackNarrative = getFallbackEventNarrative(event.type);
+            set({
+              currentEvent: { ...event, narrative: fallbackNarrative },
+            });
+          }
+        } catch (error) {
+          console.error('Failed to fetch event narrative:', error);
+          // Use fallback on error
+          const fallbackNarrative = getFallbackEventNarrative(event.type);
+          set({
+            currentEvent: { ...event, narrative: fallbackNarrative },
+          });
+        }
+      },
+
+      // Year chronicle (set when advancing to collect for a new year)
+      yearChronicle: null,
+
+      generateBusinessStories: async () => {
+        const state = get();
+        const activeBusinesses = state.businesses.filter(b => b.status === 'active');
+
+        // Generate stories for businesses that had significant changes
+        const updatedBusinesses = await Promise.all(
+          state.businesses.map(async (b) => {
+            if (b.status !== 'active') return b;
+
+            // Only generate stories every few years or on significant events
+            const yearsOwned = state.round - b.acquisitionRound;
+            const hasRecentImprovement = b.improvements.some(i => i.appliedRound === state.round - 1);
+            const significantGrowth = b.ebitda > b.acquisitionEbitda * 1.2;
+            const shouldGenerateStory = yearsOwned === 1 || yearsOwned === 5 || yearsOwned === 10 || hasRecentImprovement;
+
+            if (!shouldGenerateStory) return b;
+
+            const sector = SECTORS[b.sectorId];
+            const ebitdaChange = b.ebitda > b.acquisitionEbitda
+              ? `+${((b.ebitda / b.acquisitionEbitda - 1) * 100).toFixed(0)}% since acquisition`
+              : `${((b.ebitda / b.acquisitionEbitda - 1) * 100).toFixed(0)}% since acquisition`;
+
+            const narrative = await generateBusinessUpdate(
+              b.name,
+              sector.name,
+              b.subType,
+              yearsOwned,
+              ebitdaChange,
+              b.qualityRating,
+              state.currentEvent?.type,
+              b.improvements.length > 0 ? b.improvements.map(i => i.type).join(', ') : undefined,
+              b.isPlatform,
+              b.boltOnIds.length
+            );
+
+            if (narrative) {
+              const newBeat = {
+                round: state.round,
+                narrative,
+                type: hasRecentImprovement ? 'milestone' as const : 'update' as const,
+              };
+              return {
+                ...b,
+                storyBeats: [...(b.storyBeats || []), newBeat].slice(-5), // Keep last 5 beats
+              };
+            }
+
+            return b;
+          })
+        );
+
+        set({ businesses: updatedBusinesses });
+      },
+
+      generateYearChronicle: async () => {
+        const state = get();
+        const activeBusinesses = state.businesses.filter(b => b.status === 'active');
+        const metrics = calculateMetrics(state);
+
+        // Build actions summary
+        const actionsThisRound = state.actionsThisRound;
+        let actionsSummary = '';
+
+        const acquisitions = actionsThisRound.filter(a => a.type === 'acquire' || a.type === 'acquire_tuck_in');
+        const sales = actionsThisRound.filter(a => a.type === 'sell');
+        const improvements = actionsThisRound.filter(a => a.type === 'improve');
+
+        if (acquisitions.length > 0) {
+          actionsSummary += `Acquired ${acquisitions.length} business${acquisitions.length > 1 ? 'es' : ''}. `;
+        }
+        if (sales.length > 0) {
+          actionsSummary += `Sold ${sales.length} business${sales.length > 1 ? 'es' : ''}. `;
+        }
+        if (improvements.length > 0) {
+          actionsSummary += `Made ${improvements.length} operational improvement${improvements.length > 1 ? 's' : ''}. `;
+        }
+        if (!actionsSummary) {
+          actionsSummary = 'Focused on organic growth and portfolio management.';
+        }
+
+        // Get market conditions from last event
+        const lastEvent = state.eventHistory[state.eventHistory.length - 1];
+        let marketConditions = 'Normal market conditions';
+        if (lastEvent) {
+          if (lastEvent.type === 'global_recession') marketConditions = 'Recessionary environment';
+          else if (lastEvent.type === 'global_bull_market') marketConditions = 'Bull market conditions';
+          else if (lastEvent.type === 'global_inflation') marketConditions = 'Inflationary pressures';
+          else if (lastEvent.type === 'global_credit_tightening') marketConditions = 'Tight credit markets';
+        }
+
+        try {
+          const chronicle = await generateYearChronicle(
+            state.holdcoName,
+            state.round,
+            formatMoney(metrics.totalEbitda),
+            formatMoney(state.cash),
+            activeBusinesses.length,
+            metrics.netDebtToEbitda < 0 ? 'Net cash position' : `${metrics.netDebtToEbitda.toFixed(1)}x`,
+            actionsSummary,
+            marketConditions
+          );
+
+          set({ yearChronicle: chronicle });
+        } catch (error) {
+          console.error('Failed to generate year chronicle:', error);
+          // Use a fallback
+          set({
+            yearChronicle: `Year ${state.round} saw ${state.holdcoName} continue to build its portfolio. ${actionsSummary}`,
+          });
         }
       },
 

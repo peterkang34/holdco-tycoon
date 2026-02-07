@@ -283,6 +283,157 @@ export async function generateGameAnalysis(input: GameAnalysisInput): Promise<AI
   }
 }
 
+// Dynamic narrative generation
+export type NarrativeType = 'event' | 'business_update' | 'year_chronicle' | 'deal_story';
+
+export async function generateNarrative(
+  type: NarrativeType,
+  context: Record<string, unknown>
+): Promise<string | null> {
+  const isEnabled = await checkAIStatus();
+  if (!isEnabled) {
+    return null;
+  }
+
+  try {
+    const response = await fetch('/api/ai/generate-narrative', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ type, context }),
+    });
+
+    if (!response.ok) {
+      console.error('Narrative generation failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.narrative || null;
+  } catch (error) {
+    console.error('Narrative generation error:', error);
+    return null;
+  }
+}
+
+// Generate event narrative
+export async function generateEventNarrative(
+  eventType: string,
+  effect: string,
+  playerContext?: string
+): Promise<string | null> {
+  return generateNarrative('event', {
+    eventType,
+    effect,
+    playerContext,
+  });
+}
+
+// Generate business story update
+export async function generateBusinessUpdate(
+  businessName: string,
+  sector: string,
+  subType: string,
+  yearsOwned: number,
+  ebitdaChange: string,
+  quality: number,
+  recentEvents?: string,
+  improvements?: string,
+  isPlatform?: boolean,
+  boltOnCount?: number
+): Promise<string | null> {
+  return generateNarrative('business_update', {
+    businessName,
+    sector,
+    subType,
+    yearsOwned,
+    ebitdaChange,
+    quality,
+    recentEvents,
+    improvements,
+    isPlatform,
+    boltOnCount,
+  });
+}
+
+// Generate year-end chronicle
+export async function generateYearChronicle(
+  holdcoName: string,
+  year: number,
+  totalEbitda: string,
+  cash: string,
+  portfolioCount: number,
+  leverage: string,
+  actions?: string,
+  marketConditions?: string
+): Promise<string | null> {
+  return generateNarrative('year_chronicle', {
+    holdcoName,
+    year,
+    totalEbitda,
+    cash,
+    portfolioCount,
+    leverage,
+    actions,
+    marketConditions,
+  });
+}
+
+// Fallback narratives for when AI is not available
+export const FALLBACK_EVENT_NARRATIVES: Record<string, string[]> = {
+  global_recession: [
+    'Markets tumbled as recession fears gripped Wall Street. CFOs across the country began tightening budgets.',
+    'The economic downturn arrived swiftly. Businesses that had overextended found themselves scrambling.',
+    'A chill swept through boardrooms as quarterly projections were slashed. The party was over.',
+  ],
+  global_bull_market: [
+    'Optimism surged through the markets as deal activity hit record levels. Every banker had a buyer.',
+    'The bull market roared on. Multiples expanded as investors competed for quality assets.',
+    'Main Street caught the fever as the longest expansion in decades continued unabated.',
+  ],
+  interest_rate_hike: [
+    'The Fed raised rates again, sending leveraged buyers back to their spreadsheets.',
+    'Higher rates meant tighter terms. The era of cheap debt was fading fast.',
+    'Borrowing costs climbed as the central bank moved to cool an overheating economy.',
+  ],
+  credit_tightening: [
+    'Banks pulled back, their risk committees suddenly cautious. Credit became a precious commodity.',
+    'Loan committees tightened their criteria. Deals that would have sailed through last year now stalled.',
+    'The credit window narrowed. Only the strongest borrowers could access capital.',
+  ],
+  sector_boom: [
+    'The sector caught fire as new demand drivers emerged. Valuations soared.',
+    'Investors piled into the space, sensing a generational opportunity.',
+    'What was once overlooked became the hottest sector in M&A.',
+  ],
+  sector_disruption: [
+    'A new technology threatened to upend the industry. Incumbents scrambled to adapt.',
+    'Disruption arrived faster than anyone predicted. Some businesses would never recover.',
+    'The old playbook no longer worked. Only the agile would survive.',
+  ],
+  key_employee_departure: [
+    'The departure sent shockwaves through the organization. Institutional knowledge walked out the door.',
+    'After years of loyal service, a key leader moved on. The transition would be rocky.',
+    'The resignation caught everyone off guard. Clients started asking questions.',
+  ],
+  major_customer_loss: [
+    'The call came on a Monday morning. Their biggest customer was leaving.',
+    'After a decade of partnership, the relationship ended. Revenue projections needed revising.',
+    'Losing the anchor account forced a painful strategic pivot.',
+  ],
+  regulatory_change: [
+    'New regulations landed with the force of law. Compliance costs would eat into margins.',
+    'Washington had spoken. The industry would never operate the same way.',
+    'The regulatory environment shifted. Those who had prepared would thrive.',
+  ],
+};
+
+export function getFallbackEventNarrative(eventType: string): string {
+  const narratives = FALLBACK_EVENT_NARRATIVES[eventType] || FALLBACK_EVENT_NARRATIVES.global_recession;
+  return narratives[Math.floor(Math.random() * narratives.length)];
+}
+
 // Fallback analysis when AI is not available
 export function generateFallbackAnalysis(input: GameAnalysisInput): AIGameAnalysis {
   const allBusinesses = [...input.businesses, ...input.exitedBusinesses];

@@ -63,6 +63,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     triggerAIEnhancement,
     dealSourcingUsedThisRound,
     sourceDealFlow,
+    fetchEventNarrative,
+    generateBusinessStories,
+    yearChronicle,
+    generateYearChronicle: generateYearChronicleAction,
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;
@@ -98,6 +102,27 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     }
   }, [phase, round, triggerAIEnhancement]);
 
+  // Fetch event narrative when entering event phase
+  useEffect(() => {
+    if (phase === 'event' && currentEvent) {
+      fetchEventNarrative();
+    }
+  }, [phase, currentEvent, fetchEventNarrative]);
+
+  // Generate business stories at key milestones (every 5 years)
+  useEffect(() => {
+    if (phase === 'collect' && (round === 1 || round % 5 === 0)) {
+      generateBusinessStories();
+    }
+  }, [phase, round, generateBusinessStories]);
+
+  // Generate year chronicle when entering collect phase (for years 2+)
+  useEffect(() => {
+    if (phase === 'collect' && round > 1) {
+      generateYearChronicleAction();
+    }
+  }, [phase, round, generateYearChronicleAction]);
+
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const lastEventType = eventHistory.length > 0 ? eventHistory[eventHistory.length - 1].type : undefined;
   const activeServicesCount = sharedServices.filter(s => s.active).length;
@@ -115,6 +140,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             totalDebt={totalDebt}
             interestRate={interestRate}
             sharedServicesCost={sharedServicesCost}
+            round={round}
+            yearChronicle={yearChronicle}
             onContinue={advanceToEvent}
           />
         );

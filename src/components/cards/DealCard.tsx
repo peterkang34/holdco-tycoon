@@ -177,9 +177,14 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [] }: 
       </div>
 
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/10">
-        <span className="text-xs text-text-muted">
-          {deal.source === 'inbound' ? 'Inbound' : 'Brokered'}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-text-muted">
+            {deal.source === 'inbound' ? 'Inbound' : deal.source === 'sourced' ? 'IB Sourced' : 'Brokered'}
+          </span>
+          {deal.aiContent?.backstory && deal.aiContent.backstory.length > 100 && (
+            <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">AI</span>
+          )}
+        </div>
         {onSelect && !disabled && (
           <button className="btn-primary text-sm py-1.5 px-4">
             Review Deal

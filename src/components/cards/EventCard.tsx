@@ -70,6 +70,15 @@ export function EventCard({ event, onAcceptOffer, onDeclineOffer, onContinue }: 
         <p className="text-text-secondary">{event.description}</p>
       </div>
 
+      {/* AI-Generated Narrative */}
+      {event.narrative && (
+        <div className="bg-gradient-to-r from-white/5 to-transparent p-4 rounded-lg mb-4 border-l-2 border-accent/50">
+          <p className="text-sm text-text-primary italic leading-relaxed">
+            "{event.narrative}"
+          </p>
+        </div>
+      )}
+
       <div className={`p-4 rounded-lg mb-4 ${isPositive ? 'bg-accent/10' : isNegative ? 'bg-danger/10' : 'bg-white/5'}`}>
         <p className={`text-sm font-medium ${isPositive ? 'text-accent' : isNegative ? 'text-danger' : 'text-text-primary'}`}>
           {event.effect}

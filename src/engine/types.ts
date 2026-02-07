@@ -94,6 +94,15 @@ export interface Business {
   integrationOutcome?: IntegrationOutcome; // How well the integration went
   synergiesRealized: number; // EBITDA boost from successful integration (in $k)
   totalAcquisitionCost: number; // Sum of this business + all bolt-ons acquired
+
+  // Dynamic narratives
+  storyBeats?: StoryBeat[]; // Narrative events that happened to this business
+}
+
+export interface StoryBeat {
+  round: number;
+  narrative: string;
+  type: 'milestone' | 'challenge' | 'opportunity' | 'update';
 }
 
 export type OperationalImprovementType =
@@ -232,6 +241,7 @@ export interface GameEvent {
   affectedBusinessId?: string;
   offerAmount?: number; // for unsolicited offers
   impacts?: EventImpact[]; // actual measured impacts from the event
+  narrative?: string; // AI-generated narrative context
 }
 
 export interface Metrics {

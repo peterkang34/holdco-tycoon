@@ -106,6 +106,16 @@ export function BusinessCard({
         </div>
       )}
 
+      {/* Latest Story Beat */}
+      {business.storyBeats && business.storyBeats.length > 0 && (
+        <div className="bg-gradient-to-r from-accent/5 to-transparent border-l-2 border-accent/30 p-2 mb-3 text-xs">
+          <p className="text-text-secondary italic leading-relaxed">
+            "{business.storyBeats[business.storyBeats.length - 1].narrative}"
+          </p>
+          <p className="text-text-muted mt-1">— Year {business.storyBeats[business.storyBeats.length - 1].round}</p>
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-4 mb-3">
         <div>
           <p className="text-xs text-text-muted">Annual EBITDA</p>
