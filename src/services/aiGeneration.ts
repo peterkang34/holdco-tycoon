@@ -1,28 +1,35 @@
-import { SectorId, AIGeneratedContent, QualityRating, GameState, Business, ScoreBreakdown } from '../engine/types';
+import { SectorId, AIGeneratedContent, QualityRating, Business, ScoreBreakdown } from '../engine/types';
 import { SECTORS } from '../data/sectors';
 
-const API_KEY_STORAGE_KEY = 'holdco-tycoon-anthropic-api-key';
-const AI_ENABLED_KEY = 'holdco-tycoon-ai-enabled';
+// Cache the AI status to avoid repeated requests
+let aiStatusCache: { enabled: boolean; checkedAt: number } | null = null;
+const AI_STATUS_CACHE_TTL = 60000; // 1 minute
 
-// Store API key securely in localStorage
-export function setApiKey(key: string): void {
-  localStorage.setItem(API_KEY_STORAGE_KEY, key);
+// Check if server-side AI is enabled
+export async function checkAIStatus(): Promise<boolean> {
+  // Return cached value if still valid
+  if (aiStatusCache && Date.now() - aiStatusCache.checkedAt < AI_STATUS_CACHE_TTL) {
+    return aiStatusCache.enabled;
+  }
+
+  try {
+    const response = await fetch('/api/ai/status');
+    if (response.ok) {
+      const data = await response.json();
+      aiStatusCache = { enabled: data.enabled, checkedAt: Date.now() };
+      return data.enabled;
+    }
+  } catch (error) {
+    console.error('Failed to check AI status:', error);
+  }
+
+  aiStatusCache = { enabled: false, checkedAt: Date.now() };
+  return false;
 }
 
-export function getApiKey(): string | null {
-  return localStorage.getItem(API_KEY_STORAGE_KEY);
-}
-
-export function clearApiKey(): void {
-  localStorage.removeItem(API_KEY_STORAGE_KEY);
-}
-
+// Synchronous check using cached value (for UI display)
 export function isAIEnabled(): boolean {
-  return localStorage.getItem(AI_ENABLED_KEY) === 'true' && !!getApiKey();
-}
-
-export function setAIEnabled(enabled: boolean): void {
-  localStorage.setItem(AI_ENABLED_KEY, enabled ? 'true' : 'false');
+  return aiStatusCache?.enabled ?? false;
 }
 
 interface GenerationParams {
@@ -33,108 +40,40 @@ interface GenerationParams {
   acquisitionType: 'standalone' | 'tuck_in' | 'platform';
 }
 
-// Generate AI content for a business
+// Generate AI content for a business via server API
 export async function generateBusinessContent(params: GenerationParams): Promise<AIGeneratedContent | null> {
-  const apiKey = getApiKey();
-  if (!apiKey || !isAIEnabled()) {
+  const isEnabled = await checkAIStatus();
+  if (!isEnabled) {
     return null;
   }
 
   const sector = SECTORS[params.sectorId];
-  const ebitdaFormatted = params.ebitda >= 1000
-    ? `$${(params.ebitda / 1000).toFixed(1)}M`
-    : `$${params.ebitda}k`;
-
-  const qualityDescriptions: Record<QualityRating, string> = {
-    1: 'struggling, has significant issues',
-    2: 'below average, needs work',
-    3: 'average, solid performer',
-    4: 'above average, well-run',
-    5: 'exceptional, best-in-class',
-  };
-
-  const prompt = `Generate realistic M&A deal content for a private equity acquisition game. Be creative and specific.
-
-Business Details:
-- Sector: ${sector.name}
-- Type: ${params.subType}
-- Annual EBITDA: ${ebitdaFormatted}
-- Quality: ${qualityDescriptions[params.qualityRating]}
-- Deal Type: ${params.acquisitionType === 'tuck_in' ? 'Small tuck-in acquisition' : params.acquisitionType === 'platform' ? 'Platform company opportunity' : 'Standalone acquisition'}
-
-Generate a JSON object with these fields:
-1. "backstory" - 2-3 sentences about the company's founding, history, and what makes it unique. Be specific about location, founder background, or key milestones.
-2. "sellerMotivation" - 1-2 sentences explaining why the owner is selling. Make it realistic (retirement, partner dispute, health, opportunity cost, estate planning, burnout, etc.)
-3. "quirks" - Array of 2-3 interesting/unique details about the business (unusual customer, hidden asset, key relationship, operational quirk)
-4. "redFlags" - Array of 0-2 concerns a buyer should know about (only if quality < 4)
-5. "opportunities" - Array of 1-2 potential upsides for a new owner
-
-Respond ONLY with valid JSON, no other text.`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/ai/generate-deal', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 500,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
+        sectorName: sector.name,
+        subType: params.subType,
+        ebitda: params.ebitda,
+        qualityRating: params.qualityRating,
+        acquisitionType: params.acquisitionType,
       }),
     });
 
     if (!response.ok) {
-      console.error('AI generation failed:', response.status, response.statusText);
+      console.error('AI generation failed:', response.status);
       return null;
     }
 
-    const data = await response.json();
-    const content = data.content?.[0]?.text;
-
-    if (!content) {
-      return null;
-    }
-
-    // Parse the JSON response
-    const parsed = JSON.parse(content);
-
-    return {
-      backstory: parsed.backstory || '',
-      sellerMotivation: parsed.sellerMotivation || '',
-      quirks: parsed.quirks || [],
-      redFlags: parsed.redFlags,
-      opportunities: parsed.opportunities,
-    };
+    return await response.json();
   } catch (error) {
     console.error('AI generation error:', error);
     return null;
   }
-}
-
-// Batch generate content for multiple businesses (more efficient)
-export async function generateBatchContent(
-  businesses: GenerationParams[]
-): Promise<(AIGeneratedContent | null)[]> {
-  // Generate in parallel with rate limiting
-  const results: (AIGeneratedContent | null)[] = [];
-
-  for (const business of businesses) {
-    const content = await generateBusinessContent(business);
-    results.push(content);
-    // Small delay to avoid rate limiting
-    await new Promise(resolve => setTimeout(resolve, 100));
-  }
-
-  return results;
 }
 
 // Pre-built fallback content for when AI is not available
@@ -218,30 +157,6 @@ export function generateFallbackContent(
   return content;
 }
 
-// Validate API key by making a minimal request
-export async function validateApiKey(key: string): Promise<boolean> {
-  try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': key,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 10,
-        messages: [{ role: 'user', content: 'Say "ok"' }],
-      }),
-    });
-
-    return response.ok;
-  } catch {
-    return false;
-  }
-}
-
 // Post-game AI analysis
 export interface AIGameAnalysis {
   overallAssessment: string;
@@ -278,30 +193,39 @@ interface GameAnalysisInput {
   sharedServicesActive: number;
 }
 
-function formatMoneyForPrompt(amountInThousands: number): string {
-  const amount = amountInThousands * 1000;
-  if (Math.abs(amount) >= 1000000) {
-    return `$${(amount / 1000000).toFixed(1)}M`;
-  }
-  return `$${(amount / 1000).toFixed(0)}k`;
-}
-
 export async function generateGameAnalysis(input: GameAnalysisInput): Promise<AIGameAnalysis | null> {
-  const apiKey = getApiKey();
-  if (!apiKey || !isAIEnabled()) {
+  const isEnabled = await checkAIStatus();
+  if (!isEnabled) {
     return null;
   }
 
-  // Build a comprehensive summary for the AI
+  // Build summary stats for the API
   const allBusinesses = [...input.businesses, ...input.exitedBusinesses];
   const activeBusinesses = input.businesses.filter(b => b.status === 'active');
 
-  // Calculate key stats
   const totalAcquisitions = allBusinesses.length;
   const totalSold = input.exitedBusinesses.filter(b => b.status === 'sold').length;
   const totalWoundDown = input.exitedBusinesses.filter(b => b.status === 'wound_down').length;
 
-  // Sector distribution
+  const soldWithProfit = input.exitedBusinesses.filter(b =>
+    b.status === 'sold' && b.exitPrice && b.exitPrice > b.acquisitionPrice
+  ).length;
+
+  const avgHoldPeriod = allBusinesses.length > 0
+    ? (allBusinesses.reduce((sum, b) => sum + ((b.exitRound || input.totalRounds) - b.acquisitionRound), 0) / allBusinesses.length).toFixed(1)
+    : '0';
+
+  const avgQuality = allBusinesses.length > 0
+    ? (allBusinesses.reduce((sum, b) => sum + b.qualityRating, 0) / allBusinesses.length).toFixed(1)
+    : '3';
+
+  const totalImprovements = allBusinesses.reduce((sum, b) => sum + b.improvements.length, 0);
+
+  const platforms = activeBusinesses.filter(b => b.isPlatform);
+  const platformSummary = platforms.length > 0
+    ? `${platforms.length} platform(s), max scale ${Math.max(...platforms.map(p => p.platformScale))}/3`
+    : 'No platforms built';
+
   const sectorCounts: Record<string, number> = {};
   allBusinesses.forEach(b => {
     const sectorName = SECTORS[b.sectorId]?.name || b.sectorId;
@@ -311,125 +235,48 @@ export async function generateGameAnalysis(input: GameAnalysisInput): Promise<AI
     .map(([name, count]) => `${name}: ${count}`)
     .join(', ');
 
-  // MOIC calculations
-  const soldWithProfit = input.exitedBusinesses.filter(b =>
-    b.status === 'sold' && b.exitPrice && b.exitPrice > b.acquisitionPrice
-  ).length;
-  const avgHoldPeriod = allBusinesses.length > 0
-    ? allBusinesses.reduce((sum, b) => sum + ((b.exitRound || input.totalRounds) - b.acquisitionRound), 0) / allBusinesses.length
-    : 0;
-
-  // Quality distribution
-  const avgQuality = allBusinesses.length > 0
-    ? allBusinesses.reduce((sum, b) => sum + b.qualityRating, 0) / allBusinesses.length
-    : 3;
-
-  // Improvements made
-  const totalImprovements = allBusinesses.reduce((sum, b) => sum + b.improvements.length, 0);
-
-  // Platform stats
-  const platforms = activeBusinesses.filter(b => b.isPlatform);
-  const platformSummary = platforms.length > 0
-    ? `${platforms.length} platform(s), max scale ${Math.max(...platforms.map(p => p.platformScale))}/3`
-    : 'No platforms built';
-
-  // Metrics trajectory
   const startMetrics = input.metricsHistory[0]?.metrics;
   const endMetrics = input.metricsHistory[input.metricsHistory.length - 1]?.metrics;
-  const ebitdaGrowth = startMetrics && endMetrics
+  const ebitdaGrowth = startMetrics && endMetrics && startMetrics.totalEbitda > 0
     ? ((endMetrics.totalEbitda - startMetrics.totalEbitda) / startMetrics.totalEbitda * 100).toFixed(0)
     : 'N/A';
-
-  const prompt = `You are an experienced private equity investment advisor reviewing a player's 20-year holdco simulation game. Analyze their performance and provide personalized, actionable feedback.
-
-GAME RESULTS:
-- Holdco Name: ${input.holdcoName}
-- Final Grade: ${input.score.grade} (${input.score.total}/100 points)
-- Title: ${input.score.title}
-- Enterprise Value: ${formatMoneyForPrompt(input.enterpriseValue)}
-
-SCORE BREAKDOWN:
-- FCF/Share Growth: ${input.score.fcfShareGrowth}/25
-- Portfolio ROIC: ${input.score.portfolioRoic}/20
-- Capital Deployment: ${input.score.capitalDeployment}/20
-- Balance Sheet Health: ${input.score.balanceSheetHealth}/15
-- Strategic Discipline: ${input.score.strategicDiscipline}/20
-
-PORTFOLIO ACTIVITY:
-- Total Acquisitions: ${totalAcquisitions}
-- Businesses Sold: ${totalSold} (${soldWithProfit} at profit)
-- Businesses Wound Down: ${totalWoundDown}
-- Average Hold Period: ${avgHoldPeriod.toFixed(1)} years
-- Average Quality Rating: ${avgQuality.toFixed(1)}/5
-- Operational Improvements Made: ${totalImprovements}
-- ${platformSummary}
-- Sector Distribution: ${sectorSummary}
-
-CAPITAL MANAGEMENT:
-- Total Invested Capital: ${formatMoneyForPrompt(input.totalInvestedCapital)}
-- Distributions to Owners: ${formatMoneyForPrompt(input.totalDistributions)}
-- Share Buybacks: ${formatMoneyForPrompt(input.totalBuybacks)}
-- Equity Raises Used: ${input.equityRaisesUsed}/3
-- Shared Services Active: ${input.sharedServicesActive}
-
-TRAJECTORY:
-- EBITDA Growth: ${ebitdaGrowth}%
-- Final Leverage: ${endMetrics?.netDebtToEbitda?.toFixed(1) || 'N/A'}x Net Debt/EBITDA
-
-Generate a JSON response with these fields:
-1. "overallAssessment" - 2-3 sentences summarizing their performance, mentioning specific strengths and weaknesses
-2. "keyStrengths" - Array of 2-3 specific things they did well (be concrete, reference their actual numbers)
-3. "areasForImprovement" - Array of 2-3 specific areas where they could improve (be constructive and specific)
-4. "specificLessons" - Array of 2-3 objects with:
-   - "observation": What pattern you noticed in their play
-   - "lesson": The PE/holdco principle this relates to
-   - "reference": Optional book/investor quote (Buffett, Munger, Mark Leonard, etc.)
-5. "whatIfScenario" - 1-2 sentences describing an alternative path that might have improved their outcome
-
-Be direct and specific. Reference their actual numbers. Don't be generic. Respond ONLY with valid JSON.`;
+  const finalLeverage = endMetrics?.netDebtToEbitda?.toFixed(1) || 'N/A';
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    const response = await fetch('/api/ai/analyze-game', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true',
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 1000,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
+        holdcoName: input.holdcoName,
+        score: input.score,
+        enterpriseValue: input.enterpriseValue,
+        totalAcquisitions,
+        totalSold,
+        soldWithProfit,
+        totalWoundDown,
+        avgHoldPeriod,
+        avgQuality,
+        totalImprovements,
+        platformSummary,
+        sectorSummary,
+        totalInvestedCapital: input.totalInvestedCapital,
+        totalDistributions: input.totalDistributions,
+        totalBuybacks: input.totalBuybacks,
+        equityRaisesUsed: input.equityRaisesUsed,
+        sharedServicesActive: input.sharedServicesActive,
+        ebitdaGrowth,
+        finalLeverage,
       }),
     });
 
     if (!response.ok) {
-      console.error('AI analysis failed:', response.status, response.statusText);
+      console.error('AI analysis failed:', response.status);
       return null;
     }
 
-    const data = await response.json();
-    const content = data.content?.[0]?.text;
-
-    if (!content) {
-      return null;
-    }
-
-    const parsed = JSON.parse(content);
-
-    return {
-      overallAssessment: parsed.overallAssessment || '',
-      keyStrengths: parsed.keyStrengths || [],
-      areasForImprovement: parsed.areasForImprovement || [],
-      specificLessons: parsed.specificLessons || [],
-      whatIfScenario: parsed.whatIfScenario || '',
-    };
+    return await response.json();
   } catch (error) {
     console.error('AI analysis error:', error);
     return null;

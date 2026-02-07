@@ -19,7 +19,6 @@ import { generateDealStructures, getStructureLabel, getStructureDescription } fr
 import { SECTORS } from '../../data/sectors';
 import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES } from '../../data/sharedServices';
 import { MarketGuideModal } from '../ui/MarketGuideModal';
-import { AISettingsModal } from '../ui/AISettingsModal';
 import { isAIEnabled } from '../../services/aiGeneration';
 
 const STARTING_SHARES = 1000;
@@ -108,7 +107,6 @@ export function AllocatePhase({
   });
   const [mergeName, setMergeName] = useState('');
   const [showMarketGuide, setShowMarketGuide] = useState(false);
-  const [showAISettings, setShowAISettings] = useState(false);
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const aiEnabled = isAIEnabled();
@@ -561,19 +559,18 @@ export function AllocatePhase({
                   <h3 className="font-bold">M&A Focus</h3>
                   <p className="text-sm text-text-muted">Set your acquisition preferences to see more relevant deals</p>
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
                   <button
                     onClick={() => setShowMarketGuide(true)}
                     className="btn-secondary text-sm flex items-center gap-2"
                   >
                     <span>📊</span> Market Guide
                   </button>
-                  <button
-                    onClick={() => setShowAISettings(true)}
-                    className={`btn-secondary text-sm flex items-center gap-2 ${aiEnabled ? 'border-accent' : ''}`}
-                  >
-                    <span>🤖</span> AI {aiEnabled ? 'On' : 'Off'}
-                  </button>
+                  {aiEnabled && (
+                    <span className="text-xs text-accent flex items-center gap-1 px-2 py-1 bg-accent/10 rounded">
+                      <span>🤖</span> AI Enhanced
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1061,11 +1058,6 @@ export function AllocatePhase({
       {/* Market Guide Modal */}
       {showMarketGuide && (
         <MarketGuideModal onClose={() => setShowMarketGuide(false)} />
-      )}
-
-      {/* AI Settings Modal */}
-      {showAISettings && (
-        <AISettingsModal onClose={() => setShowAISettings(false)} />
       )}
 
       {/* End Turn Confirmation Modal */}
