@@ -1324,7 +1324,7 @@ export function AllocatePhase({
 
                 <div className="mt-6 p-4 bg-white/5 rounded-lg text-sm text-text-muted">
                   <p className="font-medium text-text-secondary mb-1">Roll-Up Strategy Tip</p>
-                  <p>Merging creates platform scale, which commands higher exit multiples. The best roll-ups combine businesses with complementary strengths and shared customers.</p>
+                  <p>Merging automatically creates a platform — no need to designate first. If one business is already a platform, the merged entity starts at a higher scale. Only designate separately if you plan to do tuck-in acquisitions before merging.</p>
                 </div>
               </>
             )}

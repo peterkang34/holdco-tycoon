@@ -312,25 +312,30 @@ export function BusinessCard({
                 )}
               </div>
               {onDesignatePlatform && !isPlatform && (
-                <div className="flex gap-2">
-                  <button
-                    onClick={onDesignatePlatform}
-                    disabled={!canAffordPlatform}
-                    className="btn-primary text-xs flex-1"
-                  >
-                    {canAffordPlatform
-                      ? `Designate as Platform (${formatMoney(Math.round(business.ebitda * 0.05))})`
-                      : 'Need more cash for platform setup'}
-                  </button>
-                  {onShowRollUpGuide && (
+                <div>
+                  <div className="flex gap-2">
                     <button
-                      onClick={onShowRollUpGuide}
-                      className="btn-secondary text-xs px-2"
-                      title="What is a platform?"
+                      onClick={onDesignatePlatform}
+                      disabled={!canAffordPlatform}
+                      className="btn-primary text-xs flex-1"
                     >
-                      ?
+                      {canAffordPlatform
+                        ? `Designate as Platform (${formatMoney(Math.round(business.ebitda * 0.05))})`
+                        : 'Need more cash for platform setup'}
                     </button>
-                  )}
+                    {onShowRollUpGuide && (
+                      <button
+                        onClick={onShowRollUpGuide}
+                        className="btn-secondary text-xs px-2"
+                        title="What is a platform?"
+                      >
+                        ?
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-text-muted mt-1">
+                    Only needed for tuck-in acquisitions. Merging two businesses creates a platform automatically.
+                  </p>
                 </div>
               )}
             </div>

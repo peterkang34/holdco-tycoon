@@ -207,6 +207,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
           holdcoName={holdcoName}
           initialRaise={initialRaiseAmount}
           founderOwnership={founderOwnership}
+          firstBusinessName={businesses.length > 0 ? businesses[0].name : undefined}
+          firstBusinessPrice={businesses.length > 0 ? businesses[0].acquisitionPrice : undefined}
+          startingCash={cash}
           onClose={handleCloseTutorial}
         />
       )}

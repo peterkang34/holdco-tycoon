@@ -5,10 +5,13 @@ interface InstructionsModalProps {
   holdcoName: string;
   initialRaise: number;
   founderOwnership: number;
+  firstBusinessName?: string;
+  firstBusinessPrice?: number;
+  startingCash?: number;
   onClose: () => void;
 }
 
-export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, onClose }: InstructionsModalProps) {
+export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, firstBusinessName, firstBusinessPrice, startingCash, onClose }: InstructionsModalProps) {
   const [page, setPage] = useState(0);
 
   const pages = [
@@ -18,10 +21,32 @@ export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, 
       content: (
         <>
           <p className="text-text-secondary mb-4">
-            Congratulations! You've raised <strong className="text-accent">{formatMoney(initialRaise)}</strong> from
-            investors to build your <strong>holding company</strong>.
+            You sold 20% of {holdcoName} to outside investors, raising <strong className="text-accent">{formatMoney(initialRaise)}</strong> in
+            equity capital to fund your first acquisition and future deals.
           </p>
 
+          {/* Sources & Uses */}
+          <div className="bg-white/5 rounded-lg p-4 border border-white/10 mb-4">
+            <p className="text-sm font-bold mb-3">Sources & Uses of Funds</p>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-text-muted">Equity raise (20% sold to investors)</span>
+                <span className="font-mono text-accent">{formatMoney(initialRaise)}</span>
+              </div>
+              {firstBusinessName && firstBusinessPrice && (
+                <div className="flex justify-between text-warning">
+                  <span>First acquisition: {firstBusinessName}</span>
+                  <span className="font-mono">-{formatMoney(firstBusinessPrice)}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t border-white/10 pt-2 font-bold">
+                <span>Starting cash</span>
+                <span className="font-mono text-accent">{formatMoney(startingCash ?? (initialRaise - (firstBusinessPrice ?? 0)))}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Cap Table */}
           <div className="bg-accent/10 rounded-lg p-4 border border-accent/30 mb-4">
             <p className="text-sm font-bold text-accent mb-2">Your Cap Table</p>
             <div className="flex justify-between text-sm">
@@ -41,14 +66,6 @@ export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, 
             Your mission: <strong className="text-accent">maximize Enterprise Value over 20 years</strong> through
             smart acquisitions, operational improvements, and disciplined capital allocation.
           </p>
-
-          <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-            <p className="text-sm text-text-muted">
-              "The goal isn't to be the biggest. It's to compound value per share while
-              maintaining a fortress balance sheet."
-            </p>
-            <p className="text-xs text-text-muted mt-2">— The Holdco Guide</p>
-          </div>
         </>
       ),
     },
