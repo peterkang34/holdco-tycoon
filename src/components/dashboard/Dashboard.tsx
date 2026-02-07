@@ -120,7 +120,11 @@ export function Dashboard({
         <MetricCard
           label="Leverage"
           value={isNetCash ? 'Net Cash' : formatMultiple(metrics.netDebtToEbitda)}
-          subValue={isNetCash ? formatMoney(netCashAmount) + ' excess' : 'Net Debt/EBITDA'}
+          subValue={
+            metrics.totalDebt > 0
+              ? `${formatMoney(metrics.totalDebt)} debt ${isNetCash ? '(cash > debt)' : '/ EBITDA'}`
+              : isNetCash ? 'No debt' : 'Net Debt/EBITDA'
+          }
           status={getLeverageStatus()}
         />
         <MetricCard
@@ -152,11 +156,6 @@ export function Dashboard({
         {metrics.interestRate > 0.08 && (
           <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded-full">
             High Interest: {formatPercent(metrics.interestRate)}
-          </span>
-        )}
-        {isNetCash && (
-          <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded-full">
-            Net Cash Position
           </span>
         )}
         {distressLevel === 'elevated' && (
