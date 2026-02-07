@@ -24,6 +24,7 @@ import {
   calculateSynergies,
   calculateMultipleExpansion,
   enhanceDealsWithAI,
+  generateSourcedDeals,
 } from '../engine/businesses';
 import { resetUsedNames } from '../data/names';
 import { initializeSharedServices, MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES } from '../data/sharedServices';
@@ -84,6 +85,10 @@ interface GameStore extends GameState {
   declineOffer: () => void;
   setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference) => void;
 
+  // Deal sourcing
+  sourceDealFlow: () => void;
+  dealSourcingUsedThisRound: boolean;
+
   // AI enhancement
   triggerAIEnhancement: () => Promise<void>;
 
@@ -95,6 +100,8 @@ interface GameStore extends GameState {
   getAvailableDeals: () => Deal[];
   canAfford: (amount: number) => boolean;
 }
+
+const DEAL_SOURCING_COST = 500; // $500k to hire investment banker for additional deal flow
 
 const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: ReturnType<typeof initializeSharedServices> } = {
   holdcoName: '',
@@ -263,6 +270,7 @@ export const useGameStore = create<GameStore>()(
           dealPipeline: newPipeline,
           actionsThisRound: [],
           focusBonus,
+          dealSourcingUsedThisRound: false, // Reset for new round
         });
       },
 
@@ -919,6 +927,36 @@ export const useGameStore = create<GameStore>()(
       setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference) => {
         set({
           maFocus: { sectorId, sizePreference },
+        });
+      },
+
+      // Track if deal sourcing was used this round
+      dealSourcingUsedThisRound: false,
+
+      sourceDealFlow: () => {
+        const state = get();
+
+        // Can only source once per round
+        if (state.dealSourcingUsedThisRound) return;
+
+        // Check if player can afford
+        if (state.cash < DEAL_SOURCING_COST) return;
+
+        const focusBonus = calculateSectorFocusBonus(state.businesses);
+        const newDeals = generateSourcedDeals(
+          state.round,
+          state.maFocus,
+          focusBonus?.focusGroup
+        );
+
+        set({
+          cash: state.cash - DEAL_SOURCING_COST,
+          dealPipeline: [...state.dealPipeline, ...newDeals],
+          dealSourcingUsedThisRound: true,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'source_deals', round: state.round, details: { cost: DEAL_SOURCING_COST, dealsGenerated: newDeals.length } },
+          ],
         });
       },
 

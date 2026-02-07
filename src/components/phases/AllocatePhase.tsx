@@ -24,6 +24,8 @@ import { isAIEnabled } from '../../services/aiGeneration';
 
 const STARTING_SHARES = 1000;
 
+const DEAL_SOURCING_COST = 500; // $500k
+
 interface AllocatePhaseProps {
   businesses: Business[];
   cash: number;
@@ -39,6 +41,7 @@ interface AllocatePhaseProps {
   totalDistributions: number;
   intrinsicValuePerShare: number;
   lastEventType?: string;
+  dealSourcingUsedThisRound: boolean;
   onAcquire: (deal: Deal, structure: DealStructure) => void;
   onAcquireTuckIn: (deal: Deal, structure: DealStructure, platformId: string) => void;
   onMergeBusinesses: (businessId1: string, businessId2: string, newName: string) => void;
@@ -53,6 +56,7 @@ interface AllocatePhaseProps {
   onWindDown: (businessId: string) => void;
   onImprove: (businessId: string, improvementType: OperationalImprovementType) => void;
   onEndRound: () => void;
+  onSourceDeals: () => void;
   maFocus: MAFocus;
   onSetMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference) => void;
 }
@@ -74,6 +78,7 @@ export function AllocatePhase({
   totalDistributions,
   intrinsicValuePerShare,
   lastEventType,
+  dealSourcingUsedThisRound,
   onAcquire,
   onAcquireTuckIn,
   onMergeBusinesses,
@@ -88,6 +93,7 @@ export function AllocatePhase({
   onWindDown,
   onImprove,
   onEndRound,
+  onSourceDeals,
   maFocus,
   onSetMAFocus,
 }: AllocatePhaseProps) {
@@ -626,6 +632,30 @@ export function AllocatePhase({
                   Your M&A focus will generate more {SECTORS[maFocus.sectorId].name} deals next year.
                 </p>
               )}
+
+              {/* Source Additional Deals */}
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">Need more deal flow?</p>
+                    <p className="text-xs text-text-muted">
+                      Hire an investment banker to source 3 additional deals
+                      {maFocus.sectorId && ` (weighted toward ${SECTORS[maFocus.sectorId].name})`}
+                    </p>
+                  </div>
+                  <button
+                    onClick={onSourceDeals}
+                    disabled={dealSourcingUsedThisRound || cash < DEAL_SOURCING_COST}
+                    className={`btn-secondary text-sm whitespace-nowrap ${
+                      !dealSourcingUsedThisRound && cash >= DEAL_SOURCING_COST ? 'border-accent' : ''
+                    }`}
+                  >
+                    {dealSourcingUsedThisRound
+                      ? 'Already Sourced'
+                      : `Source Deals (${formatMoney(DEAL_SOURCING_COST)})`}
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Deals Grid */}

@@ -129,7 +129,7 @@ export interface Deal {
   askingPrice: number;
   freshness: number; // rounds remaining before deal expires (1-3)
   roundAppeared: number;
-  source: 'inbound' | 'brokered';
+  source: 'inbound' | 'brokered' | 'sourced';
   acquisitionType: AcquisitionType; // standalone, tuck-in, or platform opportunity
   tuckInDiscount?: number; // discount % if this is a tuck-in (0.1 = 10% off)
   aiContent?: AIGeneratedContent; // Rich AI-generated content (optional)
@@ -327,7 +327,8 @@ export type GameActionType =
   | 'sell'
   | 'wind_down'
   | 'accept_offer'
-  | 'decline_offer';
+  | 'decline_offer'
+  | 'source_deals'; // Hire investment banker for additional deal flow
 
 export interface GameAction {
   type: GameActionType;

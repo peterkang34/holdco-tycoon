@@ -525,6 +525,49 @@ export function generateDealPipeline(
   return pipeline;
 }
 
+// Generate additional deals through investment banker sourcing
+// More expensive but higher chance of getting deals in your focus sector
+export function generateSourcedDeals(
+  round: number,
+  maFocus?: MAFocus,
+  portfolioFocusSector?: SectorId
+): Deal[] {
+  const deals: Deal[] = [];
+
+  // Sourced deals are higher quality opportunities
+  // Generate 3 deals, heavily weighted toward focus sector
+
+  // If M&A focus is set, 2 of 3 deals will be in that sector
+  if (maFocus?.sectorId) {
+    deals.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference));
+    deals.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference));
+
+    // Third deal from a different sector for variety
+    const otherSector = portfolioFocusSector && portfolioFocusSector !== maFocus.sectorId
+      ? portfolioFocusSector
+      : pickWeightedSector(round);
+    deals.push(generateDealWithSize(otherSector, round, maFocus.sizePreference));
+  } else if (portfolioFocusSector) {
+    // No M&A focus but have portfolio focus - generate deals in that sector
+    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any'));
+    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any'));
+    deals.push(generateDealWithSize(pickWeightedSector(round), round, 'any'));
+  } else {
+    // No focus set - generate diverse deals
+    const sectors = SECTOR_LIST.sort(() => Math.random() - 0.5).slice(0, 3);
+    sectors.forEach(sector => {
+      deals.push(generateDealWithSize(sector.id, round, 'any'));
+    });
+  }
+
+  // Mark these as sourced deals (fresher since they just arrived)
+  return deals.map(deal => ({
+    ...deal,
+    source: 'sourced' as const,
+    freshness: 2,
+  }));
+}
+
 export function createStartingBusiness(sectorId: SectorId = 'agency'): Business {
   const sector = SECTORS[sectorId];
   const business = generateBusiness(sectorId, 1, 3); // Start with a fair quality business

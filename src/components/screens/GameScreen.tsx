@@ -61,6 +61,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     maFocus,
     setMAFocus,
     triggerAIEnhancement,
+    dealSourcingUsedThisRound,
+    sourceDealFlow,
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;
@@ -142,6 +144,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             totalBuybacks={totalBuybacks}
             totalDistributions={totalDistributions}
             intrinsicValuePerShare={metrics.intrinsicValuePerShare}
+            dealSourcingUsedThisRound={dealSourcingUsedThisRound}
             onAcquire={acquireBusiness}
             onAcquireTuckIn={acquireTuckIn}
             onMergeBusinesses={mergeBusinesses}
@@ -156,6 +159,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             onWindDown={windDownBusiness}
             onImprove={improveBusiness}
             onEndRound={endRound}
+            onSourceDeals={sourceDealFlow}
             maFocus={maFocus}
             onSetMAFocus={setMAFocus}
           />
