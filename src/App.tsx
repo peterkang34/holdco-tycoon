@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useGameStore, useFinalScore, usePostGameInsights, useEnterpriseValue } from './hooks/useGame';
+import { useState, useEffect, useMemo } from 'react';
+import { useGameStore, getFinalScore, getPostGameInsights, getEnterpriseValue } from './hooks/useGame';
 import { IntroScreen } from './components/screens/IntroScreen';
 import { GameScreen } from './components/screens/GameScreen';
 import { GameOverScreen } from './components/screens/GameOverScreen';
@@ -50,10 +50,10 @@ function App() {
     setScreen('intro');
   };
 
-  // Get final score, insights, and enterprise value for game over screen
-  const score = useFinalScore();
-  const insights = usePostGameInsights();
-  const enterpriseValue = useEnterpriseValue();
+  // Compute game-over values only when needed (non-reactive to avoid infinite re-renders)
+  const score = useMemo(() => screen === 'gameOver' ? getFinalScore() : undefined, [screen]);
+  const insights = useMemo(() => screen === 'gameOver' ? getPostGameInsights() : undefined, [screen]);
+  const enterpriseValue = useMemo(() => screen === 'gameOver' ? getEnterpriseValue() : undefined, [screen]);
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
@@ -62,12 +62,12 @@ function App() {
       {screen === 'gameOver' && (
         <GameOverScreen
           holdcoName={holdcoName}
-          score={score}
-          insights={insights}
+          score={score!}
+          insights={insights!}
           businesses={businesses}
           exitedBusinesses={exitedBusinesses}
           metrics={metrics}
-          enterpriseValue={enterpriseValue}
+          enterpriseValue={enterpriseValue!}
           metricsHistory={metricsHistory}
           totalDistributions={totalDistributions}
           totalBuybacks={totalBuybacks}

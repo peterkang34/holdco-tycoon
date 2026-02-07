@@ -61,7 +61,6 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     maFocus,
     setMAFocus,
     triggerAIEnhancement,
-    dealSourcingUsedThisRound,
     sourceDealFlow,
     fetchEventNarrative,
     generateBusinessStories,
@@ -172,7 +171,6 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             totalBuybacks={totalBuybacks}
             totalDistributions={totalDistributions}
             intrinsicValuePerShare={metrics.intrinsicValuePerShare}
-            dealSourcingUsedThisRound={dealSourcingUsedThisRound}
             onAcquire={acquireBusiness}
             onAcquireTuckIn={acquireTuckIn}
             onMergeBusinesses={mergeBusinesses}

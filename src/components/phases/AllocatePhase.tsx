@@ -42,7 +42,6 @@ interface AllocatePhaseProps {
   totalDistributions: number;
   intrinsicValuePerShare: number;
   lastEventType?: string;
-  dealSourcingUsedThisRound: boolean;
   onAcquire: (deal: Deal, structure: DealStructure) => void;
   onAcquireTuckIn: (deal: Deal, structure: DealStructure, platformId: string) => void;
   onMergeBusinesses: (businessId1: string, businessId2: string, newName: string) => void;
@@ -80,7 +79,6 @@ export function AllocatePhase({
   totalDistributions,
   intrinsicValuePerShare,
   lastEventType,
-  dealSourcingUsedThisRound,
   onAcquire,
   onAcquireTuckIn,
   onMergeBusinesses,
@@ -107,6 +105,9 @@ export function AllocatePhase({
   const [buybackAmount, setBuybackAmount] = useState('');
   const [distributeAmount, setDistributeAmount] = useState('');
   const [showEndTurnConfirm, setShowEndTurnConfirm] = useState(false);
+  // Deal pass state
+  const [passedDealIds, setPassedDealIds] = useState<Set<string>>(new Set());
+  const [showPassedDeals, setShowPassedDeals] = useState(false);
   // Tuck-in and merge state
   const [selectedTuckInPlatform, setSelectedTuckInPlatform] = useState<string | null>(null);
   const [showMergeModal, setShowMergeModal] = useState(false);
@@ -763,34 +764,72 @@ export function AllocatePhase({
                   </div>
                   <button
                     onClick={onSourceDeals}
-                    disabled={dealSourcingUsedThisRound || cash < DEAL_SOURCING_COST}
+                    disabled={cash < DEAL_SOURCING_COST}
                     className={`btn-secondary text-sm whitespace-nowrap ${
-                      !dealSourcingUsedThisRound && cash >= DEAL_SOURCING_COST ? 'border-accent' : ''
+                      cash >= DEAL_SOURCING_COST ? 'border-accent' : ''
                     }`}
                   >
-                    {dealSourcingUsedThisRound
-                      ? 'Already Sourced'
-                      : `Source Deals (${formatMoney(DEAL_SOURCING_COST)})`}
+                    Source Deals ({formatMoney(DEAL_SOURCING_COST)})
                   </button>
                 </div>
               </div>
             </div>
 
+            {/* Passed deals toggle */}
+            {passedDealIds.size > 0 && (
+              <div className="flex items-center justify-between mb-2">
+                <button
+                  onClick={() => setShowPassedDeals(!showPassedDeals)}
+                  className="text-xs text-text-muted hover:text-text-secondary transition-colors"
+                >
+                  {showPassedDeals ? 'Hide' : 'Show'} {passedDealIds.size} passed deal{passedDealIds.size !== 1 ? 's' : ''}
+                </button>
+              </div>
+            )}
+
             {/* Deals Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {dealPipeline.map(deal => (
+              {dealPipeline
+                .filter(deal => showPassedDeals || !passedDealIds.has(deal.id))
+                .map(deal => (
                 <DealCard
                   key={deal.id}
                   deal={deal}
                   onSelect={() => setSelectedDeal(deal)}
                   disabled={cash < deal.askingPrice * 0.15}
                   availablePlatforms={getPlatformsForSector(deal.business.sectorId)}
+                  isPassed={passedDealIds.has(deal.id)}
+                  onPass={() => {
+                    setPassedDealIds(prev => {
+                      const next = new Set(prev);
+                      if (next.has(deal.id)) {
+                        next.delete(deal.id);
+                      } else {
+                        next.add(deal.id);
+                      }
+                      return next;
+                    });
+                  }}
                 />
               ))}
               {dealPipeline.length === 0 && (
                 <div className="col-span-full card text-center text-text-muted py-12">
                   <p>No deals available this year.</p>
                   <p className="text-sm mt-2">New opportunities will appear next year.</p>
+                </div>
+              )}
+              {dealPipeline.length > 0 && dealPipeline.every(d => passedDealIds.has(d.id)) && !showPassedDeals && (
+                <div className="col-span-full card text-center text-text-muted py-12">
+                  <p>All deals passed on.</p>
+                  <p className="text-sm mt-2">
+                    <button
+                      onClick={() => setShowPassedDeals(true)}
+                      className="text-accent hover:underline"
+                    >
+                      Show passed deals
+                    </button>
+                    {' '}or source new ones above.
+                  </p>
                 </div>
               )}
             </div>

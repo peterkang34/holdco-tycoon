@@ -18,7 +18,7 @@ import {
   createMockGameState,
   createMultiBusinessState,
 } from './helpers';
-import { Business, GameState, SectorId } from '../types';
+import { Business, GameState, Metrics, SectorId } from '../types';
 
 describe('calculateAnnualFcf', () => {
   it('should calculate FCF correctly for a basic business', () => {

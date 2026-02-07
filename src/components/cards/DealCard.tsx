@@ -7,9 +7,11 @@ interface DealCardProps {
   onSelect?: () => void;
   disabled?: boolean;
   availablePlatforms?: Business[]; // Platforms in the same sector that can receive this as a tuck-in
+  isPassed?: boolean;
+  onPass?: () => void;
 }
 
-export function DealCard({ deal, onSelect, disabled, availablePlatforms = [] }: DealCardProps) {
+export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], isPassed, onPass }: DealCardProps) {
   const [showStory, setShowStory] = useState(false);
   const sector = SECTORS[deal.business.sectorId];
   const { dueDiligence, qualityRating } = deal.business;
@@ -185,11 +187,28 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [] }: 
             <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">AI</span>
           )}
         </div>
-        {onSelect && !disabled && (
-          <button className="btn-primary text-sm py-1.5 px-4">
-            Review Deal
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {onPass && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onPass();
+              }}
+              className={`text-xs py-1.5 px-3 rounded transition-colors ${
+                isPassed
+                  ? 'bg-white/10 text-text-secondary hover:text-text-primary'
+                  : 'text-text-muted hover:text-warning hover:bg-warning/10'
+              }`}
+            >
+              {isPassed ? 'Restore' : 'Pass'}
+            </button>
+          )}
+          {onSelect && !disabled && !isPassed && (
+            <button className="btn-primary text-sm py-1.5 px-4">
+              Review Deal
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

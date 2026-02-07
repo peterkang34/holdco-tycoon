@@ -19,7 +19,6 @@ import {
   createStartingBusiness,
   generateDealPipeline,
   resetBusinessIdCounter,
-  restoreBusinessIdCounter,
   generateBusinessId,
   determineIntegrationOutcome,
   calculateSynergies,
@@ -98,7 +97,6 @@ interface GameStore extends GameState {
 
   // Deal sourcing
   sourceDealFlow: () => void;
-  dealSourcingUsedThisRound: boolean;
 
   // AI enhancement
   triggerAIEnhancement: () => Promise<void>;
@@ -312,7 +310,6 @@ export const useGameStore = create<GameStore>()(
           dealPipeline: newPipeline,
           actionsThisRound: [],
           focusBonus,
-          dealSourcingUsedThisRound: false, // Reset for new round
         });
       },
 
@@ -982,14 +979,8 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
-      // Track if deal sourcing was used this round
-      dealSourcingUsedThisRound: false,
-
       sourceDealFlow: () => {
         const state = get();
-
-        // Can only source once per round
-        if (state.dealSourcingUsedThisRound) return;
 
         // Check if player can afford
         if (state.cash < DEAL_SOURCING_COST) return;
@@ -1004,7 +995,6 @@ export const useGameStore = create<GameStore>()(
         set({
           cash: state.cash - DEAL_SOURCING_COST,
           dealPipeline: [...state.dealPipeline, ...newDeals],
-          dealSourcingUsedThisRound: true,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'source_deals', round: state.round, details: { cost: DEAL_SOURCING_COST, dealsGenerated: newDeals.length } },
@@ -1283,15 +1273,6 @@ export const useGameStore = create<GameStore>()(
         metricsHistory: state.metricsHistory,
         actionsThisRound: state.actionsThisRound, // M-14: Persist actions for acquisition limit tracking
       }),
-      onRehydrate: () => {
-        // H-8: Restore business ID counter after loading from storage
-        return (state) => {
-          if (state) {
-            const allBusinesses = [...state.businesses, ...state.exitedBusinesses];
-            restoreBusinessIdCounter(allBusinesses);
-          }
-        };
-      },
     }
   )
 );
@@ -1322,9 +1303,7 @@ export const usePlatforms = () => useGameStore(state =>
   state.businesses.filter(b => b.status === 'active' && b.isPlatform)
 );
 
-// L-14: Make final score hooks reactive (use selector instead of getState)
-export const useFinalScore = () => useGameStore(state => calculateFinalScore(state));
-
-export const usePostGameInsights = () => useGameStore(state => generatePostGameInsights(state));
-
-export const useEnterpriseValue = () => useGameStore(state => calculateEnterpriseValue(state));
+// Non-reactive getters for game-over computations (avoids infinite re-render from new object refs)
+export const getFinalScore = () => calculateFinalScore(useGameStore.getState());
+export const getPostGameInsights = () => generatePostGameInsights(useGameStore.getState());
+export const getEnterpriseValue = () => calculateEnterpriseValue(useGameStore.getState());
