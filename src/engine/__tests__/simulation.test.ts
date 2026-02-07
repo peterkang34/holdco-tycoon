@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   calculateAnnualFcf,
   calculatePortfolioFcf,
+  calculatePortfolioTax,
   calculateSharedServicesBenefits,
   calculateSectorFocusBonus,
   getSectorFocusEbitdaBonus,
@@ -12,6 +13,7 @@ import {
   calculateMetrics,
   recordHistoricalMetrics,
   calculateExitValuation,
+  TAX_RATE,
 } from '../simulation';
 import {
   createMockBusiness,
@@ -21,12 +23,12 @@ import {
 import { Business, GameState, Metrics, SectorId } from '../types';
 
 describe('calculateAnnualFcf', () => {
-  it('should calculate FCF correctly for a basic business', () => {
+  it('should calculate pre-tax FCF correctly for a basic business', () => {
     const business = createMockBusiness({ ebitda: 1000, sectorId: 'agency' });
-    // Agency: capexRate = 0.03, tax = 0.30
-    // FCF = 1000 - (1000 * 0.03) - (1000 * 0.30) = 1000 - 30 - 300 = 670
+    // Agency: capexRate = 0.03 (tax now at portfolio level)
+    // FCF = 1000 - (1000 * 0.03) = 1000 - 30 = 970
     const fcf = calculateAnnualFcf(business);
-    expect(fcf).toBe(670);
+    expect(fcf).toBe(970);
   });
 
   it('should reduce capex with shared services reduction', () => {
@@ -58,24 +60,25 @@ describe('calculateAnnualFcf', () => {
     expect(Number.isFinite(fcf)).toBe(true);
   });
 
-  it('should produce correct FCF for high-capex sectors', () => {
-    // Real estate: capexRate = 0.18
+  it('should produce correct pre-tax FCF for high-capex sectors', () => {
+    // Real estate: capexRate = 0.18 (tax now at portfolio level)
     const business = createMockBusiness({ ebitda: 5000, sectorId: 'realEstate' });
-    // FCF = 5000 - (5000 * 0.18) - (5000 * 0.30) = 5000 - 900 - 1500 = 2600
+    // FCF = 5000 - (5000 * 0.18) = 5000 - 900 = 4100
     const fcf = calculateAnnualFcf(business);
-    expect(fcf).toBe(2600);
+    expect(fcf).toBe(4100);
   });
 });
 
 describe('calculatePortfolioFcf', () => {
-  it('should sum FCF across all active businesses', () => {
+  it('should sum pre-tax FCF minus portfolio tax across all active businesses', () => {
     const businesses = [
       createMockBusiness({ id: 'b1', ebitda: 1000, sectorId: 'agency' }),
       createMockBusiness({ id: 'b2', ebitda: 2000, sectorId: 'agency' }),
     ];
     const portfolioFcf = calculatePortfolioFcf(businesses);
-    const expected = calculateAnnualFcf(businesses[0]) + calculateAnnualFcf(businesses[1]);
-    expect(portfolioFcf).toBe(expected);
+    const preTaxFcf = calculateAnnualFcf(businesses[0]) + calculateAnnualFcf(businesses[1]);
+    const taxBreakdown = calculatePortfolioTax(businesses);
+    expect(portfolioFcf).toBe(preTaxFcf - taxBreakdown.taxAmount);
   });
 
   it('should exclude non-active businesses', () => {
@@ -84,12 +87,121 @@ describe('calculatePortfolioFcf', () => {
       createMockBusiness({ id: 'b2', ebitda: 2000, status: 'sold' }),
     ];
     const portfolioFcf = calculatePortfolioFcf(businesses);
-    const expectedActive = calculateAnnualFcf(businesses[0]);
-    expect(portfolioFcf).toBe(expectedActive);
+    const preTaxFcf = calculateAnnualFcf(businesses[0]);
+    const taxBreakdown = calculatePortfolioTax(businesses); // only active b1 counted
+    expect(portfolioFcf).toBe(preTaxFcf - taxBreakdown.taxAmount);
   });
 
   it('should return 0 for empty portfolio', () => {
     expect(calculatePortfolioFcf([])).toBe(0);
+  });
+});
+
+describe('calculatePortfolioTax', () => {
+  it('should compute 30% tax with no deductions', () => {
+    const businesses = [createMockBusiness({ ebitda: 1000 })];
+    const result = calculatePortfolioTax(businesses);
+    expect(result.grossEbitda).toBe(1000);
+    expect(result.taxableIncome).toBe(1000);
+    expect(result.taxAmount).toBe(300);
+    expect(result.effectiveTaxRate).toBeCloseTo(0.30);
+    expect(result.totalTaxSavings).toBe(0);
+  });
+
+  it('should apply interest tax shield (holdco debt)', () => {
+    const businesses = [createMockBusiness({ ebitda: 1000 })];
+    // $5000 debt at 10% = $500 interest
+    const result = calculatePortfolioTax(businesses, 5000, 0.10, 0);
+    // Taxable = max(0, 1000 - 500) = 500
+    expect(result.holdcoInterest).toBe(500);
+    expect(result.taxableIncome).toBe(500);
+    expect(result.taxAmount).toBe(150);
+    expect(result.interestTaxShield).toBe(150); // 500 * 0.30
+    expect(result.totalTaxSavings).toBe(150); // 300 - 150
+  });
+
+  it('should apply interest tax shield (opco seller note)', () => {
+    const businesses = [createMockBusiness({ ebitda: 1000, sellerNoteBalance: 2000, sellerNoteRate: 0.08 })];
+    const result = calculatePortfolioTax(businesses, 0, 0, 0);
+    // OpCo interest = round(2000 * 0.08) = 160
+    expect(result.opcoInterest).toBe(160);
+    expect(result.taxableIncome).toBe(840);
+    expect(result.taxAmount).toBe(252);
+    expect(result.interestTaxShield).toBe(48); // 160 * 0.30
+  });
+
+  it('should apply shared services deduction', () => {
+    const businesses = [createMockBusiness({ ebitda: 1000 })];
+    const result = calculatePortfolioTax(businesses, 0, 0, 200);
+    // Taxable = max(0, 1000 - 200) = 800
+    expect(result.sharedServicesCost).toBe(200);
+    expect(result.taxableIncome).toBe(800);
+    expect(result.taxAmount).toBe(240);
+    expect(result.sharedServicesTaxShield).toBe(60); // 200 * 0.30
+    expect(result.totalTaxSavings).toBe(60);
+  });
+
+  it('should apply loss offsets from negative EBITDA businesses', () => {
+    const businesses = [
+      createMockBusiness({ id: 'b1', ebitda: 1000 }),
+      createMockBusiness({ id: 'b2', ebitda: -300 }),
+    ];
+    const result = calculatePortfolioTax(businesses);
+    expect(result.grossEbitda).toBe(1000);
+    expect(result.lossOffset).toBe(300);
+    expect(result.netEbitda).toBe(700);
+    expect(result.taxableIncome).toBe(700);
+    expect(result.taxAmount).toBe(210);
+    expect(result.lossOffsetTaxShield).toBe(90); // 300 * 0.30
+    expect(result.totalTaxSavings).toBe(90);
+  });
+
+  it('should combine all three deductions', () => {
+    const businesses = [
+      createMockBusiness({ id: 'b1', ebitda: 2000 }),
+      createMockBusiness({ id: 'b2', ebitda: -400 }),
+    ];
+    // Holdco interest = round(3000 * 0.08) = 240
+    const result = calculatePortfolioTax(businesses, 3000, 0.08, 150);
+    // Gross EBITDA = 2000, losses = 400, net = 1600
+    // Interest = 240, SS = 150
+    // Taxable = max(0, 1600 - 240 - 150) = 1210
+    expect(result.grossEbitda).toBe(2000);
+    expect(result.lossOffset).toBe(400);
+    expect(result.netEbitda).toBe(1600);
+    expect(result.taxableIncome).toBe(1210);
+    expect(result.taxAmount).toBe(363); // round(1210 * 0.30)
+    // Naive = round(2000 * 0.30) = 600
+    expect(result.totalTaxSavings).toBe(600 - 363);
+  });
+
+  it('should floor taxable income at 0 (no negative tax)', () => {
+    const businesses = [createMockBusiness({ ebitda: 100 })];
+    // $10000 debt at 10% = $1000 interest (exceeds EBITDA)
+    const result = calculatePortfolioTax(businesses, 10000, 0.10, 500);
+    expect(result.taxableIncome).toBe(0);
+    expect(result.taxAmount).toBe(0);
+    expect(result.effectiveTaxRate).toBe(0);
+  });
+
+  it('should handle empty portfolio', () => {
+    const result = calculatePortfolioTax([]);
+    expect(result.grossEbitda).toBe(0);
+    expect(result.lossOffset).toBe(0);
+    expect(result.taxableIncome).toBe(0);
+    expect(result.taxAmount).toBe(0);
+    expect(result.effectiveTaxRate).toBe(0);
+    expect(result.totalTaxSavings).toBe(0);
+  });
+
+  it('should exclude non-active businesses', () => {
+    const businesses = [
+      createMockBusiness({ id: 'b1', ebitda: 1000, status: 'active' }),
+      createMockBusiness({ id: 'b2', ebitda: 2000, status: 'sold' }),
+    ];
+    const result = calculatePortfolioTax(businesses);
+    expect(result.grossEbitda).toBe(1000);
+    expect(result.taxAmount).toBe(300);
   });
 });
 

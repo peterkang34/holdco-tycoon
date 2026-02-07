@@ -66,6 +66,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     generateBusinessStories,
     yearChronicle,
     generateYearChronicle: generateYearChronicleAction,
+    debtPaymentThisRound,
+    cashBeforeDebtPayments,
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;
@@ -141,6 +143,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             sharedServicesCost={sharedServicesCost}
             round={round}
             yearChronicle={yearChronicle}
+            debtPaymentThisRound={debtPaymentThisRound}
+            cashBeforeDebtPayments={cashBeforeDebtPayments}
             onContinue={advanceToEvent}
           />
         );

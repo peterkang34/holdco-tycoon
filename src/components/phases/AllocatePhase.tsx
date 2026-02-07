@@ -1027,7 +1027,7 @@ export function AllocatePhase({
             <div className="card">
               <h4 className="font-bold mb-3">Issue Equity</h4>
               <p className="text-sm text-text-muted mb-2">
-                Sell new shares to outside investors at current value/share ({formatMoney(intrinsicValuePerShare)}).
+                Raise capital by selling new shares at {formatMoney(intrinsicValuePerShare)}/share. Enter dollar amount ($k) to raise.
               </p>
               <p className="text-xs text-text-muted mb-4">
                 Your ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% | {equityRaisesUsed} raise{equityRaisesUsed !== 1 ? 's' : ''} so far
@@ -1037,7 +1037,7 @@ export function AllocatePhase({
                   type="number"
                   value={equityAmount}
                   onChange={(e) => setEquityAmount(e.target.value)}
-                  placeholder="Amount"
+                  placeholder="$k to raise"
                   className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-2 text-sm"
                 />
                 <button
@@ -1054,20 +1054,50 @@ export function AllocatePhase({
                   Issue
                 </button>
               </div>
+              {equityAmount && parseInt(equityAmount) > 0 && intrinsicValuePerShare > 0 && (() => {
+                const amt = parseInt(equityAmount);
+                const newShares = Math.round((amt / intrinsicValuePerShare) * 1000) / 1000;
+                const newTotal = sharesOutstanding + newShares;
+                const newOwnership = founderShares / newTotal * 100;
+                return (
+                  <div className="mt-3 p-3 bg-white/5 rounded text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-text-muted">New shares issued</span>
+                      <span className="font-mono">{newShares.toFixed(1)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-text-muted">At price per share</span>
+                      <span className="font-mono">{formatMoney(intrinsicValuePerShare)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-text-muted">Your new ownership</span>
+                      <span className={`font-mono font-bold ${newOwnership < 51 ? 'text-danger' : newOwnership < 55 ? 'text-warning' : ''}`}>
+                        {newOwnership.toFixed(1)}%
+                      </span>
+                    </div>
+                    {newOwnership < 51 && (
+                      <p className="text-danger mt-1">Below 51% — this raise would be blocked</p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Buyback Shares */}
             <div className="card">
               <h4 className="font-bold mb-3">Buyback Shares</h4>
-              <p className="text-sm text-text-muted mb-4">
-                Shares outstanding: {sharesOutstanding.toFixed(0)}
+              <p className="text-sm text-text-muted mb-2">
+                Repurchase outside investor shares at {formatMoney(intrinsicValuePerShare)}/share. Enter dollar amount ($k) to spend.
+              </p>
+              <p className="text-xs text-text-muted mb-4">
+                Outstanding: {sharesOutstanding.toFixed(0)} total | {(sharesOutstanding - founderShares).toFixed(0)} outside shares
               </p>
               <div className="flex gap-2">
                 <input
                   type="number"
                   value={buybackAmount}
                   onChange={(e) => setBuybackAmount(e.target.value)}
-                  placeholder="Amount"
+                  placeholder="$k to spend"
                   className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-2 text-sm"
                 />
                 <button
@@ -1084,6 +1114,28 @@ export function AllocatePhase({
                   Buyback
                 </button>
               </div>
+              {buybackAmount && parseInt(buybackAmount) > 0 && intrinsicValuePerShare > 0 && (() => {
+                const amt = parseInt(buybackAmount);
+                const sharesRepurchased = Math.round((amt / intrinsicValuePerShare) * 1000) / 1000;
+                const outsideShares = sharesOutstanding - founderShares;
+                const newTotal = sharesOutstanding - Math.min(sharesRepurchased, outsideShares);
+                const newOwnership = founderShares / newTotal * 100;
+                return (
+                  <div className="mt-3 p-3 bg-white/5 rounded text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-text-muted">Shares repurchased</span>
+                      <span className="font-mono">{Math.min(sharesRepurchased, outsideShares).toFixed(1)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-text-muted">Your new ownership</span>
+                      <span className="font-mono font-bold text-accent">{newOwnership.toFixed(1)}%</span>
+                    </div>
+                    {sharesRepurchased > outsideShares && (
+                      <p className="text-warning mt-1">Exceeds outside shares — capped at {outsideShares.toFixed(0)}</p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Distribute */}

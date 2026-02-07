@@ -80,6 +80,36 @@ export function generateDealStructures(
     }
   }
 
+  // Option E: LBO Combo — Cash + Seller Note + Bank Debt (not available during credit tightening)
+  if (!creditTightening) {
+    const lboCashPercent = 0.20 + Math.random() * 0.10; // 20-30% equity
+    const lboNotePercent = 0.30 + Math.random() * 0.10; // 30-40% seller note
+    const lboCash = Math.round(askingPrice * lboCashPercent);
+    const lboNoteAmount = Math.round(askingPrice * lboNotePercent);
+    const lboBankAmount = askingPrice - lboCash - lboNoteAmount; // remainder as bank debt
+    const lboNoteRate = 0.05 + Math.random() * 0.01; // 5-6%
+
+    if (playerCash >= lboCash && lboBankAmount > 0) {
+      const combinedDebt = lboNoteAmount + lboBankAmount;
+      structures.push({
+        type: 'seller_note_bank_debt',
+        cashRequired: lboCash,
+        sellerNote: {
+          amount: lboNoteAmount,
+          rate: lboNoteRate,
+          termRounds: 3,
+        },
+        bankDebt: {
+          amount: lboBankAmount,
+          rate: interestRate,
+          termRounds: 10,
+        },
+        leverage: Math.round((combinedDebt / deal.business.ebitda) * 10) / 10,
+        risk: 'high',
+      });
+    }
+  }
+
   return structures;
 }
 
@@ -123,6 +153,8 @@ export function getStructureLabel(type: DealStructureType): string {
       return 'Bank Debt';
     case 'earnout':
       return 'Earn-out';
+    case 'seller_note_bank_debt':
+      return 'LBO (Note + Debt)';
   }
 }
 
@@ -136,5 +168,12 @@ export function getStructureDescription(structure: DealStructure): string {
       return `Pay ${Math.round((structure.cashRequired / (structure.cashRequired + (structure.bankDebt?.amount ?? 0))) * 100)}% equity, ${Math.round(((structure.bankDebt?.amount ?? 0) / (structure.cashRequired + (structure.bankDebt?.amount ?? 0))) * 100)}% financed. Higher leverage, higher risk, recourse to holdco.`;
     case 'earnout':
       return `Pay ${Math.round((structure.cashRequired / (structure.cashRequired + (structure.earnout?.amount ?? 0))) * 100)}% upfront, remainder contingent on hitting growth targets. Aligned incentives but seller may disengage.`;
+    case 'seller_note_bank_debt': {
+      const total = structure.cashRequired + (structure.sellerNote?.amount ?? 0) + (structure.bankDebt?.amount ?? 0);
+      const equityPct = Math.round((structure.cashRequired / total) * 100);
+      const notePct = Math.round(((structure.sellerNote?.amount ?? 0) / total) * 100);
+      const debtPct = 100 - equityPct - notePct;
+      return `${equityPct}% equity, ${notePct}% seller note at ${((structure.sellerNote?.rate ?? 0) * 100).toFixed(1)}%, ${debtPct}% bank debt. Classic LBO structure — maximum leverage, holdco guarantees bank debt.`;
+    }
   }
 }

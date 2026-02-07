@@ -164,7 +164,7 @@ export interface Deal {
   aiContent?: AIGeneratedContent; // Rich AI-generated content (optional)
 }
 
-export type DealStructureType = 'all_cash' | 'seller_note' | 'bank_debt' | 'earnout';
+export type DealStructureType = 'all_cash' | 'seller_note' | 'bank_debt' | 'earnout' | 'seller_note_bank_debt';
 
 export interface DealStructure {
   type: DealStructureType;
@@ -341,6 +341,10 @@ export interface GameState {
 
   // Scoring
   actionsThisRound: GameAction[];
+
+  // Debt payment tracking (between years)
+  debtPaymentThisRound?: number;
+  cashBeforeDebtPayments?: number;
 }
 
 export type GameActionType =

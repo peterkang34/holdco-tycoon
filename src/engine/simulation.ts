@@ -23,7 +23,7 @@ import {
   generateValuationCommentary,
 } from './buyers';
 
-const TAX_RATE = 0.30;
+export const TAX_RATE = 0.30;
 const MAX_ORGANIC_GROWTH_RATE = 0.20; // M-4: Cap on growth rate accumulation
 
 // Calculate exit valuation for a business with full breakdown
@@ -126,11 +126,8 @@ export function calculateAnnualFcf(
   const effectiveCapexRate = sector.capexRate * (1 - sharedServicesCapexReduction);
   const capex = annualEbitda * effectiveCapexRate;
 
-  // Tax
-  const tax = annualEbitda * TAX_RATE;
-
-  // FCF before cash conversion bonus
-  let fcf = annualEbitda - capex - tax;
+  // Pre-tax FCF: EBITDA - CapEx only (tax computed at portfolio level)
+  let fcf = annualEbitda - capex;
 
   // Apply cash conversion bonus
   fcf *= 1 + sharedServicesCashConversionBonus;
@@ -141,15 +138,118 @@ export function calculateAnnualFcf(
 export function calculatePortfolioFcf(
   businesses: Business[],
   sharedServicesCapexReduction: number = 0,
-  sharedServicesCashConversionBonus: number = 0
+  sharedServicesCashConversionBonus: number = 0,
+  holdcoDebt: number = 0,
+  holdcoInterestRate: number = 0,
+  sharedServicesCost: number = 0
 ): number {
-  return businesses
+  const preTaxFcf = businesses
     .filter(b => b.status === 'active')
     .reduce(
       (total, b) =>
         total + calculateAnnualFcf(b, sharedServicesCapexReduction, sharedServicesCashConversionBonus),
       0
     );
+
+  // Portfolio-level tax
+  const taxBreakdown = calculatePortfolioTax(businesses, holdcoDebt, holdcoInterestRate, sharedServicesCost);
+
+  return preTaxFcf - taxBreakdown.taxAmount;
+}
+
+export interface PortfolioTaxBreakdown {
+  grossEbitda: number;       // Sum of positive EBITDA businesses only
+  lossOffset: number;        // Absolute value of negative EBITDA businesses
+  netEbitda: number;         // grossEbitda - lossOffset
+  holdcoInterest: number;
+  opcoInterest: number;
+  totalInterest: number;
+  sharedServicesCost: number;
+  taxableIncome: number;     // max(0, netEbitda - totalInterest - sharedServicesCost)
+  taxAmount: number;         // taxableIncome × 0.30
+  effectiveTaxRate: number;  // taxAmount / grossEbitda (0 if no gross EBITDA)
+  interestTaxShield: number;
+  sharedServicesTaxShield: number;
+  lossOffsetTaxShield: number;
+  totalTaxSavings: number;   // naiveTax - taxAmount
+}
+
+export function calculatePortfolioTax(
+  businesses: Business[],
+  holdcoDebt: number = 0,
+  holdcoInterestRate: number = 0,
+  sharedServicesCost: number = 0
+): PortfolioTaxBreakdown {
+  const activeBusinesses = businesses.filter(b => b.status === 'active');
+
+  // Separate positive and negative EBITDA
+  let grossEbitda = 0;
+  let lossOffset = 0;
+  for (const b of activeBusinesses) {
+    if (b.ebitda >= 0) {
+      grossEbitda += b.ebitda;
+    } else {
+      lossOffset += Math.abs(b.ebitda);
+    }
+  }
+
+  const netEbitda = grossEbitda - lossOffset;
+
+  // Interest calculations
+  const holdcoInterest = Math.round(holdcoDebt * holdcoInterestRate);
+  const opcoInterest = activeBusinesses.reduce(
+    (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate),
+    0
+  );
+  const totalInterest = holdcoInterest + opcoInterest;
+
+  // Taxable income after all deductions (floored at 0)
+  const taxableIncome = Math.max(0, netEbitda - totalInterest - sharedServicesCost);
+  const taxAmount = Math.round(taxableIncome * TAX_RATE);
+
+  // Naive tax (what you'd pay without any deductions)
+  const naiveTax = Math.round(Math.max(0, grossEbitda) * TAX_RATE);
+
+  // Effective tax rate
+  const effectiveTaxRate = grossEbitda > 0 ? taxAmount / grossEbitda : 0;
+
+  // Calculate individual shields by ordered deduction from grossEbitda
+  // Order: losses first, then interest, then shared services
+  let remaining = Math.max(0, grossEbitda);
+
+  // Loss offset shield
+  const lossDeduction = Math.min(remaining, lossOffset);
+  const lossOffsetTaxShield = Math.round(lossDeduction * TAX_RATE);
+  remaining -= lossDeduction;
+
+  // Interest shield
+  const interestDeduction = Math.min(remaining, totalInterest);
+  const interestTaxShield = Math.round(interestDeduction * TAX_RATE);
+  remaining -= interestDeduction;
+
+  // Shared services shield
+  const ssDeduction = Math.min(remaining, sharedServicesCost);
+  const sharedServicesTaxShield = Math.round(ssDeduction * TAX_RATE);
+
+  // Total savings (use naive - actual to avoid rounding drift)
+  const totalTaxSavings = naiveTax - taxAmount;
+
+  return {
+    grossEbitda,
+    lossOffset,
+    netEbitda,
+    holdcoInterest,
+    opcoInterest,
+    totalInterest,
+    sharedServicesCost,
+    taxableIncome,
+    taxAmount,
+    effectiveTaxRate,
+    interestTaxShield,
+    sharedServicesTaxShield,
+    lossOffsetTaxShield,
+    totalTaxSavings,
+  };
 }
 
 export function calculateSharedServicesBenefits(state: GameState): {
@@ -812,11 +912,25 @@ export function calculateMetrics(state: GameState): Metrics {
   // Total EBITDA (annual)
   const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
 
+  // H-5: Shared services annual cost
+  const sharedServicesCost = state.sharedServices
+    .filter(s => s.active)
+    .reduce((sum, s) => sum + s.annualCost, 0);
+
   // Total FCF (annual - each round is now 1 year)
+  // Portfolio-level tax is computed inside calculatePortfolioFcf
   const totalFcf = calculatePortfolioFcf(
     activeBusinesses,
     sharedServicesBenefits.capexReduction,
-    sharedServicesBenefits.cashConversionBonus
+    sharedServicesBenefits.cashConversionBonus,
+    state.totalDebt,
+    state.interestRate,
+    sharedServicesCost
+  );
+
+  // Portfolio tax breakdown for NOPAT calculation
+  const taxBreakdown = calculatePortfolioTax(
+    activeBusinesses, state.totalDebt, state.interestRate, sharedServicesCost
   );
 
   // Total debt (holdco + opco level seller notes only)
@@ -833,11 +947,6 @@ export function calculateMetrics(state: GameState): Metrics {
     (sum, b) => sum + b.sellerNoteBalance * b.sellerNoteRate,
     0
   );
-
-  // H-5: Shared services annual cost deducted from FCF metrics
-  const sharedServicesCost = state.sharedServices
-    .filter(s => s.active)
-    .reduce((sum, s) => sum + s.annualCost, 0);
 
   // Net FCF after interest and shared services costs
   const netFcf = totalFcf - annualInterest - opcoInterest - sharedServicesCost;
@@ -860,8 +969,8 @@ export function calculateMetrics(state: GameState): Metrics {
     ? netFcf / state.sharesOutstanding
     : 0;
 
-  // ROIC
-  const nopat = totalEbitda * (1 - TAX_RATE);
+  // ROIC — NOPAT uses portfolio-level tax (includes deductions)
+  const nopat = totalEbitda - taxBreakdown.taxAmount;
   const portfolioRoic = state.totalInvestedCapital > 0 ? nopat / state.totalInvestedCapital : 0;
 
   // ROIIC (requires historical data)
@@ -910,7 +1019,15 @@ export function recordHistoricalMetrics(state: GameState): HistoricalMetrics {
   const metrics = calculateMetrics(state);
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
   const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
-  const nopat = totalEbitda * (1 - TAX_RATE);
+
+  // Use portfolio-level tax for NOPAT (includes deductions)
+  const sharedServicesCost = state.sharedServices
+    .filter(s => s.active)
+    .reduce((sum, s) => sum + s.annualCost, 0);
+  const taxBreakdown = calculatePortfolioTax(
+    activeBusinesses, state.totalDebt, state.interestRate, sharedServicesCost
+  );
+  const nopat = totalEbitda - taxBreakdown.taxAmount;
 
   return {
     round: state.round,

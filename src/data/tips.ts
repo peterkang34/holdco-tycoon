@@ -68,6 +68,12 @@ export const METRIC_TOOLTIPS: Record<string, { definition: string; formula: stri
     benchmark: 'Berkshire has never issued shares for acquisitions. Dilution is a cardinal sin.',
     chapter: 'Ch. VII',
   },
+  effectivetaxrate: {
+    definition: 'The actual tax rate paid after deductions from interest, shared services, and loss offsets across the consolidated portfolio.',
+    formula: 'Tax Paid / Gross EBITDA. Taxable Income = max(0, Net EBITDA - Interest - Mgmt Fees)',
+    benchmark: 'Statutory is 30%. Below 25% means your structuring is working. Below 20% is excellent.',
+    chapter: 'Ch. VII',
+  },
 };
 
 export const SITUATION_TIPS: Record<string, Tip> = {
@@ -148,6 +154,24 @@ export const SITUATION_TIPS: Record<string, Tip> = {
     content: 'Codify a distribution hierarchy: 1) Reinvest above hurdle rate, 2) Deleverage, 3) Repurchase when cheap, 4) Distribute the residual.',
     bookReference: 'Ch. VII',
     trigger: 'distribution_made',
+  },
+  interest_tax_shield: {
+    id: 'interest_tax_shield',
+    content: 'Debt interest reduces your taxable income. At 30% tax, every $1M in interest saves $300K in taxes. TransDigm uses this deliberately — the interest shield partially offsets the cost of leverage.',
+    bookReference: 'Ch. VII',
+    trigger: 'effective_tax_rate < 0.25 && total_interest > 0',
+  },
+  shared_services_tax_benefit: {
+    id: 'shared_services_tax_benefit',
+    content: 'Management fees and shared services costs are tax-deductible. Your operating system pays for itself twice: once through operational improvements, and again through tax savings.',
+    bookReference: 'Ch. III',
+    trigger: 'shared_services_tax_shield > 0',
+  },
+  loss_offset_benefit: {
+    id: 'loss_offset_benefit',
+    content: 'A struggling opco reduces the consolidated tax base. Like a real holdco filing consolidated returns, losses in one business offset profits in others. Diversification has a tax benefit too.',
+    bookReference: 'Ch. VII',
+    trigger: 'loss_offset > 0',
   },
 };
 
@@ -233,6 +257,11 @@ export const POST_GAME_INSIGHTS: Record<string, { pattern: string; insight: stri
   hoarded_cash: {
     pattern: 'Excess idle cash',
     insight: "Cash on the balance sheet earning nothing is a drag on returns. When you can't find deals above hurdle rate, return capital to owners — don't let it rot.",
+    bookReference: 'Ch. VII',
+  },
+  tax_efficient: {
+    pattern: 'Tax-efficient structuring',
+    insight: 'You used interest shields, management fee deductions, and consolidated loss offsets to lower your effective tax rate. Like TransDigm and Danaher, smart tax structuring is a real competitive advantage.',
     bookReference: 'Ch. VII',
   },
 };

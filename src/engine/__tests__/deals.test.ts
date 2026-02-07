@@ -99,6 +99,31 @@ describe('generateDealStructures', () => {
 
     vi.restoreAllMocks();
   });
+
+  it('should include LBO combo (seller_note_bank_debt) when credit is normal', () => {
+    const deal = createMockDeal({ askingPrice: 4000 });
+    const structures = generateDealStructures(deal, 10000, 0.07, false);
+    const lbo = structures.find(s => s.type === 'seller_note_bank_debt');
+    expect(lbo).toBeDefined();
+    if (lbo) {
+      expect(lbo.sellerNote).toBeDefined();
+      expect(lbo.bankDebt).toBeDefined();
+      expect(lbo.sellerNote!.amount).toBeGreaterThan(0);
+      expect(lbo.bankDebt!.amount).toBeGreaterThan(0);
+      expect(lbo.cashRequired).toBeLessThan(4000);
+      expect(lbo.risk).toBe('high');
+      // Verify total equals asking price
+      const total = lbo.cashRequired + lbo.sellerNote!.amount + lbo.bankDebt!.amount;
+      expect(total).toBe(4000);
+    }
+  });
+
+  it('should not include LBO combo during credit tightening', () => {
+    const deal = createMockDeal({ askingPrice: 4000 });
+    const structures = generateDealStructures(deal, 10000, 0.07, true);
+    const lbo = structures.find(s => s.type === 'seller_note_bank_debt');
+    expect(lbo).toBeUndefined();
+  });
 });
 
 describe('executeDealStructure', () => {
@@ -185,6 +210,7 @@ describe('getStructureLabel', () => {
     expect(getStructureLabel('seller_note')).toBe('Seller Note');
     expect(getStructureLabel('bank_debt')).toBe('Bank Debt');
     expect(getStructureLabel('earnout')).toBe('Earn-out');
+    expect(getStructureLabel('seller_note_bank_debt')).toBe('LBO (Note + Debt)');
   });
 });
 
@@ -212,6 +238,14 @@ describe('getStructureDescription', () => {
         earnout: { amount: 1500, targetEbitdaGrowth: 0.12 },
         leverage: 0,
         risk: 'medium',
+      },
+      {
+        type: 'seller_note_bank_debt',
+        cashRequired: 1000,
+        sellerNote: { amount: 1500, rate: 0.055, termRounds: 3 },
+        bankDebt: { amount: 1500, rate: 0.07, termRounds: 10 },
+        leverage: 3.0,
+        risk: 'high',
       },
     ];
 

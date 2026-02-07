@@ -53,16 +53,20 @@ function simulateCollectPhase(state: GameState): GameState {
 
 function simulateEventPhase(state: GameState): GameState {
   const sharedBenefits = calculateSharedServicesBenefits(state);
-  const annualFcf = calculatePortfolioFcf(
-    state.businesses.filter(b => b.status === 'active'),
-    sharedBenefits.capexReduction,
-    sharedBenefits.cashConversionBonus
-  );
-
-  const annualInterest = Math.round(state.totalDebt * state.interestRate);
   const sharedServicesCost = state.sharedServices
     .filter(s => s.active)
     .reduce((sum, s) => sum + s.annualCost, 0);
+
+  const annualFcf = calculatePortfolioFcf(
+    state.businesses.filter(b => b.status === 'active'),
+    sharedBenefits.capexReduction,
+    sharedBenefits.cashConversionBonus,
+    state.totalDebt,
+    state.interestRate,
+    sharedServicesCost
+  );
+
+  const annualInterest = Math.round(state.totalDebt * state.interestRate);
 
   const newCash = state.cash + annualFcf - annualInterest - sharedServicesCost;
   const event = generateEvent(state);

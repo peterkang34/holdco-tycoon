@@ -146,6 +146,8 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   inflationRoundsRemaining: 0,
   metricsHistory: [],
   actionsThisRound: [],
+  debtPaymentThisRound: 0,
+  cashBeforeDebtPayments: 0,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -242,6 +244,8 @@ export const useGameStore = create<GameStore>()(
           businesses: updatedBusinesses,
           cash: newCash,
           phase: 'collect',
+          cashBeforeDebtPayments: state.cash,
+          debtPaymentThisRound: Math.abs(cashAdjustment),
         });
       },
 
@@ -249,17 +253,23 @@ export const useGameStore = create<GameStore>()(
         const state = get();
         const sharedBenefits = calculateSharedServicesBenefits(state as GameState);
 
-        // Collect FCF when transitioning from collect to event phase (annual)
-        const annualFcf = calculatePortfolioFcf(
-          state.businesses.filter(b => b.status === 'active'),
-          sharedBenefits.capexReduction,
-          sharedBenefits.cashConversionBonus
-        );
-
-        const annualInterest = Math.round(state.totalDebt * state.interestRate);
         const sharedServicesCost = state.sharedServices
           .filter(s => s.active)
           .reduce((sum, s) => sum + s.annualCost, 0);
+
+        // Collect FCF when transitioning from collect to event phase (annual)
+        // Portfolio tax (with interest/SS deductions for tax shield) is computed inside
+        const annualFcf = calculatePortfolioFcf(
+          state.businesses.filter(b => b.status === 'active'),
+          sharedBenefits.capexReduction,
+          sharedBenefits.cashConversionBonus,
+          state.totalDebt,
+          state.interestRate,
+          sharedServicesCost
+        );
+
+        // Interest and shared services are still cash costs (separate from tax)
+        const annualInterest = Math.round(state.totalDebt * state.interestRate);
 
         const newCash = state.cash + annualFcf - annualInterest - sharedServicesCost;
 
@@ -558,7 +568,15 @@ export const useGameStore = create<GameStore>()(
           qualityRating: bestQuality,
           dueDiligence: biz1.dueDiligence, // Keep first business's DD
           integrationRoundsRemaining: 2, // Mergers take longer to fully integrate
-          improvements: [...biz1.improvements, ...biz2.improvements],
+          improvements: (() => {
+            const all = [...biz1.improvements, ...biz2.improvements];
+            const best = new Map<string, typeof all[0]>();
+            for (const imp of all) {
+              const existing = best.get(imp.type);
+              if (!existing || imp.effect > existing.effect) best.set(imp.type, imp);
+            }
+            return Array.from(best.values());
+          })(),
           sellerNoteBalance: biz1.sellerNoteBalance + biz2.sellerNoteBalance,
           sellerNoteRate: Math.max(biz1.sellerNoteRate, biz2.sellerNoteRate),
           sellerNoteRoundsRemaining: Math.max(biz1.sellerNoteRoundsRemaining, biz2.sellerNoteRoundsRemaining),
@@ -1272,7 +1290,20 @@ export const useGameStore = create<GameStore>()(
         inflationRoundsRemaining: state.inflationRoundsRemaining,
         metricsHistory: state.metricsHistory,
         actionsThisRound: state.actionsThisRound, // M-14: Persist actions for acquisition limit tracking
+        debtPaymentThisRound: state.debtPaymentThisRound,
+        cashBeforeDebtPayments: state.cashBeforeDebtPayments,
       }),
+      onRehydrateStorage: () => (state) => {
+        if (state && state.holdcoName) {
+          try {
+            const metrics = calculateMetrics(state as GameState);
+            const focusBonus = calculateSectorFocusBonus(state.businesses);
+            useGameStore.setState({ metrics, focusBonus });
+          } catch (e) {
+            console.error('Failed to recalculate metrics on rehydration:', e);
+          }
+        }
+      },
     }
   )
 );
