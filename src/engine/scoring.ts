@@ -54,6 +54,20 @@ export function calculateEnterpriseValue(state: GameState): number {
 }
 
 export function calculateFinalScore(state: GameState): ScoreBreakdown {
+  // Bankruptcy = immediate F grade, score 0
+  if (state.bankruptRound) {
+    return {
+      fcfShareGrowth: 0,
+      portfolioRoic: 0,
+      capitalDeployment: 0,
+      balanceSheetHealth: 0,
+      strategicDiscipline: 0,
+      total: 0,
+      grade: 'F',
+      title: `Bankrupt — Filed for bankruptcy in Year ${state.bankruptRound}`,
+    };
+  }
+
   const metrics = calculateMetrics(state);
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
   const allBusinesses = [...state.businesses, ...state.exitedBusinesses];
@@ -151,6 +165,17 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   // Penalty for ever going above 4x
   const everOverLeveraged = state.metricsHistory.some(h => h.metrics.netDebtToEbitda > 4);
   if (everOverLeveraged) {
+    balanceSheetHealth = Math.max(0, balanceSheetHealth - 5);
+  }
+
+  // Penalty for covenant breach
+  const everBreached = state.metricsHistory.some(h => h.metrics.distressLevel === 'breach');
+  if (everBreached) {
+    balanceSheetHealth = Math.max(0, balanceSheetHealth - 3);
+  }
+
+  // Penalty for having used restructuring
+  if (state.hasRestructured) {
     balanceSheetHealth = Math.max(0, balanceSheetHealth - 5);
   }
 

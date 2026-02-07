@@ -23,6 +23,7 @@ function App() {
     totalInvestedCapital,
     equityRaisesUsed,
     sharedServices,
+    bankruptRound,
     startGame,
     resetGame,
   } = useGameStore();
@@ -74,6 +75,7 @@ function App() {
           totalInvestedCapital={totalInvestedCapital}
           equityRaisesUsed={equityRaisesUsed}
           sharedServicesActive={sharedServices.filter(s => s.active).length}
+          bankruptRound={bankruptRound}
           onPlayAgain={handlePlayAgain}
         />
       )}

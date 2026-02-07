@@ -213,7 +213,9 @@ export interface SectorFocusBonus {
   opcoCount: number;
 }
 
-export type GamePhase = 'collect' | 'event' | 'allocate';
+export type DistressLevel = 'comfortable' | 'elevated' | 'stressed' | 'breach';
+
+export type GamePhase = 'collect' | 'event' | 'allocate' | 'restructure';
 
 export type DealSizePreference = 'small' | 'medium' | 'large' | 'any';
 
@@ -276,6 +278,7 @@ export interface Metrics {
   roiic: number;
   portfolioMoic: number;
   netDebtToEbitda: number;
+  distressLevel: DistressLevel;
   cashConversion: number;
   interestRate: number;
   sharesOutstanding: number;
@@ -345,6 +348,16 @@ export interface GameState {
   // Debt payment tracking (between years)
   debtPaymentThisRound?: number;
   cashBeforeDebtPayments?: number;
+
+  // Holdco debt amortization
+  holdcoDebtStartRound: number; // round when first holdco bank debt was taken (0 = never)
+  holdcoAmortizationThisRound?: number; // amount of mandatory amortization paid this round
+
+  // Financial distress
+  requiresRestructuring: boolean;
+  covenantBreachRounds: number; // consecutive rounds in breach
+  hasRestructured: boolean; // one-time flag — second insolvency = game over
+  bankruptRound?: number; // if set, game ended via bankruptcy
 }
 
 export type GameActionType =

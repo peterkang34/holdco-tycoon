@@ -22,6 +22,7 @@ import {
   generateBuyerProfile,
   generateValuationCommentary,
 } from './buyers';
+import { calculateDistressLevel } from './distress';
 
 export const TAX_RATE = 0.30;
 const MAX_ORGANIC_GROWTH_RATE = 0.20; // M-4: Cap on growth rate accumulation
@@ -991,6 +992,9 @@ export function calculateMetrics(state: GameState): Metrics {
   // Leverage
   const netDebtToEbitda = totalEbitda > 0 ? (totalDebt - state.cash) / totalEbitda : 0;
 
+  // Distress level
+  const distressLevel = calculateDistressLevel(netDebtToEbitda, totalDebt, totalEbitda);
+
   // Cash conversion
   const cashConversion = totalEbitda > 0 ? totalFcf / totalEbitda : 0;
 
@@ -1004,6 +1008,7 @@ export function calculateMetrics(state: GameState): Metrics {
     roiic,
     portfolioMoic,
     netDebtToEbitda,
+    distressLevel,
     cashConversion,
     interestRate: state.interestRate,
     sharesOutstanding: state.sharesOutstanding,

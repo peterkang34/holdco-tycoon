@@ -51,6 +51,7 @@ import {
 } from '../engine/simulation';
 import { executeDealStructure } from '../engine/deals';
 import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue } from '../engine/scoring';
+import { calculateDistressLevel, getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
 
 // Capital structure constants
@@ -94,6 +95,12 @@ interface GameStore extends GameState {
   acceptOffer: () => void;
   declineOffer: () => void;
   setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference) => void;
+
+  // Restructuring actions
+  distressedSale: (businessId: string) => void;
+  emergencyEquityRaise: (amount: number) => void;
+  declareBankruptcy: () => void;
+  advanceFromRestructure: () => void;
 
   // Deal sourcing
   sourceDealFlow: () => void;
@@ -148,6 +155,10 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   actionsThisRound: [],
   debtPaymentThisRound: 0,
   cashBeforeDebtPayments: 0,
+  holdcoDebtStartRound: 0,
+  requiresRestructuring: false,
+  covenantBreachRounds: 0,
+  hasRestructured: false,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -200,6 +211,7 @@ export const useGameStore = create<GameStore>()(
       advanceToCollect: () => {
         const state = get();
         let cashAdjustment = 0;
+        let holdcoAmortizationAmount = 0;
 
         // Process opco-level debt payments and earnouts
         const updatedBusinesses = state.businesses.map(b => {
@@ -237,15 +249,35 @@ export const useGameStore = create<GameStore>()(
           return updated;
         });
 
+        // Holdco bank debt amortization (mandatory after grace period)
+        let newTotalDebt = state.totalDebt;
+        if (state.totalDebt > 0 && state.holdcoDebtStartRound > 0) {
+          const yearsWithDebt = state.round - state.holdcoDebtStartRound;
+          if (yearsWithDebt >= 2) {
+            // After 2-year grace period: mandatory 10% principal payment
+            const scheduledPayment = Math.round(state.totalDebt * 0.10);
+            // Pay what we can — partial payment if cash is insufficient
+            const availableCash = state.cash + cashAdjustment; // cash after opco payments
+            const actualPayment = Math.min(scheduledPayment, Math.max(0, availableCash));
+            if (actualPayment > 0) {
+              cashAdjustment -= actualPayment;
+              newTotalDebt = state.totalDebt - actualPayment;
+              holdcoAmortizationAmount = actualPayment;
+            }
+          }
+        }
+
         // C-3: Floor cash at 0 after debt payments
         const newCash = Math.max(0, state.cash + cashAdjustment);
 
         set({
           businesses: updatedBusinesses,
           cash: newCash,
+          totalDebt: newTotalDebt,
           phase: 'collect',
           cashBeforeDebtPayments: state.cash,
           debtPaymentThisRound: Math.abs(cashAdjustment),
+          holdcoAmortizationThisRound: holdcoAmortizationAmount,
         });
       },
 
@@ -257,6 +289,11 @@ export const useGameStore = create<GameStore>()(
           .filter(s => s.active)
           .reduce((sum, s) => sum + s.annualCost, 0);
 
+        // Apply distress interest penalty
+        const currentMetrics = calculateMetrics(state as GameState);
+        const distressRestrictions = getDistressRestrictions(currentMetrics.distressLevel);
+        const effectiveRate = state.interestRate + distressRestrictions.interestPenalty;
+
         // Collect FCF when transitioning from collect to event phase (annual)
         // Portfolio tax (with interest/SS deductions for tax shield) is computed inside
         const annualFcf = calculatePortfolioFcf(
@@ -264,14 +301,21 @@ export const useGameStore = create<GameStore>()(
           sharedBenefits.capexReduction,
           sharedBenefits.cashConversionBonus,
           state.totalDebt,
-          state.interestRate,
+          effectiveRate,
           sharedServicesCost
         );
 
         // Interest and shared services are still cash costs (separate from tax)
-        const annualInterest = Math.round(state.totalDebt * state.interestRate);
+        const annualInterest = Math.round(state.totalDebt * effectiveRate);
 
-        const newCash = state.cash + annualFcf - annualInterest - sharedServicesCost;
+        let newCash = state.cash + annualFcf - annualInterest - sharedServicesCost;
+
+        // Negative cash triggers restructuring
+        let requiresRestructuring = state.requiresRestructuring;
+        if (newCash < 0) {
+          requiresRestructuring = true;
+          newCash = 0; // Floor at 0
+        }
 
         // Generate event
         const event = generateEvent(state as GameState);
@@ -280,10 +324,11 @@ export const useGameStore = create<GameStore>()(
           ...state,
           cash: Math.round(newCash),
           currentEvent: event,
-          phase: 'event' as GamePhase
+          requiresRestructuring,
+          phase: requiresRestructuring ? 'restructure' as GamePhase : 'event' as GamePhase,
         };
 
-        if (event && event.type !== 'unsolicited_offer') {
+        if (event && event.type !== 'unsolicited_offer' && !requiresRestructuring) {
           gameState = applyEventEffects(gameState, event);
         }
 
@@ -346,17 +391,44 @@ export const useGameStore = create<GameStore>()(
           businesses: updatedBusinesses,
         });
 
+        // Track covenant breach streaks
+        const endMetrics = calculateMetrics({ ...state, businesses: updatedBusinesses });
+        let newCovenantBreachRounds = state.covenantBreachRounds;
+        if (endMetrics.distressLevel === 'breach') {
+          newCovenantBreachRounds += 1;
+        } else {
+          newCovenantBreachRounds = 0;
+        }
+
+        // Check for forced restructuring from prolonged breach
+        let requiresRestructuring = state.requiresRestructuring;
+        let gameOverFromBankruptcy = false;
+        let bankruptRound: number | undefined = state.bankruptRound;
+
+        if (newCovenantBreachRounds >= 2) {
+          if (state.hasRestructured) {
+            // Already used restructuring — bankruptcy
+            gameOverFromBankruptcy = true;
+            bankruptRound = state.round;
+          } else {
+            requiresRestructuring = true;
+          }
+        }
+
         const newRound = state.round + 1;
-        const gameOver = newRound > TOTAL_ROUNDS;
+        const gameOver = newRound > TOTAL_ROUNDS || gameOverFromBankruptcy;
 
         set({
           businesses: updatedBusinesses,
           round: newRound,
           metricsHistory: [...state.metricsHistory, historyEntry],
           gameOver,
+          bankruptRound,
+          covenantBreachRounds: newCovenantBreachRounds,
+          requiresRestructuring,
           phase: 'collect', // L-4: Removed redundant ternary (both branches were identical)
           currentEvent: null,
-          metrics: calculateMetrics({ ...state, businesses: updatedBusinesses }),
+          metrics: endMetrics,
           focusBonus: calculateSectorFocusBonus(updatedBusinesses),
         });
 
@@ -388,9 +460,15 @@ export const useGameStore = create<GameStore>()(
         // Add bank debt to holdco if applicable
         const newTotalDebt = state.totalDebt + (structure.bankDebt?.amount ?? 0);
 
+        // Track when first holdco debt was taken
+        const holdcoDebtStartRound = (structure.bankDebt?.amount ?? 0) > 0 && state.holdcoDebtStartRound === 0
+          ? state.round
+          : state.holdcoDebtStartRound;
+
         set({
           cash: state.cash - structure.cashRequired,
           totalDebt: newTotalDebt,
+          holdcoDebtStartRound,
           totalInvestedCapital: state.totalInvestedCapital + deal.askingPrice,
           businesses: [...state.businesses, businessWithPlatformFields],
           dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
@@ -490,9 +568,15 @@ export const useGameStore = create<GameStore>()(
         // Add bank debt to holdco if applicable
         const newTotalDebt = state.totalDebt + (structure.bankDebt?.amount ?? 0);
 
+        // Track when first holdco debt was taken
+        const holdcoDebtStartRound = (structure.bankDebt?.amount ?? 0) > 0 && state.holdcoDebtStartRound === 0
+          ? state.round
+          : state.holdcoDebtStartRound;
+
         set({
           cash: state.cash - structure.cashRequired,
           totalDebt: newTotalDebt,
+          holdcoDebtStartRound,
           totalInvestedCapital: state.totalInvestedCapital + deal.askingPrice,
           businesses: [...updatedBusinesses, boltOnBusiness],
           dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
@@ -991,6 +1075,90 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
+      // Restructuring actions
+      distressedSale: (businessId: string) => {
+        const state = get();
+        const business = state.businesses.find(b => b.id === businessId);
+        if (!business || business.status !== 'active') return;
+
+        // Fire sale at 70% of normal exit valuation
+        const lastEvent = state.eventHistory[state.eventHistory.length - 1];
+        const valuation = calculateExitValuation(business, state.round, lastEvent?.type);
+        const exitPrice = Math.round(valuation.exitPrice * 0.70);
+        const netProceeds = Math.max(0, exitPrice - business.sellerNoteBalance);
+
+        const updatedBusinesses = state.businesses.map(b =>
+          b.id === businessId
+            ? { ...b, status: 'sold' as const, exitPrice, exitRound: state.round }
+            : b
+        );
+
+        set({
+          cash: state.cash + netProceeds,
+          totalExitProceeds: state.totalExitProceeds + netProceeds,
+          businesses: updatedBusinesses,
+          exitedBusinesses: [
+            ...state.exitedBusinesses,
+            { ...business, status: 'sold' as const, exitPrice, exitRound: state.round },
+          ],
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'sell', round: state.round, details: { businessId, exitPrice, netProceeds, distressedSale: true } },
+          ],
+        });
+      },
+
+      emergencyEquityRaise: (amount: number) => {
+        const state = get();
+        const metrics = calculateMetrics(state);
+        if (metrics.intrinsicValuePerShare <= 0) return;
+
+        // Emergency: shares issued at 50% of intrinsic value (2x dilution)
+        const emergencyPrice = metrics.intrinsicValuePerShare * 0.5;
+        const newShares = Math.round((amount / emergencyPrice) * 1000) / 1000;
+
+        // No 51% ownership floor during emergency
+        set({
+          cash: state.cash + amount,
+          sharesOutstanding: state.sharesOutstanding + newShares,
+          equityRaisesUsed: state.equityRaisesUsed + 1,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'issue_equity', round: state.round, details: { amount, newShares, emergency: true } },
+          ],
+        });
+      },
+
+      declareBankruptcy: () => {
+        const state = get();
+        set({
+          gameOver: true,
+          bankruptRound: state.round,
+          requiresRestructuring: false,
+        });
+      },
+
+      advanceFromRestructure: () => {
+        const state = get();
+        // Must have taken some action (cash >= 0 is enforced by the floor)
+        set({
+          requiresRestructuring: false,
+          hasRestructured: true,
+          covenantBreachRounds: 0, // Reset breach counter after restructuring
+          phase: 'event' as GamePhase,
+        });
+
+        // Now apply event effects if there was a pending event
+        const updatedState = get();
+        if (updatedState.currentEvent && updatedState.currentEvent.type !== 'unsolicited_offer') {
+          const gameState = applyEventEffects(updatedState as GameState, updatedState.currentEvent);
+          set({
+            ...gameState,
+            metrics: calculateMetrics(gameState),
+          });
+        }
+      },
+
       setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference) => {
         set({
           maFocus: { sectorId, sizePreference },
@@ -1261,7 +1429,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v7', // v7: dynamic multiple expansion + buyer profiles
+      name: 'holdco-tycoon-save-v8', // v8: financial distress & insolvency system
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -1292,6 +1460,12 @@ export const useGameStore = create<GameStore>()(
         actionsThisRound: state.actionsThisRound, // M-14: Persist actions for acquisition limit tracking
         debtPaymentThisRound: state.debtPaymentThisRound,
         cashBeforeDebtPayments: state.cashBeforeDebtPayments,
+        holdcoDebtStartRound: state.holdcoDebtStartRound,
+        holdcoAmortizationThisRound: state.holdcoAmortizationThisRound,
+        requiresRestructuring: state.requiresRestructuring,
+        covenantBreachRounds: state.covenantBreachRounds,
+        hasRestructured: state.hasRestructured,
+        bankruptRound: state.bankruptRound,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.holdcoName) {

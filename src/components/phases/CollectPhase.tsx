@@ -13,6 +13,8 @@ interface CollectPhaseProps {
   yearChronicle?: string | null;
   debtPaymentThisRound?: number;
   cashBeforeDebtPayments?: number;
+  holdcoAmortization?: number;
+  interestPenalty?: number;
   onContinue: () => void;
 }
 
@@ -55,6 +57,8 @@ export function CollectPhase({
   yearChronicle,
   debtPaymentThisRound,
   cashBeforeDebtPayments,
+  holdcoAmortization,
+  interestPenalty,
   onContinue
 }: CollectPhaseProps) {
   const [expandedBusiness, setExpandedBusiness] = useState<string | null>(null);
@@ -336,7 +340,13 @@ export function CollectPhase({
               <div className="flex items-center gap-2">
                 <span className="text-lg">🏦</span>
                 <span className="text-text-secondary">Holdco Debt Interest</span>
-                <span className="text-xs text-text-muted">({formatMoney(totalDebt)} @ {formatPercent(interestRate)})</span>
+                <span className="text-xs text-text-muted">
+                  ({formatMoney(totalDebt)} @ {formatPercent(interestRate)}
+                  {(interestPenalty ?? 0) > 0 && (
+                    <span className="text-red-400"> + {formatPercent(interestPenalty!)} penalty</span>
+                  )}
+                  )
+                </span>
               </div>
               <span className="font-mono text-danger">-{formatMoney(holdcoInterest)}</span>
             </div>
@@ -371,17 +381,25 @@ export function CollectPhase({
               <span className="text-text-secondary">Last Year's Ending Cash</span>
               <span className="font-mono">{formatMoney(cashBeforeDebtPayments ?? 0)}</span>
             </div>
-            <div className="flex justify-between text-warning">
-              <span>Debt Payments (seller notes & earnouts)</span>
-              <span className="font-mono">-{formatMoney(debtPaymentThisRound ?? 0)}</span>
-            </div>
+            {((debtPaymentThisRound ?? 0) - (holdcoAmortization ?? 0)) > 0 && (
+              <div className="flex justify-between text-warning">
+                <span>OpCo Debt (seller notes & earnouts)</span>
+                <span className="font-mono">-{formatMoney((debtPaymentThisRound ?? 0) - (holdcoAmortization ?? 0))}</span>
+              </div>
+            )}
+            {(holdcoAmortization ?? 0) > 0 && (
+              <div className="flex justify-between text-warning">
+                <span>Holdco Debt Amortization (10% mandatory)</span>
+                <span className="font-mono">-{formatMoney(holdcoAmortization ?? 0)}</span>
+              </div>
+            )}
             <div className="flex justify-between border-t border-white/10 pt-2 font-bold">
               <span>Starting Cash</span>
               <span className="font-mono">{formatMoney(cash)}</span>
             </div>
           </div>
           <p className="text-xs text-text-muted mt-3 italic">
-            Seller notes and earnouts are paid automatically before cash collection each year.
+            Seller notes, earnouts, and holdco debt amortization are paid automatically before cash collection each year.
           </p>
         </div>
       )}

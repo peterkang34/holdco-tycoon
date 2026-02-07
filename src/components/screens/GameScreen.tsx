@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../../hooks/useGame';
+import { getDistressRestrictions } from '../../engine/distress';
 import { Dashboard } from '../dashboard/Dashboard';
 import { CollectPhase } from '../phases/CollectPhase';
 import { EventPhase } from '../phases/EventPhase';
 import { AllocatePhase } from '../phases/AllocatePhase';
+import { RestructurePhase } from '../phases/RestructurePhase';
 import { InstructionsModal } from '../ui/InstructionsModal';
 
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
@@ -40,6 +42,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     totalDistributions,
     metrics,
     focusBonus,
+    requiresRestructuring,
+    hasRestructured,
+    bankruptRound,
+    holdcoAmortizationThisRound,
     advanceToEvent,
     advanceToAllocate,
     endRound,
@@ -62,6 +68,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     setMAFocus,
     triggerAIEnhancement,
     sourceDealFlow,
+    distressedSale,
+    emergencyEquityRaise,
+    declareBankruptcy,
+    advanceFromRestructure,
     fetchEventNarrative,
     generateBusinessStories,
     yearChronicle,
@@ -145,7 +155,28 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             yearChronicle={yearChronicle}
             debtPaymentThisRound={debtPaymentThisRound}
             cashBeforeDebtPayments={cashBeforeDebtPayments}
+            holdcoAmortization={holdcoAmortizationThisRound}
+            interestPenalty={getDistressRestrictions(metrics.distressLevel).interestPenalty}
             onContinue={advanceToEvent}
+          />
+        );
+      case 'restructure':
+        return (
+          <RestructurePhase
+            businesses={businesses}
+            cash={cash}
+            totalDebt={totalDebt}
+            netDebtToEbitda={metrics.netDebtToEbitda}
+            round={round}
+            hasRestructured={hasRestructured}
+            lastEventType={lastEventType}
+            intrinsicValuePerShare={metrics.intrinsicValuePerShare}
+            founderShares={founderShares}
+            sharesOutstanding={sharesOutstanding}
+            onDistressedSale={distressedSale}
+            onEmergencyEquityRaise={emergencyEquityRaise}
+            onDeclareBankruptcy={declareBankruptcy}
+            onContinue={advanceFromRestructure}
           />
         );
       case 'event':
@@ -165,6 +196,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             totalDebt={totalDebt}
             interestRate={interestRate}
             creditTightening={creditTighteningRoundsRemaining > 0}
+            distressLevel={metrics.distressLevel}
             dealPipeline={dealPipeline}
             sharedServices={sharedServices}
             round={round}
@@ -241,6 +273,11 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
           }`}>
             1. Collect
           </span>
+          {phase === 'restructure' && (
+            <span className="px-3 py-1 rounded-full bg-red-600 text-white animate-pulse">
+              Restructure
+            </span>
+          )}
           <span className={`px-3 py-1 rounded-full ${
             phase === 'event' ? 'bg-accent text-bg-primary' :
             'bg-white/10 text-text-muted'
@@ -267,6 +304,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         sharedServicesCount={activeServicesCount}
         focusTier={focusBonus?.tier}
         focusSector={focusBonus?.focusGroup}
+        distressLevel={metrics.distressLevel}
       />
 
       {/* Phase Content */}

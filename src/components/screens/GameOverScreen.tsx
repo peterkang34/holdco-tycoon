@@ -18,6 +18,7 @@ interface GameOverScreenProps {
   totalInvestedCapital: number;
   equityRaisesUsed: number;
   sharedServicesActive: number;
+  bankruptRound?: number;
   onPlayAgain: () => void;
 }
 
@@ -35,6 +36,7 @@ export function GameOverScreen({
   totalInvestedCapital,
   equityRaisesUsed,
   sharedServicesActive,
+  bankruptRound,
   onPlayAgain,
 }: GameOverScreenProps) {
   const [initials, setInitials] = useState('');
@@ -113,7 +115,39 @@ export function GameOverScreen({
 
   return (
     <div className="min-h-screen p-8 max-w-4xl mx-auto">
-      {/* Header */}
+      {/* Bankruptcy Header (replaces normal header) */}
+      {bankruptRound ? (
+        <div className="text-center mb-8">
+          <span className="text-6xl mb-4 block">💀</span>
+          <h1 className="text-3xl font-bold mb-2">{holdcoName}</h1>
+          <div className="text-7xl font-bold mb-2 text-red-500">
+            BANKRUPT
+          </div>
+          <p className="text-xl text-red-400">
+            Filed for bankruptcy in Year {bankruptRound}
+          </p>
+
+          <div className="card mt-6 bg-red-900/20 border-red-500/30">
+            <p className="text-text-secondary">
+              Your holding company couldn't service its debt obligations and was forced into bankruptcy.
+              All equity value was wiped out.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+              <div>
+                <p className="text-text-muted text-sm">Final Debt</p>
+                <p className="text-2xl font-bold font-mono text-red-400">{formatMoney(metrics.totalDebt)}</p>
+              </div>
+              <div>
+                <p className="text-text-muted text-sm">Peak Leverage</p>
+                <p className="text-2xl font-bold font-mono text-red-400">
+                  {formatMultiple(Math.max(...metricsHistory.map(h => h.metrics.netDebtToEbitda), metrics.netDebtToEbitda))}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+      /* Normal Header */
       <div className="text-center mb-8">
         <span className="text-6xl mb-4 block">{getGradeEmoji()}</span>
         <h1 className="text-3xl font-bold mb-2">{holdcoName}</h1>
@@ -122,6 +156,7 @@ export function GameOverScreen({
         </div>
         <p className="text-xl text-text-secondary">{score.title}</p>
       </div>
+      )}
 
       {/* Enterprise Value - Hero Display */}
       <div className="card mb-6 bg-gradient-to-r from-accent/20 to-accent-secondary/20 border-accent/30">

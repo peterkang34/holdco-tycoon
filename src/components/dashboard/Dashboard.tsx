@@ -1,4 +1,5 @@
-import { Metrics, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
+import { Metrics, DistressLevel, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
+import { getDistressLabel } from '../../engine/distress';
 import { MetricCard } from '../ui/MetricCard';
 
 interface DashboardProps {
@@ -11,6 +12,7 @@ interface DashboardProps {
   sharedServicesCount: number;
   focusTier?: number;
   focusSector?: string;
+  distressLevel: DistressLevel;
 }
 
 export function Dashboard({
@@ -23,6 +25,7 @@ export function Dashboard({
   sharedServicesCount,
   focusTier,
   focusSector,
+  distressLevel,
 }: DashboardProps) {
   const getCashStatus = () => {
     if (liveCash > 5000) return 'positive';  // $5M+ is healthy
@@ -156,9 +159,19 @@ export function Dashboard({
             Net Cash Position
           </span>
         )}
-        {metrics.netDebtToEbitda > 3.5 && (
-          <span className="text-xs bg-danger/20 text-danger px-2 py-1 rounded-full animate-danger">
-            Overleveraged
+        {distressLevel === 'elevated' && (
+          <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">
+            {getDistressLabel(distressLevel)}
+          </span>
+        )}
+        {distressLevel === 'stressed' && (
+          <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-1 rounded-full">
+            {getDistressLabel(distressLevel)}
+          </span>
+        )}
+        {distressLevel === 'breach' && (
+          <span className="text-xs bg-red-600/30 text-red-400 px-2 py-1 rounded-full animate-pulse font-bold">
+            {getDistressLabel(distressLevel)}
           </span>
         )}
       </div>

@@ -9,9 +9,11 @@ import {
   MAFocus,
   SectorId,
   DealSizePreference,
+  DistressLevel,
   formatMoney,
   formatPercent,
 } from '../../engine/types';
+import { getDistressRestrictions, getDistressLabel, getDistressDescription } from '../../engine/distress';
 import { SECTOR_LIST } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
@@ -32,6 +34,7 @@ interface AllocatePhaseProps {
   totalDebt: number;
   interestRate: number;
   creditTightening: boolean;
+  distressLevel: DistressLevel;
   dealPipeline: Deal[];
   sharedServices: SharedService[];
   round: number;
@@ -69,6 +72,7 @@ export function AllocatePhase({
   totalDebt,
   interestRate,
   creditTightening,
+  distressLevel,
   dealPipeline,
   sharedServices,
   round,
@@ -120,6 +124,7 @@ export function AllocatePhase({
   const [showRollUpGuide, setShowRollUpGuide] = useState(false);
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
+  const distressRestrictions = getDistressRestrictions(distressLevel);
   const aiEnabled = isAIEnabled();
   const activeServicesCount = sharedServices.filter(s => s.active).length;
   const canUnlockSharedService =
@@ -154,7 +159,7 @@ export function AllocatePhase({
   const renderDealStructuring = () => {
     if (!selectedDeal) return null;
 
-    const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening);
+    const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening || !distressRestrictions.canTakeDebt);
     const availablePlatformsForDeal = getPlatformsForSector(selectedDeal.business.sectorId);
     const canTuckIn = selectedDeal.acquisitionType === 'tuck_in' && availablePlatformsForDeal.length > 0;
 
@@ -575,6 +580,30 @@ export function AllocatePhase({
 
   return (
     <div className="p-6">
+      {/* Distress Warning Banner */}
+      {distressLevel === 'stressed' && (
+        <div className="bg-orange-900/30 border border-orange-500/40 rounded-xl p-4 mb-6">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">⚠️</span>
+            <div>
+              <h3 className="font-bold text-orange-400">{getDistressLabel(distressLevel)}</h3>
+              <p className="text-sm text-text-secondary">{getDistressDescription(distressLevel)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      {distressLevel === 'breach' && (
+        <div className="bg-red-900/30 border-2 border-red-500/50 rounded-xl p-4 mb-6 animate-pulse">
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">🚨</span>
+            <div>
+              <h3 className="font-bold text-red-400">{getDistressLabel(distressLevel)}</h3>
+              <p className="text-sm text-red-300">{getDistressDescription(distressLevel)}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -796,7 +825,7 @@ export function AllocatePhase({
                   key={deal.id}
                   deal={deal}
                   onSelect={() => setSelectedDeal(deal)}
-                  disabled={cash < deal.askingPrice * 0.15}
+                  disabled={cash < deal.askingPrice * 0.15 || !distressRestrictions.canAcquire}
                   availablePlatforms={getPlatformsForSector(deal.business.sectorId)}
                   isPassed={passedDealIds.has(deal.id)}
                   onPass={() => {
@@ -1108,10 +1137,10 @@ export function AllocatePhase({
                       setBuybackAmount('');
                     }
                   }}
-                  disabled={!buybackAmount || parseInt(buybackAmount) <= 0 || parseInt(buybackAmount) > cash}
+                  disabled={!buybackAmount || parseInt(buybackAmount) <= 0 || parseInt(buybackAmount) > cash || !distressRestrictions.canBuyback}
                   className="btn-primary text-sm"
                 >
-                  Buyback
+                  {!distressRestrictions.canBuyback ? 'Blocked' : 'Buyback'}
                 </button>
               </div>
               {buybackAmount && parseInt(buybackAmount) > 0 && intrinsicValuePerShare > 0 && (() => {
@@ -1160,10 +1189,10 @@ export function AllocatePhase({
                       setDistributeAmount('');
                     }
                   }}
-                  disabled={!distributeAmount || parseInt(distributeAmount) <= 0 || parseInt(distributeAmount) > cash}
+                  disabled={!distributeAmount || parseInt(distributeAmount) <= 0 || parseInt(distributeAmount) > cash || !distressRestrictions.canDistribute}
                   className="btn-primary text-sm"
                 >
-                  Distribute
+                  {!distressRestrictions.canDistribute ? 'Blocked' : 'Distribute'}
                 </button>
               </div>
               <p className="text-xs text-text-muted">

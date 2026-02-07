@@ -113,6 +113,7 @@ describe('calculateFinalScore', () => {
           roiic: 0.10,
           portfolioMoic: 1.5,
           netDebtToEbitda: 0,
+          distressLevel: 'comfortable' as const,
           cashConversion: 0.5,
           interestRate: 0.07,
           sharesOutstanding: 1000,
@@ -193,6 +194,7 @@ describe('calculateFinalScore', () => {
         roiic: 0.10,
         portfolioMoic: 1.5,
         netDebtToEbitda: 5.0, // Way over 4x!
+        distressLevel: 'breach' as const,
         cashConversion: 0.5,
         interestRate: 0.07,
         sharesOutstanding: 1000,

@@ -131,6 +131,12 @@ export function createMockGameState(overrides: Partial<GameState> = {}): GameSta
     inflationRoundsRemaining: 0,
     metricsHistory: [],
     actionsThisRound: [],
+    debtPaymentThisRound: 0,
+    cashBeforeDebtPayments: 0,
+    holdcoDebtStartRound: 0,
+    requiresRestructuring: false,
+    covenantBreachRounds: 0,
+    hasRestructured: false,
     ...overrides,
   };
 }
