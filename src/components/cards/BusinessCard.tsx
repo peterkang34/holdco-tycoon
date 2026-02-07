@@ -215,6 +215,24 @@ export function BusinessCard({
                     </span>
                   </div>
                 )}
+                {exitValuation.sizeTierPremium > 0 && (
+                  <div className="flex justify-between text-accent">
+                    <span>
+                      {exitValuation.buyerPoolTier === 'individual' ? 'Individual Buyers' :
+                       exitValuation.buyerPoolTier === 'small_pe' ? 'Small PE Buyers' :
+                       exitValuation.buyerPoolTier === 'lower_middle_pe' ? 'Lower-Mid PE Buyers' :
+                       exitValuation.buyerPoolTier === 'institutional_pe' ? 'Institutional PE Buyers' :
+                       'Large PE Buyers'}
+                    </span>
+                    <span className="font-mono">+{exitValuation.sizeTierPremium.toFixed(1)}x</span>
+                  </div>
+                )}
+                {exitValuation.deRiskingPremium > 0 && (
+                  <div className="flex justify-between text-accent">
+                    <span>De-risking Factors</span>
+                    <span className="font-mono">+{exitValuation.deRiskingPremium.toFixed(1)}x</span>
+                  </div>
+                )}
                 {exitValuation.platformPremium > 0 && (
                   <div className="flex justify-between text-accent">
                     <span>Platform Scale ({platformScale}/3)</span>
@@ -266,6 +284,11 @@ export function BusinessCard({
                       <span className="font-mono">{formatMoney(exitValuation.netProceeds)}</span>
                     </div>
                   </>
+                )}
+                {exitValuation.commentary && (
+                  <p className="text-text-muted italic mt-2 pt-2 border-t border-white/10 leading-relaxed">
+                    {exitValuation.commentary.buyerPoolDescription}
+                  </p>
                 )}
               </div>
             )}

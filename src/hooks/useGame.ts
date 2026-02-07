@@ -27,6 +27,7 @@ import {
   enhanceDealsWithAI,
   generateSourcedDeals,
 } from '../engine/businesses';
+import { generateBuyerProfile } from '../engine/buyers';
 import {
   generateEventNarrative,
   getFallbackEventNarrative,
@@ -846,11 +847,20 @@ export const useGameStore = create<GameStore>()(
         const lastEvent = state.eventHistory[state.eventHistory.length - 1];
         const valuation = calculateExitValuation(business, state.round, lastEvent?.type);
 
+        // Generate buyer profile for the sale
+        const buyerProfile = generateBuyerProfile(business, valuation.buyerPoolTier, business.sectorId);
+
+        // If strategic buyer, add their premium
+        let effectiveMultiple = valuation.totalMultiple;
+        if (buyerProfile.isStrategic) {
+          effectiveMultiple += buyerProfile.strategicPremium;
+        }
+
         // Add small random variance for actual sale (market conditions variation)
         const marketVariance = lastEvent?.type === 'global_bull_market' ? Math.random() * 0.3
           : lastEvent?.type === 'global_recession' ? -(Math.random() * 0.3)
           : (Math.random() * 0.2 - 0.1);
-        const exitPrice = Math.round(business.ebitda * Math.max(2.0, valuation.totalMultiple + marketVariance));
+        const exitPrice = Math.round(business.ebitda * Math.max(2.0, effectiveMultiple + marketVariance));
         const netProceeds = Math.max(0, exitPrice - business.sellerNoteBalance);
 
         const updatedBusinesses = state.businesses.map(b =>
@@ -876,7 +886,10 @@ export const useGameStore = create<GameStore>()(
           ],
           actionsThisRound: [
             ...state.actionsThisRound,
-            { type: 'sell', round: state.round, details: { businessId, exitPrice, netProceeds } },
+            {
+              type: 'sell', round: state.round,
+              details: { businessId, exitPrice, netProceeds, buyerName: buyerProfile.name, buyerType: buyerProfile.type },
+            },
           ],
         });
       },
@@ -1188,7 +1201,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v6', // v6: audit fixes — integrated status, earnout eval, balance fixes
+      name: 'holdco-tycoon-save-v7', // v7: dynamic multiple expansion + buyer profiles
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

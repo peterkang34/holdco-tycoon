@@ -4,9 +4,8 @@ import {
   PostGameInsight,
   LeaderboardEntry,
 } from './types';
-import { calculateMetrics, calculateSectorFocusBonus } from './simulation';
+import { calculateMetrics, calculateSectorFocusBonus, calculateExitValuation } from './simulation';
 import { POST_GAME_INSIGHTS } from '../data/tips';
-import { SECTORS } from '../data/sectors';
 
 const LEADERBOARD_KEY = 'holdco-tycoon-leaderboard';
 const MAX_LEADERBOARD_ENTRIES = 10;
@@ -23,20 +22,14 @@ export function calculateEnterpriseValue(state: GameState): number {
     return Math.max(0, state.cash - state.totalDebt);
   }
 
-  // Calculate total EBITDA and blended exit multiple
+  // Calculate total EBITDA and blended exit multiple using full valuation engine
   let totalEbitda = 0;
   let weightedMultiple = 0;
 
   for (const business of activeBusinesses) {
-    const sector = SECTORS[business.sectorId];
-    // Use the midpoint of the sector's acquisition multiple range as exit multiple
-    // Apply a quality premium/discount
-    const baseMult = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
-    const qualityFactor = 0.8 + (business.qualityRating / 5) * 0.4; // 0.8x to 1.2x
-    const exitMultiple = baseMult * qualityFactor;
-
+    const valuation = calculateExitValuation(business, 20); // End of game = round 20
     totalEbitda += business.ebitda;
-    weightedMultiple += business.ebitda * exitMultiple;
+    weightedMultiple += business.ebitda * valuation.totalMultiple;
   }
 
   const blendedMultiple = totalEbitda > 0 ? weightedMultiple / totalEbitda : 0;

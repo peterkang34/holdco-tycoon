@@ -1,4 +1,4 @@
-import { SectorId, AIGeneratedContent, QualityRating, Business, ScoreBreakdown } from '../engine/types';
+import { SectorId, AIGeneratedContent, QualityRating, Business, BuyerProfile, ScoreBreakdown } from '../engine/types';
 import { SECTORS } from '../data/sectors';
 
 // Cache the AI status to avoid repeated requests
@@ -432,6 +432,44 @@ export const FALLBACK_EVENT_NARRATIVES: Record<string, string[]> = {
 export function getFallbackEventNarrative(eventType: string): string {
   const narratives = FALLBACK_EVENT_NARRATIVES[eventType] || FALLBACK_EVENT_NARRATIVES.global_recession;
   return narratives[Math.floor(Math.random() * narratives.length)];
+}
+
+// AI-enriched buyer profile — fire-and-forget, deterministic profile works standalone
+export async function generateAIBuyerProfile(
+  profile: BuyerProfile,
+  business: { name: string; sectorId: SectorId; ebitda: number; qualityRating: QualityRating }
+): Promise<string | null> {
+  const isEnabled = await checkAIStatus();
+  if (!isEnabled) return null;
+
+  const sector = SECTORS[business.sectorId];
+  const ebitdaFormatted = business.ebitda >= 1000
+    ? `$${(business.ebitda / 1000).toFixed(1)}M`
+    : `$${business.ebitda}k`;
+
+  try {
+    const response = await fetch('/api/ai/generate-buyer', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        buyerName: profile.name,
+        buyerType: profile.type,
+        isStrategic: profile.isStrategic,
+        fundSize: profile.fundSize,
+        sectorName: sector.name,
+        businessName: business.name,
+        ebitda: ebitdaFormatted,
+        qualityRating: business.qualityRating,
+        baseThesis: profile.investmentThesis,
+      }),
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    return data.thesis || null;
+  } catch {
+    return null;
+  }
 }
 
 // Fallback analysis when AI is not available

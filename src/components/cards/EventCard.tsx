@@ -1,4 +1,4 @@
-import { GameEvent, EventImpact, formatMoney, formatPercent } from '../../engine/types';
+import { GameEvent, EventImpact, BuyerProfile, formatMoney, formatPercent } from '../../engine/types';
 
 interface EventCardProps {
   event: GameEvent;
@@ -135,19 +135,43 @@ export function EventCard({ event, onAcceptOffer, onDeclineOffer, onContinue }: 
       )}
 
       {event.type === 'unsolicited_offer' && onAcceptOffer && onDeclineOffer ? (
-        <div className="flex gap-3">
-          <button
-            onClick={onDeclineOffer}
-            className="btn-secondary flex-1"
-          >
-            Decline
-          </button>
-          <button
-            onClick={onAcceptOffer}
-            className="btn-primary flex-1"
-          >
-            Accept {event.offerAmount ? formatMoney(event.offerAmount) : ''}
-          </button>
+        <div>
+          {event.buyerProfile && (
+            <div className="bg-white/5 rounded-lg p-4 mb-4 border border-white/10">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="font-bold text-sm">{event.buyerProfile.name}</span>
+                <span className="text-xs bg-white/10 text-text-secondary px-2 py-0.5 rounded">
+                  {event.buyerProfile.type === 'strategic' ? 'Strategic' :
+                   event.buyerProfile.type === 'individual' ? 'Individual' :
+                   event.buyerProfile.type === 'family_office' ? 'Family Office' :
+                   event.buyerProfile.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                </span>
+                {event.buyerProfile.isStrategic && (
+                  <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">Strategic Buyer</span>
+                )}
+              </div>
+              {event.buyerProfile.fundSize && (
+                <p className="text-xs text-text-muted mb-1">{event.buyerProfile.fundSize}</p>
+              )}
+              <p className="text-xs text-text-secondary italic leading-relaxed">
+                "{event.buyerProfile.investmentThesis}"
+              </p>
+            </div>
+          )}
+          <div className="flex gap-3">
+            <button
+              onClick={onDeclineOffer}
+              className="btn-secondary flex-1"
+            >
+              Decline
+            </button>
+            <button
+              onClick={onAcceptOffer}
+              className="btn-primary flex-1"
+            >
+              Accept {event.offerAmount ? formatMoney(event.offerAmount) : ''}
+            </button>
+          </div>
         </div>
       ) : (
         onContinue && (

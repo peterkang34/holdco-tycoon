@@ -16,6 +16,12 @@ import {
 } from './types';
 import { SECTORS } from '../data/sectors';
 import { GLOBAL_EVENTS, PORTFOLIO_EVENTS, SECTOR_EVENTS, SectorEventDefinition } from '../data/events';
+import {
+  calculateSizeTierPremium,
+  calculateDeRiskingPremium,
+  generateBuyerProfile,
+  generateValuationCommentary,
+} from './buyers';
 
 const TAX_RATE = 0.30;
 const MAX_ORGANIC_GROWTH_RATE = 0.20; // M-4: Cap on growth rate accumulation
@@ -24,7 +30,8 @@ const MAX_ORGANIC_GROWTH_RATE = 0.20; // M-4: Cap on growth rate accumulation
 export function calculateExitValuation(
   business: Business,
   currentRound: number,
-  lastEventType?: string
+  lastEventType?: string,
+  portfolioContext?: { totalPlatformEbitda?: number }
 ): ExitValuation {
   // Start with acquisition multiple as baseline
   const baseMultiple = business.acquisitionMultiple;
@@ -33,13 +40,19 @@ export function calculateExitValuation(
   const ebitdaGrowth = business.acquisitionEbitda > 0
     ? (business.ebitda - business.acquisitionEbitda) / business.acquisitionEbitda
     : 0;
-  const growthPremium = ebitdaGrowth > 0 ? Math.min(1.0, ebitdaGrowth * 0.5) : ebitdaGrowth * 0.3;
+  // Expanded growth premium range: declining -1.0x to exceptional +2.5x
+  let growthPremium: number;
+  if (ebitdaGrowth > 0) {
+    growthPremium = Math.min(2.5, ebitdaGrowth * 0.8);
+  } else {
+    growthPremium = Math.max(-1.0, ebitdaGrowth * 0.5);
+  }
 
   // Quality premium: higher quality businesses command higher multiples
-  const qualityPremium = (business.qualityRating - 3) * 0.3;
+  const qualityPremium = (business.qualityRating - 3) * 0.4;
 
-  // Platform premium: platforms with scale command roll-up premiums
-  const platformPremium = business.isPlatform ? (business.platformScale * 0.3) : 0;
+  // Platform premium: reduced since size tier now does the heavy lifting
+  const platformPremium = business.isPlatform ? (business.platformScale * 0.2) : 0;
 
   // Hold period premium: longer holds show stability (max +0.5x for 5+ years)
   const yearsHeld = currentRound - business.acquisitionRound;
@@ -48,15 +61,26 @@ export function calculateExitValuation(
   // Improvements premium: investments in the business increase value
   const improvementsPremium = business.improvements.length * 0.15;
 
-  // Market conditions modifier (deterministic for display, randomized on actual sale)
+  // Market conditions modifier
   let marketModifier = 0;
   if (lastEventType === 'global_bull_market') marketModifier = 0.5;
   if (lastEventType === 'global_recession') marketModifier = -0.5;
 
+  // Size tier premium — the big new driver
+  // Use platform consolidated EBITDA if available, otherwise business standalone
+  const effectiveEbitda = portfolioContext?.totalPlatformEbitda ?? business.ebitda;
+  const sizeTierResult = calculateSizeTierPremium(effectiveEbitda);
+  const sizeTierPremium = sizeTierResult.premium;
+  const buyerPoolTier = sizeTierResult.tier;
+
+  // De-risking premium — composite de-risking factor
+  const deRiskingPremium = calculateDeRiskingPremium(business);
+
   // Calculate exit multiple
   const totalMultiple = Math.max(
     2.0, // Absolute floor - distressed sale
-    baseMultiple + growthPremium + qualityPremium + platformPremium + holdPremium + improvementsPremium + marketModifier
+    baseMultiple + growthPremium + qualityPremium + platformPremium + holdPremium +
+    improvementsPremium + marketModifier + sizeTierPremium + deRiskingPremium
   );
 
   const exitPrice = Math.round(business.ebitda * totalMultiple);
@@ -64,6 +88,11 @@ export function calculateExitValuation(
   // Net proceeds after debt payoff
   const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance;
   const netProceeds = Math.max(0, exitPrice - debtPayoff);
+
+  // Generate valuation commentary
+  const commentary = generateValuationCommentary(
+    business, buyerPoolTier, sizeTierPremium, deRiskingPremium, effectiveEbitda, totalMultiple
+  );
 
   return {
     baseMultiple,
@@ -73,11 +102,15 @@ export function calculateExitValuation(
     holdPremium,
     improvementsPremium,
     marketModifier,
+    sizeTierPremium,
+    deRiskingPremium,
+    buyerPoolTier,
     totalMultiple,
     exitPrice,
     netProceeds,
     ebitdaGrowth,
     yearsHeld,
+    commentary,
   };
 }
 
@@ -395,22 +428,38 @@ export function generateEvent(state: GameState): GameEvent | null {
     if (Math.random() < offerChance) {
       const business = pickRandom(activeBusinesses);
       if (business) {
-        const sector = SECTORS[business.sectorId];
-        const baseMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
-        const premiumMultiple = baseMultiple * (1.2 + Math.random() * 0.6);
-        const offerAmount = Math.round(business.ebitda * premiumMultiple);
+        // Use calculateExitValuation for realistic pricing
+        const valuation = calculateExitValuation(business, state.round);
+        const buyerProfile = generateBuyerProfile(business, valuation.buyerPoolTier, business.sectorId);
 
-        // M-1: Use canonical formatMoney from types.ts
+        // If strategic, add their premium
+        let offerMultiple = valuation.totalMultiple;
+        if (buyerProfile.isStrategic) {
+          offerMultiple += buyerProfile.strategicPremium;
+        }
+
+        // Apply random offer variance: 0.9-1.2x of calculated multiple
+        offerMultiple *= (0.9 + Math.random() * 0.3);
+        offerMultiple = Math.max(2.0, offerMultiple);
+
+        const offerAmount = Math.round(business.ebitda * offerMultiple);
+
+        const buyerLabel = buyerProfile.isStrategic
+          ? `Strategic acquirer ${buyerProfile.name}`
+          : buyerProfile.name;
+
         return {
           id: `event_${state.round}_unsolicited_${business.id}`,
           type: 'unsolicited_offer',
           title: 'Unsolicited Acquisition Offer',
-          description: `A buyer has approached you with an offer to acquire ${business.name} for ${formatMoney(offerAmount)} (${premiumMultiple.toFixed(1)}x EBITDA).`,
+          description: `${buyerLabel} has approached you with an offer to acquire ${business.name} for ${formatMoney(offerAmount)} (${offerMultiple.toFixed(1)}x EBITDA).`,
           effect: 'Accept to sell immediately, or decline to keep the business',
           tip: "The best holdcos know when to sell. If the price is right and you can redeploy capital at higher returns, it's worth considering.",
           tipSource: 'Ch. IV',
           affectedBusinessId: business.id,
           offerAmount,
+          offerMultiple,
+          buyerProfile,
         };
       }
     }

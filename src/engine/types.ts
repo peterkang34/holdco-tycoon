@@ -26,6 +26,24 @@ export type SectorFocusGroup =
 
 export type ConcentrationLevel = 'low' | 'medium' | 'high';
 
+export type BuyerPoolTier = 'individual' | 'small_pe' | 'lower_middle_pe' | 'institutional_pe' | 'large_pe';
+export type BuyerType = 'individual' | 'family_office' | 'small_pe' | 'lower_middle_pe' | 'institutional_pe' | 'large_pe' | 'strategic';
+
+export interface BuyerProfile {
+  name: string;
+  type: BuyerType;
+  fundSize?: string;
+  investmentThesis: string;
+  isStrategic: boolean;
+  strategicPremium: number;
+}
+
+export interface ValuationCommentary {
+  summary: string;
+  factors: string[];
+  buyerPoolDescription: string;
+}
+
 export interface SectorDefinition {
   id: SectorId;
   name: string;
@@ -242,8 +260,10 @@ export interface GameEvent {
   tipSource?: string;
   affectedBusinessId?: string;
   offerAmount?: number; // for unsolicited offers
+  offerMultiple?: number; // for unsolicited offers
   impacts?: EventImpact[]; // actual measured impacts from the event
   narrative?: string; // AI-generated narrative context
+  buyerProfile?: BuyerProfile; // buyer profile for unsolicited offers
 }
 
 export interface Metrics {
@@ -421,9 +441,14 @@ export interface ExitValuation {
   holdPremium: number;
   improvementsPremium: number;
   marketModifier: number;
+  sizeTierPremium: number;
+  deRiskingPremium: number;
+  buyerPoolTier: BuyerPoolTier;
   totalMultiple: number;
   exitPrice: number;
   netProceeds: number; // after debt payoff
   ebitdaGrowth: number;
   yearsHeld: number;
+  buyerProfile?: BuyerProfile;
+  commentary?: ValuationCommentary;
 }
