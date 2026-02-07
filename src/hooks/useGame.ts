@@ -19,6 +19,7 @@ import {
   createStartingBusiness,
   generateDealPipeline,
   resetBusinessIdCounter,
+  restoreBusinessIdCounter,
   generateBusinessId,
   determineIntegrationOutcome,
   calculateSynergies,
@@ -35,7 +36,7 @@ import {
 } from '../services/aiGeneration';
 import { formatMoney } from '../engine/types';
 import { resetUsedNames } from '../data/names';
-import { initializeSharedServices, MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES } from '../data/sharedServices';
+import { initializeSharedServices, MIN_OPCOS_FOR_SHARED_SERVICES } from '../data/sharedServices';
 import {
   calculatePortfolioFcf,
   calculateSharedServicesBenefits,
@@ -46,6 +47,7 @@ import {
   applyEventEffects,
   calculateMetrics,
   recordHistoricalMetrics,
+  calculateExitValuation,
 } from '../engine/simulation';
 import { executeDealStructure } from '../engine/deals';
 import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue } from '../engine/scoring';
@@ -196,25 +198,50 @@ export const useGameStore = create<GameStore>()(
 
       advanceToCollect: () => {
         const state = get();
+        let cashAdjustment = 0;
 
-        // Process opco-level debt payments
+        // Process opco-level debt payments and earnouts
         const updatedBusinesses = state.businesses.map(b => {
           if (b.status !== 'active') return b;
 
           let updated = { ...b };
 
-          // Seller note payment
+          // H-6: Seller note interest payment + principal amortization
           if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
-            const payment = Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
-            updated.sellerNoteBalance = Math.max(0, b.sellerNoteBalance - payment);
+            const interest = Math.round(b.sellerNoteBalance * b.sellerNoteRate);
+            const principal = Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
+            cashAdjustment -= (interest + principal); // Deduct both from holdco cash
+            updated.sellerNoteBalance = Math.max(0, b.sellerNoteBalance - principal);
             updated.sellerNoteRoundsRemaining = b.sellerNoteRoundsRemaining - 1;
+          }
+          // Clean up residual balances when term is done
+          if (updated.sellerNoteRoundsRemaining <= 0 && updated.sellerNoteBalance > 0) {
+            cashAdjustment -= updated.sellerNoteBalance;
+            updated.sellerNoteBalance = 0;
+          }
+
+          // L-12: Evaluate earnout - if EBITDA grew enough, pay the earnout
+          if (b.earnoutRemaining > 0 && b.earnoutTarget > 0) {
+            const actualGrowth = b.acquisitionEbitda > 0
+              ? (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda
+              : 0;
+            if (actualGrowth >= b.earnoutTarget) {
+              // Target met - pay earnout
+              cashAdjustment -= b.earnoutRemaining;
+              updated.earnoutRemaining = 0;
+              updated.earnoutTarget = 0;
+            }
           }
 
           return updated;
         });
 
+        // C-3: Floor cash at 0 after debt payments
+        const newCash = Math.max(0, state.cash + cashAdjustment);
+
         set({
           businesses: updatedBusinesses,
+          cash: newCash,
           phase: 'collect',
         });
       },
@@ -319,7 +346,7 @@ export const useGameStore = create<GameStore>()(
           round: newRound,
           metricsHistory: [...state.metricsHistory, historyEntry],
           gameOver,
-          phase: gameOver ? 'collect' : 'collect',
+          phase: 'collect', // L-4: Removed redundant ternary (both branches were identical)
           currentEvent: null,
           metrics: calculateMetrics({ ...state, businesses: updatedBusinesses }),
           focusBonus: calculateSectorFocusBonus(updatedBusinesses),
@@ -417,7 +444,7 @@ export const useGameStore = create<GameStore>()(
           bankDebtBalance: 0,
           earnoutRemaining: structure.earnout?.amount ?? 0,
           earnoutTarget: structure.earnout?.targetEbitdaGrowth ?? 0,
-          status: 'active',
+          status: 'integrated', // H-3: Mark as integrated so EBITDA isn't double-counted (it's folded into platform)
           isPlatform: false,
           platformScale: 0,
           boltOnIds: [],
@@ -522,7 +549,7 @@ export const useGameStore = create<GameStore>()(
           sectorId: biz1.sectorId,
           subType: biz1.subType,
           ebitda: combinedEbitda,
-          peakEbitda: Math.max(biz1.peakEbitda, biz2.peakEbitda) + combinedEbitda,
+          peakEbitda: combinedEbitda, // C-4: Start tracking peak from combined value (was incorrectly adding both)
           acquisitionEbitda: biz1.acquisitionEbitda + biz2.acquisitionEbitda,
           acquisitionPrice: combinedTotalCost,
           acquisitionRound: Math.min(biz1.acquisitionRound, biz2.acquisitionRound),
@@ -625,6 +652,9 @@ export const useGameStore = create<GameStore>()(
         const business = state.businesses.find(b => b.id === businessId);
         if (!business || business.status !== 'active') return;
 
+        // M-3: Prevent applying the same improvement type twice to the same business
+        if (business.improvements.some(i => i.type === improvementType)) return;
+
         // Calculate cost based on improvement type
         let cost: number;
         let ebitdaBoost: number;
@@ -648,7 +678,8 @@ export const useGameStore = create<GameStore>()(
             break;
           case 'fix_underperformance':
             cost = Math.round(business.ebitda * 0.12);
-            ebitdaBoost = (business.peakEbitda * 0.8 - business.ebitda) / business.ebitda;
+            // C-5: Clamp to 0 minimum — if business is already near peak, no boost
+            ebitdaBoost = Math.max(0, (business.peakEbitda * 0.8 - business.ebitda) / business.ebitda);
             break;
           default:
             return;
@@ -688,7 +719,7 @@ export const useGameStore = create<GameStore>()(
         const activeCount = state.sharedServices.filter(s => s.active).length;
         const opcoCount = state.businesses.filter(b => b.status === 'active').length;
 
-        if (activeCount >= MAX_ACTIVE_SHARED_SERVICES) return;
+        // No cap on active shared services — annual cost is the natural limiter
         if (opcoCount < MIN_OPCOS_FOR_SHARED_SERVICES) return;
         if (state.cash < service.unlockCost) return;
 
@@ -740,10 +771,11 @@ export const useGameStore = create<GameStore>()(
       issueEquity: (amount: number) => {
         const state = get();
 
-        if (state.round <= 3) return; // Not allowed in first 3 rounds
-        if (state.equityRaisesUsed >= 3) return; // Max 3 raises per game
+        // Dilution is the natural consequence — no artificial caps on raises
 
         const metrics = calculateMetrics(state);
+        // M-5: Guard against division by zero or negative intrinsic value
+        if (metrics.intrinsicValuePerShare <= 0) return;
         const newShares = Math.round((amount / metrics.intrinsicValuePerShare) * 1000) / 1000;
 
         // Calculate what ownership would be after issuance
@@ -769,6 +801,8 @@ export const useGameStore = create<GameStore>()(
         if (state.cash < amount) return;
 
         const metrics = calculateMetrics(state);
+        // M-5: Guard against division by zero or negative intrinsic value
+        if (metrics.intrinsicValuePerShare <= 0) return;
         const sharesRepurchased = Math.round((amount / metrics.intrinsicValuePerShare) * 1000) / 1000;
 
         // Can only buy back non-founder shares (outside investors' shares)
@@ -808,44 +842,16 @@ export const useGameStore = create<GameStore>()(
         const business = state.businesses.find(b => b.id === businessId);
         if (!business || business.status !== 'active') return;
 
-        const sector = SECTORS[business.sectorId];
-
-        // Start with acquisition multiple as baseline (you bought it at this price)
-        let baseMultiple = business.acquisitionMultiple;
-
-        // EBITDA growth premium: if EBITDA grew, you've created value
-        const ebitdaGrowth = (business.ebitda - business.acquisitionEbitda) / business.acquisitionEbitda;
-        const growthPremium = ebitdaGrowth > 0 ? Math.min(1.0, ebitdaGrowth * 0.5) : ebitdaGrowth * 0.3;
-
-        // Quality premium: higher quality businesses command higher multiples
-        const qualityPremium = (business.qualityRating - 3) * 0.3;
-
-        // Platform premium: platforms with scale command roll-up premiums
-        const platformPremium = business.isPlatform ? (business.platformScale * 0.3) : 0;
-
-        // Hold period premium: longer holds show stability (max +0.5x for 5+ years)
-        const yearsHeld = state.round - business.acquisitionRound;
-        const holdPremium = Math.min(0.5, yearsHeld * 0.1);
-
-        // Improvements premium: investments in the business increase value
-        const improvementsPremium = business.improvements.length * 0.15;
-
-        // Market conditions modifier
-        let marketModifier = 0;
+        // L-1: Use shared calculateExitValuation instead of duplicated logic
         const lastEvent = state.eventHistory[state.eventHistory.length - 1];
-        if (lastEvent?.type === 'global_bull_market') marketModifier = 0.5 + Math.random() * 0.3;
-        if (lastEvent?.type === 'global_recession') marketModifier = -0.5 - Math.random() * 0.3;
+        const valuation = calculateExitValuation(business, state.round, lastEvent?.type);
 
-        // Calculate exit multiple
-        const exitMultiple = Math.max(
-          2.0, // Absolute floor - distressed sale
-          baseMultiple + growthPremium + qualityPremium + platformPremium + holdPremium + improvementsPremium + marketModifier
-        );
-        const exitPrice = Math.round(business.ebitda * exitMultiple);
-
-        // Pay off any opco debt first
-        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance;
-        const netProceeds = Math.max(0, exitPrice - debtPayoff);
+        // Add small random variance for actual sale (market conditions variation)
+        const marketVariance = lastEvent?.type === 'global_bull_market' ? Math.random() * 0.3
+          : lastEvent?.type === 'global_recession' ? -(Math.random() * 0.3)
+          : (Math.random() * 0.2 - 0.1);
+        const exitPrice = Math.round(business.ebitda * Math.max(2.0, valuation.totalMultiple + marketVariance));
+        const netProceeds = Math.max(0, exitPrice - business.sellerNoteBalance);
 
         const updatedBusinesses = state.businesses.map(b =>
           b.id === businessId
@@ -853,10 +859,17 @@ export const useGameStore = create<GameStore>()(
             : b
         );
 
+        // M-7: Auto-deactivate shared services if opco count drops below minimum
+        const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
+        const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
+          ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
+          : state.sharedServices;
+
         set({
           cash: state.cash + netProceeds,
           totalExitProceeds: state.totalExitProceeds + netProceeds,
           businesses: updatedBusinesses,
+          sharedServices: updatedServices,
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...business, status: 'sold' as const, exitPrice, exitRound: state.round },
@@ -874,15 +887,25 @@ export const useGameStore = create<GameStore>()(
         if (!business || business.status !== 'active') return;
 
         const windDownCost = 250; // $250k
-        const debtWriteOff = business.sellerNoteBalance + business.bankDebtBalance;
+        const debtWriteOff = business.sellerNoteBalance; // L-13: Only seller note on opco
 
         const updatedBusinesses = state.businesses.map(b =>
           b.id === businessId ? { ...b, status: 'wound_down' as const, exitRound: state.round } : b
         );
 
+        // C-3: Floor cash at 0
+        const newCash = Math.max(0, state.cash - windDownCost - debtWriteOff);
+
+        // M-7: Auto-deactivate shared services if opco count drops below minimum
+        const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
+        const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
+          ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
+          : state.sharedServices;
+
         set({
-          cash: state.cash - windDownCost - debtWriteOff,
+          cash: newCash,
           businesses: updatedBusinesses,
+          sharedServices: updatedServices,
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...business, status: 'wound_down' as const, exitRound: state.round },
@@ -1037,7 +1060,7 @@ export const useGameStore = create<GameStore>()(
             // Only generate stories every few years or on significant events
             const yearsOwned = state.round - b.acquisitionRound;
             const hasRecentImprovement = b.improvements.some(i => i.appliedRound === state.round - 1);
-            const significantGrowth = b.ebitda > b.acquisitionEbitda * 1.2;
+            // L-3: Removed unused significantGrowth variable
             const shouldGenerateStory = yearsOwned === 1 || yearsOwned === 5 || yearsOwned === 10 || hasRecentImprovement;
 
             if (!shouldGenerateStory) return b;
@@ -1165,7 +1188,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v5', // Updated for platform/tuck-in mechanics
+      name: 'holdco-tycoon-save-v6', // v6: audit fixes — integrated status, earnout eval, balance fixes
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -1188,11 +1211,22 @@ export const useGameStore = create<GameStore>()(
         sharedServices: state.sharedServices,
         dealPipeline: state.dealPipeline,
         maFocus: state.maFocus,
+        currentEvent: state.currentEvent, // L-2: Persist current event across page refreshes
         eventHistory: state.eventHistory,
         creditTighteningRoundsRemaining: state.creditTighteningRoundsRemaining,
         inflationRoundsRemaining: state.inflationRoundsRemaining,
         metricsHistory: state.metricsHistory,
+        actionsThisRound: state.actionsThisRound, // M-14: Persist actions for acquisition limit tracking
       }),
+      onRehydrate: () => {
+        // H-8: Restore business ID counter after loading from storage
+        return (state) => {
+          if (state) {
+            const allBusinesses = [...state.businesses, ...state.exitedBusinesses];
+            restoreBusinessIdCounter(allBusinesses);
+          }
+        };
+      },
     }
   )
 );
@@ -1223,18 +1257,9 @@ export const usePlatforms = () => useGameStore(state =>
   state.businesses.filter(b => b.status === 'active' && b.isPlatform)
 );
 
-// Final score helper
-export const useFinalScore = () => {
-  const state = useGameStore.getState();
-  return calculateFinalScore(state);
-};
+// L-14: Make final score hooks reactive (use selector instead of getState)
+export const useFinalScore = () => useGameStore(state => calculateFinalScore(state));
 
-export const usePostGameInsights = () => {
-  const state = useGameStore.getState();
-  return generatePostGameInsights(state);
-};
+export const usePostGameInsights = () => useGameStore(state => generatePostGameInsights(state));
 
-export const useEnterpriseValue = () => {
-  const state = useGameStore.getState();
-  return calculateEnterpriseValue(state);
-};
+export const useEnterpriseValue = () => useGameStore(state => calculateEnterpriseValue(state));

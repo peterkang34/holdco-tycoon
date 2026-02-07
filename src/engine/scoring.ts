@@ -42,23 +42,20 @@ export function calculateEnterpriseValue(state: GameState): number {
   const blendedMultiple = totalEbitda > 0 ? weightedMultiple / totalEbitda : 0;
   const portfolioValue = totalEbitda * blendedMultiple;
 
-  // Also add exit proceeds from sold businesses (already received)
-  const exitProceeds = state.exitedBusinesses
-    .filter(b => b.status === 'sold' && b.exitPrice)
-    .reduce((sum, b) => sum + (b.exitPrice || 0), 0);
+  // M-6: Distributions represent value already returned to shareholders (reduces cash, so add back)
+  // Buybacks are NOT added: their benefit is captured in fewer shares outstanding → higher per-share value
+  const distributionsReturned = state.totalDistributions;
 
-  // Add distributions made to shareholders (value already returned)
-  const distributionsAndBuybacks = state.totalDistributions + state.totalBuybacks;
-
-  // Calculate total holdco-level debt including opco debt
+  // Calculate total holdco-level debt including opco-level seller notes
+  // L-13: Only include sellerNoteBalance (bank debt is tracked at holdco level in state.totalDebt)
   const opcoDebt = activeBusinesses.reduce(
-    (sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance,
+    (sum, b) => sum + b.sellerNoteBalance,
     0
   );
   const totalDebt = state.totalDebt + opcoDebt;
 
-  // EV = Portfolio Value + Cash + Exit Proceeds Already Received + Value Returned - All Debt
-  const ev = portfolioValue + state.cash + distributionsAndBuybacks - totalDebt;
+  // EV = Portfolio Value + Cash + Distributions Returned - All Debt
+  const ev = portfolioValue + state.cash + distributionsReturned - totalDebt;
 
   return Math.round(Math.max(0, ev));
 }

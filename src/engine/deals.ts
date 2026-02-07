@@ -41,7 +41,7 @@ export function generateDealStructures(
 
   // Option C: Cash + Bank Debt (not available during credit tightening)
   if (!creditTightening) {
-    const bankDebtCashPercent = 0.15 + Math.random() * 0.1; // 15-25%
+    const bankDebtCashPercent = 0.30 + Math.random() * 0.1; // M-12: 30-40% equity (was 15-25%, too powerful)
     const bankDebtCash = Math.round(askingPrice * bankDebtCashPercent);
     const bankDebtAmount = askingPrice - bankDebtCash;
 
@@ -98,7 +98,7 @@ export function executeDealStructure(
     sellerNoteBalance: structure.sellerNote?.amount ?? 0,
     sellerNoteRate: structure.sellerNote?.rate ?? 0,
     sellerNoteRoundsRemaining: structure.sellerNote?.termRounds ?? 0,
-    bankDebtBalance: structure.bankDebt?.amount ?? 0,
+    bankDebtBalance: 0, // L-13: Bank debt tracked at holdco level (state.totalDebt), not on individual business
     earnoutRemaining: structure.earnout?.amount ?? 0,
     earnoutTarget: structure.earnout?.targetEbitdaGrowth ?? 0,
   };

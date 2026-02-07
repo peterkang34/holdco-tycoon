@@ -31,6 +31,18 @@ export function resetBusinessIdCounter(): void {
   businessIdCounter = 0;
 }
 
+// H-8: Restore counter from existing businesses after save/load
+export function restoreBusinessIdCounter(businesses: { id: string }[]): void {
+  let maxId = 0;
+  for (const b of businesses) {
+    const match = b.id.match(/^biz_(\d+)$/);
+    if (match) {
+      maxId = Math.max(maxId, parseInt(match[1], 10));
+    }
+  }
+  businessIdCounter = maxId;
+}
+
 function generateQualityRating(): QualityRating {
   // Weighted distribution: more 3s, fewer 1s and 5s
   const roll = Math.random();
@@ -308,7 +320,7 @@ export function generateDeal(sectorId: SectorId, round: number): Deal {
     id: `deal_${generateBusinessId()}`,
     business,
     askingPrice,
-    freshness: 3,
+    freshness: 2, // H-7: Consistent with generateDealWithSize
     roundAppeared: round,
     source: Math.random() > 0.4 ? 'inbound' : 'brokered',
     acquisitionType,
@@ -503,7 +515,8 @@ export function generateDealPipeline(
 
   // 3. Ensure sector variety - add deals from sectors not in pipeline
   const missingSectors = allSectorIds.filter(s => !sectorsInPipeline.has(s));
-  const shuffledMissing = missingSectors.sort(() => Math.random() - 0.5);
+  // L-5/M-11: Copy before sorting to avoid mutating source arrays
+  const shuffledMissing = [...missingSectors].sort(() => Math.random() - 0.5);
 
   for (const sectorId of shuffledMissing.slice(0, 3)) {
     if (pipeline.length >= MAX_DEALS) break;
@@ -511,7 +524,9 @@ export function generateDealPipeline(
   }
 
   // 4. Fill remaining slots with weighted random deals
-  while (pipeline.length < Math.min(MAX_DEALS, pipeline.length + targetNewDeals)) {
+  // H-4: Compute target once before loop to prevent infinite loop
+  const targetPipelineLength = Math.min(MAX_DEALS, pipeline.length + targetNewDeals);
+  while (pipeline.length < targetPipelineLength) {
     const sectorId = pickWeightedSector(round);
     pipeline.push(generateDealWithSize(sectorId, round, maFocus?.sizePreference || 'any'));
   }
@@ -554,7 +569,8 @@ export function generateSourcedDeals(
     deals.push(generateDealWithSize(pickWeightedSector(round), round, 'any'));
   } else {
     // No focus set - generate diverse deals
-    const sectors = SECTOR_LIST.sort(() => Math.random() - 0.5).slice(0, 3);
+    // M-11: Spread to avoid mutating global SECTOR_LIST
+    const sectors = [...SECTOR_LIST].sort(() => Math.random() - 0.5).slice(0, 3);
     sectors.forEach(sector => {
       deals.push(generateDealWithSize(sector.id, round, 'any'));
     });

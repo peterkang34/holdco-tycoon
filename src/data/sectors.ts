@@ -248,6 +248,6 @@ export const SECTORS: Record<string, SectorDefinition> = {
 
 export const SECTOR_LIST = Object.values(SECTORS);
 
-export function getSectorById(id: string): SectorDefinition {
+export function getSectorById(id: string): SectorDefinition | undefined {
   return SECTORS[id];
 }

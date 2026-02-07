@@ -5,17 +5,20 @@ import {
   EventImpact,
   ExitValuation,
   SectorFocusBonus,
+  SectorFocusGroup,
   SectorFocusTier,
   Metrics,
   HistoricalMetrics,
   randomInRange,
   randomInt,
   pickRandom,
+  formatMoney,
 } from './types';
 import { SECTORS } from '../data/sectors';
 import { GLOBAL_EVENTS, PORTFOLIO_EVENTS, SECTOR_EVENTS, SectorEventDefinition } from '../data/events';
 
 const TAX_RATE = 0.30;
+const MAX_ORGANIC_GROWTH_RATE = 0.20; // M-4: Cap on growth rate accumulation
 
 // Calculate exit valuation for a business with full breakdown
 export function calculateExitValuation(
@@ -26,8 +29,10 @@ export function calculateExitValuation(
   // Start with acquisition multiple as baseline
   const baseMultiple = business.acquisitionMultiple;
 
-  // EBITDA growth premium: if EBITDA grew, you've created value
-  const ebitdaGrowth = (business.ebitda - business.acquisitionEbitda) / business.acquisitionEbitda;
+  // C-1: Guard against division by zero when acquisitionEbitda is 0
+  const ebitdaGrowth = business.acquisitionEbitda > 0
+    ? (business.ebitda - business.acquisitionEbitda) / business.acquisitionEbitda
+    : 0;
   const growthPremium = ebitdaGrowth > 0 ? Math.min(1.0, ebitdaGrowth * 0.5) : ebitdaGrowth * 0.3;
 
   // Quality premium: higher quality businesses command higher multiples
@@ -124,7 +129,10 @@ export function calculateSharedServicesBenefits(state: GameState): {
 } {
   const activeServices = state.sharedServices.filter(s => s.active);
   const opcoCount = state.businesses.filter(b => b.status === 'active').length;
-  const scaleMultiplier = opcoCount >= 5 ? 1.2 : 1.0;
+
+  // L-10: Smooth ramp instead of binary cliff at 5 opcos
+  // 1-2 opcos: 1.0x, 3: 1.05x, 4: 1.1x, 5: 1.15x, 6+: 1.2x
+  const scaleMultiplier = opcoCount >= 6 ? 1.2 : opcoCount >= 3 ? 1.0 + (opcoCount - 2) * 0.05 : 1.0;
 
   let capexReduction = 0;
   let cashConversionBonus = 0;
@@ -197,7 +205,7 @@ export function calculateSectorFocusBonus(businesses: Business[]): SectorFocusBo
   else tier = 1;
 
   return {
-    focusGroup: maxGroup as any,
+    focusGroup: maxGroup as SectorFocusGroup, // M-2: Proper type cast instead of `as any`
     tier,
     opcoCount: maxCount,
   };
@@ -235,8 +243,11 @@ export function applyOrganicGrowth(
 ): Business {
   const sector = SECTORS[business.sectorId];
 
+  // M-4: Cap the organic growth rate before applying
+  const cappedGrowthRate = Math.min(MAX_ORGANIC_GROWTH_RATE, Math.max(-0.10, business.organicGrowthRate));
+
   // Base annual growth (each round = 1 year)
-  let annualGrowth = business.organicGrowthRate;
+  let annualGrowth = cappedGrowthRate;
 
   // Sector volatility (random variation within the year)
   annualGrowth += sector.volatility * (Math.random() * 2 - 1);
@@ -260,6 +271,11 @@ export function applyOrganicGrowth(
     annualGrowth -= (0.03 + Math.random() * 0.05);
   }
 
+  // H-2: Inflation increases effective capex, reducing growth
+  if (inflationActive) {
+    annualGrowth -= 0.03; // Inflation drags growth by 3% (higher costs)
+  }
+
   // Calculate new EBITDA
   let newEbitda = Math.round(business.ebitda * (1 + annualGrowth));
 
@@ -273,11 +289,15 @@ export function applyOrganicGrowth(
   // Decrease integration period (now in years)
   const newIntegration = Math.max(0, business.integrationRoundsRemaining - 1);
 
+  // M-4: Also cap the stored growth rate to prevent runaway accumulation
+  const newGrowthRate = Math.min(MAX_ORGANIC_GROWTH_RATE, Math.max(-0.10, business.organicGrowthRate));
+
   return {
     ...business,
     ebitda: newEbitda,
     peakEbitda: newPeak,
     integrationRoundsRemaining: newIntegration,
+    organicGrowthRate: newGrowthRate,
   };
 }
 
@@ -313,15 +333,18 @@ export function generateEvent(state: GameState): GameEvent | null {
       let adjustedProb = eventDef.probability;
 
       // Adjust talent events based on shared services
+      // H-1: Clamp adjusted probabilities to prevent exceeding 1.0
       if (eventDef.type === 'portfolio_talent_leaves') {
-        adjustedProb *= 1 - sharedServicesBenefits.talentRetentionBonus;
+        adjustedProb *= Math.max(0, 1 - sharedServicesBenefits.talentRetentionBonus);
       } else if (eventDef.type === 'portfolio_star_joins') {
         adjustedProb *= 1 + sharedServicesBenefits.talentGainBonus;
       }
 
       cumulativeProb += adjustedProb;
-      if (portfolioRoll < cumulativeProb) {
+      // H-1: Cap cumulative probability at 1.0
+      if (portfolioRoll < Math.min(1.0, cumulativeProb)) {
         const affectedBusiness = pickRandom(activeBusinesses);
+        if (!affectedBusiness) break; // C-2: Guard against empty array
         return {
           id: `event_${state.round}_${eventDef.type}`,
           type: eventDef.type,
@@ -348,6 +371,7 @@ export function generateEvent(state: GameState): GameEvent | null {
       cumulativeProb += eventDef.probability;
       if (sectorRoll < cumulativeProb) {
         const sectorBusinesses = activeBusinesses.filter(b => b.sectorId === eventDef.sectorId);
+        if (sectorBusinesses.length === 0) continue; // C-2: Guard against empty array
         const affectedBusiness = eventDef.affectsAll ? undefined : pickRandom(sectorBusinesses);
 
         return {
@@ -364,25 +388,31 @@ export function generateEvent(state: GameState): GameEvent | null {
     }
   }
 
-  // Roll for unsolicited offer (5% per opco)
-  for (const business of activeBusinesses) {
-    if (Math.random() < 0.05) {
-      const sector = SECTORS[business.sectorId];
-      const baseMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
-      const premiumMultiple = baseMultiple * (1.2 + Math.random() * 0.6); // 1.2x to 1.8x market
-      const offerAmount = Math.round(business.ebitda * premiumMultiple);
+  // M-13: Roll for unsolicited offer - pick random business instead of iterating
+  // (fixes bias toward earlier businesses in the array)
+  if (activeBusinesses.length > 0) {
+    const offerChance = 1 - Math.pow(0.95, activeBusinesses.length); // Combined probability
+    if (Math.random() < offerChance) {
+      const business = pickRandom(activeBusinesses);
+      if (business) {
+        const sector = SECTORS[business.sectorId];
+        const baseMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
+        const premiumMultiple = baseMultiple * (1.2 + Math.random() * 0.6);
+        const offerAmount = Math.round(business.ebitda * premiumMultiple);
 
-      return {
-        id: `event_${state.round}_unsolicited_${business.id}`,
-        type: 'unsolicited_offer',
-        title: 'Unsolicited Acquisition Offer',
-        description: `A buyer has approached you with an offer to acquire ${business.name} for ${formatMoney(offerAmount)} (${premiumMultiple.toFixed(1)}x EBITDA).`,
-        effect: 'Accept to sell immediately, or decline to keep the business',
-        tip: "The best holdcos know when to sell. If the price is right and you can redeploy capital at higher returns, it's worth considering.",
-        tipSource: 'Ch. IV',
-        affectedBusinessId: business.id,
-        offerAmount,
-      };
+        // M-1: Use canonical formatMoney from types.ts
+        return {
+          id: `event_${state.round}_unsolicited_${business.id}`,
+          type: 'unsolicited_offer',
+          title: 'Unsolicited Acquisition Offer',
+          description: `A buyer has approached you with an offer to acquire ${business.name} for ${formatMoney(offerAmount)} (${premiumMultiple.toFixed(1)}x EBITDA).`,
+          effect: 'Accept to sell immediately, or decline to keep the business',
+          tip: "The best holdcos know when to sell. If the price is right and you can redeploy capital at higher returns, it's worth considering.",
+          tipSource: 'Ch. IV',
+          affectedBusinessId: business.id,
+          offerAmount,
+        };
+      }
     }
   }
 
@@ -396,17 +426,12 @@ export function generateEvent(state: GameState): GameEvent | null {
   };
 }
 
-function formatMoney(amount: number): string {
-  if (amount >= 1000) {
-    return `$${(amount / 1000).toFixed(1)}M`;
-  }
-  return `$${amount}k`;
-}
-
 export function applyEventEffects(state: GameState, event: GameEvent): GameState {
   let newState = { ...state };
-  const activeBusinesses = newState.businesses.filter(b => b.status === 'active');
   const impacts: EventImpact[] = [];
+
+  // M-4: Helper to cap growth rate changes
+  const capGrowthRate = (rate: number) => Math.min(MAX_ORGANIC_GROWTH_RATE, Math.max(-0.10, rate));
 
   switch (event.type) {
     case 'global_bull_market': {
@@ -462,7 +487,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
         before,
         after,
         delta: after - before,
-        deltaPercent: (after - before) / before,
+        deltaPercent: before > 0 ? (after - before) / before : 0,
       });
       break;
     }
@@ -477,7 +502,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
         before,
         after,
         delta: after - before,
-        deltaPercent: (after - before) / before,
+        deltaPercent: before > 0 ? (after - before) / before : 0,
       });
       break;
     }
@@ -510,7 +535,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
           return {
             ...b,
             ebitda: after,
-            organicGrowthRate: b.organicGrowthRate + 0.02,
+            organicGrowthRate: capGrowthRate(b.organicGrowthRate + 0.02), // M-4: Cap
           };
         });
       }
@@ -535,7 +560,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
           return {
             ...b,
             ebitda: after,
-            organicGrowthRate: b.organicGrowthRate - 0.015,
+            organicGrowthRate: capGrowthRate(b.organicGrowthRate - 0.015), // M-4: Cap
           };
         });
       }
@@ -631,13 +656,15 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
           });
           return { ...b, ebitda: after };
         });
+        // C-3: Floor cash at 0 for event costs
+        const complianceCost = Math.min(500, state.cash);
         impacts.push({
           metric: 'cash',
           before: state.cash,
-          after: state.cash - 500,
-          delta: -500,
+          after: state.cash - complianceCost,
+          delta: -complianceCost,
         });
-        newState.cash -= 500; // $500k cost
+        newState.cash -= complianceCost;
       }
       break;
     }
@@ -670,7 +697,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
             });
             let updated = { ...b, ebitda: after };
             if (sectorEvent.growthEffect) {
-              updated.organicGrowthRate += sectorEvent.growthEffect;
+              updated.organicGrowthRate = capGrowthRate(updated.organicGrowthRate + sectorEvent.growthEffect); // M-4
             }
             return updated;
           });
@@ -691,21 +718,22 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
             });
             let updated = { ...b, ebitda: after };
             if (sectorEvent.growthEffect) {
-              updated.organicGrowthRate += sectorEvent.growthEffect;
+              updated.organicGrowthRate = capGrowthRate(updated.organicGrowthRate + sectorEvent.growthEffect); // M-4
             }
             return updated;
           });
         }
 
-        // Apply cost if any
+        // Apply cost if any - C-3: Floor cash at 0
         if (sectorEvent.costAmount) {
+          const actualCost = Math.min(sectorEvent.costAmount, newState.cash);
           impacts.push({
             metric: 'cash',
-            before: state.cash,
-            after: state.cash - sectorEvent.costAmount,
-            delta: -sectorEvent.costAmount,
+            before: newState.cash,
+            after: newState.cash - actualCost,
+            delta: -actualCost,
           });
-          newState.cash -= sectorEvent.costAmount;
+          newState.cash -= actualCost;
         }
       }
       break;
@@ -742,9 +770,10 @@ export function calculateMetrics(state: GameState): Metrics {
     sharedServicesBenefits.cashConversionBonus
   );
 
-  // Total debt (holdco + opco level)
+  // Total debt (holdco + opco level seller notes only)
+  // L-13: Bank debt is tracked at holdco level (state.totalDebt) only
   const opcoDebt = activeBusinesses.reduce(
-    (sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance,
+    (sum, b) => sum + b.sellerNoteBalance,
     0
   );
   const totalDebt = state.totalDebt + opcoDebt;
@@ -752,17 +781,17 @@ export function calculateMetrics(state: GameState): Metrics {
   // Interest expense
   const annualInterest = state.totalDebt * state.interestRate;
   const opcoInterest = activeBusinesses.reduce(
-    (sum, b) => sum + b.sellerNoteBalance * b.sellerNoteRate + b.bankDebtBalance * state.interestRate,
+    (sum, b) => sum + b.sellerNoteBalance * b.sellerNoteRate,
     0
   );
 
-  // Net FCF after interest
-  const netFcf = totalFcf - annualInterest - opcoInterest;
-
-  // Shared services annual cost
+  // H-5: Shared services annual cost deducted from FCF metrics
   const sharedServicesCost = state.sharedServices
     .filter(s => s.active)
     .reduce((sum, s) => sum + s.annualCost, 0);
+
+  // Net FCF after interest and shared services costs
+  const netFcf = totalFcf - annualInterest - opcoInterest - sharedServicesCost;
 
   // Portfolio value (using sector average multiples)
   const portfolioValue = activeBusinesses.reduce((sum, b) => {
@@ -773,10 +802,14 @@ export function calculateMetrics(state: GameState): Metrics {
 
   // Intrinsic value per share
   const intrinsicValue = portfolioValue + state.cash - totalDebt;
-  const intrinsicValuePerShare = intrinsicValue / state.sharesOutstanding;
+  const intrinsicValuePerShare = state.sharesOutstanding > 0
+    ? intrinsicValue / state.sharesOutstanding
+    : 0;
 
   // FCF per share
-  const fcfPerShare = netFcf / state.sharesOutstanding;
+  const fcfPerShare = state.sharesOutstanding > 0
+    ? netFcf / state.sharesOutstanding
+    : 0;
 
   // ROIC
   const nopat = totalEbitda * (1 - TAX_RATE);

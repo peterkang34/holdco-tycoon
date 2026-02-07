@@ -129,8 +129,14 @@ Be direct and specific. Reference their actual numbers. Don't be generic. Respon
       return res.status(500).json({ error: 'No content generated' });
     }
 
-    // Parse and validate the JSON response
-    const parsed = JSON.parse(content);
+    // L-8: Parse and validate the JSON response with error handling
+    let parsed;
+    try {
+      parsed = JSON.parse(content);
+    } catch {
+      console.error('Failed to parse AI response as JSON:', content.slice(0, 200));
+      return res.status(500).json({ error: 'AI returned invalid JSON' });
+    }
 
     return res.status(200).json({
       overallAssessment: parsed.overallAssessment || '',

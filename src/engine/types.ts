@@ -45,6 +45,8 @@ export interface SectorDefinition {
   subTypes: string[];
 }
 
+export type BusinessStatus = 'active' | 'sold' | 'wound_down' | 'integrated';
+
 export type QualityRating = 1 | 2 | 3 | 4 | 5;
 
 export interface DueDiligenceSignals {
@@ -82,7 +84,7 @@ export interface Business {
   bankDebtBalance: number;
   earnoutRemaining: number;
   earnoutTarget: number;
-  status: 'active' | 'sold' | 'wound_down';
+  status: BusinessStatus;
   exitPrice?: number;
   exitRound?: number;
 
@@ -386,6 +388,7 @@ export function randomInt(min: number, max: number): number {
 }
 
 export function pickRandom<T>(array: T[]): T {
+  if (array.length === 0) return undefined as T;
   return array[Math.floor(Math.random() * array.length)];
 }
 
