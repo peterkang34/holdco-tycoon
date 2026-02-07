@@ -36,22 +36,30 @@ Write 2-3 sentences about what happened at this business this year. Include a sp
 }
 
 function buildYearChroniclePrompt(context: Record<string, unknown>): string {
-  return `You are writing the annual chronicle for a holding company in a business simulation. Summarize the year's events in a compelling narrative.
+  return `You are writing the annual chronicle for a holding company in a business simulation. Be HONEST and balanced — if the financials are stressed, say so. Do not sugarcoat bad numbers.
 
 HOLDCO NAME: ${context.holdcoName}
 YEAR: ${context.year}
-KEY METRICS:
-- Total EBITDA: ${context.totalEbitda}
+
+FINANCIAL SNAPSHOT:
+- Total EBITDA: ${context.totalEbitda}${context.prevTotalEbitda ? ` (prior year: ${context.prevTotalEbitda})` : ''}
+- Free Cash Flow: ${context.fcf}
 - Cash Position: ${context.cash}
-- Portfolio Companies: ${context.portfolioCount}
+- Total Debt: ${context.totalDebt}
+- Interest Expense: ${context.interestExpense}
 - Net Debt/EBITDA: ${context.leverage}
+- Portfolio Companies: ${context.portfolioCount}
 
 THIS YEAR'S ACTIONS:
 ${context.actions || 'Quiet year of organic growth'}
 
 MARKET CONDITIONS: ${context.marketConditions || 'Normal'}
+${context.concerns ? `\nKEY CONCERNS: ${context.concerns}` : ''}
+${context.positives ? `\nBRIGHT SPOTS: ${context.positives}` : ''}
 
-Write a 3-4 sentence chronicle of this year for ${context.holdcoName}. Use a narrative, almost literary style - like the opening of an annual letter to shareholders. Reference specific actions taken. Keep it under 80 words. Respond with just the narrative text.`;
+IMPORTANT: Your tone MUST match the financial reality. If FCF is negative, leverage is high, or interest is eating EBITDA — the tone should reflect the strain, risk, and pressure. Aggressive acquisitions funded by debt deserve cautious commentary, not celebration. Only be optimistic when the numbers justify it.
+
+Write a 3-4 sentence chronicle of this year for ${context.holdcoName}. Use a narrative style like a shareholder letter. Reference specific financial realities (FCF, leverage, cash). Keep it under 80 words. Respond with just the narrative text.`;
 }
 
 function buildDealStoryPrompt(context: Record<string, unknown>): string {

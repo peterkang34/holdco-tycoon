@@ -1122,26 +1122,45 @@ export const useGameStore = create<GameStore>()(
         const activeBusinesses = state.businesses.filter(b => b.status === 'active');
         const metrics = calculateMetrics(state);
 
-        // Build actions summary
+        // Build detailed actions summary
         const actionsThisRound = state.actionsThisRound;
-        let actionsSummary = '';
+        const actionParts: string[] = [];
 
         const acquisitions = actionsThisRound.filter(a => a.type === 'acquire' || a.type === 'acquire_tuck_in');
         const sales = actionsThisRound.filter(a => a.type === 'sell');
         const improvements = actionsThisRound.filter(a => a.type === 'improve');
+        const debtPaydowns = actionsThisRound.filter(a => a.type === 'pay_debt');
+        const equityRaises = actionsThisRound.filter(a => a.type === 'issue_equity');
+        const distributions = actionsThisRound.filter(a => a.type === 'distribute');
+        const buybacks = actionsThisRound.filter(a => a.type === 'buyback');
 
         if (acquisitions.length > 0) {
-          actionsSummary += `Acquired ${acquisitions.length} business${acquisitions.length > 1 ? 'es' : ''}. `;
+          const totalSpent = acquisitions.reduce((sum, a) => sum + ((a.details?.cost as number) || (a.details?.askingPrice as number) || 0), 0);
+          actionParts.push(`Acquired ${acquisitions.length} business${acquisitions.length > 1 ? 'es' : ''}${totalSpent > 0 ? ` for ${formatMoney(totalSpent)} total` : ''}`);
         }
         if (sales.length > 0) {
-          actionsSummary += `Sold ${sales.length} business${sales.length > 1 ? 'es' : ''}. `;
+          actionParts.push(`Sold ${sales.length} business${sales.length > 1 ? 'es' : ''}`);
         }
         if (improvements.length > 0) {
-          actionsSummary += `Made ${improvements.length} operational improvement${improvements.length > 1 ? 's' : ''}. `;
+          actionParts.push(`Made ${improvements.length} operational improvement${improvements.length > 1 ? 's' : ''}`);
         }
-        if (!actionsSummary) {
-          actionsSummary = 'Focused on organic growth and portfolio management.';
+        if (debtPaydowns.length > 0) {
+          const totalPaid = debtPaydowns.reduce((sum, a) => sum + ((a.details?.amount as number) || 0), 0);
+          if (totalPaid > 0) actionParts.push(`Paid down ${formatMoney(totalPaid)} in debt`);
         }
+        if (equityRaises.length > 0) {
+          actionParts.push('Raised equity capital');
+        }
+        if (distributions.length > 0) {
+          actionParts.push('Made distributions to owners');
+        }
+        if (buybacks.length > 0) {
+          actionParts.push('Bought back shares');
+        }
+
+        const actionsSummary = actionParts.length > 0
+          ? actionParts.join('. ') + '.'
+          : 'Focused on organic growth and portfolio management.';
 
         // Get market conditions from last event
         const lastEvent = state.eventHistory[state.eventHistory.length - 1];
@@ -1151,24 +1170,55 @@ export const useGameStore = create<GameStore>()(
           else if (lastEvent.type === 'global_bull_market') marketConditions = 'Bull market conditions';
           else if (lastEvent.type === 'global_inflation') marketConditions = 'Inflationary pressures';
           else if (lastEvent.type === 'global_credit_tightening') marketConditions = 'Tight credit markets';
+          else if (lastEvent.type === 'global_interest_hike') marketConditions = 'Rising interest rates';
+          else if (lastEvent.type === 'global_interest_cut') marketConditions = 'Falling interest rates';
         }
 
+        // Calculate financial health signals
+        const totalDebt = metrics.totalDebt;
+        const interestExpense = Math.round(totalDebt * metrics.interestRate);
+        const fcf = metrics.totalFcf;
+
+        // Build concerns and positives for balanced commentary
+        const concerns: string[] = [];
+        const positives: string[] = [];
+
+        if (fcf < 0) concerns.push(`Negative free cash flow of ${formatMoney(fcf)}`);
+        if (metrics.netDebtToEbitda > 3) concerns.push(`High leverage at ${metrics.netDebtToEbitda.toFixed(1)}x net debt/EBITDA`);
+        if (interestExpense > metrics.totalEbitda * 0.3) concerns.push(`Interest expense (${formatMoney(interestExpense)}) consuming ${Math.round(interestExpense / metrics.totalEbitda * 100)}% of EBITDA`);
+        if (state.cash < metrics.totalEbitda * 0.5 && totalDebt > 0) concerns.push('Thin cash cushion relative to obligations');
+
+        if (fcf > 0 && metrics.totalEbitda > 0) positives.push(`Generating ${formatMoney(fcf)} in free cash flow`);
+        if (metrics.netDebtToEbitda < 1 && metrics.netDebtToEbitda >= 0) positives.push('Conservative balance sheet');
+        if (metrics.portfolioRoic > 0.15) positives.push(`Strong ${Math.round(metrics.portfolioRoic * 100)}% ROIC`);
+
+        // Get previous year EBITDA for comparison
+        const prevMetrics = state.metricsHistory.length > 0
+          ? state.metricsHistory[state.metricsHistory.length - 1]
+          : null;
+        const prevTotalEbitda = prevMetrics ? formatMoney(prevMetrics.metrics.totalEbitda) : undefined;
+
         try {
-          const chronicle = await generateYearChronicle(
-            state.holdcoName,
-            state.round,
-            formatMoney(metrics.totalEbitda),
-            formatMoney(state.cash),
-            activeBusinesses.length,
-            metrics.netDebtToEbitda < 0 ? 'Net cash position' : `${metrics.netDebtToEbitda.toFixed(1)}x`,
-            actionsSummary,
-            marketConditions
-          );
+          const chronicle = await generateYearChronicle({
+            holdcoName: state.holdcoName,
+            year: state.round,
+            totalEbitda: formatMoney(metrics.totalEbitda),
+            prevTotalEbitda,
+            cash: formatMoney(state.cash),
+            portfolioCount: activeBusinesses.length,
+            leverage: metrics.netDebtToEbitda < 0 ? 'Net cash position' : `${metrics.netDebtToEbitda.toFixed(1)}x`,
+            totalDebt: formatMoney(totalDebt),
+            fcf: formatMoney(fcf),
+            interestExpense: formatMoney(interestExpense),
+            actions: actionsSummary,
+            marketConditions,
+            concerns: concerns.length > 0 ? concerns.join('; ') : undefined,
+            positives: positives.length > 0 ? positives.join('; ') : undefined,
+          });
 
           set({ yearChronicle: chronicle });
         } catch (error) {
           console.error('Failed to generate year chronicle:', error);
-          // Use a fallback
           set({
             yearChronicle: `Year ${state.round} saw ${state.holdcoName} continue to build its portfolio. ${actionsSummary}`,
           });

@@ -225,4 +225,14 @@ export const POST_GAME_INSIGHTS: Record<string, { pattern: string; insight: stri
     insight: "Buybacks when your capital has nowhere better to go is exactly right. You followed the distribution hierarchy.",
     bookReference: 'Ch. VII',
   },
+  smart_distributions: {
+    pattern: 'Disciplined capital return',
+    insight: "You returned capital when reinvestment returns declined — exactly right. The best allocators know when to stop compounding and start returning.",
+    bookReference: 'Ch. VII',
+  },
+  hoarded_cash: {
+    pattern: 'Excess idle cash',
+    insight: "Cash on the balance sheet earning nothing is a drag on returns. When you can't find deals above hurdle rate, return capital to owners — don't let it rot.",
+    bookReference: 'Ch. VII',
+  },
 };

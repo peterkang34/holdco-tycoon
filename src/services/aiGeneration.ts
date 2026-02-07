@@ -359,25 +359,24 @@ export async function generateBusinessUpdate(
 
 // Generate year-end chronicle
 export async function generateYearChronicle(
-  holdcoName: string,
-  year: number,
-  totalEbitda: string,
-  cash: string,
-  portfolioCount: number,
-  leverage: string,
-  actions?: string,
-  marketConditions?: string
+  context: {
+    holdcoName: string;
+    year: number;
+    totalEbitda: string;
+    prevTotalEbitda?: string;
+    cash: string;
+    portfolioCount: number;
+    leverage: string;
+    totalDebt: string;
+    fcf: string;
+    interestExpense: string;
+    actions?: string;
+    marketConditions?: string;
+    concerns?: string;
+    positives?: string;
+  }
 ): Promise<string | null> {
-  return generateNarrative('year_chronicle', {
-    holdcoName,
-    year,
-    totalEbitda,
-    cash,
-    portfolioCount,
-    leverage,
-    actions,
-    marketConditions,
-  });
+  return generateNarrative('year_chronicle', context);
 }
 
 // Fallback narratives for when AI is not available

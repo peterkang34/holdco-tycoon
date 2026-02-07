@@ -37,6 +37,7 @@ interface AllocatePhaseProps {
   round: number;
   equityRaisesUsed: number;
   sharesOutstanding: number;
+  founderShares: number;
   totalBuybacks: number;
   totalDistributions: number;
   intrinsicValuePerShare: number;
@@ -74,6 +75,7 @@ export function AllocatePhase({
   round,
   equityRaisesUsed,
   sharesOutstanding,
+  founderShares,
   totalBuybacks,
   totalDistributions,
   intrinsicValuePerShare,
@@ -882,49 +884,73 @@ export function AllocatePhase({
             })()}
 
             {/* Cap Table / Equity Summary */}
-            <div className="card bg-white/5">
-              <h4 className="font-bold mb-3">Cap Table & Equity</h4>
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
-                <div>
-                  <p className="text-text-muted">Starting Shares</p>
-                  <p className="font-mono font-bold text-lg">{STARTING_SHARES}</p>
+            {(() => {
+              const founderOwnership = founderShares / sharesOutstanding;
+              const outsideShares = sharesOutstanding - founderShares;
+              return (
+                <div className="card bg-white/5">
+                  <h4 className="font-bold mb-3">Cap Table & Equity</h4>
+
+                  {/* Ownership bar */}
+                  <div className="mb-4">
+                    <div className="flex justify-between text-xs text-text-muted mb-1">
+                      <span>You: {(founderOwnership * 100).toFixed(1)}%</span>
+                      <span>Investors: {((1 - founderOwnership) * 100).toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden flex">
+                      <div
+                        className={`h-full transition-all ${founderOwnership > 0.6 ? 'bg-accent' : founderOwnership > 0.51 ? 'bg-warning' : 'bg-danger'}`}
+                        style={{ width: `${founderOwnership * 100}%` }}
+                      />
+                    </div>
+                    {founderOwnership < 0.55 && (
+                      <p className="text-xs text-warning mt-1">Control at risk — you must stay above 51%</p>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                    <div>
+                      <p className="text-text-muted">Your Shares</p>
+                      <p className="font-mono font-bold text-lg">{founderShares.toFixed(0)}</p>
+                      <p className="text-xs text-text-muted">Fixed — never diluted</p>
+                    </div>
+                    <div>
+                      <p className="text-text-muted">Outside Shares</p>
+                      <p className="font-mono font-bold text-lg">{outsideShares.toFixed(0)}</p>
+                      <p className="text-xs text-text-muted">
+                        {outsideShares > STARTING_SHARES * 0.2
+                          ? `+${(outsideShares - STARTING_SHARES * 0.2).toFixed(0)} since start`
+                          : outsideShares < STARTING_SHARES * 0.2
+                          ? `${(STARTING_SHARES * 0.2 - outsideShares).toFixed(0)} bought back`
+                          : 'Initial 200 from raise'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-text-muted">Total Outstanding</p>
+                      <p className="font-mono font-bold text-lg">{sharesOutstanding.toFixed(0)}</p>
+                      <p className={`text-xs ${sharesOutstanding > STARTING_SHARES ? 'text-warning' : sharesOutstanding < STARTING_SHARES ? 'text-accent' : 'text-text-muted'}`}>
+                        {sharesOutstanding > STARTING_SHARES
+                          ? `+${((sharesOutstanding / STARTING_SHARES - 1) * 100).toFixed(0)}% since start`
+                          : sharesOutstanding < STARTING_SHARES
+                          ? `-${((1 - sharesOutstanding / STARTING_SHARES) * 100).toFixed(0)}% accretive`
+                          : 'No change'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-text-muted">Value/Share</p>
+                      <p className="font-mono font-bold text-lg">{formatMoney(intrinsicValuePerShare)}</p>
+                      <p className="text-xs text-text-muted">Intrinsic value</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 p-3 bg-white/5 rounded text-xs text-text-muted">
+                    <strong>How equity works:</strong> You started with 1,000 total shares — 800 yours (80%), 200 sold to investors for {formatMoney(20000)}.
+                    Issuing new shares raises cash but dilutes your ownership %. Buybacks retire outside shares, increasing your % back.
+                    You must always hold &gt;51% to keep control.
+                  </div>
                 </div>
-                <div>
-                  <p className="text-text-muted">Shares Issued</p>
-                  <p className="font-mono font-bold text-lg text-warning">
-                    +{Math.max(0, sharesOutstanding - STARTING_SHARES + (totalBuybacks / intrinsicValuePerShare)).toFixed(0)}
-                  </p>
-                  <p className="text-xs text-text-muted">{equityRaisesUsed}/3 raises used</p>
-                </div>
-                <div>
-                  <p className="text-text-muted">Shares Bought Back</p>
-                  <p className="font-mono font-bold text-lg text-accent">
-                    -{(totalBuybacks / Math.max(1, intrinsicValuePerShare)).toFixed(0)}
-                  </p>
-                  <p className="text-xs text-text-muted">{formatMoney(totalBuybacks)} spent</p>
-                </div>
-                <div>
-                  <p className="text-text-muted">Outstanding</p>
-                  <p className="font-mono font-bold text-lg">{sharesOutstanding.toFixed(0)}</p>
-                  <p className={`text-xs ${sharesOutstanding > STARTING_SHARES ? 'text-warning' : sharesOutstanding < STARTING_SHARES ? 'text-accent' : 'text-text-muted'}`}>
-                    {sharesOutstanding > STARTING_SHARES
-                      ? `+${((sharesOutstanding / STARTING_SHARES - 1) * 100).toFixed(0)}% dilution`
-                      : sharesOutstanding < STARTING_SHARES
-                      ? `-${((1 - sharesOutstanding / STARTING_SHARES) * 100).toFixed(0)}% accretive`
-                      : 'No change'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-text-muted">Value/Share</p>
-                  <p className="font-mono font-bold text-lg">{formatMoney(intrinsicValuePerShare)}</p>
-                  <p className="text-xs text-text-muted">Intrinsic value</p>
-                </div>
-              </div>
-              <div className="mt-4 p-3 bg-white/5 rounded text-xs text-text-muted">
-                <strong>Equity mechanics:</strong> Issuing shares raises cash but dilutes FCF/share. Buybacks use cash but increase FCF/share.
-                Distributions return cash to owners without affecting share count. Berkshire has never diluted for acquisitions.
-              </div>
-            </div>
+              );
+            })()}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Pay Down Holdco Debt */}
@@ -961,8 +987,11 @@ export function AllocatePhase({
             {/* Issue Equity */}
             <div className="card">
               <h4 className="font-bold mb-3">Issue Equity</h4>
-              <p className="text-sm text-text-muted mb-4">
-                Raises used: {equityRaisesUsed}/3 | Value/share: {formatMoney(intrinsicValuePerShare)}
+              <p className="text-sm text-text-muted mb-2">
+                Sell new shares to outside investors at current value/share ({formatMoney(intrinsicValuePerShare)}).
+              </p>
+              <p className="text-xs text-text-muted mb-4">
+                Your ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% | {equityRaisesUsed} raise{equityRaisesUsed !== 1 ? 's' : ''} so far
               </p>
               <div className="flex gap-2">
                 <input
@@ -980,13 +1009,12 @@ export function AllocatePhase({
                       setEquityAmount('');
                     }
                   }}
-                  disabled={!equityAmount || parseInt(equityAmount) <= 0 || round <= 3 || equityRaisesUsed >= 3}
+                  disabled={!equityAmount || parseInt(equityAmount) <= 0}
                   className="btn-primary text-sm"
                 >
                   Issue
                 </button>
               </div>
-              {round <= 3 && <p className="text-xs text-warning mt-2">Available after Year 3</p>}
             </div>
 
             {/* Buyback Shares */}
@@ -1048,7 +1076,7 @@ export function AllocatePhase({
                 </button>
               </div>
               <p className="text-xs text-text-muted">
-                <strong>Scoring:</strong> Distributions are penalized if ROIIC is high (should reinvest) or if leverage is high (should deleverage first). Follow the hierarchy: reinvest → deleverage → buyback → distribute.
+                <strong>Scoring:</strong> Distributing when ROIIC is low and leverage is healthy earns points. But distributing while ROIIC is high (should reinvest) or leverage is high (should deleverage) costs points. Hoarding excess cash also hurts. Follow the hierarchy: reinvest → deleverage → buyback → distribute.
               </p>
             </div>
           </div>

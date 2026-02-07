@@ -175,33 +175,56 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
     sharedServicesScore = Math.min(5, activeServices.length * 1.5);
   }
 
-  // Distribution hierarchy adherence (5 points)
+  // Capital return discipline (5 points)
   // The hierarchy: 1) Reinvest above hurdle, 2) Deleverage, 3) Buyback when cheap, 4) Distribute
-  let distributionScore = 5;
+  // Both hoarding cash AND distributing at the wrong time are penalized.
+  let distributionScore = 0;
 
-  // Check if player distributed at all
   const madeDistributions = state.totalDistributions > 0;
+  const avgRoiicDuringGame = state.metricsHistory.length > 0
+    ? state.metricsHistory.reduce((sum, h) => sum + h.metrics.roiic, 0) / state.metricsHistory.length
+    : 0;
+
+  // Idle cash penalty: ending with excess cash and low leverage means you should have returned capital
+  const cashToEbitda = metrics.totalEbitda > 0 ? state.cash / metrics.totalEbitda : 0;
+  const hasExcessCash = cashToEbitda > 2.0 && metrics.netDebtToEbitda < 1.0;
 
   if (madeDistributions) {
-    // Check average ROIIC during the game - did they distribute while returns were high?
-    const avgRoiicDuringGame = state.metricsHistory.length > 0
-      ? state.metricsHistory.reduce((sum, h) => sum + h.metrics.roiic, 0) / state.metricsHistory.length
+    // Base: well-timed distributions earn points
+    if (avgRoiicDuringGame < 0.15 && metrics.netDebtToEbitda < 2.0) {
+      // Distributed when reinvestment returns were modest and balance sheet was healthy — good discipline
+      distributionScore += 4;
+    } else if (avgRoiicDuringGame < 0.20 && metrics.netDebtToEbitda < 2.5) {
+      // Acceptable — returns were decent but not great, leverage manageable
+      distributionScore += 2;
+    } else {
+      // Distributed while ROIIC was high (should have reinvested) or leverage was high (should have deleveraged)
+      distributionScore += 0;
+    }
+
+    // Penalty for distributing while ending with leverage > 2.5x
+    if (metrics.netDebtToEbitda > 2.5) {
+      distributionScore = Math.max(0, distributionScore - 2);
+    }
+
+    // Bonus for meaningful capital return (not token amounts)
+    const distributionPct = state.totalInvestedCapital > 0
+      ? state.totalDistributions / state.totalInvestedCapital
       : 0;
-
-    // Penalty for distributing while average ROIIC > 20%
-    if (avgRoiicDuringGame > 0.20) {
-      distributionScore -= 2;
-    }
-
-    // Penalty for distributing while ending with leverage > 2x
-    // (indicates should have paid down debt instead)
-    if (metrics.netDebtToEbitda > 2) {
-      distributionScore -= 2;
-    }
-
-    // Bonus for only distributing when returns dropped
-    if (avgRoiicDuringGame < 0.10 && metrics.netDebtToEbitda < 1.5 && state.totalDistributions > 0) {
+    if (distributionPct > 0.10 && metrics.netDebtToEbitda < 1.5) {
       distributionScore = Math.min(5, distributionScore + 1);
+    }
+  } else {
+    // Never distributed — fine if capital was well-deployed, penalized if hoarding
+    if (hasExcessCash) {
+      // Sitting on excess cash with low leverage = idle capital = bad allocation
+      distributionScore = 1;
+    } else if (avgRoiicDuringGame > 0.15) {
+      // High ROIIC and no excess cash — reinvested everything productively
+      distributionScore = 4;
+    } else {
+      // Mediocre returns and didn't distribute — neutral
+      distributionScore = 2;
     }
   }
 
@@ -314,6 +337,20 @@ export function generatePostGameInsights(state: GameState): PostGameInsight[] {
   }
   if (wellTimedBuybacks) {
     insights.push(POST_GAME_INSIGHTS.well_timed_buybacks);
+  }
+
+  // Smart distributions: returned capital when ROIIC was low and balance sheet was healthy
+  const avgRoiicForInsights = state.metricsHistory.length > 0
+    ? state.metricsHistory.reduce((sum, h) => sum + h.metrics.roiic, 0) / state.metricsHistory.length
+    : 0;
+  if (state.totalDistributions > 0 && avgRoiicForInsights < 0.15 && metrics.netDebtToEbitda < 2.0) {
+    insights.push(POST_GAME_INSIGHTS.smart_distributions);
+  }
+
+  // Idle cash hoarding: ended with excess cash and low leverage, never distributed
+  const cashToEbitdaForInsights = metrics.totalEbitda > 0 ? state.cash / metrics.totalEbitda : 0;
+  if (state.totalDistributions === 0 && cashToEbitdaForInsights > 2.0 && metrics.netDebtToEbitda < 1.0) {
+    insights.push(POST_GAME_INSIGHTS.hoarded_cash);
   }
 
   // Return top 3 most relevant

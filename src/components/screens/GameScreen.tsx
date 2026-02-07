@@ -168,6 +168,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             lastEventType={lastEventType}
             equityRaisesUsed={equityRaisesUsed}
             sharesOutstanding={sharesOutstanding}
+            founderShares={founderShares}
             totalBuybacks={totalBuybacks}
             totalDistributions={totalDistributions}
             intrinsicValuePerShare={metrics.intrinsicValuePerShare}
