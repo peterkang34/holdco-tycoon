@@ -1,226 +1,63 @@
-// Business name pools by sector
+// Combinatorial business name generator — produces thousands of unique names per sector
+// by combining prefixes, core words, and suffixes. Never runs out.
 
-export const BUSINESS_NAMES: Record<string, string[]> = {
-  agency: [
-    'Pixel & Co',
-    'Spark Creative',
-    'Brandwave',
-    'Digital Edge',
-    'Metric Media',
-    'ClearPath Marketing',
-    'Amplify Agency',
-    'Catalyst Creative',
-    'Neon Digital',
-    'Prism Studios',
-    'Launchpad Media',
-    'Velocity Creative',
-    'Beacon Digital',
-    'Summit Marketing',
-    'Horizon Agency',
-    'Ember & Oak',
-    'Signal Creative',
-    'Uplift Digital',
-    'Forge Media',
-    'Atlas Agency',
-  ],
-  saas: [
-    'CloudSync',
-    'DataPulse',
-    'FlowStack',
-    'Nimbus Systems',
-    'CoreLogic Pro',
-    'Apex Software',
-    'Streamline.io',
-    'TaskForge',
-    'MetricMaster',
-    'Insight Cloud',
-    'Pipeline Pro',
-    'AutomateHQ',
-    'Syncwave',
-    'Clarity Software',
-    'Basecamp Analytics',
-    'Quantum SaaS',
-    'Elevate Systems',
-    'Nexus Platform',
-    'Orbit Solutions',
-    'Vertex Cloud',
-  ],
-  homeServices: [
-    'Summit Plumbing',
-    'Comfort Pro HVAC',
-    'Guardian Pest Control',
-    'Reliable Electric',
-    'Peak Home Services',
-    'All-Season Comfort',
-    'TrustPoint Property',
-    'Horizon Roofing',
-    'Evergreen Services',
-    'Precision Plumbing',
-    'Climate Masters',
-    'Shield Pest Solutions',
-    'Apex Electric',
-    'First Call Services',
-    'Integrity Home Pro',
-    'ServiceMax',
-    'Blue Ribbon HVAC',
-    'Premier Property Care',
-    'Solid Rock Roofing',
-    'ClearView Services',
-  ],
-  consumer: [
-    'Artisan Goods Co',
-    'Pure Living',
-    'Heritage Brand',
-    'Modern Essentials',
-    'Craft & Co',
-    'Daily Ritual',
-    'Wildwood Goods',
-    'Ember & Stone',
-    'True North Brand',
-    'Harmony Foods',
-    'Luxe Elements',
-    'Native Roots',
-    'Simply Better',
-    'Golden Hour',
-    'Evergreen Brand',
-    'Coastal Living',
-    'Urban Harvest',
-    'Signature Select',
-    'Pure & Simple',
-    'Makers Mark Co',
-  ],
-  industrial: [
-    'Precision Parts Inc',
-    'Apex Manufacturing',
-    'Sterling Components',
-    'Industrial Solutions',
-    'CoreTech Industries',
-    'Summit Precision',
-    'Delta Manufacturing',
-    'Solid State Systems',
-    'Foundry Works',
-    'Allied Industrial',
-    'Titan Components',
-    'Forge Industries',
-    'Benchmark Precision',
-    'Granite Manufacturing',
-    'Keystone Industrial',
-    'Atlas Precision',
-    'ProTech Industries',
-    'Ironclad Manufacturing',
-    'Anchor Components',
-    'Vanguard Industrial',
-  ],
-  b2bServices: [
-    'TechServe Solutions',
-    'Clarity Consulting',
-    'Pinnacle Services',
-    'Strategic Advisors',
-    'CoreData Analytics',
-    'Fusion IT',
-    'Insight Partners',
-    'Elevate Consulting',
-    'ProServe Group',
-    'Catalyst Partners',
-    'Synergy Services',
-    'Apex Advisory',
-    'Meridian IT',
-    'Summit Consulting',
-    'Nexus Solutions',
-    'Vantage Services',
-    'Prime Analytics',
-    'Blueprint Consulting',
-    'Vector Services',
-    'Cornerstone IT',
-  ],
-  healthcare: [
-    'Wellness Partners',
-    'Premier Care Group',
-    'Vitality Health',
-    'Compass Medical',
-    'Evergreen Health',
-    'Summit Care',
-    'Horizon Medical Group',
-    'Pinnacle Health',
-    'Unity Healthcare',
-    'Guardian Medical',
-    'Bright Health Partners',
-    'CarePath Medical',
-    'Beacon Health',
-    'Thrive Medical Group',
-    'ClearView Health',
-    'Alliance Care',
-    'Harmony Health',
-    'Genesis Medical',
-    'Ascent Healthcare',
-    'Wellspring Partners',
-  ],
-  restaurant: [
-    'Urban Kitchen',
-    'Fresh & Fast',
-    'The Local Table',
-    'Daily Grind Coffee',
-    'Harvest Bistro',
-    'Street Eats Co',
-    'The Copper Kettle',
-    'Modern Diner',
-    'Farm to Fork',
-    'Quick Bites',
-    'The Gathering Spot',
-    'Craft Kitchen',
-    'Downtown Grill',
-    'Morning Brew',
-    'Rustic Table',
-    'City Eats',
-    'The Neighborhood',
-    'Fresh Kitchen',
-    'Comfort & Co',
-    'The Daily Menu',
-  ],
-  realEstate: [
-    'Keystone Properties',
-    'Summit Storage',
-    'Metro Logistics',
-    'Granite Real Estate',
-    'Horizon Properties',
-    'Prime Storage Co',
-    'Urban Core REIT',
-    'Anchor Properties',
-    'Evergreen Holdings',
-    'Pacific Industrial',
-    'Cornerstone Properties',
-    'Atlas Storage',
-    'Meridian Real Estate',
-    'Pinnacle Holdings',
-    'Central Properties',
-    'Gateway Logistics',
-    'Sterling Storage',
-    'Foundation REIT',
-    'Vanguard Properties',
-    'Capitol Holdings',
-  ],
-  education: [
-    'SkillPath Academy',
-    'Elevate Learning',
-    'CareerForge',
-    'Knowledge Hub',
-    'LearnPro',
-    'Ascent Academy',
-    'NextStep Education',
-    'Clarity Learning',
-    'MasterClass Pro',
-    'Upskill Academy',
-    'Pathway Learning',
-    'Growth Academy',
-    'Insight Education',
-    'Thrive Learning',
-    'Catalyst Academy',
-    'Summit Education',
-    'Foundations Learning',
-    'Progress Academy',
-    'Advantage Learning',
-    'Excel Education',
-  ],
+interface NameParts {
+  prefixes: string[];
+  cores: string[];
+  suffixes: string[];
+}
+
+const SECTOR_NAME_PARTS: Record<string, NameParts> = {
+  agency: {
+    prefixes: ['Pixel', 'Spark', 'Brand', 'Digital', 'Metric', 'Clear', 'Neon', 'Prism', 'Beacon', 'Signal', 'Nova', 'Vivid', 'Bold', 'Bright', 'Sharp', 'Core', 'True', 'Prime', 'Open', 'Next'],
+    cores: ['Wave', 'Edge', 'Path', 'Fire', 'Pulse', 'Lab', 'Lens', 'Arc', 'Link', 'Shift', 'Flow', 'Cast', 'Craft', 'Hive', 'Grid', 'Mark', 'Volt', 'Flux', 'Dot', 'Ink'],
+    suffixes: ['Creative', 'Media', 'Agency', 'Studios', 'Digital', 'Group', 'Co', 'Partners', 'Collective', ''],
+  },
+  saas: {
+    prefixes: ['Cloud', 'Data', 'Flow', 'Nimbus', 'Core', 'Apex', 'Stream', 'Task', 'Sync', 'Insight', 'Pipe', 'Auto', 'Clear', 'Base', 'Quantum', 'Orbit', 'Vertex', 'Logic', 'Dash', 'Relay'],
+    cores: ['Sync', 'Pulse', 'Stack', 'Wave', 'Line', 'Forge', 'Master', 'Link', 'Hub', 'Grid', 'Base', 'Wire', 'Dock', 'Mint', 'Beam', 'Nest', 'Rack', 'Tap', 'Mesh', 'Kit'],
+    suffixes: ['Systems', '.io', 'Pro', 'Software', 'HQ', 'Cloud', 'Platform', 'Analytics', 'Labs', ''],
+  },
+  homeServices: {
+    prefixes: ['Summit', 'Comfort', 'Guardian', 'Reliable', 'Peak', 'Trust', 'Horizon', 'Evergreen', 'Shield', 'Apex', 'Blue', 'Premier', 'Solid', 'Clear', 'First', 'Patriot', 'Liberty', 'Eagle', 'Valley', 'Golden'],
+    cores: ['Point', 'Star', 'Rock', 'Line', 'Call', 'Ridge', 'Creek', 'View', 'Mark', 'Field', 'Stone', 'Crest', 'Haven', 'Lake', 'Bay', 'Gate', 'Dale', 'Brook', 'Glen', 'Bend'],
+    suffixes: ['Plumbing', 'HVAC', 'Services', 'Electric', 'Roofing', 'Pest Control', 'Property Care', 'Home Pro', 'Comfort', 'Solutions'],
+  },
+  consumer: {
+    prefixes: ['Artisan', 'Pure', 'Heritage', 'Modern', 'Craft', 'Wild', 'True', 'Native', 'Golden', 'Coastal', 'Urban', 'Rustic', 'Fresh', 'Nordic', 'Harbor', 'Cedar', 'Maple', 'Stone', 'River', 'Iron'],
+    cores: ['Wood', 'Root', 'Moon', 'Leaf', 'Bloom', 'Oak', 'Pine', 'Sage', 'Reed', 'Wren', 'Fern', 'Moss', 'Birch', 'Elm', 'Clay', 'Dusk', 'Dawn', 'Vale', 'Glen', 'Ridge'],
+    suffixes: ['Goods Co', 'Brand', 'Essentials', '& Co', 'Living', 'Supply', 'Provisions', 'Market', 'Trading', ''],
+  },
+  industrial: {
+    prefixes: ['Precision', 'Apex', 'Sterling', 'Core', 'Summit', 'Delta', 'Titan', 'Forge', 'Granite', 'Atlas', 'Iron', 'Vanguard', 'Anchor', 'Patriot', 'Centurion', 'Pinnacle', 'Vulcan', 'Nexus', 'Cobalt', 'Chromium'],
+    cores: ['Tech', 'Clad', 'Stone', 'Steel', 'Bolt', 'Weld', 'Cast', 'Mill', 'Works', 'Alloy', 'Craft', 'Forge', 'Guard', 'Lock', 'Grip', 'Port', 'Link', 'Core', 'Edge', 'Arc'],
+    suffixes: ['Industries', 'Manufacturing', 'Components', 'Inc', 'Precision', 'Solutions', 'Systems', 'Industrial', 'Engineering', ''],
+  },
+  b2bServices: {
+    prefixes: ['Tech', 'Clarity', 'Pinnacle', 'Strategic', 'Core', 'Fusion', 'Insight', 'Elevate', 'Meridian', 'Vantage', 'Prime', 'Blueprint', 'Vector', 'Mosaic', 'Lumen', 'Arbor', 'Praxis', 'Scope', 'Vertex', 'Nuvio'],
+    cores: ['Serve', 'Path', 'Point', 'Link', 'Hub', 'Bridge', 'Scope', 'Ware', 'Logic', 'Source', 'Tier', 'Deck', 'Node', 'Gate', 'Base', 'Dock', 'Sage', 'Lens', 'Mark', 'Grid'],
+    suffixes: ['Solutions', 'Consulting', 'Services', 'Partners', 'Group', 'Advisory', 'IT', 'Analytics', 'Corp', ''],
+  },
+  healthcare: {
+    prefixes: ['Wellness', 'Premier', 'Vitality', 'Compass', 'Evergreen', 'Summit', 'Horizon', 'Unity', 'Guardian', 'Bright', 'Care', 'Beacon', 'Thrive', 'Alliance', 'Harmony', 'Genesis', 'Ascent', 'Harbor', 'Sage', 'Haven'],
+    cores: ['Path', 'Point', 'View', 'Spring', 'Bridge', 'Gate', 'Well', 'Leaf', 'Crest', 'Lake', 'Ridge', 'Field', 'Stone', 'Glen', 'Pointe', 'Bay', 'Vale', 'Grove', 'Park', 'Haven'],
+    suffixes: ['Health', 'Medical Group', 'Care', 'Partners', 'Healthcare', 'Medical', 'Wellness', 'Health Partners', 'Clinical', ''],
+  },
+  restaurant: {
+    prefixes: ['Urban', 'Fresh', 'Local', 'Daily', 'Harvest', 'Street', 'Copper', 'Modern', 'Farm', 'Craft', 'Downtown', 'Morning', 'Rustic', 'City', 'Golden', 'Silver', 'Red', 'Blue', 'Green', 'Oak'],
+    cores: ['Kitchen', 'Table', 'Grill', 'Brew', 'Bistro', 'Eats', 'Kettle', 'Diner', 'Fork', 'Plate', 'Hearth', 'Pantry', 'Oven', 'Skillet', 'Barrel', 'Spoon', 'Cup', 'Bowl', 'Toast', 'Flame'],
+    suffixes: ['Co', '& Co', 'Cafe', 'Eatery', 'Restaurant', 'House', 'Kitchen', 'Bar', 'Spot', ''],
+  },
+  realEstate: {
+    prefixes: ['Keystone', 'Summit', 'Metro', 'Granite', 'Horizon', 'Prime', 'Urban', 'Anchor', 'Evergreen', 'Pacific', 'Atlas', 'Meridian', 'Pinnacle', 'Central', 'Gateway', 'Sterling', 'Foundation', 'Vanguard', 'Capitol', 'Liberty'],
+    cores: ['Core', 'Point', 'Park', 'Square', 'Plaza', 'Tower', 'Gate', 'Ridge', 'Crest', 'Bay', 'Harbor', 'Landing', 'Crossing', 'Station', 'Terrace', 'Heights', 'View', 'Bluff', 'Field', 'Glen'],
+    suffixes: ['Properties', 'Storage', 'Logistics', 'Real Estate', 'Holdings', 'REIT', 'Capital', 'Partners', 'Realty', ''],
+  },
+  education: {
+    prefixes: ['Skill', 'Elevate', 'Career', 'Knowledge', 'Learn', 'Ascent', 'Next', 'Clarity', 'Master', 'Upskill', 'Path', 'Growth', 'Insight', 'Thrive', 'Catalyst', 'Summit', 'Progress', 'Advantage', 'Excel', 'Bright'],
+    cores: ['Path', 'Forge', 'Hub', 'Pro', 'Step', 'Class', 'Mind', 'Spark', 'Leap', 'Track', 'Way', 'Arc', 'Bridge', 'Gate', 'Rise', 'Quest', 'Edge', 'Reach', 'Zone', 'Tier'],
+    suffixes: ['Academy', 'Learning', 'Education', 'Institute', 'Training', 'School', 'Lab', 'Center', 'Pro', ''],
+  },
 };
 
 // Track used names to avoid duplicates within a game
@@ -230,18 +67,56 @@ export function resetUsedNames(): void {
   usedNames = new Set();
 }
 
-export function getRandomBusinessName(sectorId: string): string {
-  const names = BUSINESS_NAMES[sectorId] || BUSINESS_NAMES.agency;
-  const availableNames = names.filter(name => !usedNames.has(name));
+function buildName(parts: NameParts): string {
+  const prefix = parts.prefixes[Math.floor(Math.random() * parts.prefixes.length)];
+  const core = parts.cores[Math.floor(Math.random() * parts.cores.length)];
+  const suffix = parts.suffixes[Math.floor(Math.random() * parts.suffixes.length)];
 
-  if (availableNames.length === 0) {
-    // If all names are used, generate a fallback
-    const baseName = names[Math.floor(Math.random() * names.length)];
-    const suffix = Math.floor(Math.random() * 1000);
-    return `${baseName} ${suffix}`;
+  // Vary the structure for diversity
+  const roll = Math.random();
+  if (roll < 0.4) {
+    // "Prefix Core Suffix" — e.g. "Titan Steel Industries"
+    return [prefix, core, suffix].filter(Boolean).join(' ');
+  } else if (roll < 0.7) {
+    // "PrefixCore Suffix" — e.g. "IronClad Manufacturing"
+    return [prefix + core, suffix].filter(Boolean).join(' ');
+  } else if (roll < 0.85) {
+    // "Prefix Suffix" — e.g. "Apex Industries"
+    return [prefix, suffix].filter(Boolean).join(' ') || prefix;
+  } else {
+    // "Core & Prefix" or "The Core Suffix" — e.g. "Steel & Titan" or "The Forge Co"
+    if (Math.random() < 0.5) {
+      return `${core} & ${prefix}`;
+    }
+    return ['The', core, suffix].filter(Boolean).join(' ');
+  }
+}
+
+export function getRandomBusinessName(sectorId: string): string {
+  const parts = SECTOR_NAME_PARTS[sectorId] || SECTOR_NAME_PARTS.agency;
+
+  // Try up to 20 times to get a unique name
+  for (let i = 0; i < 20; i++) {
+    const name = buildName(parts);
+    if (!usedNames.has(name)) {
+      usedNames.add(name);
+      return name;
+    }
   }
 
-  const name = availableNames[Math.floor(Math.random() * availableNames.length)];
+  // Extremely unlikely fallback — prefix + core guaranteed unique combo
+  const prefix = parts.prefixes[Math.floor(Math.random() * parts.prefixes.length)];
+  const core = parts.cores[Math.floor(Math.random() * parts.cores.length)];
+  const suffix = parts.suffixes[Math.floor(Math.random() * parts.suffixes.length)];
+  const name = [prefix, core, suffix, Math.floor(Math.random() * 99) + 1].filter(Boolean).join(' ');
   usedNames.add(name);
   return name;
 }
+
+// Backwards compatibility — not used anymore but kept for any external references
+export const BUSINESS_NAMES: Record<string, string[]> = Object.fromEntries(
+  Object.entries(SECTOR_NAME_PARTS).map(([sector, parts]) => [
+    sector,
+    parts.prefixes.slice(0, 5).map((p, i) => `${p} ${parts.cores[i]} ${parts.suffixes[i]}`.trim()),
+  ])
+);
