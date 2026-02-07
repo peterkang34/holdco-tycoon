@@ -1028,27 +1028,38 @@ export function AllocatePhase({
                 Holdco debt: {formatMoney(totalDebt)} @ {formatPercent(interestRate)}
               </p>
               <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={payDebtAmount}
-                  onChange={(e) => setPayDebtAmount(e.target.value)}
-                  placeholder="Amount"
-                  className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-2 text-sm"
-                />
+                <div className="flex-1 relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={payDebtAmount}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9]/g, '');
+                      setPayDebtAmount(raw);
+                    }}
+                    placeholder="1,000,000"
+                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2 text-sm"
+                  />
+                </div>
                 <button
                   onClick={() => {
-                    const amount = parseInt(payDebtAmount);
-                    if (amount > 0) {
-                      onPayDebt(amount);
+                    const dollars = parseInt(payDebtAmount);
+                    const internalAmount = Math.round(dollars / 1000);
+                    if (internalAmount > 0) {
+                      onPayDebt(internalAmount);
                       setPayDebtAmount('');
                     }
                   }}
-                  disabled={!payDebtAmount || parseInt(payDebtAmount) <= 0 || totalDebt === 0}
+                  disabled={!payDebtAmount || parseInt(payDebtAmount) < 1000 || totalDebt === 0}
                   className="btn-primary text-sm"
                 >
                   Pay
                 </button>
               </div>
+              {payDebtAmount && parseInt(payDebtAmount) >= 1000 && (
+                <p className="text-xs text-text-muted mt-1">= {formatMoney(Math.round(parseInt(payDebtAmount) / 1000))}</p>
+              )}
               <p className="text-xs text-text-muted mt-2">Interest charged annually on remaining balance</p>
             </div>
 
@@ -1056,35 +1067,46 @@ export function AllocatePhase({
             <div className="card">
               <h4 className="font-bold mb-3">Issue Equity</h4>
               <p className="text-sm text-text-muted mb-2">
-                Raise capital by selling new shares at {formatMoney(intrinsicValuePerShare)}/share. Enter dollar amount ($k) to raise.
+                Raise capital by selling new shares at {formatMoney(intrinsicValuePerShare)}/share.
               </p>
               <p className="text-xs text-text-muted mb-4">
                 Your ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% | {equityRaisesUsed} raise{equityRaisesUsed !== 1 ? 's' : ''} so far
               </p>
               <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={equityAmount}
-                  onChange={(e) => setEquityAmount(e.target.value)}
-                  placeholder="$k to raise"
-                  className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-2 text-sm"
-                />
+                <div className="flex-1 relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={equityAmount}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9]/g, '');
+                      setEquityAmount(raw);
+                    }}
+                    placeholder="5,000,000"
+                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2 text-sm"
+                  />
+                </div>
                 <button
                   onClick={() => {
-                    const amount = parseInt(equityAmount);
-                    if (amount > 0) {
-                      onIssueEquity(amount);
+                    const dollars = parseInt(equityAmount);
+                    const internalAmount = Math.round(dollars / 1000);
+                    if (internalAmount > 0) {
+                      onIssueEquity(internalAmount);
                       setEquityAmount('');
                     }
                   }}
-                  disabled={!equityAmount || parseInt(equityAmount) <= 0}
+                  disabled={!equityAmount || parseInt(equityAmount) < 1000}
                   className="btn-primary text-sm"
                 >
                   Issue
                 </button>
               </div>
-              {equityAmount && parseInt(equityAmount) > 0 && intrinsicValuePerShare > 0 && (() => {
-                const amt = parseInt(equityAmount);
+              {equityAmount && parseInt(equityAmount) >= 1000 && (
+                <p className="text-xs text-text-muted mt-1">= {formatMoney(Math.round(parseInt(equityAmount) / 1000))}</p>
+              )}
+              {equityAmount && parseInt(equityAmount) >= 1000 && intrinsicValuePerShare > 0 && (() => {
+                const amt = Math.round(parseInt(equityAmount) / 1000);
                 const newShares = Math.round((amt / intrinsicValuePerShare) * 1000) / 1000;
                 const newTotal = sharesOutstanding + newShares;
                 const newOwnership = founderShares / newTotal * 100;
@@ -1116,35 +1138,46 @@ export function AllocatePhase({
             <div className="card">
               <h4 className="font-bold mb-3">Buyback Shares</h4>
               <p className="text-sm text-text-muted mb-2">
-                Repurchase outside investor shares at {formatMoney(intrinsicValuePerShare)}/share. Enter dollar amount ($k) to spend.
+                Repurchase outside investor shares at {formatMoney(intrinsicValuePerShare)}/share.
               </p>
               <p className="text-xs text-text-muted mb-4">
                 Outstanding: {sharesOutstanding.toFixed(0)} total | {(sharesOutstanding - founderShares).toFixed(0)} outside shares
               </p>
               <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={buybackAmount}
-                  onChange={(e) => setBuybackAmount(e.target.value)}
-                  placeholder="$k to spend"
-                  className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-2 text-sm"
-                />
+                <div className="flex-1 relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={buybackAmount}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9]/g, '');
+                      setBuybackAmount(raw);
+                    }}
+                    placeholder="2,000,000"
+                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2 text-sm"
+                  />
+                </div>
                 <button
                   onClick={() => {
-                    const amount = parseInt(buybackAmount);
-                    if (amount > 0) {
-                      onBuyback(amount);
+                    const dollars = parseInt(buybackAmount);
+                    const internalAmount = Math.round(dollars / 1000);
+                    if (internalAmount > 0) {
+                      onBuyback(internalAmount);
                       setBuybackAmount('');
                     }
                   }}
-                  disabled={!buybackAmount || parseInt(buybackAmount) <= 0 || parseInt(buybackAmount) > cash || !distressRestrictions.canBuyback}
+                  disabled={!buybackAmount || parseInt(buybackAmount) < 1000 || Math.round(parseInt(buybackAmount) / 1000) > cash || !distressRestrictions.canBuyback}
                   className="btn-primary text-sm"
                 >
                   {!distressRestrictions.canBuyback ? 'Blocked' : 'Buyback'}
                 </button>
               </div>
-              {buybackAmount && parseInt(buybackAmount) > 0 && intrinsicValuePerShare > 0 && (() => {
-                const amt = parseInt(buybackAmount);
+              {buybackAmount && parseInt(buybackAmount) >= 1000 && (
+                <p className="text-xs text-text-muted mt-1">= {formatMoney(Math.round(parseInt(buybackAmount) / 1000))}</p>
+              )}
+              {buybackAmount && parseInt(buybackAmount) >= 1000 && intrinsicValuePerShare > 0 && (() => {
+                const amt = Math.round(parseInt(buybackAmount) / 1000);
                 const sharesRepurchased = Math.round((amt / intrinsicValuePerShare) * 1000) / 1000;
                 const outsideShares = sharesOutstanding - founderShares;
                 const newTotal = sharesOutstanding - Math.min(sharesRepurchased, outsideShares);
@@ -1174,27 +1207,38 @@ export function AllocatePhase({
                 Returns cash to shareholders. Distributed: {formatMoney(totalDistributions)}
               </p>
               <div className="flex gap-2 mb-3">
-                <input
-                  type="number"
-                  value={distributeAmount}
-                  onChange={(e) => setDistributeAmount(e.target.value)}
-                  placeholder="Amount"
-                  className="flex-1 bg-white/5 border border-white/10 rounded px-3 py-2 text-sm"
-                />
+                <div className="flex-1 relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={distributeAmount}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^0-9]/g, '');
+                      setDistributeAmount(raw);
+                    }}
+                    placeholder="1,000,000"
+                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2 text-sm"
+                  />
+                </div>
                 <button
                   onClick={() => {
-                    const amount = parseInt(distributeAmount);
-                    if (amount > 0) {
-                      onDistribute(amount);
+                    const dollars = parseInt(distributeAmount);
+                    const internalAmount = Math.round(dollars / 1000);
+                    if (internalAmount > 0) {
+                      onDistribute(internalAmount);
                       setDistributeAmount('');
                     }
                   }}
-                  disabled={!distributeAmount || parseInt(distributeAmount) <= 0 || parseInt(distributeAmount) > cash || !distressRestrictions.canDistribute}
+                  disabled={!distributeAmount || parseInt(distributeAmount) < 1000 || Math.round(parseInt(distributeAmount) / 1000) > cash || !distressRestrictions.canDistribute}
                   className="btn-primary text-sm"
                 >
                   {!distressRestrictions.canDistribute ? 'Blocked' : 'Distribute'}
                 </button>
               </div>
+              {distributeAmount && parseInt(distributeAmount) >= 1000 && (
+                <p className="text-xs text-text-muted mt-1 mb-2">= {formatMoney(Math.round(parseInt(distributeAmount) / 1000))}</p>
+              )}
               <p className="text-xs text-text-muted">
                 <strong>Scoring:</strong> Distributing when ROIIC is low and leverage is healthy earns points. But distributing while ROIIC is high (should reinvest) or leverage is high (should deleverage) costs points. Hoarding excess cash also hurts. Follow the hierarchy: reinvest → deleverage → buyback → distribute.
               </p>

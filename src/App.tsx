@@ -9,6 +9,7 @@ type Screen = 'intro' | 'game' | 'gameOver';
 
 function App() {
   const [screen, setScreen] = useState<Screen>('intro');
+  const [isNewGame, setIsNewGame] = useState(false);
 
   const {
     holdcoName,
@@ -39,6 +40,7 @@ function App() {
 
   const handleStart = (name: string, startingSector: SectorId) => {
     startGame(name, startingSector);
+    setIsNewGame(true);
     setScreen('game');
   };
 
@@ -59,7 +61,7 @@ function App() {
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
       {screen === 'intro' && <IntroScreen onStart={handleStart} />}
-      {screen === 'game' && <GameScreen onGameOver={handleGameOver} onResetGame={handlePlayAgain} />}
+      {screen === 'game' && <GameScreen onGameOver={handleGameOver} onResetGame={handlePlayAgain} showTutorial={isNewGame} />}
       {screen === 'gameOver' && (
         <GameOverScreen
           holdcoName={holdcoName}
