@@ -10,13 +10,28 @@ interface NarrativeRequest {
 }
 
 function buildEventPrompt(context: Record<string, unknown>): string {
+  const holdcoName = context.holdcoName || 'the holding company';
+  const affectedBiz = context.affectedBusinessName;
+  const affectedSector = context.affectedSector;
+  const allBizNames = context.allBusinessNames as string[] | undefined;
+
+  let portfolioContext = `HOLDING COMPANY: ${holdcoName}`;
+  if (affectedBiz) {
+    portfolioContext += `\nAFFECTED BUSINESS: ${affectedBiz}${affectedSector ? ` (${affectedSector})` : ''}`;
+  }
+  if (allBizNames && allBizNames.length > 0) {
+    portfolioContext += `\nPORTFOLIO: ${allBizNames.join(', ')}`;
+  }
+
   return `You are a financial journalist writing a brief, dramatic narrative for a private equity simulation game. Write 2-3 sentences that bring this economic event to life with specific details and human impact.
 
 EVENT: ${context.eventType}
 EFFECT: ${context.effect}
-PLAYER CONTEXT: ${context.playerContext || 'General market participant'}
+${portfolioContext}
 
-Write a vivid, present-tense narrative. Include fictional but realistic details (names, places, quotes). Keep it under 50 words. Be dramatic but professional. Respond with just the narrative text, no quotes or labels.`;
+CRITICAL: Use the REAL company and holdco names provided above — do NOT invent fictional business names. ${affectedBiz ? `The story must be about ${affectedBiz}.` : 'Reference the actual portfolio companies.'} You may invent character names (people) for color but all business names must match the player's actual portfolio.
+
+Write a vivid, present-tense narrative. Keep it under 50 words. Be dramatic but professional. Respond with just the narrative text, no quotes or labels.`;
 }
 
 function buildBusinessUpdatePrompt(context: Record<string, unknown>): string {

@@ -321,12 +321,20 @@ export async function generateNarrative(
 export async function generateEventNarrative(
   eventType: string,
   effect: string,
-  playerContext?: string
+  playerContext?: string,
+  affectedBusinessName?: string,
+  affectedSector?: string,
+  holdcoName?: string,
+  allBusinessNames?: string[],
 ): Promise<string | null> {
   return generateNarrative('event', {
     eventType,
     effect,
     playerContext,
+    affectedBusinessName,
+    affectedSector,
+    holdcoName,
+    allBusinessNames,
   });
 }
 

@@ -1208,11 +1208,24 @@ export const useGameStore = create<GameStore>()(
         if (event.type === 'global_quiet') return;
 
         try {
+          // Build rich context for narrative generation
+          const activeBusinesses = state.businesses.filter(b => b.status === 'active');
+          const affectedBusiness = event.affectedBusinessId
+            ? activeBusinesses.find(b => b.id === event.affectedBusinessId)
+            : undefined;
+          const affectedSector = affectedBusiness
+            ? SECTORS[affectedBusiness.sectorId]?.name
+            : undefined;
+
           // Try AI generation first
           const narrative = await generateEventNarrative(
             event.type,
             event.effect,
-            `Holdco with ${state.businesses.filter(b => b.status === 'active').length} portfolio companies`
+            `${state.holdcoName} with ${activeBusinesses.length} portfolio companies`,
+            affectedBusiness?.name,
+            affectedSector,
+            state.holdcoName,
+            activeBusinesses.map(b => b.name),
           );
 
           if (narrative) {
