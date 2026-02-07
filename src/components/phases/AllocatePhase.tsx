@@ -19,6 +19,7 @@ import { generateDealStructures, getStructureLabel, getStructureDescription } fr
 import { SECTORS } from '../../data/sectors';
 import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES } from '../../data/sharedServices';
 import { MarketGuideModal } from '../ui/MarketGuideModal';
+import { RollUpGuideModal } from '../ui/RollUpGuideModal';
 import { isAIEnabled } from '../../services/aiGeneration';
 
 const STARTING_SHARES = 1000;
@@ -107,6 +108,7 @@ export function AllocatePhase({
   });
   const [mergeName, setMergeName] = useState('');
   const [showMarketGuide, setShowMarketGuide] = useState(false);
+  const [showRollUpGuide, setShowRollUpGuide] = useState(false);
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const aiEnabled = isAIEnabled();
@@ -491,7 +493,16 @@ export function AllocatePhase({
               <div className="card bg-accent/5 border-accent/30 mb-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h3 className="font-bold">Roll-Up Strategy</h3>
+                    <h3 className="font-bold flex items-center gap-2">
+                      Roll-Up Strategy
+                      <button
+                        onClick={() => setShowRollUpGuide(true)}
+                        className="text-text-muted hover:text-accent text-sm font-normal"
+                        title="Learn about roll-up strategy"
+                      >
+                        (?)
+                      </button>
+                    </h3>
                     <p className="text-sm text-text-muted">
                       {platforms.length > 0
                         ? `${platforms.length} platform${platforms.length > 1 ? 's' : ''} active. Acquire tuck-ins to grow scale.`
@@ -532,6 +543,7 @@ export function AllocatePhase({
                   onSell={() => onSell(business.id)}
                   onImprove={() => setSelectedBusinessForImprovement(business)}
                   onDesignatePlatform={!business.isPlatform ? () => onDesignatePlatform(business.id) : undefined}
+                  onShowRollUpGuide={() => setShowRollUpGuide(true)}
                   isPlatform={business.isPlatform}
                   platformScale={business.platformScale}
                   boltOnCount={business.boltOnIds?.length || 0}
@@ -1058,6 +1070,11 @@ export function AllocatePhase({
       {/* Market Guide Modal */}
       {showMarketGuide && (
         <MarketGuideModal onClose={() => setShowMarketGuide(false)} />
+      )}
+
+      {/* Roll-Up Guide Modal */}
+      {showRollUpGuide && (
+        <RollUpGuideModal onClose={() => setShowRollUpGuide(false)} />
       )}
 
       {/* End Turn Confirmation Modal */}

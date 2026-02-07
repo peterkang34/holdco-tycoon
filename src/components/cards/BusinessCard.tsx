@@ -9,6 +9,7 @@ interface BusinessCardProps {
   onSell?: () => void;
   onImprove?: () => void;
   onDesignatePlatform?: () => void;
+  onShowRollUpGuide?: () => void;
   compact?: boolean;
   isPlatform?: boolean;
   platformScale?: number;
@@ -24,6 +25,7 @@ export function BusinessCard({
   onSell,
   onImprove,
   onDesignatePlatform,
+  onShowRollUpGuide,
   compact = false,
   isPlatform = false,
   platformScale = 0,
@@ -277,15 +279,26 @@ export function BusinessCard({
                 )}
               </div>
               {onDesignatePlatform && !isPlatform && (
-                <button
-                  onClick={onDesignatePlatform}
-                  disabled={!canAffordPlatform}
-                  className="btn-primary text-xs w-full"
-                >
-                  {canAffordPlatform
-                    ? `Designate as Platform (${formatMoney(Math.round(business.ebitda * 0.05))})`
-                    : 'Need more cash for platform setup'}
-                </button>
+                <div className="flex gap-2">
+                  <button
+                    onClick={onDesignatePlatform}
+                    disabled={!canAffordPlatform}
+                    className="btn-primary text-xs flex-1"
+                  >
+                    {canAffordPlatform
+                      ? `Designate as Platform (${formatMoney(Math.round(business.ebitda * 0.05))})`
+                      : 'Need more cash for platform setup'}
+                  </button>
+                  {onShowRollUpGuide && (
+                    <button
+                      onClick={onShowRollUpGuide}
+                      className="btn-secondary text-xs px-2"
+                      title="What is a platform?"
+                    >
+                      ?
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           )}
