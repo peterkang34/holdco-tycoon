@@ -1,0 +1,156 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bg-primary: #0D1117;
+  --color-bg-card: rgba(255, 255, 255, 0.04);
+  --color-bg-card-hover: rgba(255, 255, 255, 0.08);
+  --color-accent: #4ECDC4;
+  --color-accent-secondary: #44B09E;
+  --color-danger: #E07A5F;
+  --color-warning: #F4D03F;
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: rgba(255, 255, 255, 0.6);
+  --color-text-muted: rgba(255, 255, 255, 0.35);
+
+  /* Sector colors */
+  --color-sector-agency: #E07A5F;
+  --color-sector-saas: #3D85C6;
+  --color-sector-home-services: #6A9955;
+  --color-sector-consumer: #C27BA0;
+  --color-sector-industrial: #8E7CC3;
+  --color-sector-b2b: #6C8EBF;
+  --color-sector-healthcare: #E06666;
+  --color-sector-restaurant: #F6B26B;
+  --color-sector-real-estate: #93C47D;
+  --color-sector-education: #76A5AF;
+
+  --font-family-sans: 'DM Sans', system-ui, sans-serif;
+  --font-family-mono: 'DM Mono', ui-monospace, monospace;
+}
+
+@layer base {
+  * {
+    box-sizing: border-box;
+  }
+
+  html, body, #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: var(--font-family-sans);
+    background-color: var(--color-bg-primary);
+    color: var(--color-text-primary);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+@layer components {
+  .card {
+    background: var(--color-bg-card);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    transition: all 0.2s ease;
+  }
+
+  .card:hover {
+    background: var(--color-bg-card-hover);
+    border-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--color-accent), var(--color-accent-secondary));
+    color: var(--color-bg-primary);
+    font-weight: 600;
+    padding: 12px 24px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 20px rgba(78, 205, 196, 0.3);
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .btn-secondary {
+    background: var(--color-bg-card);
+    color: var(--color-text-primary);
+    font-weight: 500;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .btn-secondary:hover {
+    background: var(--color-bg-card-hover);
+    border-color: var(--color-accent);
+  }
+
+  .metric-positive {
+    color: var(--color-accent);
+  }
+
+  .metric-negative {
+    color: var(--color-danger);
+  }
+
+  .metric-warning {
+    color: var(--color-warning);
+  }
+}
+
+/* Number animation */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-count {
+  animation: countUp 0.3s ease-out;
+}
+
+/* Cash flow animation */
+@keyframes flowRight {
+  0% { transform: translateX(-100%); opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateX(100%); opacity: 0; }
+}
+
+.animate-flow {
+  animation: flowRight 2s ease-in-out infinite;
+}
+
+/* Pulse animation for danger states */
+@keyframes dangerPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(224, 122, 95, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(224, 122, 95, 0); }
+}
+
+.animate-danger {
+  animation: dangerPulse 2s ease-in-out infinite;
+}
+
+/* Glow effect */
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(78, 205, 196, 0.3); }
+  50% { box-shadow: 0 0 40px rgba(78, 205, 196, 0.5); }
+}
+
+.animate-glow {
+  animation: glow 3s ease-in-out infinite;
+}
