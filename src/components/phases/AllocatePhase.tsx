@@ -945,7 +945,7 @@ export function AllocatePhase({
                     </div>
                   </div>
                   <div className="mt-4 p-3 bg-white/5 rounded text-xs text-text-muted">
-                    <strong>How debt works:</strong> Holdco debt is paid manually here. Seller notes auto-amortize each year. Bank debt at opco level stays until you sell or wind down the business (proceeds net of debt).
+                    <strong>How debt works:</strong> Holdco debt has a 2-year grace period, then 10% of the balance amortizes automatically each year. You can also pay down extra here. Seller notes auto-amortize each year. Bank debt at opco level stays until you sell or wind down the business (proceeds net of debt).
                   </div>
                 </div>
               );
