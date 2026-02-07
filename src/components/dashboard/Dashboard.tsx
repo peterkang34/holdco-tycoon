@@ -43,10 +43,15 @@ export function Dashboard({
   };
 
   const getLeverageStatus = () => {
+    if (metrics.netDebtToEbitda <= 0) return 'positive'; // Net cash position
     if (metrics.netDebtToEbitda < 2.5) return 'positive';
     if (metrics.netDebtToEbitda < 3.5) return 'warning';
     return 'negative';
   };
+
+  // Calculate net cash amount when in net cash position
+  const isNetCash = metrics.netDebtToEbitda < 0;
+  const netCashAmount = isNetCash ? Math.abs(metrics.netDebtToEbitda * metrics.totalEbitda) : 0;
 
   const getMoicStatus = () => {
     if (metrics.portfolioMoic > 2.0) return 'positive';
@@ -110,9 +115,9 @@ export function Dashboard({
           status={getMoicStatus()}
         />
         <MetricCard
-          label="Leverage"
-          value={formatMultiple(metrics.netDebtToEbitda)}
-          subValue="Net Debt/EBITDA"
+          label={isNetCash ? "Net Cash" : "Leverage"}
+          value={isNetCash ? formatMoney(netCashAmount) : formatMultiple(metrics.netDebtToEbitda)}
+          subValue={isNetCash ? "Cash > Debt" : "Net Debt/EBITDA"}
           status={getLeverageStatus()}
         />
         <MetricCard
@@ -144,6 +149,11 @@ export function Dashboard({
         {metrics.interestRate > 0.08 && (
           <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded-full">
             High Interest: {formatPercent(metrics.interestRate)}
+          </span>
+        )}
+        {isNetCash && (
+          <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded-full">
+            Net Cash Position
           </span>
         )}
         {metrics.netDebtToEbitda > 3.5 && (
