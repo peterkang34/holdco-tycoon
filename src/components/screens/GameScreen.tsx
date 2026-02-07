@@ -82,7 +82,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
 
   const founderOwnership = founderShares / sharesOutstanding;
 
-  // Show tutorial on first load or when explicitly requested
+  // Show tutorial on new game start or first visit
   useEffect(() => {
     if (showTutorial) {
       setShowInstructions(true);
@@ -92,7 +92,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         setShowInstructions(true);
       }
     }
-  }, [showTutorial, round]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount only
 
   const handleCloseTutorial = () => {
     setShowInstructions(false);

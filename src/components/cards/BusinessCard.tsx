@@ -82,13 +82,20 @@ export function BusinessCard({
         </div>
         <div className="flex flex-col items-end gap-1">
           {isPlatform && (
-            <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded">
+            <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded relative group/platform cursor-help">
               Platform {platformScale}/3
+              <div className="absolute top-full right-0 mt-2 w-56 p-3 bg-bg-primary border border-white/10 rounded-lg shadow-xl opacity-0 invisible group-hover/platform:opacity-100 group-hover/platform:visible transition-all z-50 text-left">
+                <p className="text-sm text-text-secondary font-normal">This is a roll-up hub. Tuck-in bolt-on acquisitions to increase scale (up to 3/3) and unlock synergies + exit multiple expansion.</p>
+                <p className="text-xs text-accent mt-2 font-normal">Current: {platformScale}/3 scale, {boltOnCount} bolt-on{boltOnCount !== 1 ? 's' : ''}</p>
+              </div>
             </span>
           )}
           {business.integrationRoundsRemaining > 0 && (
-            <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded">
+            <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded relative group/integration cursor-help">
               Integrating ({business.integrationRoundsRemaining}y)
+              <div className="absolute top-full right-0 mt-2 w-56 p-3 bg-bg-primary border border-white/10 rounded-lg shadow-xl opacity-0 invisible group-hover/integration:opacity-100 group-hover/integration:visible transition-all z-50 text-left">
+                <p className="text-sm text-text-secondary font-normal">Recently acquired — organic growth is dampened during integration. {business.integrationRoundsRemaining} year{business.integrationRoundsRemaining !== 1 ? 's' : ''} remaining until fully integrated.</p>
+              </div>
             </span>
           )}
         </div>
