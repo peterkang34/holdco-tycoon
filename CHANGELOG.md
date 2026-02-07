@@ -40,6 +40,105 @@ A living document tracking the evolution of the game design based on user feedba
 
 ---
 
+### Dynamic Narratives System
+> Commit: `84b0cd3` — Add dynamic narratives system for immersive storytelling
+
+### Changes Made
+- **Event Narratives**: AI-generated (or fallback) immersive context for market events
+  - Each event type has a pool of pre-written narrative text
+  - AI can generate richer, context-aware narratives when enabled
+- **Business Story Updates**: Generated at key milestones (Year 1, 5, 10, after improvements)
+  - Tracks "story beats" per business (last 5 kept)
+  - Considers sector, sub-type, EBITDA change, quality, platform status
+- **Year Chronicles**: Annual summary of holdco progress and market conditions
+  - Summarizes acquisitions, sales, improvements made that year
+  - References market conditions from recent events
+- **Fallback Narratives**: Pre-written pools for 9 event categories (recession, bull market, interest rate, credit tightening, sector boom/disruption, employee departure, customer loss, regulatory change)
+
+### Files Modified
+- `src/services/aiGeneration.ts` - Added generateNarrative, generateEventNarrative, generateBusinessUpdate, generateYearChronicle, fallback narrative pools
+- `src/hooks/useGame.ts` - Added fetchEventNarrative, generateBusinessStories, generateYearChronicle actions; yearChronicle state
+- `src/engine/types.ts` - Added StoryBeat interface, narrative field on GameEvent
+- `api/ai/generate-narrative.ts` - New Vercel serverless endpoint for narrative generation
+
+---
+
+### Deal Sourcing Feature
+> Commit: `3966713` — Add deal sourcing feature for additional deal flow
+
+### Changes Made
+- **Hire Investment Banker**: Pay $500k to source additional deal flow
+  - Generates 3 new deals, heavily weighted toward M&A focus sector
+  - If no focus set, generates diverse deals across sectors
+  - One use per round
+  - Deals marked as `sourced` source type with fresh expiration
+- **UI**: Added "Source Deals" button in Allocate phase deals tab
+
+### Files Modified
+- `src/engine/businesses.ts` - Added generateSourcedDeals function
+- `src/hooks/useGame.ts` - Added sourceDealFlow action, dealSourcingUsedThisRound tracking
+- `src/engine/types.ts` - Added 'source_deals' to GameActionType, 'sourced' to Deal source type
+- `src/components/phases/AllocatePhase.tsx` - Added Source Deals button and cost display
+
+---
+
+### Leverage Display Improvement
+> Commit: `419c467` — Improve leverage display: show Net Cash when debt < cash
+
+### Changes Made
+- When the holdco has more cash than debt (net cash position), the leverage metric now displays "Net Cash" instead of a negative number
+- More intuitive for players to understand their balance sheet health
+
+### Files Modified
+- `src/components/dashboard/Dashboard.tsx` - Updated leverage display logic
+
+---
+
+### Roll-Up Guide Modal
+> Commit: `50b10d7` — Add Roll-Up Guide modal to explain platform mechanics
+
+### Changes Made
+- **Roll-Up Guide**: New educational modal explaining platform/tuck-in mechanics:
+  - What platforms are and how to designate them
+  - How tuck-in acquisitions work (same-sector bolt-ons)
+  - Multiple expansion mechanics (scale 1-3 bonuses)
+  - How to merge two businesses
+  - Integration outcomes (success/partial/failure)
+  - Synergy expectations
+
+### Files Created
+- `src/components/ui/RollUpGuideModal.tsx` - New component
+
+### Files Modified
+- `src/components/phases/AllocatePhase.tsx` - Added Roll-Up Guide button in Portfolio tab
+
+---
+
+### Vercel Serverless API Routes
+> Commit: `790a789` — Add Vercel serverless API routes for AI features
+
+### Changes Made
+- **Server-Side AI**: Moved AI integration from client-side API key to server-side
+  - `GET /api/ai/status` - Check if ANTHROPIC_API_KEY environment variable is configured
+  - `POST /api/ai/generate-deal` - Generate rich deal content (backstory, motivation, quirks, red flags, opportunities)
+  - `POST /api/ai/analyze-game` - Post-game personalized AI analysis with strengths, improvements, lessons, what-if scenarios
+  - `POST /api/ai/generate-narrative` - Dynamic narrative generation for events, business updates, year chronicles
+- **Vercel Config**: Added `vercel.json` for deployment configuration
+- **Security**: API key stored as Vercel environment variable instead of localStorage
+
+### Files Created
+- `api/ai/status.ts` - AI status check endpoint
+- `api/ai/generate-deal.ts` - Deal content generation endpoint
+- `api/ai/analyze-game.ts` - Game analysis endpoint
+- `api/ai/generate-narrative.ts` - Narrative generation endpoint
+- `vercel.json` - Vercel deployment configuration
+
+### Files Modified
+- `src/services/aiGeneration.ts` - Refactored to use server API instead of direct Claude API calls
+- `package.json` - Added @vercel/node dev dependency
+
+---
+
 ### User Request - AI-Generated M&A Targets
 > "now let's do AI-generated M&A targets"
 
@@ -97,12 +196,23 @@ A living document tracking the evolution of the game design based on user feedba
 
 ---
 
-### AI Enhancement Discussion
-User asked about layering AI onto the game. Ideas discussed:
-- **Supported**: AI-generated M&A targets, post-game analysis, dynamic narratives
-- **Partial support**: Real-world-inspired events (not literal current events)
-- **Pushback**: Real-time sector multiples (breaks game balance, expensive APIs)
-- **Original ideas**: AI advisor, intelligent event chaining, competitor holdcos, DD conversations
+### AI Enhancement Discussion & Progress
+User asked about layering AI onto the game. Ideas discussed and implementation status:
+
+**Implemented (3 of ~8 ideas):**
+- AI-generated M&A targets (backstories, motivations, quirks, red flags)
+- Post-game AI analysis (personalized performance review)
+- Dynamic narratives (event context, business stories, year chronicles)
+
+**Not yet implemented:**
+- **AI Advisor**: In-game AI mentor that offers strategic suggestions based on portfolio state
+- **Intelligent Event Chaining**: AI creates multi-year narrative arcs (e.g., recession leads to distressed deals leads to recovery)
+- **Competitor Holdcos**: AI-controlled rival holdcos competing for the same deal pipeline
+- **DD Conversations**: Interactive due diligence where player asks AI questions about a target business
+- **Real-world-inspired events**: Events loosely based on real economic patterns (partial support — not literal current events)
+
+**Rejected:**
+- Real-time sector multiples from live market data (breaks game balance, expensive APIs)
 
 ---
 
@@ -277,7 +387,26 @@ Based on Peter Kang's "The Holdco Guide":
 
 ## Future Considerations
 
-Ideas mentioned or implied for future development:
+### AI Features (from brainstorm)
+- [ ] AI Advisor — in-game strategic mentor suggesting moves based on portfolio state
+- [ ] Intelligent Event Chaining — multi-year narrative arcs driven by AI
+- [ ] Competitor Holdcos — AI-controlled rivals competing for deals
+- [ ] DD Conversations — interactive due diligence Q&A with AI
+- [ ] Real-world-inspired events — loosely based on real economic patterns
+
+### Gameplay Features (from PRD v2.0, not yet built)
+- [ ] Cash Flow River Animation — Sankey-style animated flow visualization
+- [ ] Portfolio Health Heatmap — at-a-glance portfolio composition bar
+- [ ] Difficulty Modes — Easy/Normal/Hard with different parameters
+- [ ] Holdco Archetype Selection — Capital Allocator/Operational/Roll-Up starting style
+- [ ] Sound Design — UI sounds for cash collection, acquisitions, events
+- [ ] Share-Your-Score Image Generation — shareable game-over card
+- [ ] Responsive Mobile Layout — optimize for tablet/phone
+- [ ] Sector Focus Event Modifiers — reduce negative event impact at Tier 2+
+- [ ] Earn-out Resolution — track whether earn-out targets are hit over time
+- [ ] Bank Debt Amortization — 10-year repayment schedule
+
+### Gameplay Ideas (from sessions)
 - [ ] More detailed integration mechanics (cultural fit, technology integration)
 - [ ] Management team quality affecting outcomes
 - [ ] Economic cycles affecting deal flow and valuations
