@@ -4,6 +4,106 @@ A living document tracking the evolution of the game design based on user feedba
 
 ---
 
+## Session 6 - Dynamic Multiple Expansion & Buyer Profiles (2026-02-07)
+
+### Design Problem
+Exit multiples didn't reflect real PE dynamics. A $15M EBITDA agency platform exited at ~5x, but in reality it should command 8-12x because institutional buyers and strategics bid up large, de-risked platforms. The core roll-up thesis — buy small at low multiples, aggregate, professionalize, sell high — wasn't being rewarded. Players who built $20M+ EBITDA platforms saw the same exit multiples as $1M standalone businesses.
+
+### Changes Made
+
+#### Size-Tier Multiple Expansion (the big new mechanic)
+Smooth interpolation based on platform EBITDA — the larger you build, the more buyers compete:
+
+| EBITDA | Buyer Pool | Premium |
+|---|---|---|
+| <$2M | Individual operators | +0.0x |
+| $2-5M | Small PE funds | +0.5–1.0x |
+| $5-10M | Lower middle market PE | +1.0–2.0x |
+| $10-20M | Institutional PE | +2.0–3.5x |
+| $20M+ | Large-cap PE / strategics | +3.5–5.0x (caps at $30M) |
+
+#### De-Risking Premium (+0–1.5x)
+Composite premium rewarding operational quality:
+- Low revenue concentration: +0.3x
+- Strong operator/management: +0.3x
+- Platform with bolt-ons: +0.2x per scale tier (up to +0.6x)
+- 2+ operational improvements: +0.2x
+- 90%+ customer retention: +0.2x
+- Total capped at 1.5x
+
+#### Expanded Growth & Quality Premiums
+- **Growth premium** range widened: -1.0x (declining) to +2.5x (exceptional) — was capped at +1.0x
+- **Quality premium** increased: ±0.4x per star from 3 — was ±0.3x
+- **Platform premium** reduced to +0.2x per scale — was +0.3x (size tier now does the heavy lifting)
+
+#### Deterministic Buyer Profiles
+Every exit and unsolicited offer now shows a realistic buyer:
+- **Name pools**: ~15 PE fund names, ~10 family office names, sector-specific strategic acquirer names
+- **Buyer types**: Individual, Family Office, Small PE, Lower-Mid PE, Institutional PE, Large PE, Strategic
+- **Strategic buyers**: Chance increases by tier (0%→5%→15%→25%→35%), add +0.5–1.5x premium
+- **Investment thesis**: Template-driven based on buyer type, business characteristics, and platform status
+- **Fund size**: Displayed for institutional buyers (e.g., "$2-10B fund")
+
+#### Valuation Commentary
+Each business now shows educational context:
+- Summary line: "At $15M platform EBITDA, this attracts institutional PE attention at 10.5x"
+- Factor bullets explaining each premium driver
+- Buyer pool description: 1-2 sentences about who buys at this EBITDA level
+
+#### Unsolicited Offers Reworked
+Previously used crude `baseMultiple * (1.2 + random * 0.6)`. Now:
+1. Runs full `calculateExitValuation()` for realistic pricing
+2. Generates a buyer profile with name and thesis
+3. Strategic buyers add their premium on top
+4. Random variance: ×0.9–1.2 of calculated multiple
+5. Buyer profile card shown on event screen (name, type badge, fund size, thesis)
+
+#### Enterprise Value Scoring
+`calculateEnterpriseValue()` now uses `calculateExitValuation()` instead of crude sector-average multiples. This is the highest-impact change for game scoring — players who build large platforms now see dramatically higher EVs at game end.
+
+#### AI Buyer Enrichment (optional)
+- `generateAIBuyerProfile()` takes the deterministic profile and asks AI to rewrite the investment thesis with more specificity
+- New `api/ai/generate-buyer.ts` endpoint (Haiku, 300 tokens)
+- Fire-and-forget — deterministic profile works standalone, AI just adds polish
+
+#### Save Version Bump
+`holdco-tycoon-save-v6` → `holdco-tycoon-save-v7` since valuation math changes would make old saves feel inconsistent.
+
+### Target Outcomes (verified via test suite)
+- $1M EBITDA agency, quality 3: ~4x exit (individual buyers)
+- $5M EBITDA SaaS platform, quality 4, 30% growth: ~9-10x
+- $15M EBITDA agency platform, quality 4, 50% growth, 3 improvements: ~10-12x
+- $25M EBITDA industrial platform, quality 5: ~12-14x
+
+### Files Created
+- `src/engine/buyers.ts` — Size-tier math, de-risking premium, buyer profile generation, valuation commentary
+- `src/engine/__tests__/buyers.test.ts` — 25 new tests covering all buyer engine functions
+- `api/ai/generate-buyer.ts` — AI buyer thesis enrichment endpoint
+
+### Files Modified
+- `src/engine/types.ts` — Added BuyerPoolTier, BuyerType, BuyerProfile, ValuationCommentary types; extended ExitValuation and GameEvent
+- `src/engine/simulation.ts` — Rewrote calculateExitValuation with size-tier + de-risking; updated unsolicited offers
+- `src/engine/scoring.ts` — calculateEnterpriseValue now uses calculateExitValuation
+- `src/hooks/useGame.ts` — sellBusiness generates buyer profile; save version bumped to v7
+- `src/components/cards/BusinessCard.tsx` — Added Size Tier and De-risking rows + buyer pool description
+- `src/components/cards/EventCard.tsx` — Buyer profile card on unsolicited offers
+- `src/services/aiGeneration.ts` — Added generateAIBuyerProfile function
+
+### Test Results
+- 190/190 tests pass (165 existing + 25 new)
+- `tsc --noEmit` clean
+- `vite build` succeeds
+
+---
+
+## Session 5 - Audit & Bug Fixes (2026-02-06)
+
+> Commit: `e6d0660` — Fix 41 audit findings + add Vitest test suite (165 tests)
+
+See `audit-fixes.md` for the full list of 41 issues found and fixed (5 Critical, 8 High, 14 Medium, 14 Low).
+
+---
+
 ## Session 4 - AI Enhancement & Market Guide (2026-02-06)
 
 ### User Request - Post-Game AI Analysis
@@ -410,6 +510,6 @@ Based on Peter Kang's "The Holdco Guide":
 - [ ] More detailed integration mechanics (cultural fit, technology integration)
 - [ ] Management team quality affecting outcomes
 - [ ] Economic cycles affecting deal flow and valuations
-- [ ] Strategic buyer exits vs financial buyer exits
-- [ ] Add-on acquisition sourcing bonuses for established platforms
+- [x] Strategic buyer exits vs financial buyer exits *(Session 6 — buyer profiles with strategic premium)*
+- [x] Add-on acquisition sourcing bonuses for established platforms *(Session 6 — size-tier premium rewards scale)*
 - [ ] Industry-specific events and dynamics

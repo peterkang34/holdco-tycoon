@@ -367,10 +367,12 @@ export const useGameStore = create<GameStore>()(
         const newBusiness = executeDealStructure(deal, structure, state.round);
 
         // Add platform fields to new business
+        // Note: acquisitionType === 'platform' is just a deal label suggesting platform potential.
+        // Players must explicitly designate a business as a platform (costs 5% EBITDA).
         const businessWithPlatformFields: Business = {
           ...newBusiness,
-          isPlatform: deal.acquisitionType === 'platform',
-          platformScale: deal.acquisitionType === 'platform' ? 1 : 0,
+          isPlatform: false,
+          platformScale: 0,
           boltOnIds: [],
           synergiesRealized: 0,
           totalAcquisitionCost: deal.askingPrice,

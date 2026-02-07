@@ -218,8 +218,8 @@ describe('Full Game Simulation - Aggressive Acquirer', () => {
             const struct = structures[0]; // Pick first available
             if (state.cash >= struct.cashRequired) {
               const newBiz = executeDealStructure(deal, struct, round);
-              newBiz.isPlatform = deal.acquisitionType === 'platform';
-              newBiz.platformScale = deal.acquisitionType === 'platform' ? 1 : 0;
+              newBiz.isPlatform = false;
+              newBiz.platformScale = 0;
               newBiz.boltOnIds = [];
               newBiz.synergiesRealized = 0;
               newBiz.totalAcquisitionCost = deal.askingPrice;
