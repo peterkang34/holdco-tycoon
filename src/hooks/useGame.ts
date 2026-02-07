@@ -418,23 +418,94 @@ export const useGameStore = create<GameStore>()(
         const newRound = state.round + 1;
         const gameOver = newRound > TOTAL_ROUNDS || gameOverFromBankruptcy;
 
-        set({
-          businesses: updatedBusinesses,
-          round: newRound,
-          metricsHistory: [...state.metricsHistory, historyEntry],
-          gameOver,
-          bankruptRound,
-          covenantBreachRounds: newCovenantBreachRounds,
-          requiresRestructuring,
-          phase: 'collect', // L-4: Removed redundant ternary (both branches were identical)
-          currentEvent: null,
-          metrics: endMetrics,
-          focusBonus: calculateSectorFocusBonus(updatedBusinesses),
-        });
-
-        // If not game over, advance to collect phase for next round
         if (!gameOver) {
-          get().advanceToCollect();
+          // Advance to collect phase atomically — compute debt payments in the same set()
+          // to avoid a brief flash where cash/phase are stale.
+          let cashAdjustment = 0;
+          let holdcoAmortizationAmount = 0;
+
+          // Process opco-level debt payments
+          const collectBusinesses = updatedBusinesses.map(b => {
+            if (b.status !== 'active') return b;
+            let updated = { ...b };
+
+            if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
+              const interest = Math.round(b.sellerNoteBalance * b.sellerNoteRate);
+              const principal = Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
+              cashAdjustment -= (interest + principal);
+              updated.sellerNoteBalance = Math.max(0, b.sellerNoteBalance - principal);
+              updated.sellerNoteRoundsRemaining = b.sellerNoteRoundsRemaining - 1;
+            }
+            if (updated.sellerNoteRoundsRemaining <= 0 && updated.sellerNoteBalance > 0) {
+              cashAdjustment -= updated.sellerNoteBalance;
+              updated.sellerNoteBalance = 0;
+            }
+
+            if (b.earnoutRemaining > 0 && b.earnoutTarget > 0) {
+              const actualGrowth = b.acquisitionEbitda > 0
+                ? (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda
+                : 0;
+              if (actualGrowth >= b.earnoutTarget) {
+                cashAdjustment -= b.earnoutRemaining;
+                updated.earnoutRemaining = 0;
+                updated.earnoutTarget = 0;
+              }
+            }
+
+            return updated;
+          });
+
+          // Holdco bank debt amortization
+          let newTotalDebt = state.totalDebt;
+          const holdcoDebtStartRound = state.holdcoDebtStartRound;
+          if (state.totalDebt > 0 && holdcoDebtStartRound > 0) {
+            const yearsWithDebt = newRound - holdcoDebtStartRound;
+            if (yearsWithDebt >= 2) {
+              const scheduledPayment = Math.round(state.totalDebt * 0.10);
+              const availableCash = state.cash + cashAdjustment;
+              const actualPayment = Math.min(scheduledPayment, Math.max(0, availableCash));
+              if (actualPayment > 0) {
+                cashAdjustment -= actualPayment;
+                newTotalDebt = state.totalDebt - actualPayment;
+                holdcoAmortizationAmount = actualPayment;
+              }
+            }
+          }
+
+          const newCash = Math.max(0, state.cash + cashAdjustment);
+
+          set({
+            businesses: collectBusinesses,
+            round: newRound,
+            metricsHistory: [...state.metricsHistory, historyEntry],
+            gameOver: false,
+            bankruptRound,
+            covenantBreachRounds: newCovenantBreachRounds,
+            requiresRestructuring,
+            phase: 'collect' as GamePhase,
+            currentEvent: null,
+            metrics: endMetrics,
+            focusBonus: calculateSectorFocusBonus(collectBusinesses),
+            cash: newCash,
+            totalDebt: newTotalDebt,
+            cashBeforeDebtPayments: state.cash,
+            debtPaymentThisRound: Math.abs(cashAdjustment),
+            holdcoAmortizationThisRound: holdcoAmortizationAmount,
+          });
+        } else {
+          set({
+            businesses: updatedBusinesses,
+            round: newRound,
+            metricsHistory: [...state.metricsHistory, historyEntry],
+            gameOver: true,
+            bankruptRound,
+            covenantBreachRounds: newCovenantBreachRounds,
+            requiresRestructuring,
+            phase: 'collect' as GamePhase,
+            currentEvent: null,
+            metrics: endMetrics,
+            focusBonus: calculateSectorFocusBonus(updatedBusinesses),
+          });
         }
       },
 
