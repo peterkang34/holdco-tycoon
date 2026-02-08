@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Deal, formatMoney, formatPercent, Business } from '../../engine/types';
+import { Deal, DealHeat, formatMoney, formatPercent, Business } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 
 interface DealCardProps {
@@ -33,6 +33,18 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
   const acquisitionBadge = getAcquisitionTypeBadge();
   const canTuckIn = deal.acquisitionType === 'tuck_in' && availablePlatforms.length > 0;
 
+  const getHeatBadge = (heat: DealHeat) => {
+    switch (heat) {
+      case 'cold': return { label: 'Cold', color: 'bg-blue-500/20 text-blue-400', pulse: false };
+      case 'warm': return { label: 'Warm', color: 'bg-yellow-500/20 text-yellow-400', pulse: false };
+      case 'hot': return { label: 'Hot', color: 'bg-orange-500/20 text-orange-400', pulse: false };
+      case 'contested': return { label: 'Contested', color: 'bg-red-500/20 text-red-400', pulse: true };
+    }
+  };
+  const heatBadge = getHeatBadge(deal.heat);
+  const hasHeatPremium = deal.effectivePrice > deal.askingPrice;
+  const premiumPct = hasHeatPremium ? Math.round(((deal.effectivePrice / deal.askingPrice) - 1) * 100) : 0;
+
   const getSignalColor = (type: string, value: string) => {
     if (type === 'concentration') {
       return value === 'low' ? 'text-accent' : value === 'medium' ? 'text-warning' : 'text-danger';
@@ -64,9 +76,14 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
-          <span className={`text-xs px-2 py-1 rounded ${acquisitionBadge.color}`}>
-            {acquisitionBadge.label}
-          </span>
+          <div className="flex items-center gap-1">
+            <span className={`text-xs px-2 py-1 rounded ${heatBadge.color} ${heatBadge.pulse ? 'animate-pulse' : ''}`}>
+              {heatBadge.label}
+            </span>
+            <span className={`text-xs px-2 py-1 rounded ${acquisitionBadge.color}`}>
+              {acquisitionBadge.label}
+            </span>
+          </div>
           <span className={`text-xs px-2 py-1 rounded ${
             deal.freshness === 1 ? 'bg-warning/20 text-warning' : 'bg-white/10 text-text-muted'
           }`}>
@@ -153,8 +170,15 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
         </div>
         <div>
           <p className="text-xs text-text-muted">Asking Price</p>
-          <p className="font-mono font-bold text-lg">{formatMoney(deal.askingPrice)}</p>
-          <p className="text-xs text-text-muted">{deal.business.acquisitionMultiple.toFixed(1)}x EBITDA</p>
+          <p className="font-mono font-bold text-lg">{formatMoney(deal.effectivePrice)}</p>
+          {hasHeatPremium ? (
+            <p className="text-xs text-text-muted">
+              <span className="line-through">{formatMoney(deal.askingPrice)}</span>
+              <span className="ml-1 text-warning">+{premiumPct}%</span>
+            </p>
+          ) : (
+            <p className="text-xs text-text-muted">{deal.business.acquisitionMultiple.toFixed(1)}x EBITDA</p>
+          )}
         </div>
         <div>
           <p className="text-xs text-text-muted">Quality</p>

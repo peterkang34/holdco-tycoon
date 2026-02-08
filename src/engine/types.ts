@@ -67,6 +67,8 @@ export interface SectorDefinition {
 // How closely related two sub-types are within a sector
 export type SubTypeAffinity = 'match' | 'related' | 'distant';
 
+export type DealHeat = 'cold' | 'warm' | 'hot' | 'contested';
+
 export type BusinessStatus = 'active' | 'sold' | 'wound_down' | 'integrated' | 'merged';
 
 export type QualityRating = 1 | 2 | 3 | 4 | 5;
@@ -166,6 +168,8 @@ export interface Deal {
   acquisitionType: AcquisitionType; // standalone, tuck-in, or platform opportunity
   tuckInDiscount?: number; // discount % if this is a tuck-in (0.1 = 10% off)
   aiContent?: AIGeneratedContent; // Rich AI-generated content (optional)
+  heat: DealHeat; // Competitive heat level
+  effectivePrice: number; // askingPrice * heat premium
 }
 
 export type DealStructureType = 'all_cash' | 'seller_note' | 'bank_debt' | 'earnout' | 'seller_note_bank_debt';
@@ -385,6 +389,11 @@ export interface GameState {
   covenantBreachRounds: number; // consecutive rounds in breach
   hasRestructured: boolean; // one-time flag — second insolvency = game over
   bankruptRound?: number; // if set, game ended via bankruptcy
+
+  // Deal heat / acquisition limits
+  acquisitionsThisRound: number;
+  maxAcquisitionsPerRound: number;
+  lastAcquisitionResult: 'success' | 'snatched' | null;
 }
 
 export type GameActionType =

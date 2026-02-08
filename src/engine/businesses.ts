@@ -1,13 +1,16 @@
 import {
   Business,
   Deal,
+  DealHeat,
   DueDiligenceSignals,
   QualityRating,
   SectorId,
   MAFocus,
   DealSizePreference,
   AcquisitionType,
+  EventType,
   IntegrationOutcome,
+  MASourcingTier,
   SubTypeAffinity,
   AIGeneratedContent,
   randomInRange,
@@ -227,6 +230,62 @@ function calculateTuckInDiscount(quality: QualityRating): number {
   return Math.max(0.05, Math.min(0.25, baseDiscount + qualityAdjustment));
 }
 
+// --- Deal Heat System ---
+
+const HEAT_LEVELS: DealHeat[] = ['cold', 'warm', 'hot', 'contested'];
+
+// Calculate deal heat based on quality, source, round, and market conditions
+export function calculateDealHeat(
+  quality: QualityRating,
+  source: Deal['source'],
+  round: number,
+  lastEventType?: EventType
+): DealHeat {
+  // Base distribution: cold 25%, warm 35%, hot 30%, contested 10%
+  const roll = Math.random();
+  let tierIndex: number;
+  if (roll < 0.25) tierIndex = 0; // cold
+  else if (roll < 0.60) tierIndex = 1; // warm
+  else if (roll < 0.90) tierIndex = 2; // hot
+  else tierIndex = 3; // contested
+
+  // Quality modifier: high quality attracts more buyers
+  if (quality >= 4) tierIndex += 1;
+  if (quality <= 2) tierIndex -= 1;
+
+  // Market event modifier
+  if (lastEventType === 'global_bull_market') tierIndex += 1;
+  if (lastEventType === 'global_recession') tierIndex -= 1;
+
+  // Late game: more capital in market
+  if (round >= 15) tierIndex += 1;
+
+  // Source modifiers — proprietary/sourced = less competition
+  if (source === 'proprietary') tierIndex -= 2;
+  if (source === 'sourced') tierIndex -= 1;
+
+  // Clamp to valid range
+  tierIndex = Math.max(0, Math.min(3, tierIndex));
+  return HEAT_LEVELS[tierIndex];
+}
+
+// Calculate the premium multiplier for a given heat level
+export function calculateHeatPremium(heat: DealHeat): number {
+  switch (heat) {
+    case 'cold': return 1.0;
+    case 'warm': return randomInRange([1.10, 1.15]);
+    case 'hot': return randomInRange([1.20, 1.30]);
+    case 'contested': return randomInRange([1.30, 1.50]);
+  }
+}
+
+// Maximum acquisitions per round based on MA sourcing tier
+export function getMaxAcquisitions(maSourcingTier: MASourcingTier): number {
+  if (maSourcingTier >= 2) return 4;
+  if (maSourcingTier >= 1) return 3;
+  return 2;
+}
+
 // Determine how closely related two sub-types are within a sector
 export function getSubTypeAffinity(sectorId: string, subType1: string, subType2: string): SubTypeAffinity {
   if (subType1 === subType2) return 'match';
@@ -351,16 +410,23 @@ export function generateDeal(sectorId: SectorId, round: number): Deal {
   // Always include fallback content for richer deals
   const aiContent = generateFallbackContent(sectorId, business.qualityRating);
 
+  const source: Deal['source'] = Math.random() > 0.4 ? 'inbound' : 'brokered';
+  const heat = calculateDealHeat(business.qualityRating, source, round);
+  const heatPremium = calculateHeatPremium(heat);
+  const effectivePrice = Math.round(askingPrice * heatPremium);
+
   return {
     id: `deal_${generateBusinessId()}`,
     business,
     askingPrice,
     freshness: 2, // H-7: Consistent with generateDealWithSize
     roundAppeared: round,
-    source: Math.random() > 0.4 ? 'inbound' : 'brokered',
+    source,
     acquisitionType,
     tuckInDiscount,
     aiContent,
+    heat,
+    effectivePrice,
   };
 }
 
@@ -459,6 +525,7 @@ export interface DealGenerationOptions {
   source?: Deal['source'];
   freshnessBonus?: number;
   multipleDiscount?: number; // e.g., 0.15 = 15% off asking price
+  lastEventType?: EventType; // for deal heat calculation
 }
 
 // Generate a deal with size preference
@@ -513,6 +580,13 @@ export function generateDealWithSize(
   const baseFreshness = 2;
   const freshness = baseFreshness + (options.freshnessBonus ?? 0);
 
+  const dealSource = options.source ?? (Math.random() > 0.4 ? 'inbound' : 'brokered');
+
+  // Calculate deal heat and effective price
+  const heat = calculateDealHeat(quality, dealSource, round, options.lastEventType);
+  const heatPremium = calculateHeatPremium(heat);
+  const effectivePrice = Math.round(finalAskingPrice * heatPremium);
+
   return {
     id: `deal_${generateBusinessId()}`,
     business: {
@@ -525,10 +599,12 @@ export function generateDealWithSize(
     askingPrice: finalAskingPrice,
     freshness,
     roundAppeared: round,
-    source: options.source ?? (Math.random() > 0.4 ? 'inbound' : 'brokered'),
+    source: dealSource,
     acquisitionType,
     tuckInDiscount,
     aiContent,
+    heat,
+    effectivePrice,
   };
 }
 
@@ -540,7 +616,8 @@ export function generateDealPipeline(
   portfolioFocusTier?: number,
   portfolioEbitda: number = 0,
   maSourcingTier: number = 0,
-  maSourcingActive: boolean = false
+  maSourcingActive: boolean = false,
+  lastEventType?: EventType
 ): Deal[] {
   // Age existing deals first
   let pipeline = currentPipeline.map(deal => ({
@@ -558,12 +635,15 @@ export function generateDealPipeline(
   const sectorsInPipeline = new Set(pipeline.map(d => d.business.sectorId));
   const allSectorIds = SECTOR_LIST.map(s => s.id);
 
+  // Shared options to pass lastEventType for heat calculation
+  const heatOpts: DealGenerationOptions = lastEventType ? { lastEventType } : {};
+
   // 1. Generate deals based on M&A focus (if set)
   if (maFocus?.sectorId && pipeline.length < MAX_DEALS) {
     // Add 2 deals in focus sector with preferred size
     for (let i = 0; i < 2; i++) {
       if (pipeline.length >= MAX_DEALS) break;
-      pipeline.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda));
+      pipeline.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda, heatOpts));
     }
   }
 
@@ -573,6 +653,7 @@ export function generateDealPipeline(
     const sourcingOptions: DealGenerationOptions = {
       freshnessBonus: 1, // Focus deals last 3 rounds
       source: 'sourced',
+      lastEventType,
     };
 
     // Tier 2+: sub-type targeting + quality floor
@@ -615,6 +696,7 @@ export function generateDealPipeline(
           source: 'proprietary',
           multipleDiscount: 0.15,
           freshnessBonus: 1,
+          lastEventType,
         }
       ));
       }
@@ -626,7 +708,7 @@ export function generateDealPipeline(
     const focusDeals = portfolioFocusTier >= 2 ? 2 : 1;
     for (let i = 0; i < focusDeals; i++) {
       if (pipeline.length >= MAX_DEALS) break;
-      pipeline.push(generateDealWithSize(portfolioFocusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda));
+      pipeline.push(generateDealWithSize(portfolioFocusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda, heatOpts));
     }
   }
 
@@ -637,7 +719,7 @@ export function generateDealPipeline(
 
   for (const sectorId of shuffledMissing.slice(0, 3)) {
     if (pipeline.length >= MAX_DEALS) break;
-    pipeline.push(generateDealWithSize(sectorId, round, maFocus?.sizePreference || 'any', portfolioEbitda));
+    pipeline.push(generateDealWithSize(sectorId, round, maFocus?.sizePreference || 'any', portfolioEbitda, heatOpts));
   }
 
   // 4. Fill remaining slots with weighted random deals
@@ -645,13 +727,13 @@ export function generateDealPipeline(
   const targetPipelineLength = Math.min(MAX_DEALS, pipeline.length + targetNewDeals);
   while (pipeline.length < targetPipelineLength) {
     const sectorId = pickWeightedSector(round);
-    pipeline.push(generateDealWithSize(sectorId, round, maFocus?.sizePreference || 'any', portfolioEbitda));
+    pipeline.push(generateDealWithSize(sectorId, round, maFocus?.sizePreference || 'any', portfolioEbitda, heatOpts));
   }
 
   // Ensure at least 4 deals available
   while (pipeline.length < 4) {
     const sectorId = pickWeightedSector(round);
-    pipeline.push(generateDealWithSize(sectorId, round, 'any', portfolioEbitda));
+    pipeline.push(generateDealWithSize(sectorId, round, 'any', portfolioEbitda, heatOpts));
   }
 
   return pipeline;

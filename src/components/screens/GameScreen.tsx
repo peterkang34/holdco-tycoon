@@ -91,6 +91,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     debtPaymentThisRound,
     cashBeforeDebtPayments,
     actionsThisRound,
+    acquisitionsThisRound,
+    maxAcquisitionsPerRound,
+    lastAcquisitionResult,
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;
@@ -266,6 +269,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             onUpgradeMASourcing={upgradeMASourcing}
             onToggleMASourcing={toggleMASourcing}
             onProactiveOutreach={proactiveOutreach}
+            acquisitionsThisRound={acquisitionsThisRound}
+            maxAcquisitionsPerRound={maxAcquisitionsPerRound}
+            lastAcquisitionResult={lastAcquisitionResult}
           />
         );
       default:

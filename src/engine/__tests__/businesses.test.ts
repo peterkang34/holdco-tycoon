@@ -14,9 +14,12 @@ import {
   getSubTypeAffinity,
   calculateMultipleExpansion,
   createStartingBusiness,
+  calculateDealHeat,
+  calculateHeatPremium,
+  getMaxAcquisitions,
 } from '../businesses';
 import { SECTORS, SECTOR_LIST } from '../../data/sectors';
-import { SectorId, QualityRating } from '../types';
+import { SectorId, QualityRating, DealHeat, MASourcingTier } from '../types';
 
 describe('generateBusinessId', () => {
   beforeEach(() => {
@@ -500,6 +503,142 @@ describe('createStartingBusiness', () => {
       const biz = createStartingBusiness(sector);
       expect(biz.sectorId).toBe(sector);
       expect(biz.ebitda).toBe(1000);
+    }
+  });
+});
+
+describe('calculateDealHeat', () => {
+  it('should return a valid heat level', () => {
+    const validHeats: DealHeat[] = ['cold', 'warm', 'hot', 'contested'];
+    for (let i = 0; i < 50; i++) {
+      const heat = calculateDealHeat(3, 'inbound', 5);
+      expect(validHeats).toContain(heat);
+    }
+  });
+
+  it('should shift toward hot/contested for high quality', () => {
+    let hotOrContestedCount = 0;
+    for (let i = 0; i < 200; i++) {
+      const heat = calculateDealHeat(5, 'inbound', 5);
+      if (heat === 'hot' || heat === 'contested') hotOrContestedCount++;
+    }
+    // High quality (5) gets +1 tier shift, so hot/contested should be common
+    expect(hotOrContestedCount).toBeGreaterThan(50);
+  });
+
+  it('should shift toward cold for low quality', () => {
+    let coldCount = 0;
+    for (let i = 0; i < 200; i++) {
+      const heat = calculateDealHeat(1, 'inbound', 5);
+      if (heat === 'cold') coldCount++;
+    }
+    // Low quality (1) gets -1 tier shift
+    expect(coldCount).toBeGreaterThan(40);
+  });
+
+  it('should shift toward cold for proprietary source (-2 tiers)', () => {
+    let coldCount = 0;
+    for (let i = 0; i < 200; i++) {
+      const heat = calculateDealHeat(3, 'proprietary', 5);
+      if (heat === 'cold') coldCount++;
+    }
+    // Proprietary gets -2 tiers, should be almost always cold
+    expect(coldCount).toBeGreaterThan(120);
+  });
+
+  it('should shift toward hot for bull market + late game', () => {
+    let hotOrContestedCount = 0;
+    for (let i = 0; i < 200; i++) {
+      const heat = calculateDealHeat(3, 'inbound', 18, 'global_bull_market');
+      if (heat === 'hot' || heat === 'contested') hotOrContestedCount++;
+    }
+    // Bull market (+1) + late game (+1) = +2 tiers total
+    expect(hotOrContestedCount).toBeGreaterThan(80);
+  });
+
+  it('should shift toward cold for recession', () => {
+    let coldOrWarmCount = 0;
+    for (let i = 0; i < 200; i++) {
+      const heat = calculateDealHeat(3, 'inbound', 5, 'global_recession');
+      if (heat === 'cold' || heat === 'warm') coldOrWarmCount++;
+    }
+    expect(coldOrWarmCount).toBeGreaterThan(100);
+  });
+});
+
+describe('calculateHeatPremium', () => {
+  it('should return 1.0 for cold', () => {
+    expect(calculateHeatPremium('cold')).toBe(1.0);
+  });
+
+  it('should return 1.10-1.15 for warm', () => {
+    for (let i = 0; i < 20; i++) {
+      const premium = calculateHeatPremium('warm');
+      expect(premium).toBeGreaterThanOrEqual(1.10);
+      expect(premium).toBeLessThanOrEqual(1.15);
+    }
+  });
+
+  it('should return 1.20-1.30 for hot', () => {
+    for (let i = 0; i < 20; i++) {
+      const premium = calculateHeatPremium('hot');
+      expect(premium).toBeGreaterThanOrEqual(1.20);
+      expect(premium).toBeLessThanOrEqual(1.30);
+    }
+  });
+
+  it('should return 1.30-1.50 for contested', () => {
+    for (let i = 0; i < 20; i++) {
+      const premium = calculateHeatPremium('contested');
+      expect(premium).toBeGreaterThanOrEqual(1.30);
+      expect(premium).toBeLessThanOrEqual(1.50);
+    }
+  });
+});
+
+describe('getMaxAcquisitions', () => {
+  it('should return 2 for no MA sourcing', () => {
+    expect(getMaxAcquisitions(0)).toBe(2);
+  });
+
+  it('should return 3 for tier 1', () => {
+    expect(getMaxAcquisitions(1)).toBe(3);
+  });
+
+  it('should return 4 for tier 2', () => {
+    expect(getMaxAcquisitions(2)).toBe(4);
+  });
+
+  it('should return 4 for tier 3', () => {
+    expect(getMaxAcquisitions(3)).toBe(4);
+  });
+});
+
+describe('generateDealWithSize heat integration', () => {
+  it('should include heat and effectivePrice on deals', () => {
+    const deal = generateDealWithSize('agency', 5, 'any');
+    expect(deal.heat).toBeDefined();
+    expect(['cold', 'warm', 'hot', 'contested']).toContain(deal.heat);
+    expect(deal.effectivePrice).toBeDefined();
+    expect(deal.effectivePrice).toBeGreaterThanOrEqual(deal.askingPrice);
+  });
+
+  it('should have effectivePrice equal askingPrice for cold deals', () => {
+    // Generate many deals and check cold ones
+    for (let i = 0; i < 100; i++) {
+      const deal = generateDealWithSize('agency', 1, 'any');
+      if (deal.heat === 'cold') {
+        expect(deal.effectivePrice).toBe(deal.askingPrice);
+      }
+    }
+  });
+
+  it('should have effectivePrice > askingPrice for hot/contested deals', () => {
+    for (let i = 0; i < 100; i++) {
+      const deal = generateDealWithSize('agency', 5, 'any');
+      if (deal.heat === 'hot' || deal.heat === 'contested') {
+        expect(deal.effectivePrice).toBeGreaterThan(deal.askingPrice);
+      }
     }
   });
 });

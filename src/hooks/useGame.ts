@@ -30,6 +30,7 @@ import {
   enhanceDealsWithAI,
   generateSourcedDeals,
   generateProactiveOutreachDeals,
+  getMaxAcquisitions,
 } from '../engine/businesses';
 import { generateBuyerProfile } from '../engine/buyers';
 import {
@@ -141,12 +142,11 @@ function migrateV9ToV10() {
   try {
     const v10Key = 'holdco-tycoon-save-v10';
     const v9Key = 'holdco-tycoon-save-v9';
-    if (localStorage.getItem(v10Key)) return; // v10 already exists
+    if (localStorage.getItem(v10Key)) return;
     const v9Raw = localStorage.getItem(v9Key);
-    if (!v9Raw) return; // No v9 save to migrate
+    if (!v9Raw) return;
     const v9Data = JSON.parse(v9Raw);
     if (!v9Data?.state) return;
-    // Add missing MA Sourcing fields
     if (!v9Data.state.maSourcing) {
       v9Data.state.maSourcing = { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 };
     }
@@ -160,6 +160,37 @@ function migrateV9ToV10() {
   }
 }
 migrateV9ToV10();
+
+// One-time migration from v10 → v11 (adds deal heat + acquisition limits)
+function migrateV10ToV11() {
+  try {
+    const v11Key = 'holdco-tycoon-save-v11';
+    const v10Key = 'holdco-tycoon-save-v10';
+    if (localStorage.getItem(v11Key)) return;
+    const v10Raw = localStorage.getItem(v10Key);
+    if (!v10Raw) return;
+    const v10Data = JSON.parse(v10Raw);
+    if (!v10Data?.state) return;
+    // Add deal heat fields to state
+    v10Data.state.acquisitionsThisRound = 0;
+    const tier = v10Data.state.maSourcing?.tier ?? 0;
+    v10Data.state.maxAcquisitionsPerRound = tier >= 2 ? 4 : tier >= 1 ? 3 : 2;
+    v10Data.state.lastAcquisitionResult = null;
+    // Add heat + effectivePrice to existing pipeline deals
+    if (Array.isArray(v10Data.state.dealPipeline)) {
+      v10Data.state.dealPipeline = v10Data.state.dealPipeline.map((d: any) => ({
+        ...d,
+        heat: d.heat ?? 'warm',
+        effectivePrice: d.effectivePrice ?? d.askingPrice,
+      }));
+    }
+    localStorage.setItem(v11Key, JSON.stringify(v10Data));
+    localStorage.removeItem(v10Key);
+  } catch (e) {
+    console.error('v10→v11 migration failed:', e);
+  }
+}
+migrateV10ToV11();
 
 const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: ReturnType<typeof initializeSharedServices> } = {
   holdcoName: '',
@@ -197,6 +228,9 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   requiresRestructuring: false,
   covenantBreachRounds: 0,
   hasRestructured: false,
+  acquisitionsThisRound: 0,
+  maxAcquisitionsPerRound: 2,
+  lastAcquisitionResult: null,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -386,6 +420,11 @@ export const useGameStore = create<GameStore>()(
           .filter(b => b.status === 'active')
           .reduce((sum, b) => sum + b.ebitda, 0);
 
+        // Determine last event type for deal heat calculation
+        const lastEvt = state.eventHistory.length > 0
+          ? state.eventHistory[state.eventHistory.length - 1].type
+          : undefined;
+
         // Generate new deals with M&A focus and portfolio synergies
         const newPipeline = generateDealPipeline(
           state.dealPipeline,
@@ -395,7 +434,8 @@ export const useGameStore = create<GameStore>()(
           focusBonus?.tier,
           totalPortfolioEbitda,
           state.maSourcing.tier,
-          state.maSourcing.active
+          state.maSourcing.active,
+          lastEvt
         );
 
         set({
@@ -403,6 +443,7 @@ export const useGameStore = create<GameStore>()(
           dealPipeline: newPipeline,
           actionsThisRound: [],
           focusBonus,
+          lastAcquisitionResult: null,
         });
       },
 
@@ -538,6 +579,8 @@ export const useGameStore = create<GameStore>()(
             cashBeforeDebtPayments: state.cash,
             debtPaymentThisRound: holdcoAmortizationAmount,
             holdcoAmortizationThisRound: holdcoAmortizationAmount,
+            acquisitionsThisRound: 0,
+            lastAcquisitionResult: null,
           });
         } else {
           // Game over — opco debt already settled in last advanceToEvent
@@ -587,7 +630,20 @@ export const useGameStore = create<GameStore>()(
         const restrictions = getDistressRestrictions(calculateMetrics(state).distressLevel);
         if (!restrictions.canAcquire) return;
 
+        // Acquisition limit check
+        if (state.acquisitionsThisRound >= state.maxAcquisitionsPerRound) return;
+
         if (state.cash < structure.cashRequired) return;
+
+        // Contested deal snatch check — 40% chance another buyer outbids you
+        if (deal.heat === 'contested' && Math.random() < 0.40) {
+          set({
+            dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
+            acquisitionsThisRound: state.acquisitionsThisRound + 1,
+            lastAcquisitionResult: 'snatched',
+          });
+          return;
+        }
 
         const newBusiness = executeDealStructure(deal, structure, state.round);
 
@@ -600,7 +656,7 @@ export const useGameStore = create<GameStore>()(
           platformScale: 0,
           boltOnIds: [],
           synergiesRealized: 0,
-          totalAcquisitionCost: deal.askingPrice,
+          totalAcquisitionCost: deal.effectivePrice,
         };
 
         // Add bank debt to holdco if applicable
@@ -615,15 +671,17 @@ export const useGameStore = create<GameStore>()(
           cash: state.cash - structure.cashRequired,
           totalDebt: newTotalDebt,
           holdcoDebtStartRound,
-          totalInvestedCapital: state.totalInvestedCapital + deal.askingPrice,
+          totalInvestedCapital: state.totalInvestedCapital + deal.effectivePrice,
           businesses: [...state.businesses, businessWithPlatformFields],
           dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
+          acquisitionsThisRound: state.acquisitionsThisRound + 1,
+          lastAcquisitionResult: 'success',
           actionsThisRound: [
             ...state.actionsThisRound,
             {
               type: 'acquire',
               round: state.round,
-              details: { businessId: newBusiness.id, structure: structure.type, price: deal.askingPrice },
+              details: { businessId: newBusiness.id, structure: structure.type, price: deal.effectivePrice, heat: deal.heat },
             },
           ],
           metrics: calculateMetrics({
@@ -639,7 +697,20 @@ export const useGameStore = create<GameStore>()(
       acquireTuckIn: (deal: Deal, structure: DealStructure, targetPlatformId: string) => {
         const state = get();
 
+        // Acquisition limit check
+        if (state.acquisitionsThisRound >= state.maxAcquisitionsPerRound) return;
+
         if (state.cash < structure.cashRequired) return;
+
+        // Contested deal snatch check — 40% chance another buyer outbids you
+        if (deal.heat === 'contested' && Math.random() < 0.40) {
+          set({
+            dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
+            acquisitionsThisRound: state.acquisitionsThisRound + 1,
+            lastAcquisitionResult: 'snatched',
+          });
+          return;
+        }
 
         const platform = state.businesses.find(b => b.id === targetPlatformId && b.status === 'active');
         if (!platform) return;
@@ -667,7 +738,7 @@ export const useGameStore = create<GameStore>()(
           ebitda: deal.business.ebitda,
           peakEbitda: deal.business.peakEbitda,
           acquisitionEbitda: deal.business.acquisitionEbitda,
-          acquisitionPrice: deal.askingPrice,
+          acquisitionPrice: deal.effectivePrice,
           acquisitionRound: state.round,
           acquisitionMultiple: deal.business.acquisitionMultiple,
           organicGrowthRate: deal.business.organicGrowthRate,
@@ -688,7 +759,7 @@ export const useGameStore = create<GameStore>()(
           parentPlatformId: targetPlatformId,
           integrationOutcome: outcome,
           synergiesRealized: synergies,
-          totalAcquisitionCost: deal.askingPrice,
+          totalAcquisitionCost: deal.effectivePrice,
         };
 
         // Failed integration: restructuring cost + growth drag on platform
@@ -711,7 +782,7 @@ export const useGameStore = create<GameStore>()(
               boltOnIds: [...b.boltOnIds, boltOnId],
               ebitda: b.ebitda + deal.business.ebitda + synergies, // Consolidate EBITDA
               synergiesRealized: b.synergiesRealized + synergies,
-              totalAcquisitionCost: b.totalAcquisitionCost + deal.askingPrice,
+              totalAcquisitionCost: b.totalAcquisitionCost + deal.effectivePrice,
               acquisitionMultiple: b.acquisitionMultiple + multipleExpansion, // Multiple expansion!
               organicGrowthRate: b.organicGrowthRate + growthDragPenalty, // Growth drag on failure
             };
@@ -733,9 +804,11 @@ export const useGameStore = create<GameStore>()(
           cash: tuckInCash,
           totalDebt: newTotalDebt,
           holdcoDebtStartRound,
-          totalInvestedCapital: state.totalInvestedCapital + deal.askingPrice + restructuringCost,
+          totalInvestedCapital: state.totalInvestedCapital + deal.effectivePrice + restructuringCost,
           businesses: [...updatedBusinesses, boltOnBusiness],
           dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
+          acquisitionsThisRound: state.acquisitionsThisRound + 1,
+          lastAcquisitionResult: 'success',
           actionsThisRound: [
             ...state.actionsThisRound,
             {
@@ -745,11 +818,12 @@ export const useGameStore = create<GameStore>()(
                 businessId: boltOnId,
                 platformId: targetPlatformId,
                 structure: structure.type,
-                price: deal.askingPrice,
+                price: deal.effectivePrice,
                 integrationOutcome: outcome,
                 synergies,
                 restructuringCost,
                 growthDragPenalty,
+                heat: deal.heat,
               },
             },
           ],
@@ -1543,6 +1617,7 @@ export const useGameStore = create<GameStore>()(
           cash: state.cash - cost,
           totalInvestedCapital: state.totalInvestedCapital + cost,
           maSourcing: newMASourcing,
+          maxAcquisitionsPerRound: getMaxAcquisitions(nextTier),
           // Clear subType if upgrading to tier below 2 (shouldn't happen but safety)
           maFocus: nextTier < 2 ? { ...state.maFocus, subType: null } : state.maFocus,
         };
@@ -1568,6 +1643,7 @@ export const useGameStore = create<GameStore>()(
         set({
           maSourcing: newMASourcing,
           maFocus: newMAFocus,
+          maxAcquisitionsPerRound: getMaxAcquisitions(newActive ? state.maSourcing.tier : 0),
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'toggle_ma_sourcing' as const, round: state.round, details: { active: newActive } },
@@ -1916,7 +1992,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v10', // v10: MA Sourcing capability
+      name: 'holdco-tycoon-save-v11', // v11: Deal heat + acquisition limits
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -1955,6 +2031,9 @@ export const useGameStore = create<GameStore>()(
         covenantBreachRounds: state.covenantBreachRounds,
         hasRestructured: state.hasRestructured,
         bankruptRound: state.bankruptRound,
+        acquisitionsThisRound: state.acquisitionsThisRound,
+        maxAcquisitionsPerRound: state.maxAcquisitionsPerRound,
+        lastAcquisitionResult: state.lastAcquisitionResult,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.holdcoName) {
@@ -1966,6 +2045,25 @@ export const useGameStore = create<GameStore>()(
             // Backwards compat: initialize maFocus.subType if missing
             if (state.maFocus && state.maFocus.subType === undefined) {
               (state as any).maFocus = { ...state.maFocus, subType: null };
+            }
+            // Backwards compat: deal heat fields
+            if (state.acquisitionsThisRound === undefined) {
+              (state as any).acquisitionsThisRound = 0;
+            }
+            if (state.maxAcquisitionsPerRound === undefined) {
+              const tier = state.maSourcing?.tier ?? 0;
+              (state as any).maxAcquisitionsPerRound = getMaxAcquisitions(tier as any);
+            }
+            if (state.lastAcquisitionResult === undefined) {
+              (state as any).lastAcquisitionResult = null;
+            }
+            // Ensure pipeline deals have heat fields
+            if (Array.isArray(state.dealPipeline)) {
+              (state as any).dealPipeline = state.dealPipeline.map((d: any) => ({
+                ...d,
+                heat: d.heat ?? 'warm',
+                effectivePrice: d.effectivePrice ?? d.askingPrice,
+              }));
             }
             const metrics = calculateMetrics(state as GameState);
             const focusBonus = calculateSectorFocusBonus(state.businesses);

@@ -98,6 +98,8 @@ export function createMockDeal(overrides: Partial<Deal> = {}): Deal {
     roundAppeared: 1,
     source: 'inbound',
     acquisitionType: 'standalone',
+    heat: 'warm',
+    effectivePrice: 4000,
     ...overrides,
   };
 }
@@ -139,6 +141,9 @@ export function createMockGameState(overrides: Partial<GameState> = {}): GameSta
     requiresRestructuring: false,
     covenantBreachRounds: 0,
     hasRestructured: false,
+    acquisitionsThisRound: 0,
+    maxAcquisitionsPerRound: 2,
+    lastAcquisitionResult: null,
     ...overrides,
   };
 }

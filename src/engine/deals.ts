@@ -6,7 +6,7 @@ export function generateDealStructures(
   interestRate: number,
   creditTightening: boolean
 ): DealStructure[] {
-  const askingPrice = deal.askingPrice;
+  const askingPrice = deal.effectivePrice;
   const structures: DealStructure[] = [];
 
   // Option A: All Cash (always available if player has enough)
@@ -124,7 +124,7 @@ export function executeDealStructure(
     acquisitionRound: round,
     improvements: [],
     status: 'active',
-    acquisitionPrice: deal.askingPrice,
+    acquisitionPrice: deal.effectivePrice,
     sellerNoteBalance: structure.sellerNote?.amount ?? 0,
     sellerNoteRate: structure.sellerNote?.rate ?? 0,
     sellerNoteRoundsRemaining: structure.sellerNote?.termRounds ?? 0,

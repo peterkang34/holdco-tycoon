@@ -74,6 +74,9 @@ interface AllocatePhaseProps {
   onUpgradeMASourcing: () => void;
   onToggleMASourcing: () => void;
   onProactiveOutreach: () => void;
+  acquisitionsThisRound: number;
+  maxAcquisitionsPerRound: number;
+  lastAcquisitionResult: 'success' | 'snatched' | null;
 }
 
 type AllocateTab = 'portfolio' | 'deals' | 'shared_services' | 'capital';
@@ -118,6 +121,9 @@ export function AllocatePhase({
   onUpgradeMASourcing,
   onToggleMASourcing,
   onProactiveOutreach,
+  acquisitionsThisRound,
+  maxAcquisitionsPerRound,
+  lastAcquisitionResult,
 }: AllocatePhaseProps) {
   const [activeTab, setActiveTab] = useState<AllocateTab>('portfolio');
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
@@ -195,14 +201,29 @@ export function AllocatePhase({
               <p className="text-text-muted">
                 {SECTORS[selectedDeal.business.sectorId].emoji} {selectedDeal.business.subType}
               </p>
-              <span className={`text-xs px-2 py-1 rounded mt-2 inline-block ${
-                selectedDeal.acquisitionType === 'tuck_in' ? 'bg-accent-secondary/20 text-accent-secondary' :
-                selectedDeal.acquisitionType === 'platform' ? 'bg-accent/20 text-accent' :
-                'bg-white/10 text-text-muted'
-              }`}>
-                {selectedDeal.acquisitionType === 'tuck_in' ? 'Tuck-In Opportunity' :
-                 selectedDeal.acquisitionType === 'platform' ? 'Platform Opportunity' : 'Standalone'}
-              </span>
+              <div className="flex items-center gap-2 mt-2">
+                <span className={`text-xs px-2 py-1 rounded inline-block ${
+                  selectedDeal.heat === 'cold' ? 'bg-blue-500/20 text-blue-400' :
+                  selectedDeal.heat === 'warm' ? 'bg-yellow-500/20 text-yellow-400' :
+                  selectedDeal.heat === 'hot' ? 'bg-orange-500/20 text-orange-400' :
+                  'bg-red-500/20 text-red-400 animate-pulse'
+                }`}>
+                  {selectedDeal.heat.charAt(0).toUpperCase() + selectedDeal.heat.slice(1)}
+                </span>
+                <span className={`text-xs px-2 py-1 rounded inline-block ${
+                  selectedDeal.acquisitionType === 'tuck_in' ? 'bg-accent-secondary/20 text-accent-secondary' :
+                  selectedDeal.acquisitionType === 'platform' ? 'bg-accent/20 text-accent' :
+                  'bg-white/10 text-text-muted'
+                }`}>
+                  {selectedDeal.acquisitionType === 'tuck_in' ? 'Tuck-In Opportunity' :
+                   selectedDeal.acquisitionType === 'platform' ? 'Platform Opportunity' : 'Standalone'}
+                </span>
+              </div>
+              {selectedDeal.effectivePrice > selectedDeal.askingPrice && (
+                <p className="text-xs text-text-muted mt-1">
+                  Base price {formatMoney(selectedDeal.askingPrice)} + {Math.round(((selectedDeal.effectivePrice / selectedDeal.askingPrice) - 1) * 100)}% competitive premium = <span className="font-bold text-text-primary">{formatMoney(selectedDeal.effectivePrice)}</span>
+                </p>
+              )}
             </div>
             <button
               onClick={() => {
@@ -931,17 +952,34 @@ export function AllocatePhase({
               </div>
             </div>
 
-            {/* Passed deals toggle */}
-            {passedDealIds.size > 0 && (
-              <div className="flex items-center justify-between mb-2">
+            {/* Snatched banner */}
+            {lastAcquisitionResult === 'snatched' && (
+              <div className="bg-red-500/15 border border-red-500/30 rounded-lg p-3 mb-4 flex items-center justify-between">
+                <p className="text-sm text-red-400 font-medium">
+                  Another buyer outbid you! The deal is off the table.
+                </p>
+              </div>
+            )}
+
+            {/* Acquisition counter */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-3">
+                <span className={`text-sm font-medium ${acquisitionsThisRound >= maxAcquisitionsPerRound ? 'text-warning' : 'text-text-secondary'}`}>
+                  Acquisitions: {maxAcquisitionsPerRound - acquisitionsThisRound}/{maxAcquisitionsPerRound} remaining
+                </span>
+                {acquisitionsThisRound >= maxAcquisitionsPerRound && (
+                  <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded">Limit reached</span>
+                )}
+              </div>
+              {passedDealIds.size > 0 && (
                 <button
                   onClick={() => setShowPassedDeals(!showPassedDeals)}
                   className="text-xs text-text-muted hover:text-text-secondary transition-colors"
                 >
                   {showPassedDeals ? 'Hide' : 'Show'} {passedDealIds.size} passed deal{passedDealIds.size !== 1 ? 's' : ''}
                 </button>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Deals Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -952,7 +990,7 @@ export function AllocatePhase({
                   key={deal.id}
                   deal={deal}
                   onSelect={() => setSelectedDeal(deal)}
-                  disabled={cash < deal.askingPrice * 0.15 || !distressRestrictions.canAcquire}
+                  disabled={cash < deal.effectivePrice * 0.15 || !distressRestrictions.canAcquire || acquisitionsThisRound >= maxAcquisitionsPerRound}
                   availablePlatforms={getPlatformsForSector(deal.business.sectorId)}
                   isPassed={passedDealIds.has(deal.id)}
                   onPass={() => {
