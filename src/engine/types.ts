@@ -158,7 +158,7 @@ export interface Deal {
   askingPrice: number;
   freshness: number; // rounds remaining before deal expires (1-3)
   roundAppeared: number;
-  source: 'inbound' | 'brokered' | 'sourced';
+  source: 'inbound' | 'brokered' | 'sourced' | 'proprietary';
   acquisitionType: AcquisitionType; // standalone, tuck-in, or platform opportunity
   tuckInDiscount?: number; // discount % if this is a tuck-in (0.1 = 10% off)
   aiContent?: AIGeneratedContent; // Rich AI-generated content (optional)
@@ -213,6 +213,15 @@ export interface SectorFocusBonus {
   opcoCount: number;
 }
 
+export type MASourcingTier = 0 | 1 | 2 | 3;
+
+export interface MASourcingState {
+  tier: MASourcingTier;
+  active: boolean;
+  unlockedRound: number; // 0 = never unlocked
+  lastUpgradeRound: number; // 0 = never upgraded
+}
+
 export type DistressLevel = 'comfortable' | 'elevated' | 'stressed' | 'breach';
 
 export type GamePhase = 'collect' | 'event' | 'allocate' | 'restructure';
@@ -222,6 +231,7 @@ export type DealSizePreference = 'small' | 'medium' | 'large' | 'any';
 export interface MAFocus {
   sectorId: SectorId | null; // null = any sector
   sizePreference: DealSizePreference;
+  subType: string | null; // null = any sub-type (requires MA Sourcing Tier 2+)
 }
 
 export type EventType =
@@ -343,6 +353,7 @@ export interface GameState {
   // Deal Pipeline
   dealPipeline: Deal[];
   maFocus: MAFocus; // M&A sector and size focus
+  maSourcing: MASourcingState; // M&A Sourcing capability tier
 
   // Events
   currentEvent: GameEvent | null;
@@ -389,7 +400,10 @@ export type GameActionType =
   | 'wind_down'
   | 'accept_offer'
   | 'decline_offer'
-  | 'source_deals'; // Hire investment banker for additional deal flow
+  | 'source_deals' // Hire investment banker for additional deal flow
+  | 'upgrade_ma_sourcing'
+  | 'toggle_ma_sourcing'
+  | 'proactive_outreach';
 
 export interface GameAction {
   type: GameActionType;

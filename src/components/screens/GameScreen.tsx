@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useGameStore } from '../../hooks/useGame';
 import { getDistressRestrictions } from '../../engine/distress';
+import { getMASourcingAnnualCost } from '../../data/sharedServices';
 import { Dashboard } from '../dashboard/Dashboard';
 import { CollectPhase } from '../phases/CollectPhase';
 import { EventPhase } from '../phases/EventPhase';
@@ -72,6 +73,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     declineOffer,
     maFocus,
     setMAFocus,
+    maSourcing,
+    upgradeMASourcing,
+    toggleMASourcing,
+    proactiveOutreach,
     triggerAIEnhancement,
     sourceDealFlow,
     distressedSale,
@@ -148,6 +153,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
   const sharedServicesCost = sharedServices
     .filter(s => s.active)
     .reduce((sum, s) => sum + s.annualCost, 0);
+  const maSourcingCost = maSourcing.active ? getMASourcingAnnualCost(maSourcing.tier) : 0;
 
   const renderPhase = () => {
     switch (phase) {
@@ -159,6 +165,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             totalDebt={totalDebt}
             interestRate={interestRate}
             sharedServicesCost={sharedServicesCost}
+            maSourcingCost={maSourcingCost}
             round={round}
             yearChronicle={yearChronicle}
             debtPaymentThisRound={debtPaymentThisRound}
@@ -233,6 +240,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             maFocus={maFocus}
             onSetMAFocus={setMAFocus}
             actionsThisRound={actionsThisRound}
+            maSourcing={maSourcing}
+            onUpgradeMASourcing={upgradeMASourcing}
+            onToggleMASourcing={toggleMASourcing}
+            onProactiveOutreach={proactiveOutreach}
           />
         );
       default:

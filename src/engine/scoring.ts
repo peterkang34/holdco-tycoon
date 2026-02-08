@@ -204,6 +204,10 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   if (activeServices.length > 0 && activeBusinesses.length >= 3) {
     sharedServicesScore = Math.min(5, activeServices.length * 1.5);
   }
+  // MA Sourcing bonus: tier 2+ with 3+ opcos adds +1 (capped at 5)
+  if (state.maSourcing && state.maSourcing.tier >= 2 && activeBusinesses.length >= 3) {
+    sharedServicesScore = Math.min(5, sharedServicesScore + 1);
+  }
 
   // Capital return discipline (5 points)
   // The hierarchy: 1) Reinvest above hurdle, 2) Deleverage, 3) Buyback when cheap, 4) Distribute

@@ -11,6 +11,7 @@ import {
   SectorId,
   DealSizePreference,
   DistressLevel,
+  MASourcingState,
   formatMoney,
   formatPercent,
 } from '../../engine/types';
@@ -21,14 +22,16 @@ import { DealCard } from '../cards/DealCard';
 import { generateDealStructures, getStructureLabel, getStructureDescription } from '../../engine/deals';
 import { calculateExitValuation } from '../../engine/simulation';
 import { SECTORS } from '../../data/sectors';
-import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES } from '../../data/sharedServices';
+import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES, MA_SOURCING_CONFIG, getMASourcingUpgradeCost, getMASourcingAnnualCost } from '../../data/sharedServices';
 import { MarketGuideModal } from '../ui/MarketGuideModal';
 import { RollUpGuideModal } from '../ui/RollUpGuideModal';
 import { isAIEnabled } from '../../services/aiGeneration';
 
 const STARTING_SHARES = 1000;
 
-const DEAL_SOURCING_COST = 500; // $500k
+const DEAL_SOURCING_COST_BASE = 500; // $500k
+const DEAL_SOURCING_COST_TIER1 = 300; // $300k with MA Sourcing Tier 1+
+const PROACTIVE_OUTREACH_COST = 400; // $400k (Tier 3 only)
 
 interface AllocatePhaseProps {
   businesses: Business[];
@@ -63,8 +66,12 @@ interface AllocatePhaseProps {
   onEndRound: () => void;
   onSourceDeals: () => void;
   maFocus: MAFocus;
-  onSetMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference) => void;
+  onSetMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference, subType?: string | null) => void;
   actionsThisRound?: GameAction[];
+  maSourcing: MASourcingState;
+  onUpgradeMASourcing: () => void;
+  onToggleMASourcing: () => void;
+  onProactiveOutreach: () => void;
 }
 
 type AllocateTab = 'portfolio' | 'deals' | 'shared_services' | 'capital';
@@ -104,6 +111,10 @@ export function AllocatePhase({
   maFocus,
   onSetMAFocus,
   actionsThisRound = [],
+  maSourcing,
+  onUpgradeMASourcing,
+  onToggleMASourcing,
+  onProactiveOutreach,
 }: AllocatePhaseProps) {
   const [activeTab, setActiveTab] = useState<AllocateTab>('portfolio');
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
@@ -132,6 +143,7 @@ export function AllocatePhase({
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const distressRestrictions = getDistressRestrictions(distressLevel);
+  const dealSourcingCost = (maSourcing.active && maSourcing.tier >= 1) ? DEAL_SOURCING_COST_TIER1 : DEAL_SOURCING_COST_BASE;
   const aiEnabled = isAIEnabled();
   const activeServicesCount = sharedServices.filter(s => s.active).length;
   const canUnlockSharedService =
@@ -834,7 +846,31 @@ export function AllocatePhase({
                   </select>
                 </div>
               </div>
-              {maFocus.sectorId && (
+              {/* Sub-type targeting (Tier 2+, active, sector selected) */}
+              {maSourcing.active && maSourcing.tier >= 2 && maFocus.sectorId && (
+                <div className="mt-4">
+                  <label className="block text-sm text-text-muted mb-2">Target Sub-Type</label>
+                  <select
+                    value={maFocus.subType || ''}
+                    onChange={(e) => onSetMAFocus(
+                      maFocus.sectorId,
+                      maFocus.sizePreference,
+                      e.target.value || null
+                    )}
+                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                  >
+                    <option value="">Any Sub-Type</option>
+                    {SECTORS[maFocus.sectorId].subTypes.map(st => (
+                      <option key={st} value={st}>{st}</option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-accent mt-1">
+                    Industry Specialists will source {maFocus.subType ? `"${maFocus.subType}"` : 'targeted'} deals each round
+                  </p>
+                </div>
+              )}
+
+              {maFocus.sectorId && !maSourcing.active && (
                 <p className="text-xs text-accent mt-3">
                   Your M&A focus will generate more {SECTORS[maFocus.sectorId].name} deals next year.
                 </p>
@@ -848,18 +884,41 @@ export function AllocatePhase({
                     <p className="text-xs text-text-muted">
                       Hire an investment banker to source 3 additional deals
                       {maFocus.sectorId && ` (weighted toward ${SECTORS[maFocus.sectorId].name})`}
+                      {maSourcing.active && maSourcing.tier >= 1 && ' — discounted rate'}
                     </p>
                   </div>
                   <button
                     onClick={onSourceDeals}
-                    disabled={cash < DEAL_SOURCING_COST}
+                    disabled={cash < dealSourcingCost}
                     className={`btn-secondary text-sm whitespace-nowrap ${
-                      cash >= DEAL_SOURCING_COST ? 'border-accent' : ''
+                      cash >= dealSourcingCost ? 'border-accent' : ''
                     }`}
                   >
-                    Source Deals ({formatMoney(DEAL_SOURCING_COST)})
+                    Source Deals ({formatMoney(dealSourcingCost)})
                   </button>
                 </div>
+
+                {/* Proactive Outreach (Tier 3 only) */}
+                {maSourcing.active && maSourcing.tier >= 3 && (
+                  <div className="flex items-center justify-between mt-3 pt-3 border-t border-white/5">
+                    <div>
+                      <p className="text-sm font-medium">Proactive Outreach</p>
+                      <p className="text-xs text-text-muted">
+                        2 targeted quality-3+ deals
+                        {maFocus.subType && ` in ${maFocus.subType}`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={onProactiveOutreach}
+                      disabled={cash < PROACTIVE_OUTREACH_COST}
+                      className={`btn-secondary text-sm whitespace-nowrap ${
+                        cash >= PROACTIVE_OUTREACH_COST ? 'border-purple-500' : ''
+                      }`}
+                    >
+                      Outreach ({formatMoney(PROACTIVE_OUTREACH_COST)})
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -925,7 +984,132 @@ export function AllocatePhase({
         )}
 
         {activeTab === 'shared_services' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div>
+            {/* M&A Infrastructure (separate from operational shared services) */}
+            <div className="card mb-6 border-purple-500/30 bg-purple-500/5">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="font-bold text-lg flex items-center gap-2">
+                    M&A Infrastructure
+                    <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded">Separate from Shared Services</span>
+                  </h3>
+                  <p className="text-sm text-text-muted">
+                    Build a dedicated deal sourcing capability for your holdco
+                  </p>
+                </div>
+                {maSourcing.tier > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-text-muted">Annual: {formatMoney(getMASourcingAnnualCost(maSourcing.tier))}</span>
+                    <button
+                      onClick={onToggleMASourcing}
+                      className={`text-xs px-3 py-1 rounded transition-colors ${
+                        maSourcing.active
+                          ? 'bg-purple-500/20 text-purple-400 hover:bg-red-500/20 hover:text-red-400'
+                          : 'bg-white/10 text-text-muted hover:bg-purple-500/20 hover:text-purple-400'
+                      }`}
+                    >
+                      {maSourcing.active ? 'Deactivate' : 'Reactivate'}
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Tier Progress */}
+              <div className="flex items-center gap-3 mb-4">
+                {[1, 2, 3].map(tier => {
+                  const config = MA_SOURCING_CONFIG[tier as 1 | 2 | 3];
+                  const isUnlocked = maSourcing.tier >= tier;
+                  const isCurrent = maSourcing.tier === tier;
+                  const isNext = maSourcing.tier === tier - 1;
+                  return (
+                    <div
+                      key={tier}
+                      className={`flex-1 rounded-lg p-3 border transition-colors ${
+                        isUnlocked
+                          ? isCurrent && maSourcing.active
+                            ? 'border-purple-500/50 bg-purple-500/10'
+                            : 'border-white/20 bg-white/5'
+                          : isNext
+                            ? 'border-dashed border-purple-500/30'
+                            : 'border-white/5 opacity-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-xs font-bold">Tier {tier}</span>
+                        {isUnlocked && (
+                          <span className="text-xs text-purple-400">&#10003;</span>
+                        )}
+                      </div>
+                      <p className="text-xs font-medium mb-1">{config.name}</p>
+                      <p className="text-xs text-text-muted">{formatMoney(config.annualCost)}/yr</p>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Current tier effects */}
+              {maSourcing.tier > 0 && maSourcing.active && (
+                <div className="bg-white/5 rounded-lg p-3 mb-4">
+                  <p className="text-xs font-medium text-purple-400 mb-2">
+                    Active: {MA_SOURCING_CONFIG[maSourcing.tier as 1 | 2 | 3].name}
+                  </p>
+                  <ul className="space-y-1">
+                    {MA_SOURCING_CONFIG[maSourcing.tier as 1 | 2 | 3].effects.map((effect, i) => (
+                      <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
+                        <span className="text-purple-400 mt-0.5">&#8226;</span>
+                        {effect}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {/* Upgrade button */}
+              {maSourcing.tier < 3 && (() => {
+                const nextTier = (maSourcing.tier + 1) as 1 | 2 | 3;
+                const config = MA_SOURCING_CONFIG[nextTier];
+                const upgradeCost = getMASourcingUpgradeCost(maSourcing.tier);
+                const opcoCount = activeBusinesses.length;
+                const hasEnoughOpcos = opcoCount >= config.requiredOpcos;
+                const canAffordUpgrade = cash >= upgradeCost;
+                const disabled = !hasEnoughOpcos || !canAffordUpgrade;
+
+                return (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">
+                        {maSourcing.tier === 0 ? 'Build' : 'Upgrade to'} {config.name}
+                      </p>
+                      <p className="text-xs text-text-muted">
+                        {!hasEnoughOpcos
+                          ? `Requires ${config.requiredOpcos}+ opcos (you have ${opcoCount})`
+                          : `${formatMoney(upgradeCost)} one-time + ${formatMoney(config.annualCost)}/yr`
+                        }
+                      </p>
+                    </div>
+                    <button
+                      onClick={onUpgradeMASourcing}
+                      disabled={disabled}
+                      className={`btn-primary text-sm ${disabled ? 'opacity-50' : 'bg-purple-600 hover:bg-purple-500'}`}
+                    >
+                      {!hasEnoughOpcos
+                        ? `Need ${config.requiredOpcos} Opcos`
+                        : !canAffordUpgrade
+                          ? 'Not Enough Cash'
+                          : `${maSourcing.tier === 0 ? 'Build' : 'Upgrade'} (${formatMoney(upgradeCost)})`
+                      }
+                    </button>
+                  </div>
+                );
+              })()}
+
+              {maSourcing.tier >= 3 && (
+                <p className="text-xs text-purple-400 text-center">Fully upgraded — Proprietary Network active</p>
+              )}
+            </div>
+
+            {/* Operational Shared Services */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {sharedServices.map(service => (
               <div
                 key={service.type}
@@ -969,6 +1153,7 @@ export function AllocatePhase({
                 )}
               </div>
             ))}
+            </div>
           </div>
         )}
 

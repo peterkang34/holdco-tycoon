@@ -15,6 +15,8 @@ import {
   DealSizePreference,
   IntegrationOutcome,
   RoundHistoryEntry,
+  MASourcingTier,
+  MASourcingState,
 } from '../engine/types';
 import {
   createStartingBusiness,
@@ -26,6 +28,7 @@ import {
   calculateMultipleExpansion,
   enhanceDealsWithAI,
   generateSourcedDeals,
+  generateProactiveOutreachDeals,
 } from '../engine/businesses';
 import { generateBuyerProfile } from '../engine/buyers';
 import {
@@ -37,7 +40,7 @@ import {
 } from '../services/aiGeneration';
 import { formatMoney } from '../engine/types';
 import { resetUsedNames } from '../data/names';
-import { initializeSharedServices, MIN_OPCOS_FOR_SHARED_SERVICES } from '../data/sharedServices';
+import { initializeSharedServices, MIN_OPCOS_FOR_SHARED_SERVICES, getMASourcingUpgradeCost, getMASourcingAnnualCost, MA_SOURCING_CONFIG } from '../data/sharedServices';
 import {
   calculatePortfolioFcf,
   calculateSharedServicesBenefits,
@@ -94,7 +97,12 @@ interface GameStore extends GameState {
   windDownBusiness: (businessId: string) => void;
   acceptOffer: () => void;
   declineOffer: () => void;
-  setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference) => void;
+  setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference, subType?: string | null) => void;
+
+  // MA Sourcing
+  upgradeMASourcing: () => void;
+  toggleMASourcing: () => void;
+  proactiveOutreach: () => void;
 
   // Restructuring actions
   distressedSale: (businessId: string) => void;
@@ -123,7 +131,9 @@ interface GameStore extends GameState {
   canAfford: (amount: number) => boolean;
 }
 
-const DEAL_SOURCING_COST = 500; // $500k to hire investment banker for additional deal flow
+const DEAL_SOURCING_COST_BASE = 500; // $500k base cost
+const DEAL_SOURCING_COST_TIER1 = 300; // $300k with MA Sourcing Tier 1+
+const PROACTIVE_OUTREACH_COST = 400; // $400k (Tier 3 only)
 
 const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: ReturnType<typeof initializeSharedServices> } = {
   holdcoName: '',
@@ -146,7 +156,8 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   equityRaisesUsed: 0,
   sharedServices: initializeSharedServices(),
   dealPipeline: [],
-  maFocus: { sectorId: null, sizePreference: 'any' as DealSizePreference },
+  maFocus: { sectorId: null, sizePreference: 'any' as DealSizePreference, subType: null },
+  maSourcing: { tier: 0 as MASourcingTier, active: false, unlockedRound: 0, lastUpgradeRound: 0 },
   currentEvent: null,
   eventHistory: [],
   creditTighteningRoundsRemaining: 0,
@@ -189,6 +200,7 @@ export const useGameStore = create<GameStore>()(
           initialOwnershipPct: FOUNDER_OWNERSHIP,
           sharedServices: initializeSharedServices(),
           dealPipeline: initialDealPipeline,
+          maSourcing: { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 },
         };
 
         set({
@@ -217,6 +229,11 @@ export const useGameStore = create<GameStore>()(
           .filter(s => s.active)
           .reduce((sum, s) => sum + s.annualCost, 0);
 
+        // MA Sourcing annual cost (separate from shared services)
+        const maSourcingCost = state.maSourcing.active
+          ? getMASourcingAnnualCost(state.maSourcing.tier)
+          : 0;
+
         // Apply distress interest penalty
         const currentMetrics = calculateMetrics(state as GameState);
         const distressRestrictions = getDistressRestrictions(currentMetrics.distressLevel);
@@ -236,7 +253,7 @@ export const useGameStore = create<GameStore>()(
         // Interest and shared services are still cash costs (separate from tax)
         const annualInterest = Math.round(state.totalDebt * effectiveRate);
 
-        let newCash = state.cash + annualFcf - annualInterest - sharedServicesCost;
+        let newCash = state.cash + annualFcf - annualInterest - sharedServicesCost - maSourcingCost;
 
         // Negative cash triggers restructuring
         let requiresRestructuring = state.requiresRestructuring;
@@ -290,7 +307,9 @@ export const useGameStore = create<GameStore>()(
           state.maFocus,
           focusBonus?.focusGroup,
           focusBonus?.tier,
-          totalPortfolioEbitda
+          totalPortfolioEbitda,
+          state.maSourcing.tier,
+          state.maSourcing.active
         );
 
         set({
@@ -1315,17 +1334,28 @@ export const useGameStore = create<GameStore>()(
         }
       },
 
-      setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference) => {
+      setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference, subType?: string | null) => {
+        const state = get();
+        // Auto-clear subType if sector changed or tier < 2
+        const currentSector = state.maFocus.sectorId;
+        const effectiveSubType = (sectorId !== currentSector || state.maSourcing.tier < 2 || !state.maSourcing.active)
+          ? null
+          : (subType !== undefined ? subType : state.maFocus.subType);
         set({
-          maFocus: { sectorId, sizePreference },
+          maFocus: { sectorId, sizePreference, subType: effectiveSubType },
         });
       },
 
       sourceDealFlow: () => {
         const state = get();
 
+        // Dynamic cost based on MA Sourcing tier
+        const cost = (state.maSourcing.active && state.maSourcing.tier >= 1)
+          ? DEAL_SOURCING_COST_TIER1
+          : DEAL_SOURCING_COST_BASE;
+
         // Check if player can afford
-        if (state.cash < DEAL_SOURCING_COST) return;
+        if (state.cash < cost) return;
 
         const focusBonus = calculateSectorFocusBonus(state.businesses);
         const totalPortfolioEbitda = state.businesses
@@ -1336,15 +1366,99 @@ export const useGameStore = create<GameStore>()(
           state.round,
           state.maFocus,
           focusBonus?.focusGroup,
+          totalPortfolioEbitda,
+          state.maSourcing.active ? state.maSourcing.tier : 0
+        );
+
+        set({
+          cash: state.cash - cost,
+          dealPipeline: [...state.dealPipeline, ...newDeals],
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'source_deals', round: state.round, details: { cost, dealsGenerated: newDeals.length } },
+          ],
+        });
+      },
+
+      upgradeMASourcing: () => {
+        const state = get();
+        const currentTier = state.maSourcing.tier;
+        if (currentTier >= 3) return; // Already maxed
+
+        const nextTier = (currentTier + 1) as 1 | 2 | 3;
+        const config = MA_SOURCING_CONFIG[nextTier];
+        const cost = config.upgradeCost;
+        if (state.cash < cost) return;
+
+        // Check opco requirement
+        const opcoCount = state.businesses.filter(b => b.status === 'active').length;
+        if (opcoCount < config.requiredOpcos) return;
+
+        const newMASourcing: MASourcingState = {
+          tier: nextTier,
+          active: true,
+          unlockedRound: state.maSourcing.unlockedRound || state.round,
+          lastUpgradeRound: state.round,
+        };
+
+        const upgradeState = {
+          ...state,
+          cash: state.cash - cost,
+          totalInvestedCapital: state.totalInvestedCapital + cost,
+          maSourcing: newMASourcing,
+          // Clear subType if upgrading to tier below 2 (shouldn't happen but safety)
+          maFocus: nextTier < 2 ? { ...state.maFocus, subType: null } : state.maFocus,
+        };
+        set({
+          ...upgradeState,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'upgrade_ma_sourcing' as const, round: state.round, details: { fromTier: currentTier, toTier: nextTier, cost } },
+          ],
+          metrics: calculateMetrics(upgradeState),
+        });
+      },
+
+      toggleMASourcing: () => {
+        const state = get();
+        if (state.maSourcing.tier === 0) return; // Nothing to toggle
+
+        const newActive = !state.maSourcing.active;
+        const newMASourcing = { ...state.maSourcing, active: newActive };
+        // Clear subType when deactivating
+        const newMAFocus = !newActive ? { ...state.maFocus, subType: null } : state.maFocus;
+
+        set({
+          maSourcing: newMASourcing,
+          maFocus: newMAFocus,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'toggle_ma_sourcing' as const, round: state.round, details: { active: newActive } },
+          ],
+        });
+      },
+
+      proactiveOutreach: () => {
+        const state = get();
+        if (state.maSourcing.tier < 3 || !state.maSourcing.active) return;
+        if (state.cash < PROACTIVE_OUTREACH_COST) return;
+
+        const totalPortfolioEbitda = state.businesses
+          .filter(b => b.status === 'active')
+          .reduce((sum, b) => sum + b.ebitda, 0);
+
+        const newDeals = generateProactiveOutreachDeals(
+          state.round,
+          state.maFocus,
           totalPortfolioEbitda
         );
 
         set({
-          cash: state.cash - DEAL_SOURCING_COST,
+          cash: state.cash - PROACTIVE_OUTREACH_COST,
           dealPipeline: [...state.dealPipeline, ...newDeals],
           actionsThisRound: [
             ...state.actionsThisRound,
-            { type: 'source_deals', round: state.round, details: { cost: DEAL_SOURCING_COST, dealsGenerated: newDeals.length } },
+            { type: 'proactive_outreach' as const, round: state.round, details: { cost: PROACTIVE_OUTREACH_COST, dealsGenerated: newDeals.length } },
           ],
         });
       },
@@ -1603,7 +1717,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v9', // v9: dedup game-over, uncap bolt-ons, synergy penalties
+      name: 'holdco-tycoon-save-v10', // v10: MA Sourcing capability
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -1626,6 +1740,7 @@ export const useGameStore = create<GameStore>()(
         sharedServices: state.sharedServices,
         dealPipeline: state.dealPipeline,
         maFocus: state.maFocus,
+        maSourcing: state.maSourcing,
         currentEvent: state.currentEvent, // L-2: Persist current event across page refreshes
         eventHistory: state.eventHistory,
         creditTighteningRoundsRemaining: state.creditTighteningRoundsRemaining,
@@ -1645,6 +1760,14 @@ export const useGameStore = create<GameStore>()(
       onRehydrateStorage: () => (state) => {
         if (state && state.holdcoName) {
           try {
+            // Backwards compat: initialize maSourcing if missing
+            if (!state.maSourcing) {
+              (state as any).maSourcing = { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 };
+            }
+            // Backwards compat: initialize maFocus.subType if missing
+            if (state.maFocus && state.maFocus.subType === undefined) {
+              (state as any).maFocus = { ...state.maFocus, subType: null };
+            }
             const metrics = calculateMetrics(state as GameState);
             const focusBonus = calculateSectorFocusBonus(state.businesses);
             useGameStore.setState({ metrics, focusBonus });

@@ -213,6 +213,7 @@ describe('generateDealPipeline', () => {
     const pipeline = generateDealPipeline([], 5, {
       sectorId: 'saas',
       sizePreference: 'any',
+      subType: null,
     });
 
     const saasDeals = pipeline.filter(d => d.business.sectorId === 'saas');
@@ -234,7 +235,7 @@ describe('generateSourcedDeals', () => {
   });
 
   it('should weight toward M&A focus sector', () => {
-    const deals = generateSourcedDeals(5, { sectorId: 'saas', sizePreference: 'any' });
+    const deals = generateSourcedDeals(5, { sectorId: 'saas', sizePreference: 'any', subType: null });
     const saasDeals = deals.filter(d => d.business.sectorId === 'saas');
     expect(saasDeals.length).toBeGreaterThanOrEqual(2);
   });

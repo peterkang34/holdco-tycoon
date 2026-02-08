@@ -180,8 +180,14 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
 
       <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/10">
         <div className="flex items-center gap-2">
+          {deal.source === 'proprietary' && (
+            <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">Off-Market</span>
+          )}
+          {deal.source === 'sourced' && (
+            <span className="text-xs bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">Sourced</span>
+          )}
           <span className="text-xs text-text-muted">
-            {deal.source === 'inbound' ? 'Inbound' : deal.source === 'sourced' ? 'IB Sourced' : 'Brokered'}
+            {deal.source === 'inbound' ? 'Inbound' : deal.source === 'sourced' ? 'IB Sourced' : deal.source === 'proprietary' ? 'Proprietary' : 'Brokered'}
           </span>
           {deal.aiContent?.backstory && deal.aiContent.backstory.length > 100 && (
             <span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">AI</span>

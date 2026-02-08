@@ -9,6 +9,7 @@ interface CollectPhaseProps {
   totalDebt: number;
   interestRate: number;
   sharedServicesCost: number;
+  maSourcingCost?: number;
   round: number;
   yearChronicle?: string | null;
   debtPaymentThisRound?: number;
@@ -53,6 +54,7 @@ export function CollectPhase({
   totalDebt,
   interestRate,
   sharedServicesCost,
+  maSourcingCost = 0,
   round,
   yearChronicle,
   debtPaymentThisRound,
@@ -83,8 +85,8 @@ export function CollectPhase({
   // Calculate annual interest expense (holdco level)
   const holdcoInterest = Math.round(totalDebt * interestRate);
 
-  // Net FCF after tax, holdco interest, and shared services
-  const netFcf = totalBusinessFcf - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost;
+  // Net FCF after tax, holdco interest, shared services, and MA sourcing
+  const netFcf = totalBusinessFcf - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost;
 
   // What cash will be after collection
   const projectedCash = cash + netFcf;
@@ -137,7 +139,7 @@ export function CollectPhase({
           <div>
             <p className="text-text-muted">HoldCo Costs</p>
             <p className="font-mono font-bold text-lg text-danger">
-              -{formatMoney(holdcoInterest + sharedServicesCost)}
+              -{formatMoney(holdcoInterest + sharedServicesCost + maSourcingCost)}
             </p>
           </div>
           <div className="border-l border-white/20 pl-4">
@@ -359,6 +361,16 @@ export function CollectPhase({
                 <span className="text-text-secondary">Shared Services Overhead</span>
               </div>
               <span className="font-mono text-warning">-{formatMoney(sharedServicesCost)}</span>
+            </div>
+          )}
+
+          {maSourcingCost > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🔍</span>
+                <span className="text-text-secondary">M&A Sourcing Team</span>
+              </div>
+              <span className="font-mono text-warning">-{formatMoney(maSourcingCost)}</span>
             </div>
           )}
         </div>
