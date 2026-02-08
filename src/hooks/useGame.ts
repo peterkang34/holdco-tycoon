@@ -589,8 +589,8 @@ export const useGameStore = create<GameStore>()(
         };
 
         // Failed integration: restructuring cost + growth drag on platform
-        const restructuringCost = outcome === 'failure' ? Math.round(deal.business.ebitda * 0.10) : 0;
-        const growthDragPenalty = outcome === 'failure' ? -0.015 : 0;
+        const restructuringCost = outcome === 'failure' ? Math.round(deal.business.ebitda * 0.07) : 0;
+        const growthDragPenalty = outcome === 'failure' ? -0.010 : 0;
 
         // Update the platform with new bolt-on (uncapped — multiple expansion bonus caps at scale 3)
         const newPlatformScale = platform.platformScale + 1;
@@ -686,8 +686,8 @@ export const useGameStore = create<GameStore>()(
         const synergies = calculateSynergies(outcome, biz1.ebitda + biz2.ebitda, false, subTypeMatch);
 
         // Failed integration: restructuring cost + growth drag
-        const mergeRestructuringCost = outcome === 'failure' ? Math.round(Math.min(biz1.ebitda, biz2.ebitda) * 0.10) : 0;
-        const mergeGrowthDrag = outcome === 'failure' ? -0.015 : 0;
+        const mergeRestructuringCost = outcome === 'failure' ? Math.round(Math.min(biz1.ebitda, biz2.ebitda) * 0.07) : 0;
+        const mergeGrowthDrag = outcome === 'failure' ? -0.010 : 0;
 
         // Combined entity
         const combinedEbitda = biz1.ebitda + biz2.ebitda + synergies;

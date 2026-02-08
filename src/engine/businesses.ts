@@ -228,7 +228,7 @@ export function determineIntegrationOutcome(
   hasSharedServices?: boolean,
   subTypeMatch?: boolean
 ): IntegrationOutcome {
-  let successProbability = 0.5; // Base 50% chance
+  let successProbability = 0.6; // Base 60% chance
 
   // Quality affects integration - higher quality businesses integrate better
   successProbability += (acquiredBusiness.qualityRating - 3) * 0.1;

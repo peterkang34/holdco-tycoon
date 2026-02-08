@@ -5,40 +5,40 @@ export const SHARED_SERVICES_CONFIG: Record<SharedServiceType, Omit<SharedServic
   finance_reporting: {
     type: 'finance_reporting',
     name: 'Finance & Reporting',
-    unlockCost: 750,
-    annualCost: 320, // Previously 80/quarter
+    unlockCost: 560,
+    annualCost: 250,
     description: 'Centralized financial reporting and controls',
     effect: 'Cash conversion +5% across portfolio; better visibility into opco metrics',
   },
   recruiting_hr: {
     type: 'recruiting_hr',
     name: 'Recruiting & HR',
-    unlockCost: 1000,
-    annualCost: 400, // Previously 100/quarter
+    unlockCost: 750,
+    annualCost: 320,
     description: 'Shared talent acquisition and retention programs',
     effect: 'Talent loss events 50% less likely; talent gain events 30% more likely',
   },
   procurement: {
     type: 'procurement',
     name: 'Procurement',
-    unlockCost: 800,
-    annualCost: 240, // Previously 60/quarter
+    unlockCost: 600,
+    annualCost: 190,
     description: 'Centralized purchasing and vendor management',
     effect: 'Capex rate reduced by 15% across portfolio (bulk purchasing power)',
   },
   marketing_brand: {
     type: 'marketing_brand',
     name: 'Marketing & Brand',
-    unlockCost: 900,
-    annualCost: 320, // Previously 80/quarter
+    unlockCost: 675,
+    annualCost: 250,
     description: 'Shared marketing resources and brand development',
     effect: 'Organic growth rate +1.5% for all opcos; agencies and consumer brands get +2.5%',
   },
   technology_systems: {
     type: 'technology_systems',
     name: 'Technology & Systems',
-    unlockCost: 1200,
-    annualCost: 480, // Previously 120/quarter
+    unlockCost: 900,
+    annualCost: 380,
     description: 'Shared IT infrastructure and operational systems',
     effect: 'Reinvestment efficiency +20% for all opcos; SaaS and B2B services get +30%',
   },

@@ -72,7 +72,7 @@ export function generateDealStructures(
         cashRequired: earnoutCash,
         earnout: {
           amount: earnoutAmount,
-          targetEbitdaGrowth: 0.10 + Math.random() * 0.05, // 10-15% growth target
+          targetEbitdaGrowth: 0.07 + Math.random() * 0.05, // 7-12% growth target
         },
         leverage: 0, // Earnouts don't add leverage in the traditional sense
         risk: 'medium',
