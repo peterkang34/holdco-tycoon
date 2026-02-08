@@ -70,11 +70,12 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
 
   const metrics = calculateMetrics(state);
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
-  // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons
+  // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons and merged businesses
+  // Merged businesses' capital is already captured in the merged entity's totalAcquisitionCost
   const exitedIds = new Set(state.exitedBusinesses.map(b => b.id));
   const allBusinesses = [
-    ...state.exitedBusinesses.filter(b => b.status !== 'integrated'),
-    ...state.businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated'),
+    ...state.exitedBusinesses.filter(b => b.status !== 'integrated' && b.status !== 'merged'),
+    ...state.businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated' && b.status !== 'merged'),
   ];
 
   // 1. FCF/Share Growth (25 points max)
@@ -194,9 +195,9 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   if (focusBonus) {
     sectorFocusScore = Math.min(5, focusBonus.tier * 1.5 + (focusBonus.opcoCount >= 4 ? 1 : 0));
   } else if (activeBusinesses.length >= 4) {
-    // Reward diversification too
+    // Reward diversification — now competitive with focus scoring
     const uniqueSectors = new Set(activeBusinesses.map(b => b.sectorId));
-    sectorFocusScore = Math.min(4, uniqueSectors.size);
+    sectorFocusScore = Math.min(5, uniqueSectors.size >= 6 ? 5 : uniqueSectors.size >= 4 ? 4 : uniqueSectors.size);
   }
 
   // Shared services ROI (5 points)

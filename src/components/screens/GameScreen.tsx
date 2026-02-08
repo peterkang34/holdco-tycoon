@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useGameStore } from '../../hooks/useGame';
 import { getDistressRestrictions } from '../../engine/distress';
 import { getMASourcingAnnualCost } from '../../data/sharedServices';
+import { SECTORS } from '../../data/sectors';
 import { Dashboard } from '../dashboard/Dashboard';
 import { CollectPhase } from '../phases/CollectPhase';
 import { EventPhase } from '../phases/EventPhase';
@@ -150,6 +151,26 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const lastEventType = eventHistory.length > 0 ? eventHistory[eventHistory.length - 1].type : undefined;
   const activeServicesCount = sharedServices.filter(s => s.active).length;
+
+  // Compute concentration count and diversification bonus for dashboard
+  const { concentrationCount, diversificationBonus } = useMemo(() => {
+    const focusGroupCounts: Record<string, number> = {};
+    for (const b of activeBusinesses) {
+      const sector = SECTORS[b.sectorId];
+      if (sector) {
+        for (const fg of sector.sectorFocusGroup) {
+          focusGroupCounts[fg] = (focusGroupCounts[fg] || 0) + 1;
+        }
+      }
+    }
+    const maxCount = Object.values(focusGroupCounts).length > 0
+      ? Math.max(...Object.values(focusGroupCounts)) : 0;
+    const uniqueSectors = new Set(activeBusinesses.map(b => b.sectorId)).size;
+    return {
+      concentrationCount: maxCount,
+      diversificationBonus: uniqueSectors >= 4 && activeBusinesses.length >= 4,
+    };
+  }, [activeBusinesses]);
   const sharedServicesCost = sharedServices
     .filter(s => s.active)
     .reduce((sum, s) => sum + s.annualCost, 0);
@@ -343,6 +364,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         focusTier={focusBonus?.tier}
         focusSector={focusBonus?.focusGroup}
         distressLevel={metrics.distressLevel}
+        concentrationCount={concentrationCount}
+        diversificationBonus={diversificationBonus}
       />
 
       {/* Phase Content */}

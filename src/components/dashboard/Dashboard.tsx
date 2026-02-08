@@ -13,6 +13,8 @@ interface DashboardProps {
   focusTier?: number;
   focusSector?: string;
   distressLevel: DistressLevel;
+  concentrationCount?: number; // Max opcos sharing a focus group
+  diversificationBonus?: boolean; // Has 4+ unique sectors
 }
 
 export function Dashboard({
@@ -26,6 +28,8 @@ export function Dashboard({
   focusTier,
   focusSector,
   distressLevel,
+  concentrationCount,
+  diversificationBonus,
 }: DashboardProps) {
   const getCashStatus = () => {
     if (liveCash > 5000) return 'positive';  // $5M+ is healthy
@@ -155,6 +159,18 @@ export function Dashboard({
         {focusTier && focusTier > 0 && (
           <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded-full">
             Tier {focusTier} {focusSector} Focus
+          </span>
+        )}
+        {concentrationCount && concentrationCount >= 4 && (
+          <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded-full"
+            title={`${concentrationCount} businesses in same sector group — volatility amplified ${((1 + (concentrationCount - 3) * 0.25) * 100).toFixed(0)}%`}>
+            Concentration Risk ({concentrationCount} correlated)
+          </span>
+        )}
+        {diversificationBonus && (
+          <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full"
+            title="4+ unique sectors provides a diversification growth bonus">
+            Diversified Portfolio
           </span>
         )}
         {metrics.interestRate > 0.08 && (

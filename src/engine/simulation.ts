@@ -85,7 +85,7 @@ export function calculateExitValuation(
     improvementsPremium + marketModifier + sizeTierPremium + deRiskingPremium
   );
 
-  const exitPrice = Math.round(business.ebitda * totalMultiple);
+  const exitPrice = Math.max(0, Math.round(business.ebitda * totalMultiple));
 
   // Net proceeds after debt payoff
   const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance;
@@ -375,7 +375,8 @@ export function applyOrganicGrowth(
   sharedServicesGrowthBonus: number,
   sectorFocusBonus: number,
   inflationActive: boolean,
-  concentrationCount?: number // Number of opcos in same focus group — drives concentration risk
+  concentrationCount?: number, // Number of opcos in same focus group — drives concentration risk
+  diversificationBonus?: number // Growth bonus from portfolio diversification (4+ unique sectors)
 ): Business {
   const sector = SECTORS[business.sectorId];
 
@@ -405,6 +406,11 @@ export function applyOrganicGrowth(
 
   // Sector focus bonus
   annualGrowth += sectorFocusBonus;
+
+  // Diversification bonus — reward for portfolio breadth
+  if (diversificationBonus && diversificationBonus > 0) {
+    annualGrowth += diversificationBonus;
+  }
 
   // Integration penalty (first year after acquisition)
   if (business.integrationRoundsRemaining > 0) {

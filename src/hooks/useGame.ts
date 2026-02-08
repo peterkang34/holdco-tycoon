@@ -362,6 +362,12 @@ export const useGameStore = create<GameStore>()(
           }
         }
 
+        // Calculate diversification bonus — 4+ unique sectors = +1.5% growth, 6+ = +2.5%
+        const uniqueSectors = new Set(activeBusinesses.map(b => b.sectorId)).size;
+        const diversificationGrowthBonus = uniqueSectors >= 6 ? 0.025
+          : uniqueSectors >= 4 ? 0.015
+          : 0;
+
         // Apply organic growth to all businesses
         const updatedBusinesses = state.businesses.map(b => {
           if (b.status !== 'active') return b;
@@ -372,7 +378,8 @@ export const useGameStore = create<GameStore>()(
             sharedBenefits.growthBonus,
             focusEbitdaBonus,
             state.inflationRoundsRemaining > 0,
-            maxFocusCount
+            maxFocusCount,
+            diversificationGrowthBonus
           );
         });
 
@@ -1200,19 +1207,27 @@ export const useGameStore = create<GameStore>()(
           : lastEvent?.type === 'global_recession' ? -(Math.random() * 0.3)
           : (Math.random() * 0.2 - 0.1);
         const exitPrice = Math.round(business.ebitda * Math.max(2.0, effectiveMultiple + marketVariance));
-        const netProceeds = Math.max(0, exitPrice - business.sellerNoteBalance);
+        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance;
+        const netProceeds = Math.max(0, exitPrice - debtPayoff);
 
-        const updatedBusinesses = state.businesses.map(b =>
-          b.id === businessId
-            ? { ...b, status: 'sold' as const, exitPrice, exitRound: state.round }
-            : b
-        );
+        // Also mark bolt-ons as sold when selling a platform
+        const boltOnIds = new Set(business.boltOnIds || []);
+        const updatedBusinesses = state.businesses.map(b => {
+          if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round };
+          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
+          return b;
+        });
 
         // M-7: Auto-deactivate shared services if opco count drops below minimum
         const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
         const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
           ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
           : state.sharedServices;
+
+        // Collect bolt-on businesses for exitedBusinesses
+        const exitedBoltOns = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round }));
 
         const sellState = {
           ...state,
@@ -1226,6 +1241,7 @@ export const useGameStore = create<GameStore>()(
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...business, status: 'sold' as const, exitPrice, exitRound: state.round },
+            ...exitedBoltOns,
           ],
           actionsThisRound: [
             ...state.actionsThisRound,
@@ -1246,18 +1262,31 @@ export const useGameStore = create<GameStore>()(
         const windDownCost = 250; // $250k
         const debtWriteOff = business.sellerNoteBalance; // L-13: Only seller note on opco
 
-        const updatedBusinesses = state.businesses.map(b =>
-          b.id === businessId ? { ...b, status: 'wound_down' as const, exitRound: state.round } : b
-        );
+        // Also mark bolt-ons as wound down when winding down a platform
+        const boltOnIds = new Set(business.boltOnIds || []);
+        const boltOnDebtWriteOff = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+
+        const updatedBusinesses = state.businesses.map(b => {
+          if (b.id === businessId) return { ...b, status: 'wound_down' as const, exitRound: state.round };
+          if (boltOnIds.has(b.id)) return { ...b, status: 'wound_down' as const, exitRound: state.round };
+          return b;
+        });
 
         // C-3: Floor cash at 0
-        const newCash = Math.max(0, state.cash - windDownCost - debtWriteOff);
+        const newCash = Math.max(0, state.cash - windDownCost - debtWriteOff - boltOnDebtWriteOff);
 
         // M-7: Auto-deactivate shared services if opco count drops below minimum
         const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
         const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
           ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
           : state.sharedServices;
+
+        // Collect bolt-on businesses for exitedBusinesses
+        const exitedBoltOns = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .map(b => ({ ...b, status: 'wound_down' as const, exitRound: state.round }));
 
         const windDownState = {
           ...state,
@@ -1270,6 +1299,7 @@ export const useGameStore = create<GameStore>()(
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...business, status: 'wound_down' as const, exitRound: state.round },
+            ...exitedBoltOns,
           ],
           actionsThisRound: [
             ...state.actionsThisRound,

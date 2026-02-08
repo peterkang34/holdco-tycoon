@@ -312,10 +312,11 @@ export function GameOverScreen({
         <div className="space-y-2">
           {allBusinesses.map(business => {
             const sector = SECTORS[business.sectorId];
-            const moic = business.acquisitionPrice > 0
+            const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
+            const moic = totalInvested > 0
               ? (business.exitPrice
-                  ? business.exitPrice / business.acquisitionPrice
-                  : (business.ebitda * business.acquisitionMultiple) / business.acquisitionPrice)
+                  ? business.exitPrice / totalInvested
+                  : (business.ebitda * business.acquisitionMultiple) / totalInvested)
               : 0;
 
             return (
