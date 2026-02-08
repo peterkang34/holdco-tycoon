@@ -1673,13 +1673,10 @@ export const useGameStore = create<GameStore>()(
           state.businesses.map(async (b) => {
             if (b.status !== 'active') return b;
 
-            // Only generate stories every few years or on significant events
+            // Generate a story for every active business each year
             const yearsOwned = state.round - b.acquisitionRound;
+            if (yearsOwned < 1) return b; // Skip businesses acquired this round
             const hasRecentImprovement = b.improvements.some(i => i.appliedRound === state.round - 1);
-            // L-3: Removed unused significantGrowth variable
-            const shouldGenerateStory = yearsOwned === 1 || yearsOwned === 5 || yearsOwned === 10 || hasRecentImprovement;
-
-            if (!shouldGenerateStory) return b;
 
             const sector = SECTORS[b.sectorId];
             const ebitdaChange = b.ebitda > b.acquisitionEbitda

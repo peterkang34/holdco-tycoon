@@ -134,9 +134,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     }
   }, [phase, currentEvent, fetchEventNarrative]);
 
-  // Generate business stories at key milestones (every 5 years)
+  // Generate business stories each year during collect phase
   useEffect(() => {
-    if (phase === 'collect' && (round === 1 || round % 5 === 0)) {
+    if (phase === 'collect') {
       generateBusinessStories();
     }
   }, [phase, round, generateBusinessStories]);
