@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { SectorId } from '../../engine/types';
 import { SECTOR_LIST } from '../../data/sectors';
+import { loadLeaderboard } from '../../engine/scoring';
+import { LeaderboardModal } from '../ui/LeaderboardModal';
 
 interface IntroScreenProps {
   onStart: (holdcoName: string, startingSector: SectorId) => void;
@@ -10,6 +12,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
   const [holdcoName, setHoldcoName] = useState('');
   const [selectedSector, setSelectedSector] = useState<SectorId>('agency');
   const [showNameError, setShowNameError] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -106,12 +109,26 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
           </button>
         </form>
 
+        {/* High Scores */}
+        {loadLeaderboard().length > 0 && (
+          <button
+            onClick={() => setShowLeaderboard(true)}
+            className="mt-4 text-sm text-text-muted hover:text-accent transition-colors"
+          >
+            🏆 High Scores
+          </button>
+        )}
+
         {/* Info */}
         <div className="mt-8 text-sm text-text-muted">
           <p className="mb-2">20 years. Build a long-term compounder.</p>
           <p>Based on <a href="https://holdcoguide.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">The Holdco Guide</a> by Peter Kang</p>
         </div>
       </div>
+
+      {showLeaderboard && (
+        <LeaderboardModal onClose={() => setShowLeaderboard(false)} />
+      )}
     </div>
   );
 }

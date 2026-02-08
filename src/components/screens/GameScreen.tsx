@@ -8,6 +8,8 @@ import { AllocatePhase } from '../phases/AllocatePhase';
 import { RestructurePhase } from '../phases/RestructurePhase';
 import { InstructionsModal } from '../ui/InstructionsModal';
 import { AnnualReportModal } from '../ui/AnnualReportModal';
+import { LeaderboardModal } from '../ui/LeaderboardModal';
+import { calculateEnterpriseValue } from '../../engine/scoring';
 
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
 
@@ -21,6 +23,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
   const [showInstructions, setShowInstructions] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showAnnualReports, setShowAnnualReports] = useState(false);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
 
   const {
     holdcoName,
@@ -267,6 +270,15 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             </button>
           )}
           <button
+            onClick={() => {
+              setShowLeaderboard(true);
+            }}
+            className="text-text-muted hover:text-text-secondary transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
+            title="High Scores"
+          >
+            🏆
+          </button>
+          <button
             onClick={() => setShowInstructions(true)}
             className="text-text-muted hover:text-text-secondary transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
             title="View Tutorial"
@@ -332,6 +344,14 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         <AnnualReportModal
           roundHistory={roundHistory ?? []}
           onClose={() => setShowAnnualReports(false)}
+        />
+      )}
+
+      {/* Leaderboard Modal */}
+      {showLeaderboard && (
+        <LeaderboardModal
+          hypotheticalEV={calculateEnterpriseValue(useGameStore.getState())}
+          onClose={() => setShowLeaderboard(false)}
         />
       )}
 
