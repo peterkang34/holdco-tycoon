@@ -483,15 +483,11 @@ export function generateDealWithSize(
     ? calculateTuckInDiscount(quality)
     : undefined;
 
-  // Apply tuck-in discount to asking price
-  let finalAskingPrice = tuckInDiscount
-    ? Math.round(adjustedPrice * (1 - tuckInDiscount))
+  // Apply the larger of tuck-in discount or proprietary discount (don't stack)
+  const effectiveDiscount = Math.max(tuckInDiscount ?? 0, options.multipleDiscount ?? 0);
+  let finalAskingPrice = effectiveDiscount > 0
+    ? Math.round(adjustedPrice * (1 - effectiveDiscount))
     : adjustedPrice;
-
-  // Apply proprietary/off-market discount
-  if (options.multipleDiscount) {
-    finalAskingPrice = Math.round(finalAskingPrice * (1 - options.multipleDiscount));
-  }
 
   // Include fallback content for richer deals
   const aiContent = generateFallbackContent(sectorId, quality);
@@ -553,7 +549,7 @@ export function generateDealPipeline(
     }
   }
 
-  // 1b. MA Sourcing bonus deals (Tier 1+, active)
+  // 1b. MA Sourcing bonus deals (Tier 1+, active) — capped at 3 total to preserve variety
   if (maSourcingActive && maSourcingTier >= 1 && pipeline.length < MAX_DEALS) {
     const focusSector = maFocus?.sectorId ?? pickWeightedSector(round);
     const sourcingOptions: DealGenerationOptions = {
@@ -570,25 +566,7 @@ export function generateDealPipeline(
       sourcingOptions.qualityFloor = 3;
     }
 
-    // +2 focus-sector deals
-    for (let i = 0; i < 2; i++) {
-      if (pipeline.length >= MAX_DEALS) break;
-      pipeline.push(generateDealWithSize(focusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda, sourcingOptions));
-    }
-
-    // Tier 2+: 1-2 sub-type matched deals (on top of the 2 above)
-    if (maSourcingTier >= 2 && maFocus?.subType && maFocus?.sectorId) {
-      const subTypeCount = maSourcingTier >= 3 ? randomInt(2, 3) : randomInt(1, 2);
-      for (let i = 0; i < subTypeCount; i++) {
-        if (pipeline.length >= MAX_DEALS) break;
-        pipeline.push(generateDealWithSize(
-          maFocus.sectorId, round, maFocus.sizePreference || 'any', portfolioEbitda,
-          { ...sourcingOptions, subType: maFocus.subType }
-        ));
-      }
-    }
-
-    // Tier 3: 1 off-market proprietary deal (15% discount, quality 3+)
+    // Tier 3: 1 off-market proprietary deal first (15% discount, quality 3+)
     if (maSourcingTier >= 3 && pipeline.length < MAX_DEALS) {
       const proprietarySector = maFocus?.sectorId ?? focusSector;
       pipeline.push(generateDealWithSize(
@@ -601,6 +579,12 @@ export function generateDealPipeline(
           freshnessBonus: 1,
         }
       ));
+    }
+
+    // +2 sourced focus-sector deals (sub-type targeted at Tier 2+)
+    for (let i = 0; i < 2; i++) {
+      if (pipeline.length >= MAX_DEALS) break;
+      pipeline.push(generateDealWithSize(focusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda, sourcingOptions));
     }
   }
 

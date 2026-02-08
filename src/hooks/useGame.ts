@@ -135,6 +135,31 @@ const DEAL_SOURCING_COST_BASE = 500; // $500k base cost
 const DEAL_SOURCING_COST_TIER1 = 300; // $300k with MA Sourcing Tier 1+
 const PROACTIVE_OUTREACH_COST = 400; // $400k (Tier 3 only)
 
+// One-time migration from v9 → v10 (adds maSourcing + maFocus.subType)
+function migrateV9ToV10() {
+  try {
+    const v10Key = 'holdco-tycoon-save-v10';
+    const v9Key = 'holdco-tycoon-save-v9';
+    if (localStorage.getItem(v10Key)) return; // v10 already exists
+    const v9Raw = localStorage.getItem(v9Key);
+    if (!v9Raw) return; // No v9 save to migrate
+    const v9Data = JSON.parse(v9Raw);
+    if (!v9Data?.state) return;
+    // Add missing MA Sourcing fields
+    if (!v9Data.state.maSourcing) {
+      v9Data.state.maSourcing = { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 };
+    }
+    if (v9Data.state.maFocus && v9Data.state.maFocus.subType === undefined) {
+      v9Data.state.maFocus.subType = null;
+    }
+    localStorage.setItem(v10Key, JSON.stringify(v9Data));
+    localStorage.removeItem(v9Key);
+  } catch (e) {
+    console.error('v9→v10 migration failed:', e);
+  }
+}
+migrateV9ToV10();
+
 const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: ReturnType<typeof initializeSharedServices> } = {
   holdcoName: '',
   round: 0,
@@ -240,14 +265,15 @@ export const useGameStore = create<GameStore>()(
         const effectiveRate = state.interestRate + distressRestrictions.interestPenalty;
 
         // Collect FCF when transitioning from collect to event phase (annual)
-        // Portfolio tax (with interest/SS deductions for tax shield) is computed inside
+        // Portfolio tax (with interest/SS+MA deductions for tax shield) is computed inside
+        const totalDeductibleCosts = sharedServicesCost + maSourcingCost;
         const annualFcf = calculatePortfolioFcf(
           state.businesses.filter(b => b.status === 'active'),
           sharedBenefits.capexReduction,
           sharedBenefits.cashConversionBonus,
           state.totalDebt,
           effectiveRate,
-          sharedServicesCost
+          totalDeductibleCosts
         );
 
         // Interest and shared services are still cash costs (separate from tax)

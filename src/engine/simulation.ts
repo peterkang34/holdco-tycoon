@@ -23,6 +23,7 @@ import {
   generateValuationCommentary,
 } from './buyers';
 import { calculateDistressLevel } from './distress';
+import { getMASourcingAnnualCost } from '../data/sharedServices';
 
 export const TAX_RATE = 0.30;
 const MAX_ORGANIC_GROWTH_RATE = 0.20; // M-4: Cap on growth rate accumulation
@@ -918,6 +919,12 @@ export function calculateMetrics(state: GameState): Metrics {
     .filter(s => s.active)
     .reduce((sum, s) => sum + s.annualCost, 0);
 
+  // MA Sourcing annual cost (tax-deductible like shared services)
+  const maSourcingCost = state.maSourcing?.active
+    ? getMASourcingAnnualCost(state.maSourcing.tier)
+    : 0;
+  const totalDeductibleCosts = sharedServicesCost + maSourcingCost;
+
   // Total FCF (annual - each round is now 1 year)
   // Portfolio-level tax is computed inside calculatePortfolioFcf
   const totalFcf = calculatePortfolioFcf(
@@ -926,12 +933,12 @@ export function calculateMetrics(state: GameState): Metrics {
     sharedServicesBenefits.cashConversionBonus,
     state.totalDebt,
     state.interestRate,
-    sharedServicesCost
+    totalDeductibleCosts
   );
 
   // Portfolio tax breakdown for NOPAT calculation
   const taxBreakdown = calculatePortfolioTax(
-    activeBusinesses, state.totalDebt, state.interestRate, sharedServicesCost
+    activeBusinesses, state.totalDebt, state.interestRate, totalDeductibleCosts
   );
 
   // Total debt (holdco + opco level seller notes only)
@@ -1026,11 +1033,12 @@ export function recordHistoricalMetrics(state: GameState): HistoricalMetrics {
   const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
 
   // Use portfolio-level tax for NOPAT (includes deductions)
-  const sharedServicesCost = state.sharedServices
+  const ssHistCost = state.sharedServices
     .filter(s => s.active)
     .reduce((sum, s) => sum + s.annualCost, 0);
+  const maHistCost = state.maSourcing?.active ? getMASourcingAnnualCost(state.maSourcing.tier) : 0;
   const taxBreakdown = calculatePortfolioTax(
-    activeBusinesses, state.totalDebt, state.interestRate, sharedServicesCost
+    activeBusinesses, state.totalDebt, state.interestRate, ssHistCost + maHistCost
   );
   const nopat = totalEbitda - taxBreakdown.taxAmount;
 
