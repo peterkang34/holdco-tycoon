@@ -480,6 +480,10 @@ export const useGameStore = create<GameStore>()(
       acquireBusiness: (deal: Deal, structure: DealStructure) => {
         const state = get();
 
+        // Enforce distress restrictions — covenant breach blocks new acquisitions
+        const restrictions = getDistressRestrictions(calculateMetrics(state).distressLevel);
+        if (!restrictions.canAcquire) return;
+
         if (state.cash < structure.cashRequired) return;
 
         const newBusiness = executeDealStructure(deal, structure, state.round);
@@ -723,7 +727,10 @@ export const useGameStore = create<GameStore>()(
             return Array.from(best.values());
           })(),
           sellerNoteBalance: biz1.sellerNoteBalance + biz2.sellerNoteBalance,
-          sellerNoteRate: Math.max(biz1.sellerNoteRate, biz2.sellerNoteRate),
+          sellerNoteRate: (biz1.sellerNoteBalance + biz2.sellerNoteBalance) > 0
+            ? (biz1.sellerNoteBalance * biz1.sellerNoteRate + biz2.sellerNoteBalance * biz2.sellerNoteRate)
+              / (biz1.sellerNoteBalance + biz2.sellerNoteBalance)
+            : 0,
           sellerNoteRoundsRemaining: Math.max(biz1.sellerNoteRoundsRemaining, biz2.sellerNoteRoundsRemaining),
           bankDebtBalance: biz1.bankDebtBalance + biz2.bankDebtBalance,
           earnoutRemaining: 0,
@@ -908,14 +915,19 @@ export const useGameStore = create<GameStore>()(
           s.type === serviceType ? { ...s, active: true, unlockedRound: state.round } : s
         );
 
-        set({
+        const unlockState = {
+          ...state,
           cash: state.cash - service.unlockCost,
           totalInvestedCapital: state.totalInvestedCapital + service.unlockCost,
           sharedServices: updatedServices,
+        };
+        set({
+          ...unlockState,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'unlock_shared_service', round: state.round, details: { serviceType } },
           ],
+          metrics: calculateMetrics(unlockState),
         });
       },
 
@@ -925,12 +937,17 @@ export const useGameStore = create<GameStore>()(
           s.type === serviceType ? { ...s, active: false } : s
         );
 
-        set({
+        const deactivateState = {
+          ...state,
           sharedServices: updatedServices,
+        };
+        set({
+          ...deactivateState,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'deactivate_shared_service', round: state.round, details: { serviceType } },
           ],
+          metrics: calculateMetrics(deactivateState),
         });
       },
 
@@ -992,6 +1009,9 @@ export const useGameStore = create<GameStore>()(
         if (state.cash < amount) return;
 
         const metrics = calculateMetrics(state);
+        // Enforce distress restrictions — covenant breach blocks buybacks
+        const restrictions = getDistressRestrictions(metrics.distressLevel);
+        if (!restrictions.canBuyback) return;
         // M-5: Guard against division by zero or negative intrinsic value
         if (metrics.intrinsicValuePerShare <= 0) return;
         const sharesRepurchased = Math.round((amount / metrics.intrinsicValuePerShare) * 1000) / 1000;
@@ -1022,6 +1042,10 @@ export const useGameStore = create<GameStore>()(
       distributeToOwners: (amount: number) => {
         const state = get();
         if (state.cash < amount) return;
+
+        // Enforce distress restrictions — covenant breach blocks distributions
+        const restrictions = getDistressRestrictions(calculateMetrics(state).distressLevel);
+        if (!restrictions.canDistribute) return;
 
         const distributeState = {
           ...state,
@@ -1157,11 +1181,18 @@ export const useGameStore = create<GameStore>()(
             : b
         );
 
+        // Auto-deactivate shared services if opco count drops below minimum
+        const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
+        const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
+          ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
+          : state.sharedServices;
+
         const acceptState = {
           ...state,
           cash: state.cash + netProceeds,
           totalExitProceeds: state.totalExitProceeds + netProceeds,
           businesses: updatedBusinesses,
+          sharedServices: updatedServices,
         };
         set({
           ...acceptState,
@@ -1186,6 +1217,7 @@ export const useGameStore = create<GameStore>()(
             ...state.actionsThisRound,
             { type: 'decline_offer', round: state.round, details: {} },
           ],
+          metrics: calculateMetrics(state),
         });
       },
 

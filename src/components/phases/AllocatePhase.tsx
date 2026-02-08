@@ -1099,14 +1099,14 @@ export function AllocatePhase({
                 </div>
                 <button
                   onClick={() => {
-                    const dollars = parseInt(payDebtAmount);
+                    const dollars = parseInt(payDebtAmount) || 0;
                     const internalAmount = Math.round(dollars / 1000);
                     if (internalAmount > 0) {
                       onPayDebt(internalAmount);
                       setPayDebtAmount('');
                     }
                   }}
-                  disabled={!payDebtAmount || parseInt(payDebtAmount) < 1000 || totalDebt === 0}
+                  disabled={!payDebtAmount || (parseInt(payDebtAmount) || 0) < 1000 || totalDebt === 0}
                   className="btn-primary text-sm"
                 >
                   Pay
@@ -1144,14 +1144,14 @@ export function AllocatePhase({
                 </div>
                 <button
                   onClick={() => {
-                    const dollars = parseInt(equityAmount);
+                    const dollars = parseInt(equityAmount) || 0;
                     const internalAmount = Math.round(dollars / 1000);
                     if (internalAmount > 0) {
                       onIssueEquity(internalAmount);
                       setEquityAmount('');
                     }
                   }}
-                  disabled={!equityAmount || parseInt(equityAmount) < 1000}
+                  disabled={!equityAmount || (parseInt(equityAmount) || 0) < 1000}
                   className="btn-primary text-sm"
                 >
                   Issue
@@ -1215,14 +1215,14 @@ export function AllocatePhase({
                 </div>
                 <button
                   onClick={() => {
-                    const dollars = parseInt(buybackAmount);
+                    const dollars = parseInt(buybackAmount) || 0;
                     const internalAmount = Math.round(dollars / 1000);
                     if (internalAmount > 0) {
                       onBuyback(internalAmount);
                       setBuybackAmount('');
                     }
                   }}
-                  disabled={!buybackAmount || parseInt(buybackAmount) < 1000 || Math.round(parseInt(buybackAmount) / 1000) > cash || !distressRestrictions.canBuyback}
+                  disabled={!buybackAmount || (parseInt(buybackAmount) || 0) < 1000 || Math.round((parseInt(buybackAmount) || 0) / 1000) > cash || !distressRestrictions.canBuyback}
                   className="btn-primary text-sm"
                 >
                   {!distressRestrictions.canBuyback ? 'Blocked' : 'Buyback'}
@@ -1278,14 +1278,14 @@ export function AllocatePhase({
                 </div>
                 <button
                   onClick={() => {
-                    const dollars = parseInt(distributeAmount);
+                    const dollars = parseInt(distributeAmount) || 0;
                     const internalAmount = Math.round(dollars / 1000);
                     if (internalAmount > 0) {
                       onDistribute(internalAmount);
                       setDistributeAmount('');
                     }
                   }}
-                  disabled={!distributeAmount || parseInt(distributeAmount) < 1000 || Math.round(parseInt(distributeAmount) / 1000) > cash || !distressRestrictions.canDistribute}
+                  disabled={!distributeAmount || (parseInt(distributeAmount) || 0) < 1000 || Math.round((parseInt(distributeAmount) || 0) / 1000) > cash || !distressRestrictions.canDistribute}
                   className="btn-primary text-sm"
                 >
                   {!distressRestrictions.canDistribute ? 'Blocked' : 'Distribute'}

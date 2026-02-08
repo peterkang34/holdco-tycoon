@@ -85,6 +85,7 @@ export function GameOverScreen({
       case 'C': return 'text-warning';
       case 'D': return 'text-orange-500';
       case 'F': return 'text-danger';
+      default: return 'text-text-secondary';
     }
   };
 
@@ -96,6 +97,7 @@ export function GameOverScreen({
       case 'C': return '🥉';
       case 'D': return '📚';
       case 'F': return '💥';
+      default: return '📊';
     }
   };
 
@@ -191,7 +193,7 @@ export function GameOverScreen({
               <input
                 type="text"
                 value={initials}
-                onChange={(e) => setInitials(e.target.value.slice(0, 3).toUpperCase())}
+                onChange={(e) => setInitials(e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase())}
                 placeholder="AAA"
                 maxLength={3}
                 className="w-24 text-center text-2xl font-bold bg-white/10 border border-white/20 rounded-lg py-2 px-4 focus:outline-none focus:border-accent"
@@ -310,9 +312,11 @@ export function GameOverScreen({
         <div className="space-y-2">
           {allBusinesses.map(business => {
             const sector = SECTORS[business.sectorId];
-            const moic = business.exitPrice
-              ? business.exitPrice / business.acquisitionPrice
-              : (business.ebitda * business.acquisitionMultiple) / business.acquisitionPrice;
+            const moic = business.acquisitionPrice > 0
+              ? (business.exitPrice
+                  ? business.exitPrice / business.acquisitionPrice
+                  : (business.ebitda * business.acquisitionMultiple) / business.acquisitionPrice)
+              : 0;
 
             return (
               <div

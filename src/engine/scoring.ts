@@ -327,7 +327,7 @@ export function generatePostGameInsights(state: GameState): PostGameInsight[] {
   const strongConversion = metrics.cashConversion > 0.80;
   const smartExits = state.exitedBusinesses.filter(b => {
     if (!b.exitPrice) return false;
-    const moic = b.exitPrice / b.acquisitionPrice;
+    const moic = b.acquisitionPrice > 0 ? b.exitPrice / b.acquisitionPrice : 0;
     return moic > 2.0;
   }).length >= 2;
   const heldLosers = activeBusinesses.some(b => b.ebitda < b.acquisitionEbitda * 0.5);
