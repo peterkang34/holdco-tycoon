@@ -707,7 +707,7 @@ export const useGameStore = create<GameStore>()(
         };
 
         // Failed integration: restructuring cost + growth drag on platform
-        const restructuringCost = outcome === 'failure' ? Math.round(deal.business.ebitda * 0.07) : 0;
+        const restructuringCost = outcome === 'failure' ? Math.round(Math.abs(deal.business.ebitda) * 0.07) : 0;
         const growthDragPenalty = outcome === 'failure' ? -0.010 : 0;
 
         // Update the platform with new bolt-on (uncapped — multiple expansion bonus caps at scale 3)
@@ -804,7 +804,7 @@ export const useGameStore = create<GameStore>()(
         const synergies = calculateSynergies(outcome, biz1.ebitda + biz2.ebitda, false, subTypeMatch);
 
         // Failed integration: restructuring cost + growth drag
-        const mergeRestructuringCost = outcome === 'failure' ? Math.round(Math.min(biz1.ebitda, biz2.ebitda) * 0.07) : 0;
+        const mergeRestructuringCost = outcome === 'failure' ? Math.round(Math.min(Math.abs(biz1.ebitda), Math.abs(biz2.ebitda)) * 0.07) : 0;
         const mergeGrowthDrag = outcome === 'failure' ? -0.010 : 0;
 
         // Combined entity
@@ -853,7 +853,7 @@ export const useGameStore = create<GameStore>()(
               / (biz1.sellerNoteBalance + biz2.sellerNoteBalance)
             : 0,
           sellerNoteRoundsRemaining: Math.max(biz1.sellerNoteRoundsRemaining, biz2.sellerNoteRoundsRemaining),
-          bankDebtBalance: biz1.bankDebtBalance + biz2.bankDebtBalance,
+          bankDebtBalance: 0, // Bank debt tracked at holdco level, not opco
           earnoutRemaining: 0,
           earnoutTarget: 0,
           status: 'active',
@@ -1208,7 +1208,7 @@ export const useGameStore = create<GameStore>()(
         const marketVariance = lastEvent?.type === 'global_bull_market' ? Math.random() * 0.3
           : lastEvent?.type === 'global_recession' ? -(Math.random() * 0.3)
           : (Math.random() * 0.2 - 0.1);
-        const exitPrice = Math.round(business.ebitda * Math.max(2.0, effectiveMultiple + marketVariance));
+        const exitPrice = Math.max(0, Math.round(business.ebitda * Math.max(2.0, effectiveMultiple + marketVariance)));
         const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance;
         const netProceeds = Math.max(0, exitPrice - debtPayoff);
 
@@ -1322,17 +1322,24 @@ export const useGameStore = create<GameStore>()(
         const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance;
         const netProceeds = Math.max(0, event.offerAmount - debtPayoff);
 
-        const updatedBusinesses = state.businesses.map(b =>
-          b.id === event.affectedBusinessId
-            ? { ...b, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round }
-            : b
-        );
+        // Cascade to bolt-on businesses
+        const boltOnIds = new Set(business.boltOnIds || []);
+        const updatedBusinesses = state.businesses.map(b => {
+          if (b.id === event.affectedBusinessId) return { ...b, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round };
+          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
+          return b;
+        });
 
         // Auto-deactivate shared services if opco count drops below minimum
         const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
         const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
           ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
           : state.sharedServices;
+
+        // Collect bolt-on businesses for exitedBusinesses
+        const exitedBoltOns = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round }));
 
         const acceptState = {
           ...state,
@@ -1346,6 +1353,7 @@ export const useGameStore = create<GameStore>()(
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...business, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round },
+            ...exitedBoltOns,
           ],
           currentEvent: null,
           actionsThisRound: [
@@ -1389,17 +1397,30 @@ export const useGameStore = create<GameStore>()(
           return b;
         });
 
+        // Auto-deactivate shared services if opco count drops below minimum
+        const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
+        const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
+          ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
+          : state.sharedServices;
+
+        // Collect bolt-on businesses for exitedBusinesses
+        const exitedBoltOns = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round }));
+
         const distressState = {
           ...state,
           cash: state.cash + netProceeds,
           totalExitProceeds: state.totalExitProceeds + netProceeds,
           businesses: updatedBusinesses,
+          sharedServices: updatedServices,
         };
         set({
           ...distressState,
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...business, status: 'sold' as const, exitPrice, exitRound: state.round },
+            ...exitedBoltOns,
           ],
           actionsThisRound: [
             ...state.actionsThisRound,
