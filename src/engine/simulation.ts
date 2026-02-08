@@ -353,7 +353,7 @@ export function getSectorFocusEbitdaBonus(tier: SectorFocusTier): number {
     case 2:
       return 0.04;
     case 3:
-      return 0.07;
+      return 0.05; // Reduced from 0.07 — concentration risk offsets some upside
     default:
       return 0;
   }
@@ -374,7 +374,8 @@ export function applyOrganicGrowth(
   business: Business,
   sharedServicesGrowthBonus: number,
   sectorFocusBonus: number,
-  inflationActive: boolean
+  inflationActive: boolean,
+  concentrationCount?: number // Number of opcos in same focus group — drives concentration risk
 ): Business {
   const sector = SECTORS[business.sectorId];
 
@@ -385,7 +386,11 @@ export function applyOrganicGrowth(
   let annualGrowth = cappedGrowthRate;
 
   // Sector volatility (random variation within the year)
-  annualGrowth += sector.volatility * (Math.random() * 2 - 1);
+  // Concentration risk: 4+ same-sector opcos amplifies volatility (correlated exposure)
+  const concentrationMultiplier = (concentrationCount && concentrationCount >= 4)
+    ? 1 + (concentrationCount - 3) * 0.25 // 4 opcos = 1.25x, 5 = 1.5x, 6 = 1.75x
+    : 1;
+  annualGrowth += sector.volatility * (Math.random() * 2 - 1) * concentrationMultiplier;
 
   // Shared services bonus
   annualGrowth += sharedServicesGrowthBonus;
@@ -992,9 +997,11 @@ export function calculateMetrics(state: GameState): Metrics {
     }
   }
 
-  // MOIC
-  const totalReturns = state.totalDistributions + state.totalExitProceeds + portfolioValue + state.cash;
-  const portfolioMoic = state.totalInvestedCapital > 0 ? totalReturns / state.totalInvestedCapital : 1;
+  // MOIC — NAV-based: (portfolio value + cash - debt + distributions) / initial raise
+  // Uses initial raise as denominator (total paid-in capital), not just invested capital
+  // Cash already reflects exit proceeds (no double-counting)
+  const nav = portfolioValue + state.cash - totalDebt + state.totalDistributions;
+  const portfolioMoic = state.initialRaiseAmount > 0 ? nav / state.initialRaiseAmount : 1;
 
   // Leverage
   const netDebtToEbitda = totalEbitda > 0 ? (totalDebt - state.cash) / totalEbitda : 0;

@@ -324,7 +324,7 @@ export function AllocatePhase({
                     )}
                     {structure.earnout && (
                       <div className="flex justify-between">
-                        <span className="text-text-muted">Earnout</span>
+                        <span className="text-text-muted">Earnout (if {Math.round(structure.earnout.targetEbitdaGrowth * 100)}%+ growth)</span>
                         <span className="font-mono">{formatMoney(structure.earnout.amount)}</span>
                       </div>
                     )}
@@ -768,6 +768,7 @@ export function AllocatePhase({
                   onSell={() => setSellConfirmBusiness(business)}
                   onImprove={() => setSelectedBusinessForImprovement(business)}
                   onDesignatePlatform={!business.isPlatform ? () => onDesignatePlatform(business.id) : undefined}
+                  onWindDown={() => onWindDown(business.id)}
                   onShowRollUpGuide={() => setShowRollUpGuide(true)}
                   isPlatform={business.isPlatform}
                   platformScale={business.platformScale}
@@ -1760,9 +1761,16 @@ export function AllocatePhase({
             </p>
             <p className="text-sm text-text-muted mb-6">
               You have <span className="text-accent font-mono">{formatMoney(cash)}</span> unallocated cash.
-              {dealPipeline.length > 0 && (
-                <span className="text-warning"> {dealPipeline.length} deal{dealPipeline.length > 1 ? 's' : ''} will expire.</span>
-              )}
+              {(() => {
+                const expiring = dealPipeline.filter(d => d.freshness === 1).length;
+                const carrying = dealPipeline.filter(d => d.freshness > 1).length;
+                return (
+                  <>
+                    {expiring > 0 && <span className="text-warning"> {expiring} deal{expiring > 1 ? 's' : ''} will expire.</span>}
+                    {carrying > 0 && <span className="text-text-muted"> {carrying} will carry over.</span>}
+                  </>
+                );
+              })()}
             </p>
             <div className="flex gap-3 justify-end">
               <button

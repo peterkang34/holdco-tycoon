@@ -342,7 +342,7 @@ describe('getSectorFocusEbitdaBonus', () => {
     expect(getSectorFocusEbitdaBonus(0)).toBe(0);
     expect(getSectorFocusEbitdaBonus(1)).toBe(0.02);
     expect(getSectorFocusEbitdaBonus(2)).toBe(0.04);
-    expect(getSectorFocusEbitdaBonus(3)).toBe(0.07);
+    expect(getSectorFocusEbitdaBonus(3)).toBe(0.05);
   });
 });
 

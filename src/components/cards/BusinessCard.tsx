@@ -8,6 +8,7 @@ interface BusinessCardProps {
   showDetails?: boolean;
   onSell?: () => void;
   onImprove?: () => void;
+  onWindDown?: () => void;
   onDesignatePlatform?: () => void;
   onShowRollUpGuide?: () => void;
   compact?: boolean;
@@ -24,6 +25,7 @@ export function BusinessCard({
   showDetails = true,
   onSell,
   onImprove,
+  onWindDown,
   onDesignatePlatform,
   onShowRollUpGuide,
   compact = false,
@@ -36,7 +38,7 @@ export function BusinessCard({
 }: BusinessCardProps) {
   const [showValuation, setShowValuation] = useState(false);
   const sector = SECTORS[business.sectorId];
-  const annualFcf = Math.round(business.ebitda * (1 - sector.capexRate) * 0.7);
+  const annualFcf = Math.round(business.ebitda * (1 - sector.capexRate));
 
   // Calculate proper exit valuation
   const exitValuation = calculateExitValuation(business, currentRound, lastEventType);
@@ -307,7 +309,7 @@ export function BusinessCard({
             )}
           </div>
 
-          {(onSell || onImprove || onDesignatePlatform) && (
+          {(onSell || onImprove || onWindDown || onDesignatePlatform) && (
             <div className="flex flex-col gap-2 mt-3">
               <div className="flex gap-2">
                 {onImprove && (
@@ -321,6 +323,15 @@ export function BusinessCard({
                     className={`btn-secondary text-xs flex-1 ${moic >= 2 ? 'border-accent' : moic < 1 ? 'border-danger' : ''}`}
                   >
                     Sell for {formatMoney(exitValuation.netProceeds)}
+                  </button>
+                )}
+                {onWindDown && (
+                  <button
+                    onClick={onWindDown}
+                    className="btn-secondary text-xs text-danger/70 hover:text-danger"
+                    title="Shut down the business. Costs $250k + any seller note payoff."
+                  >
+                    Wind Down
                   </button>
                 )}
               </div>

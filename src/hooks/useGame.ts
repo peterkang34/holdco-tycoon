@@ -352,14 +352,27 @@ export const useGameStore = create<GameStore>()(
         const focusBonus = calculateSectorFocusBonus(state.businesses);
         const focusEbitdaBonus = focusBonus ? getSectorFocusEbitdaBonus(focusBonus.tier) : 0;
 
+        // Count opcos per focus group for concentration risk
+        const activeBusinesses = state.businesses.filter(b => b.status === 'active');
+        const focusGroupCounts: Record<string, number> = {};
+        for (const b of activeBusinesses) {
+          const sector = SECTORS[b.sectorId];
+          for (const fg of sector.sectorFocusGroup) {
+            focusGroupCounts[fg] = (focusGroupCounts[fg] || 0) + 1;
+          }
+        }
+
         // Apply organic growth to all businesses
         const updatedBusinesses = state.businesses.map(b => {
           if (b.status !== 'active') return b;
+          const sector = SECTORS[b.sectorId];
+          const maxFocusCount = Math.max(...sector.sectorFocusGroup.map(fg => focusGroupCounts[fg] || 0));
           return applyOrganicGrowth(
             b,
             sharedBenefits.growthBonus,
             focusEbitdaBonus,
-            state.inflationRoundsRemaining > 0
+            state.inflationRoundsRemaining > 0,
+            maxFocusCount
           );
         });
 
@@ -504,8 +517,57 @@ export const useGameStore = create<GameStore>()(
             holdcoAmortizationThisRound: holdcoAmortizationAmount,
           });
         } else {
+          // Game over — still process final year's debt service for accurate final state
+          let gameOverCashAdj = 0;
+          const gameOverBusinesses = updatedBusinesses.map(b => {
+            if (b.status !== 'active') return b;
+            let updated = { ...b };
+            if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
+              const interest = Math.round(b.sellerNoteBalance * b.sellerNoteRate);
+              const principal = Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
+              const totalPayment = interest + principal;
+              const availableForPayment = Math.max(0, state.cash + gameOverCashAdj);
+              const actualPayment = Math.min(totalPayment, availableForPayment);
+              gameOverCashAdj -= actualPayment;
+              const principalPaid = Math.max(0, actualPayment - interest);
+              updated.sellerNoteBalance = Math.max(0, b.sellerNoteBalance - principalPaid);
+              if (actualPayment >= totalPayment) {
+                updated.sellerNoteRoundsRemaining = b.sellerNoteRoundsRemaining - 1;
+              }
+            }
+            if (b.earnoutRemaining > 0 && b.earnoutTarget > 0) {
+              const actualGrowth = b.acquisitionEbitda > 0
+                ? (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda : 0;
+              if (actualGrowth >= b.earnoutTarget) {
+                const availableForEarnout = Math.max(0, state.cash + gameOverCashAdj);
+                const earnoutPayment = Math.min(b.earnoutRemaining, availableForEarnout);
+                gameOverCashAdj -= earnoutPayment;
+                updated.earnoutRemaining = b.earnoutRemaining - earnoutPayment;
+              }
+            }
+            return updated;
+          });
+
+          // Holdco debt amortization for final year
+          let gameOverDebt = state.totalDebt;
+          if (state.totalDebt > 0 && state.holdcoDebtStartRound > 0) {
+            const yearsWithDebt = newRound - state.holdcoDebtStartRound;
+            if (yearsWithDebt >= 2) {
+              const scheduledPayment = Math.round(state.totalDebt * 0.10);
+              const availableCash = Math.max(0, state.cash + gameOverCashAdj);
+              const actualPayment = Math.min(scheduledPayment, availableCash);
+              if (actualPayment > 0) {
+                gameOverCashAdj -= actualPayment;
+                gameOverDebt = state.totalDebt - actualPayment;
+              }
+            }
+          }
+
+          const gameOverCash = Math.max(0, state.cash + gameOverCashAdj);
+          const gameOverMetrics = calculateMetrics({ ...state, businesses: gameOverBusinesses, cash: gameOverCash, totalDebt: gameOverDebt });
+
           set({
-            businesses: updatedBusinesses,
+            businesses: gameOverBusinesses,
             round: newRound,
             metricsHistory: [...state.metricsHistory, historyEntry],
             roundHistory: newRoundHistory,
@@ -516,8 +578,10 @@ export const useGameStore = create<GameStore>()(
             phase: 'collect' as GamePhase,
             currentEvent: null,
             yearChronicle: null,
-            metrics: endMetrics,
-            focusBonus: calculateSectorFocusBonus(updatedBusinesses),
+            cash: gameOverCash,
+            totalDebt: gameOverDebt,
+            metrics: gameOverMetrics,
+            focusBonus: calculateSectorFocusBonus(gameOverBusinesses),
           });
         }
       },
@@ -639,10 +703,10 @@ export const useGameStore = create<GameStore>()(
 
         // Update the platform with new bolt-on (uncapped — multiple expansion bonus caps at scale 3)
         const newPlatformScale = platform.platformScale + 1;
-        const multipleExpansion = calculateMultipleExpansion(
-          newPlatformScale,
-          platform.ebitda + deal.business.ebitda + synergies
-        );
+        // Use INCREMENTAL expansion (new level minus old level) to prevent stacking
+        const combinedEbitda = platform.ebitda + deal.business.ebitda + synergies;
+        const multipleExpansion = calculateMultipleExpansion(newPlatformScale, combinedEbitda)
+          - calculateMultipleExpansion(platform.platformScale, platform.ebitda);
 
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id === targetPlatformId) {
@@ -669,7 +733,7 @@ export const useGameStore = create<GameStore>()(
           ? state.round
           : state.holdcoDebtStartRound;
 
-        const tuckInCash = state.cash - structure.cashRequired - restructuringCost;
+        const tuckInCash = Math.max(0, state.cash - structure.cashRequired - restructuringCost);
 
         set({
           cash: tuckInCash,
@@ -716,8 +780,8 @@ export const useGameStore = create<GameStore>()(
         // Must be same sector
         if (biz1.sectorId !== biz2.sectorId) return;
 
-        // Merge cost (restructuring, legal, integration) — 15% of smaller business
-        const mergeCost = Math.round(Math.min(biz1.ebitda, biz2.ebitda) * 0.15);
+        // Merge cost (restructuring, legal, integration) — 15% of smaller business (abs to prevent negative costs)
+        const mergeCost = Math.max(100, Math.round(Math.min(Math.abs(biz1.ebitda), Math.abs(biz2.ebitda)) * 0.15));
         if (state.cash < mergeCost) return;
 
         // Check if shared services help
@@ -739,7 +803,10 @@ export const useGameStore = create<GameStore>()(
         const totalMergeCost = mergeCost + mergeRestructuringCost;
         const combinedTotalCost = biz1.totalAcquisitionCost + biz2.totalAcquisitionCost + totalMergeCost;
         const newPlatformScale = Math.max(biz1.platformScale, biz2.platformScale) + 1;
-        const multipleExpansion = calculateMultipleExpansion(newPlatformScale, combinedEbitda);
+        const prevScale = Math.max(biz1.platformScale, biz2.platformScale);
+        const prevEbitda = Math.max(biz1.ebitda, biz2.ebitda);
+        const multipleExpansion = calculateMultipleExpansion(newPlatformScale, combinedEbitda)
+          - calculateMultipleExpansion(prevScale, prevEbitda);
 
         if (state.cash < totalMergeCost) return;
 
@@ -840,7 +907,7 @@ export const useGameStore = create<GameStore>()(
         if (business.isPlatform) return;
 
         // Cost to set up platform infrastructure
-        const setupCost = Math.round(business.ebitda * 0.05);
+        const setupCost = Math.max(50, Math.round(Math.abs(business.ebitda) * 0.05));
         if (state.cash < setupCost) return;
 
         const updatedBusinesses = state.businesses.map(b => {
@@ -888,25 +955,28 @@ export const useGameStore = create<GameStore>()(
         let growthBoost = 0;
         let volatilityReduction = 0;
 
+        const absEbitda = Math.abs(business.ebitda) || 1; // Floor at 1 to prevent zero costs
         switch (improvementType) {
           case 'operating_playbook':
-            cost = Math.round(business.ebitda * 0.15);
+            cost = Math.round(absEbitda * 0.15);
             ebitdaBoost = 0.08;
             volatilityReduction = 0.02;
             break;
           case 'pricing_model':
-            cost = Math.round(business.ebitda * 0.10);
+            cost = Math.round(absEbitda * 0.10);
             ebitdaBoost = 0.05 + Math.random() * 0.07;
             growthBoost = 0.01;
             break;
           case 'service_expansion':
-            cost = Math.round(business.ebitda * 0.20);
+            cost = Math.round(absEbitda * 0.20);
             ebitdaBoost = 0.10 + Math.random() * 0.08;
             break;
           case 'fix_underperformance':
-            cost = Math.round(business.ebitda * 0.12);
+            cost = Math.round(absEbitda * 0.12);
             // C-5: Clamp to 0 minimum — if business is already near peak, no boost
-            ebitdaBoost = Math.max(0, (business.peakEbitda * 0.8 - business.ebitda) / business.ebitda);
+            ebitdaBoost = business.ebitda > 0
+              ? Math.max(0, (business.peakEbitda * 0.8 - business.ebitda) / business.ebitda)
+              : 0.10; // Flat boost for negative EBITDA businesses
             break;
           default:
             return;

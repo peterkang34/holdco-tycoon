@@ -111,14 +111,15 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   let totalCapitalDeployed = 0;
 
   for (const business of allBusinesses) {
-    const capital = business.acquisitionPrice;
+    const capital = business.totalAcquisitionCost || business.acquisitionPrice;
     let returns = 0;
 
     if (business.status === 'sold' && business.exitPrice) {
       returns = business.exitPrice;
     } else if (business.status === 'active') {
-      // Use current value estimate
-      returns = business.ebitda * business.acquisitionMultiple * 1.1; // Slight premium for going concern
+      // Use full valuation engine for current value
+      const valuation = calculateExitValuation(business, 20);
+      returns = business.ebitda * valuation.totalMultiple;
     }
 
     totalMoicWeighted += returns;

@@ -146,7 +146,7 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-3 gap-4 mb-4">
         <div>
           <p className="text-xs text-text-muted">EBITDA</p>
           <p className="font-mono font-bold text-lg">{formatMoney(deal.business.ebitda)}</p>
@@ -155,6 +155,12 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
           <p className="text-xs text-text-muted">Asking Price</p>
           <p className="font-mono font-bold text-lg">{formatMoney(deal.askingPrice)}</p>
           <p className="text-xs text-text-muted">{deal.business.acquisitionMultiple.toFixed(1)}x EBITDA</p>
+        </div>
+        <div>
+          <p className="text-xs text-text-muted">Quality</p>
+          <p className="font-mono font-bold text-lg">
+            {'★'.repeat(qualityRating)}{'☆'.repeat(5 - qualityRating)}
+          </p>
         </div>
       </div>
 
