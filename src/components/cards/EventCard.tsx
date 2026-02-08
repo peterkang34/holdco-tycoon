@@ -169,7 +169,7 @@ export function EventCard({ event, onAcceptOffer, onDeclineOffer, onContinue }: 
               onClick={onAcceptOffer}
               className="btn-primary flex-1"
             >
-              Accept {event.offerAmount ? formatMoney(event.offerAmount) : ''}
+              Accept{event.offerAmount ? ` ${formatMoney(event.offerAmount)}` : ''}
             </button>
           </div>
         </div>

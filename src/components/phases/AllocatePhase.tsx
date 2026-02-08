@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
   Business,
   Deal,
@@ -125,6 +125,7 @@ export function AllocatePhase({
   });
   const [mergeName, setMergeName] = useState('');
   const [showMarketGuide, setShowMarketGuide] = useState(false);
+  const acquiringRef = useRef(false);
   const [showRollUpGuide, setShowRollUpGuide] = useState(false);
   const [sellConfirmBusiness, setSellConfirmBusiness] = useState<Business | null>(null);
   const [sellCelebration, setSellCelebration] = useState<{ name: string; moic: number } | null>(null);
@@ -277,6 +278,8 @@ export function AllocatePhase({
                     'border-red-500/30'
                   }`}
                   onClick={() => {
+                    if (acquiringRef.current) return;
+                    acquiringRef.current = true;
                     if (selectedTuckInPlatform) {
                       onAcquireTuckIn(selectedDeal, structure, selectedTuckInPlatform);
                     } else {
@@ -284,6 +287,7 @@ export function AllocatePhase({
                     }
                     setSelectedDeal(null);
                     setSelectedTuckInPlatform(null);
+                    setTimeout(() => { acquiringRef.current = false; }, 300);
                   }}
                 >
                   <h5 className="font-bold mb-2">{getStructureLabel(structure.type)}</h5>
@@ -1390,7 +1394,9 @@ export function AllocatePhase({
                   </div>
                 </div>
 
-                {mergeSelection.first && mergeSelection.second && (
+                {mergeSelection.first && mergeSelection.second && (() => {
+                  const mergeCost = Math.round(Math.min(mergeSelection.first.ebitda, mergeSelection.second.ebitda) * 0.15);
+                  return (
                   <>
                     <div className="card bg-white/5 mb-6">
                       <h4 className="font-bold mb-3">Merger Preview</h4>
@@ -1417,7 +1423,7 @@ export function AllocatePhase({
                         <div>
                           <p className="text-text-muted">Merge Cost</p>
                           <p className="font-mono font-bold text-lg">
-                            {formatMoney(Math.round(Math.min(mergeSelection.first.ebitda, mergeSelection.second.ebitda) * 0.15))}
+                            {formatMoney(mergeCost)}
                           </p>
                           <p className="text-xs text-text-muted">15% of smaller business</p>
                         </div>
@@ -1452,15 +1458,16 @@ export function AllocatePhase({
                           setMergeName('');
                         }
                       }}
-                      disabled={!mergeName.trim() || cash < Math.round(Math.min(mergeSelection.first.ebitda, mergeSelection.second.ebitda) * 0.15)}
+                      disabled={!mergeName.trim() || cash < mergeCost}
                       className="btn-primary w-full"
                     >
-                      {cash < Math.round(Math.min(mergeSelection.first.ebitda, mergeSelection.second.ebitda) * 0.15)
+                      {cash < mergeCost
                         ? 'Not Enough Cash'
                         : 'Complete Merger'}
                     </button>
                   </>
-                )}
+                  );
+                })()}
 
                 <div className="mt-6 p-4 bg-white/5 rounded-lg text-sm text-text-muted">
                   <p className="font-medium text-text-secondary mb-1">Roll-Up Strategy Tip</p>

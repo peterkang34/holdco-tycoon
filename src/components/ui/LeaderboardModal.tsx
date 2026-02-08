@@ -101,6 +101,9 @@ function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number
             entry.grade === 'S' ? 'text-yellow-400' :
             entry.grade === 'A' ? 'text-accent' :
             entry.grade === 'B' ? 'text-blue-400' :
+            entry.grade === 'C' ? 'text-warning' :
+            entry.grade === 'D' ? 'text-orange-500' :
+            entry.grade === 'F' ? 'text-danger' :
             'text-text-secondary'
           }`}>{entry.score} ({entry.grade})</p>
         </div>

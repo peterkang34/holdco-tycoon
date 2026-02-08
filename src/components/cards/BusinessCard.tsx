@@ -85,7 +85,7 @@ export function BusinessCard({
           {isPlatform && (
             <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded relative group/platform cursor-help">
               Scale {platformScale}
-              <div className="absolute top-full right-0 mt-2 w-56 p-3 bg-bg-primary border border-white/10 rounded-lg shadow-xl opacity-0 invisible group-hover/platform:opacity-100 group-hover/platform:visible transition-all z-50 text-left">
+              <div className="absolute top-full right-0 md:right-0 -right-2 mt-2 w-48 md:w-56 p-3 bg-bg-primary border border-white/10 rounded-lg shadow-xl opacity-0 invisible group-hover/platform:opacity-100 group-hover/platform:visible transition-all z-50 text-left">
                 <p className="text-sm text-text-secondary font-normal">This is a roll-up hub. Tuck-in bolt-on acquisitions to increase scale and unlock synergies + exit multiple expansion.</p>
                 <p className="text-xs text-text-muted mt-2 font-normal">Multiple expansion bonus caps at Scale 3 (+1.0x), but bolt-ons can continue beyond that.</p>
                 <p className="text-xs text-accent mt-1 font-normal">Current: Scale {platformScale}, {boltOnCount} bolt-on{boltOnCount !== 1 ? 's' : ''}</p>
@@ -118,7 +118,7 @@ export function BusinessCard({
       {/* Latest Story Beat */}
       {business.storyBeats && business.storyBeats.length > 0 && (
         <div className="bg-gradient-to-r from-accent/5 to-transparent border-l-2 border-accent/30 p-2 mb-3 text-xs">
-          <p className="text-text-secondary italic leading-relaxed">
+          <p className="text-text-secondary italic leading-relaxed line-clamp-3">
             "{business.storyBeats[business.storyBeats.length - 1].narrative}"
           </p>
           <p className="text-text-muted mt-1">— Year {business.storyBeats[business.storyBeats.length - 1].round}</p>
