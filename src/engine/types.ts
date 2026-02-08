@@ -61,7 +61,11 @@ export interface SectorDefinition {
   sharedServicesBenefit: number; // 0.5-1.5x
   sectorFocusGroup: SectorFocusGroup[];
   subTypes: string[];
+  subTypeGroups: number[]; // Parallel to subTypes — same group number = operationally related
 }
+
+// How closely related two sub-types are within a sector
+export type SubTypeAffinity = 'match' | 'related' | 'distant';
 
 export type BusinessStatus = 'active' | 'sold' | 'wound_down' | 'integrated' | 'merged';
 

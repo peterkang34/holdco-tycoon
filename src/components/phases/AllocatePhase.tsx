@@ -21,6 +21,7 @@ import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
 import { generateDealStructures, getStructureLabel, getStructureDescription } from '../../engine/deals';
 import { calculateExitValuation } from '../../engine/simulation';
+import { getSubTypeAffinity } from '../../engine/businesses';
 import { SECTORS } from '../../data/sectors';
 import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES, MA_SOURCING_CONFIG, getMASourcingUpgradeCost, getMASourcingAnnualCost } from '../../data/sharedServices';
 import { MarketGuideModal } from '../ui/MarketGuideModal';
@@ -240,16 +241,20 @@ export function AllocatePhase({
               </select>
               {selectedTuckInPlatform && (() => {
                 const platform = availablePlatformsForDeal.find(p => p.id === selectedTuckInPlatform);
-                const subTypeMatch = platform?.subType === selectedDeal.business.subType;
+                const affinity = platform ? getSubTypeAffinity(platform.sectorId, platform.subType, selectedDeal.business.subType) : 'distant';
                 return (
                   <div className="mt-2 space-y-1">
-                    {subTypeMatch ? (
+                    {affinity === 'match' ? (
                       <p className="text-xs text-green-400 flex items-center gap-1">
                         <span>&#10003;</span> Same sub-type ({selectedDeal.business.subType}) — full synergies expected
                       </p>
+                    ) : affinity === 'related' ? (
+                      <p className="text-xs text-blue-400 flex items-center gap-1">
+                        <span>&#8776;</span> Related sub-types ({platform?.subType} + {selectedDeal.business.subType}) — 75% synergies
+                      </p>
                     ) : (
                       <p className="text-xs text-yellow-400 flex items-center gap-1">
-                        <span>&#9888;</span> Different sub-types ({platform?.subType} + {selectedDeal.business.subType}) — reduced synergies
+                        <span>&#9888;</span> Distant sub-types ({platform?.subType} + {selectedDeal.business.subType}) — 45% synergies
                       </p>
                     )}
                     <p className="text-xs text-accent">
@@ -1591,15 +1596,22 @@ export function AllocatePhase({
                       <h4 className="font-bold mb-3">Merger Preview</h4>
 
                       {/* Sub-type match indicator */}
-                      {mergeSelection.first.subType === mergeSelection.second.subType ? (
-                        <div className="bg-green-900/20 border border-green-500/30 rounded-lg px-3 py-2 mb-4 text-sm text-green-400 flex items-center gap-2">
-                          <span>&#10003;</span> Same sub-type ({mergeSelection.first.subType}) — full synergies expected
-                        </div>
-                      ) : (
-                        <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg px-3 py-2 mb-4 text-sm text-yellow-400 flex items-center gap-2">
-                          <span>&#9888;</span> Different sub-types ({mergeSelection.first.subType} + {mergeSelection.second.subType}) — reduced synergies
-                        </div>
-                      )}
+                      {(() => {
+                        const mergeAffinity = getSubTypeAffinity(mergeSelection.first.sectorId, mergeSelection.first.subType, mergeSelection.second.subType);
+                        return mergeAffinity === 'match' ? (
+                          <div className="bg-green-900/20 border border-green-500/30 rounded-lg px-3 py-2 mb-4 text-sm text-green-400 flex items-center gap-2">
+                            <span>&#10003;</span> Same sub-type ({mergeSelection.first.subType}) — full synergies expected
+                          </div>
+                        ) : mergeAffinity === 'related' ? (
+                          <div className="bg-blue-900/20 border border-blue-500/30 rounded-lg px-3 py-2 mb-4 text-sm text-blue-400 flex items-center gap-2">
+                            <span>&#8776;</span> Related sub-types ({mergeSelection.first.subType} + {mergeSelection.second.subType}) — 75% synergies
+                          </div>
+                        ) : (
+                          <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg px-3 py-2 mb-4 text-sm text-yellow-400 flex items-center gap-2">
+                            <span>&#9888;</span> Distant sub-types ({mergeSelection.first.subType} + {mergeSelection.second.subType}) — 45% synergies
+                          </div>
+                        );
+                      })()}
 
                       <div className="grid grid-cols-3 gap-4 text-sm">
                         <div>

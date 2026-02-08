@@ -26,6 +26,8 @@ export const SECTORS: Record<string, SectorDefinition> = {
       'SEO/Content Agency',
       'Web Development Agency',
     ],
+    // Affinity groups: 0=performance/digital, 1=creative/production
+    subTypeGroups: [0, 1, 0, 0, 1],
   },
   saas: {
     id: 'saas',
@@ -49,6 +51,8 @@ export const SECTORS: Record<string, SectorDefinition> = {
       'Dev Tools / Infrastructure',
       'Micro-SaaS Product',
     ],
+    // Affinity groups: 0=product SaaS, 1=infrastructure/tools
+    subTypeGroups: [0, 0, 1, 1],
   },
   homeServices: {
     id: 'homeServices',
@@ -74,6 +78,8 @@ export const SECTORS: Record<string, SectorDefinition> = {
       'Property Management',
       'Roofing / Exterior Services',
     ],
+    // Affinity groups: 0=skilled trades, 1=property services, 2=management
+    subTypeGroups: [0, 0, 0, 1, 2, 1],
   },
   consumer: {
     id: 'consumer',
@@ -99,6 +105,8 @@ export const SECTORS: Record<string, SectorDefinition> = {
       'Specialty / Luxury Goods',
       'Spirits / Wine',
     ],
+    // Affinity groups: 0=retail/DTC, 1=food/luxury
+    subTypeGroups: [0, 0, 1, 0, 1, 1],
   },
   industrial: {
     id: 'industrial',
@@ -123,6 +131,8 @@ export const SECTORS: Record<string, SectorDefinition> = {
       'Industrial Distribution',
       'Engineered Products',
     ],
+    // Affinity groups: 0=manufacturing, 1=distribution/testing
+    subTypeGroups: [0, 0, 1, 1, 0],
   },
   b2bServices: {
     id: 'b2bServices',
@@ -147,6 +157,8 @@ export const SECTORS: Record<string, SectorDefinition> = {
       'Consulting / Advisory',
       'Data / Analytics Services',
     ],
+    // Affinity groups: 0=tech services, 1=professional services, 2=people services
+    subTypeGroups: [0, 1, 2, 1, 0],
   },
   healthcare: {
     id: 'healthcare',
@@ -171,6 +183,8 @@ export const SECTORS: Record<string, SectorDefinition> = {
       'Home Health / Hospice',
       'Behavioral Health',
     ],
+    // Affinity groups: 0=clinical practices, 1=home-based care, 2=behavioral
+    subTypeGroups: [0, 0, 0, 1, 2],
   },
   restaurant: {
     id: 'restaurant',
@@ -195,6 +209,8 @@ export const SECTORS: Record<string, SectorDefinition> = {
       'Ghost Kitchen / Delivery-First',
       'Specialty Food Concept',
     ],
+    // Affinity groups: 0=dine-in/takeout, 1=grab-and-go/delivery
+    subTypeGroups: [0, 0, 1, 1, 0],
   },
   realEstate: {
     id: 'realEstate',
@@ -219,6 +235,8 @@ export const SECTORS: Record<string, SectorDefinition> = {
       'Data Centers',
       'Utility / Infrastructure',
     ],
+    // Affinity groups: 0=residential/storage, 1=commercial/tech infra, 2=utility
+    subTypeGroups: [0, 0, 1, 1, 2],
   },
   education: {
     id: 'education',
@@ -243,6 +261,8 @@ export const SECTORS: Record<string, SectorDefinition> = {
       'Corporate Training',
       'Test Prep / Tutoring',
     ],
+    // Affinity groups: 0=digital/online, 1=in-person, 2=supplemental
+    subTypeGroups: [0, 1, 0, 1, 2],
   },
 };
 

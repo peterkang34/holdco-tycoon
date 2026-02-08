@@ -8,6 +8,7 @@ import {
   DealSizePreference,
   AcquisitionType,
   IntegrationOutcome,
+  SubTypeAffinity,
   AIGeneratedContent,
   randomInRange,
   randomInt,
@@ -226,12 +227,25 @@ function calculateTuckInDiscount(quality: QualityRating): number {
   return Math.max(0.05, Math.min(0.25, baseDiscount + qualityAdjustment));
 }
 
+// Determine how closely related two sub-types are within a sector
+export function getSubTypeAffinity(sectorId: string, subType1: string, subType2: string): SubTypeAffinity {
+  if (subType1 === subType2) return 'match';
+  const sector = SECTORS[sectorId];
+  if (!sector) return 'distant';
+  const idx1 = sector.subTypes.indexOf(subType1);
+  const idx2 = sector.subTypes.indexOf(subType2);
+  if (idx1 === -1 || idx2 === -1) return 'distant';
+  const group1 = sector.subTypeGroups[idx1];
+  const group2 = sector.subTypeGroups[idx2];
+  return group1 === group2 ? 'related' : 'distant';
+}
+
 // Determine integration outcome based on various factors
 export function determineIntegrationOutcome(
   acquiredBusiness: Omit<Business, 'id' | 'acquisitionRound' | 'improvements' | 'status'>,
   targetPlatform?: Business,
   hasSharedServices?: boolean,
-  subTypeMatch?: boolean
+  subTypeAffinity?: SubTypeAffinity
 ): IntegrationOutcome {
   let successProbability = 0.6; // Base 60% chance
 
@@ -250,9 +264,11 @@ export function determineIntegrationOutcome(
     successProbability += 0.15;
   }
 
-  // Sub-type mismatch penalty (e.g., dental + behavioral health)
-  if (subTypeMatch === false) {
-    successProbability -= 0.20;
+  // Sub-type affinity penalty — graduated based on operational relatedness
+  if (subTypeAffinity === 'related') {
+    successProbability -= 0.05; // Related sub-types: mild friction (e.g., plumbing + electrical)
+  } else if (subTypeAffinity === 'distant') {
+    successProbability -= 0.15; // Distant sub-types: significant friction (e.g., plumbing + property mgmt)
   }
 
   // Shared services help integration
@@ -281,7 +297,7 @@ export function calculateSynergies(
   outcome: IntegrationOutcome,
   acquiredEbitda: number,
   isTuckIn: boolean,
-  subTypeMatch?: boolean
+  subTypeAffinity?: SubTypeAffinity
 ): number {
   // Synergies are a % of the acquired business EBITDA
   let synergyRate: number;
@@ -298,9 +314,11 @@ export function calculateSynergies(
       break;
   }
 
-  // Sub-type mismatch halves synergies (both positive and negative)
-  if (subTypeMatch === false) {
-    synergyRate *= 0.5;
+  // Sub-type affinity affects synergy capture
+  if (subTypeAffinity === 'related') {
+    synergyRate *= 0.75; // Related sub-types: 75% synergies (e.g., HVAC + plumbing share suppliers)
+  } else if (subTypeAffinity === 'distant') {
+    synergyRate *= 0.45; // Distant sub-types: 45% synergies (e.g., dental + behavioral health)
   }
 
   return Math.round(acquiredEbitda * synergyRate);
@@ -584,11 +602,13 @@ export function generateDealPipeline(
       }
     }
 
-    // Tier 3: 1 off-market proprietary deal (15% discount, quality 3+)
-    if (maSourcingTier >= 3 && pipeline.length < MAX_DEALS) {
+    // Tier 3: 2 off-market proprietary deals (15% discount, quality 3+)
+    if (maSourcingTier >= 3) {
       const proprietarySector = maFocus?.sectorId ?? focusSector;
-      pipeline.push(generateDealWithSize(
-        proprietarySector, round, maFocus?.sizePreference || 'any', portfolioEbitda,
+      for (let i = 0; i < 2; i++) {
+        if (pipeline.length >= MAX_DEALS) break;
+        pipeline.push(generateDealWithSize(
+          proprietarySector, round, maFocus?.sizePreference || 'any', portfolioEbitda,
         {
           subType: maFocus?.subType ?? undefined,
           qualityFloor: 3,
@@ -597,6 +617,7 @@ export function generateDealPipeline(
           freshnessBonus: 1,
         }
       ));
+      }
     }
   }
 

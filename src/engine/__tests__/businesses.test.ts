@@ -11,6 +11,7 @@ import {
   getSectorWeightsForRound,
   determineIntegrationOutcome,
   calculateSynergies,
+  getSubTypeAffinity,
   calculateMultipleExpansion,
   createStartingBusiness,
 } from '../businesses';
@@ -310,32 +311,69 @@ describe('determineIntegrationOutcome', () => {
     expect(failCount).toBeGreaterThan(10);
   });
 
-  it('should produce more failures with subTypeMatch=false', () => {
+  it('should produce more failures with distant sub-types', () => {
     let failMatchCount = 0;
-    let failMismatchCount = 0;
+    let failDistantCount = 0;
     const biz = generateBusiness('healthcare', 1, 3);
 
     for (let i = 0; i < 500; i++) {
-      if (determineIntegrationOutcome(biz, undefined, false, true) === 'failure') failMatchCount++;
-      if (determineIntegrationOutcome(biz, undefined, false, false) === 'failure') failMismatchCount++;
+      if (determineIntegrationOutcome(biz, undefined, false, 'match') === 'failure') failMatchCount++;
+      if (determineIntegrationOutcome(biz, undefined, false, 'distant') === 'failure') failDistantCount++;
     }
-    // Mismatch should produce more failures due to -0.20 penalty
-    expect(failMismatchCount).toBeGreaterThan(failMatchCount);
+    // Distant sub-types should produce more failures due to -0.15 penalty
+    expect(failDistantCount).toBeGreaterThan(failMatchCount);
   });
 
-  it('should not penalize when subTypeMatch is undefined (default)', () => {
+  it('should produce moderate failures with related sub-types', () => {
+    let failMatchCount = 0;
+    let failRelatedCount = 0;
+    let failDistantCount = 0;
+    const biz = generateBusiness('healthcare', 1, 3);
+
+    for (let i = 0; i < 500; i++) {
+      if (determineIntegrationOutcome(biz, undefined, false, 'match') === 'failure') failMatchCount++;
+      if (determineIntegrationOutcome(biz, undefined, false, 'related') === 'failure') failRelatedCount++;
+      if (determineIntegrationOutcome(biz, undefined, false, 'distant') === 'failure') failDistantCount++;
+    }
+    // Related should be between match and distant
+    expect(failRelatedCount).toBeGreaterThan(failMatchCount);
+    expect(failDistantCount).toBeGreaterThan(failRelatedCount);
+  });
+
+  it('should not penalize when subTypeAffinity is undefined (default)', () => {
     let failDefault = 0;
     let failMatch = 0;
     const biz = generateBusiness('healthcare', 1, 3);
 
     for (let i = 0; i < 500; i++) {
       if (determineIntegrationOutcome(biz) === 'failure') failDefault++;
-      if (determineIntegrationOutcome(biz, undefined, false, true) === 'failure') failMatch++;
+      if (determineIntegrationOutcome(biz, undefined, false, 'match') === 'failure') failMatch++;
     }
     // Should be roughly similar (both without penalty)
     const ratio = failDefault / Math.max(failMatch, 1);
     expect(ratio).toBeGreaterThan(0.5);
     expect(ratio).toBeLessThan(2.0);
+  });
+});
+
+describe('getSubTypeAffinity', () => {
+  it('should return match for same sub-type', () => {
+    expect(getSubTypeAffinity('homeServices', 'HVAC Services', 'HVAC Services')).toBe('match');
+  });
+
+  it('should return related for same affinity group (skilled trades)', () => {
+    expect(getSubTypeAffinity('homeServices', 'HVAC Services', 'Plumbing Services')).toBe('related');
+    expect(getSubTypeAffinity('homeServices', 'Plumbing Services', 'Electrical Services')).toBe('related');
+  });
+
+  it('should return distant for different affinity groups', () => {
+    expect(getSubTypeAffinity('homeServices', 'Plumbing Services', 'Property Management')).toBe('distant');
+    expect(getSubTypeAffinity('healthcare', 'Dental Practice Group', 'Behavioral Health')).toBe('distant');
+  });
+
+  it('should return distant for unknown sector or sub-types', () => {
+    expect(getSubTypeAffinity('unknown', 'foo', 'bar')).toBe('distant');
+    expect(getSubTypeAffinity('homeServices', 'foo', 'HVAC Services')).toBe('distant');
   });
 });
 
@@ -363,32 +401,38 @@ describe('calculateSynergies', () => {
     expect(tuckInSyn).toBeGreaterThan(standaloneSyn);
   });
 
-  it('should halve synergies when subTypeMatch is false', () => {
+  it('should reduce synergies for distant sub-types (45%)', () => {
     const matched = calculateSynergies('success', 1000, false);
-    const mismatched = calculateSynergies('success', 1000, false, false);
-    expect(mismatched).toBe(Math.round(matched * 0.5));
+    const distant = calculateSynergies('success', 1000, false, 'distant');
+    expect(distant).toBe(Math.round(matched * 0.45));
   });
 
-  it('should not affect synergies when subTypeMatch is true', () => {
+  it('should reduce synergies for related sub-types (75%)', () => {
+    const matched = calculateSynergies('success', 1000, false);
+    const related = calculateSynergies('success', 1000, false, 'related');
+    expect(related).toBe(Math.round(matched * 0.75));
+  });
+
+  it('should not affect synergies when affinity is match', () => {
     const defaultSyn = calculateSynergies('success', 1000, true);
-    const matchedSyn = calculateSynergies('success', 1000, true, true);
+    const matchedSyn = calculateSynergies('success', 1000, true, 'match');
     expect(matchedSyn).toBe(defaultSyn);
   });
 
-  it('should halve tuck-in synergies on sub-type mismatch', () => {
+  it('should reduce tuck-in synergies for distant sub-types', () => {
     const matched = calculateSynergies('success', 1000, true);
-    const mismatched = calculateSynergies('success', 1000, true, false);
-    expect(mismatched).toBe(Math.round(matched * 0.5));
-    expect(mismatched).toBeGreaterThan(0);
+    const distant = calculateSynergies('success', 1000, true, 'distant');
+    expect(distant).toBe(Math.round(matched * 0.45));
+    expect(distant).toBeGreaterThan(0);
   });
 
-  it('should halve negative synergies on sub-type mismatch (less damage)', () => {
+  it('should reduce negative synergies for distant sub-types (less damage)', () => {
     const matchedFailure = calculateSynergies('failure', 1000, false);
-    const mismatchedFailure = calculateSynergies('failure', 1000, false, false);
-    // Both negative, but mismatched should be closer to 0
+    const distantFailure = calculateSynergies('failure', 1000, false, 'distant');
+    // Both negative, but distant should be closer to 0
     expect(matchedFailure).toBeLessThan(0);
-    expect(mismatchedFailure).toBeLessThan(0);
-    expect(Math.abs(mismatchedFailure)).toBeLessThan(Math.abs(matchedFailure));
+    expect(distantFailure).toBeLessThan(0);
+    expect(Math.abs(distantFailure)).toBeLessThan(Math.abs(matchedFailure));
   });
 });
 

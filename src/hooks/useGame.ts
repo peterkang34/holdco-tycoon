@@ -25,6 +25,7 @@ import {
   generateBusinessId,
   determineIntegrationOutcome,
   calculateSynergies,
+  getSubTypeAffinity,
   calculateMultipleExpansion,
   enhanceDealsWithAI,
   generateSourcedDeals,
@@ -366,8 +367,8 @@ export const useGameStore = create<GameStore>()(
         // Rationale: focused gets +5% but with amplified volatility + correlated event risk
         // Diversified gets lower bonus but with uncorrelated risk + event protection
         const uniqueSectors = new Set(activeBusinesses.map(b => b.sectorId)).size;
-        const diversificationGrowthBonus = uniqueSectors >= 6 ? 0.045
-          : uniqueSectors >= 4 ? 0.03
+        const diversificationGrowthBonus = uniqueSectors >= 6 ? 0.06
+          : uniqueSectors >= 4 ? 0.04
           : 0;
 
         // Apply organic growth to all businesses
@@ -665,12 +666,12 @@ export const useGameStore = create<GameStore>()(
         // Check if shared services are active (helps integration)
         const hasSharedServices = state.sharedServices.filter(s => s.active).length > 0;
 
-        // Check sub-type compatibility
-        const subTypeMatch = platform.subType === deal.business.subType;
+        // Check sub-type compatibility (graduated affinity)
+        const subTypeAffinity = getSubTypeAffinity(platform.sectorId, platform.subType, deal.business.subType);
 
         // Determine integration outcome
-        const outcome = determineIntegrationOutcome(deal.business, platform, hasSharedServices, subTypeMatch);
-        const synergies = calculateSynergies(outcome, deal.business.ebitda, true, subTypeMatch);
+        const outcome = determineIntegrationOutcome(deal.business, platform, hasSharedServices, subTypeAffinity);
+        const synergies = calculateSynergies(outcome, deal.business.ebitda, true, subTypeAffinity);
 
         // Create the bolt-on business record
         const boltOnId = generateBusinessId();
@@ -796,12 +797,12 @@ export const useGameStore = create<GameStore>()(
         // Check if shared services help
         const hasSharedServices = state.sharedServices.filter(s => s.active).length > 0;
 
-        // Check sub-type compatibility
-        const subTypeMatch = biz1.subType === biz2.subType;
+        // Check sub-type compatibility (graduated affinity)
+        const subTypeAffinity = getSubTypeAffinity(biz1.sectorId, biz1.subType, biz2.subType);
 
         // Integration outcome for merger
-        const outcome = determineIntegrationOutcome(biz2, biz1, hasSharedServices, subTypeMatch);
-        const synergies = calculateSynergies(outcome, biz1.ebitda + biz2.ebitda, false, subTypeMatch);
+        const outcome = determineIntegrationOutcome(biz2, biz1, hasSharedServices, subTypeAffinity);
+        const synergies = calculateSynergies(outcome, biz1.ebitda + biz2.ebitda, false, subTypeAffinity);
 
         // Failed integration: restructuring cost + growth drag
         const mergeRestructuringCost = outcome === 'failure' ? Math.round(Math.min(Math.abs(biz1.ebitda), Math.abs(biz2.ebitda)) * 0.07) : 0;
