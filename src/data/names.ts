@@ -60,6 +60,71 @@ const SECTOR_NAME_PARTS: Record<string, NameParts> = {
   },
 };
 
+// Sub-type → suffixes map: ensures the name suffix matches the business sub-type
+const SUBTYPE_SUFFIXES: Record<string, string[]> = {
+  // agency
+  'Digital/Ecommerce Agency': ['Digital', 'Digital Agency', 'Ecommerce', 'Online', 'Interactive'],
+  'Creative/Brand Agency': ['Creative', 'Studios', 'Brand Agency', 'Creative Co', 'Design'],
+  'Performance Media Agency': ['Media', 'Performance', 'Media Group', 'Advertising', 'Ads'],
+  'SEO/Content Agency': ['Content', 'SEO', 'Publishing', 'Content Co', 'Search'],
+  'Web Development Agency': ['Web', 'Dev', 'Interactive', 'Web Studio', 'Development'],
+  // saas
+  'Vertical-Market SaaS': ['Systems', 'Software', 'Platform', 'Solutions', 'Suite'],
+  'Horizontal SaaS': ['Cloud', 'HQ', 'Pro', 'Platform', 'Suite'],
+  'Dev Tools / Infrastructure': ['Labs', '.io', 'Dev', 'Tools', 'Infra'],
+  'Micro-SaaS Product': ['App', '.io', 'Pro', 'Kit', 'Lite'],
+  // homeServices
+  'HVAC Services': ['HVAC', 'Heating & Air', 'Climate', 'Comfort', 'Air Systems'],
+  'Plumbing Services': ['Plumbing', 'Plumbing Co', 'Pipe & Drain', 'Water Works', 'Plumbing Pro'],
+  'Electrical Services': ['Electric', 'Electrical', 'Power', 'Wiring', 'Electric Co'],
+  'Pest Control': ['Pest Control', 'Exterminators', 'Pest Solutions', 'Bug Guard', 'Pest Pro'],
+  'Property Management': ['Property Mgmt', 'Maintenance', 'Property Services', 'Property Care', 'Management'],
+  'Roofing / Exterior Services': ['Roofing', 'Exteriors', 'Roof & Siding', 'Roofing Co', 'Roof Pro'],
+  // consumer
+  'DTC / Ecommerce Brand': ['Brand', '& Co', 'Supply', 'Direct', 'Shop'],
+  'CPG / Household Goods': ['Goods Co', 'Essentials', 'Supply', 'Home', 'Household'],
+  'Food & Beverage Brand': ['Foods', 'Provisions', 'Kitchen', 'Pantry', 'Eats'],
+  'Beauty / Personal Care': ['Beauty', 'Naturals', 'Glow', 'Care', 'Cosmetics'],
+  'Specialty / Luxury Goods': ['& Co', 'Luxury', 'Atelier', 'Curated', 'Collection'],
+  'Spirits / Wine': ['Spirits', 'Distillery', 'Cellars', 'Vineyards', 'Brewing'],
+  // industrial
+  'Precision Parts / Components': ['Precision', 'Components', 'Parts', 'Manufacturing', 'Machining'],
+  'Aerospace Aftermarket': ['Aerospace', 'Aviation', 'Aero', 'Flight Systems', 'Aero Parts'],
+  'Specialty Instruments / Testing': ['Instruments', 'Testing', 'Analytical', 'Measurement', 'Diagnostics'],
+  'Industrial Distribution': ['Supply', 'Distribution', 'Industrial', 'Wholesale', 'Logistics'],
+  'Engineered Products': ['Engineering', 'Solutions', 'Industries', 'Systems', 'Products'],
+  // b2bServices
+  'IT Managed Services (MSP)': ['IT', 'Tech Solutions', 'Systems', 'Managed IT', 'Technology'],
+  'Finance / Accounting Services': ['Advisory', 'Accounting', 'Financial', 'CPA Group', 'Bookkeeping'],
+  'HR / Staffing': ['Staffing', 'Talent', 'HR Solutions', 'Recruiting', 'People'],
+  'Consulting / Advisory': ['Consulting', 'Advisory', 'Partners', 'Strategy', 'Advisors'],
+  'Data / Analytics Services': ['Analytics', 'Data', 'Insights', 'Intelligence', 'Data Co'],
+  // healthcare
+  'Physician Group / Multi-Specialty Practice': ['Medical Group', 'Healthcare', 'Medical', 'Physicians', 'Clinic'],
+  'Dental Practice Group': ['Dental', 'Dentistry', 'Dental Care', 'Smile', 'Dental Group'],
+  'Ophthalmology / Specialty Care': ['Eye Care', 'Vision', 'Specialty Care', 'Eye Center', 'Optical'],
+  'Home Health / Hospice': ['Home Health', 'Care', 'Home Care', 'Hospice', 'Health Services'],
+  'Behavioral Health': ['Behavioral Health', 'Wellness', 'Counseling', 'Mental Health', 'Therapy'],
+  // restaurant
+  'QSR / Fast Casual Franchise': ['Grill', 'Eats', 'Express', 'Quick', 'To-Go'],
+  'Casual Dining': ['Restaurant', 'Kitchen', 'Bistro', 'Bar & Grill', 'Dining'],
+  'Coffee / Beverage Concept': ['Cafe', 'Coffee', 'Brew', 'Roasters', 'Tea House'],
+  'Ghost Kitchen / Delivery-First': ['Kitchen', 'Eats', 'Delivery', 'To-Go', 'Express'],
+  'Specialty Food Concept': ['Eatery', 'House', 'Spot', 'Co', 'Food Co'],
+  // realEstate
+  'Self-Storage': ['Storage', 'Self-Storage', 'Storage Co', 'Space', 'Stor'],
+  'Multi-Family Residential': ['Properties', 'Residential', 'Living', 'Apartments', 'Realty'],
+  'Industrial / Logistics Warehousing': ['Logistics', 'Warehousing', 'Industrial', 'Distribution', 'Freight'],
+  'Data Centers': ['Data Centers', 'Digital', 'Hosting', 'Data', 'Colo'],
+  'Utility / Infrastructure': ['Infrastructure', 'Utilities', 'Holdings', 'Capital', 'Power'],
+  // education
+  'Online Learning Platform': ['Learning', 'Academy', 'Education', 'Online', 'EdTech'],
+  'Vocational / Trade School': ['Institute', 'School', 'Training', 'Academy', 'Trades'],
+  'EdTech SaaS': ['Lab', 'Ed', 'Tech', 'Pro', 'Platform'],
+  'Corporate Training': ['Training', 'Development', 'Pro', 'Center', 'Workforce'],
+  'Test Prep / Tutoring': ['Prep', 'Tutoring', 'Academy', 'School', 'Test Prep'],
+};
+
 // Track used names to avoid duplicates within a game
 let usedNames: Set<string> = new Set();
 
@@ -92,8 +157,13 @@ function buildName(parts: NameParts): string {
   }
 }
 
-export function getRandomBusinessName(sectorId: string): string {
-  const parts = SECTOR_NAME_PARTS[sectorId] || SECTOR_NAME_PARTS.agency;
+export function getRandomBusinessName(sectorId: string, subType?: string): string {
+  const sectorParts = SECTOR_NAME_PARTS[sectorId] || SECTOR_NAME_PARTS.agency;
+
+  // If sub-type has specific suffixes, override the sector-wide ones
+  const parts: NameParts = subType && SUBTYPE_SUFFIXES[subType]
+    ? { ...sectorParts, suffixes: SUBTYPE_SUFFIXES[subType] }
+    : sectorParts;
 
   // Try up to 20 times to get a unique name
   for (let i = 0; i < 20; i++) {

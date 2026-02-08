@@ -170,10 +170,12 @@ export function generateBusiness(
 
   const acquisitionPrice = Math.round(ebitda * multiple);
 
+  const subType = pickRandom(sector.subTypes);
+
   return {
-    name: getRandomBusinessName(sectorId),
+    name: getRandomBusinessName(sectorId, subType),
     sectorId,
-    subType: pickRandom(sector.subTypes),
+    subType,
     ebitda,
     peakEbitda: ebitda,
     acquisitionEbitda: ebitda,
