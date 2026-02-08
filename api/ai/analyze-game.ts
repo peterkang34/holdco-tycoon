@@ -4,6 +4,9 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 function formatMoney(amountInThousands: number): string {
   const amount = amountInThousands * 1000;
+  if (Math.abs(amount) >= 1000000000) {
+    return `$${(amount / 1000000000).toFixed(1)}B`;
+  }
   if (Math.abs(amount) >= 1000000) {
     return `$${(amount / 1000000).toFixed(1)}M`;
   }
