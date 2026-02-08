@@ -713,23 +713,36 @@ export function AllocatePhase({
               </div>
             )}
 
-            {/* Failed integration warning */}
-            {actionsThisRound.some(a =>
-              (a.type === 'acquire_tuck_in' || a.type === 'merge_businesses') &&
-              a.details?.integrationOutcome === 'failure'
-            ) && (
-              <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 mb-4">
-                <div className="flex items-start gap-3">
-                  <span className="text-lg">⚠️</span>
-                  <div>
-                    <h4 className="font-bold text-red-400 text-sm">Integration Failed</h4>
-                    <p className="text-xs text-text-secondary mt-1">
-                      A recent integration failed. A restructuring cost was deducted from cash, and the affected platform's organic growth rate has been permanently reduced by 1.5%.
-                    </p>
+            {/* Failed integration warnings */}
+            {actionsThisRound
+              .filter(a =>
+                (a.type === 'acquire_tuck_in' || a.type === 'merge_businesses') &&
+                a.details?.integrationOutcome === 'failure'
+              )
+              .map((a, i) => {
+                const d = a.details;
+                const cost = d.restructuringCost as number;
+                const drag = Math.abs(d.growthDragPenalty as number) * 100;
+                let description: string;
+                if (a.type === 'acquire_tuck_in') {
+                  const platform = businesses.find(b => b.id === d.platformId);
+                  const boltOn = businesses.find(b => b.id === d.businessId);
+                  description = `Tuck-in of ${boltOn?.name ?? 'bolt-on'} into ${platform?.name ?? 'platform'} failed. ${formatMoney(cost)} restructuring cost deducted and ${platform?.name ?? 'platform'}'s growth permanently reduced by ${drag.toFixed(1)}%.`;
+                } else {
+                  description = `Merger into ${d.newName as string} failed. ${formatMoney(cost)} restructuring cost deducted and growth permanently reduced by ${drag.toFixed(1)}%.`;
+                }
+                return (
+                  <div key={i} className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 mb-4">
+                    <div className="flex items-start gap-3">
+                      <span className="text-lg">⚠️</span>
+                      <div>
+                        <h4 className="font-bold text-red-400 text-sm">Integration Failed</h4>
+                        <p className="text-xs text-text-secondary mt-1">{description}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            )}
+                );
+              })}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {activeBusinesses.filter(b => !b.parentPlatformId).map(business => (
