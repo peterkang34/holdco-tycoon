@@ -228,6 +228,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         return (
           <AllocatePhase
             businesses={activeBusinesses}
+            allBusinesses={businesses}
             cash={cash}
             totalDebt={totalDebt}
             interestRate={interestRate}

@@ -35,6 +35,7 @@ const PROACTIVE_OUTREACH_COST = 400; // $400k (Tier 3 only)
 
 interface AllocatePhaseProps {
   businesses: Business[];
+  allBusinesses: Business[]; // Includes integrated bolt-ons for debt lookups
   cash: number;
   totalDebt: number;
   interestRate: number;
@@ -78,6 +79,7 @@ type AllocateTab = 'portfolio' | 'deals' | 'shared_services' | 'capital';
 
 export function AllocatePhase({
   businesses,
+  allBusinesses,
   cash,
   totalDebt,
   interestRate,
@@ -1737,7 +1739,7 @@ export function AllocatePhase({
       {windDownConfirmBusiness && (() => {
         const biz = windDownConfirmBusiness;
         const boltOnCount = biz.boltOnIds?.length || 0;
-        const boltOnDebt = businesses
+        const boltOnDebt = allBusinesses
           .filter(b => biz.boltOnIds?.includes(b.id))
           .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
         const totalCost = 250 + biz.sellerNoteBalance + boltOnDebt;

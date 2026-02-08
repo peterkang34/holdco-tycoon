@@ -1378,13 +1378,16 @@ export const useGameStore = create<GameStore>()(
         const lastEvent = state.eventHistory[state.eventHistory.length - 1];
         const valuation = calculateExitValuation(business, state.round, lastEvent?.type);
         const exitPrice = Math.round(valuation.exitPrice * 0.70);
-        const netProceeds = Math.max(0, exitPrice - business.sellerNoteBalance);
+        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance;
+        const netProceeds = Math.max(0, exitPrice - debtPayoff);
 
-        const updatedBusinesses = state.businesses.map(b =>
-          b.id === businessId
-            ? { ...b, status: 'sold' as const, exitPrice, exitRound: state.round }
-            : b
-        );
+        // Cascade to bolt-on businesses
+        const boltOnIds = new Set(business.boltOnIds || []);
+        const updatedBusinesses = state.businesses.map(b => {
+          if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round };
+          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
+          return b;
+        });
 
         const distressState = {
           ...state,

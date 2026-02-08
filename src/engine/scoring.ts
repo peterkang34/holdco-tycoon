@@ -320,8 +320,8 @@ export function generatePostGameInsights(state: GameState): PostGameInsight[] {
   // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons
   const exitedIdsInsights = new Set(state.exitedBusinesses.map(b => b.id));
   const allBusinesses = [
-    ...state.exitedBusinesses.filter(b => b.status !== 'integrated'),
-    ...state.businesses.filter(b => !exitedIdsInsights.has(b.id) && b.status !== 'integrated'),
+    ...state.exitedBusinesses.filter(b => b.status !== 'integrated' && b.status !== 'merged'),
+    ...state.businesses.filter(b => !exitedIdsInsights.has(b.id) && b.status !== 'integrated' && b.status !== 'merged'),
   ];
 
   // Check for patterns
