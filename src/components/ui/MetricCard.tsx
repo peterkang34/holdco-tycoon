@@ -21,15 +21,15 @@ export function MetricCard({ label, value, subValue, status = 'neutral', tooltip
   const tooltipData = METRIC_TOOLTIPS[label.toLowerCase().replace(/[\/\s]/g, '')];
 
   return (
-    <div className="card min-w-[120px] relative group">
-      <div className="flex items-center gap-2 mb-1">
+    <div className="card min-w-0 relative group" style={{ padding: '10px' }}>
+      <div className="flex items-center gap-1.5 mb-1">
         {icon && <span className="text-text-muted">{icon}</span>}
-        <span className="text-xs text-text-muted uppercase tracking-wider">{label}</span>
+        <span className="text-[10px] text-text-muted uppercase tracking-wider leading-tight">{label}</span>
         {(tooltip || tooltipData) && (
-          <span className="text-text-muted cursor-help text-xs">?</span>
+          <span className="text-text-muted cursor-help text-[10px]">?</span>
         )}
       </div>
-      <div className={`text-xl font-bold font-mono ${statusColors[status]}`}>
+      <div className={`text-lg font-bold font-mono ${statusColors[status]}`}>
         {value}
       </div>
       {subValue && (

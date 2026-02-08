@@ -85,21 +85,19 @@ export function Dashboard({
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
+      <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2">
         <MetricCard
           label="Cash"
           value={formatMoney(liveCash)}
           status={getCashStatus()}
         />
         <MetricCard
-          label="Total EBITDA"
+          label="EBITDA"
           value={formatMoney(metrics.totalEbitda)}
-          subValue="/year"
         />
         <MetricCard
           label="Net FCF"
           value={formatMoney(metrics.totalFcf)}
-          subValue="/year"
           status={metrics.totalFcf > 0 ? 'positive' : metrics.totalFcf < 0 ? 'negative' : 'neutral'}
         />
         <MetricCard
@@ -109,7 +107,7 @@ export function Dashboard({
           status={metrics.fcfPerShare > 0 ? 'positive' : 'negative'}
         />
         <MetricCard
-          label="Portfolio ROIC"
+          label="ROIC"
           value={formatPercent(metrics.portfolioRoic)}
           status={getRoicStatus()}
         />
@@ -128,7 +126,7 @@ export function Dashboard({
           value={isNetCash ? 'Net Cash' : formatMultiple(metrics.netDebtToEbitda)}
           subValue={
             metrics.totalDebt > 0
-              ? `${formatMoney(metrics.totalDebt)} debt ${isNetCash ? '(cash > debt)' : '/ EBITDA'}`
+              ? `${formatMoney(metrics.totalDebt)} debt`
               : isNetCash ? 'No debt' : 'Net Debt/EBITDA'
           }
           status={getLeverageStatus()}

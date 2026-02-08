@@ -20,6 +20,16 @@ export const METRIC_TOOLTIPS: Record<string, { definition: string; formula: stri
     formula: 'Sum of all opco annual EBITDA',
     benchmark: 'Growing EBITDA indicates a healthy, expanding portfolio',
   },
+  ebitda: {
+    definition: 'Total annual earnings before interest, taxes, depreciation, and amortization across all opcos.',
+    formula: 'Sum of all opco annual EBITDA',
+    benchmark: 'Growing EBITDA indicates a healthy, expanding portfolio',
+  },
+  netfcf: {
+    definition: 'Net free cash flow after taxes, interest, and capex. The actual cash your holdco generates each year.',
+    formula: 'Total EBITDA - CapEx - Taxes - Interest',
+    benchmark: 'Positive and growing FCF is the lifeblood of a holdco.',
+  },
   'fcfshare': {
     definition: 'Free cash flow generated per share. Increases when: 1) Portfolio EBITDA grows, 2) You pay down debt (less interest), 3) You buyback shares. Decreases when: you issue equity (dilution).',
     formula: '(Total FCF - Interest Expense) ÷ Shares Outstanding',
@@ -27,6 +37,12 @@ export const METRIC_TOOLTIPS: Record<string, { definition: string; formula: stri
     chapter: 'Ch. VI',
   },
   portfolioroic: {
+    definition: 'Return on Invested Capital measures how efficiently the holdco turns invested capital into profits.',
+    formula: 'NOPAT / Total Invested Capital',
+    benchmark: '>15% is good, >20% is excellent. Constellation Software averages 20%+.',
+    chapter: 'Ch. IV',
+  },
+  roic: {
     definition: 'Return on Invested Capital measures how efficiently the holdco turns invested capital into profits.',
     formula: 'NOPAT / Total Invested Capital',
     benchmark: '>15% is good, >20% is excellent. Constellation Software averages 20%+.',
