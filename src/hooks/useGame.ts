@@ -282,6 +282,64 @@ export const useGameStore = create<GameStore>()(
 
         let newCash = state.cash + annualFcf - annualInterest - sharedServicesCost - maSourcingCost;
 
+        // Pay opco-level debt (seller notes, earnouts, bank debt interest)
+        // This aligns with the waterfall display — all deductions happen at collection time
+        let opcoDebtAdjustment = 0;
+        const updatedBusinesses = state.businesses.map(b => {
+          if (b.status !== 'active') return b;
+          let updated = { ...b };
+
+          // Seller note: interest + principal
+          if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
+            const interest = Math.round(b.sellerNoteBalance * b.sellerNoteRate);
+            const principal = Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
+            const totalPayment = interest + principal;
+            const availableForPayment = Math.max(0, newCash + opcoDebtAdjustment);
+            const actualPayment = Math.min(totalPayment, availableForPayment);
+            opcoDebtAdjustment -= actualPayment;
+            const principalPaid = Math.max(0, actualPayment - interest);
+            updated.sellerNoteBalance = Math.max(0, b.sellerNoteBalance - principalPaid);
+            if (actualPayment >= totalPayment) {
+              updated.sellerNoteRoundsRemaining = b.sellerNoteRoundsRemaining - 1;
+            }
+          }
+          // Final balance payment when rounds expire
+          if (updated.sellerNoteRoundsRemaining <= 0 && updated.sellerNoteBalance > 0) {
+            const availableForFinal = Math.max(0, newCash + opcoDebtAdjustment);
+            const finalPayment = Math.min(updated.sellerNoteBalance, availableForFinal);
+            opcoDebtAdjustment -= finalPayment;
+            updated.sellerNoteBalance = updated.sellerNoteBalance - finalPayment;
+          }
+
+          // Earnout payments (conditional on growth targets)
+          if (b.earnoutRemaining > 0 && b.earnoutTarget > 0) {
+            const actualGrowth = b.acquisitionEbitda > 0
+              ? (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda
+              : 0;
+            if (actualGrowth >= b.earnoutTarget) {
+              const availableForEarnout = Math.max(0, newCash + opcoDebtAdjustment);
+              const earnoutPayment = Math.min(b.earnoutRemaining, availableForEarnout);
+              opcoDebtAdjustment -= earnoutPayment;
+              updated.earnoutRemaining = b.earnoutRemaining - earnoutPayment;
+              if (updated.earnoutRemaining <= 0) {
+                updated.earnoutTarget = 0;
+              }
+            }
+          }
+
+          // Bank debt interest (opco-level, uses base rate — distress penalty is holdco only)
+          if (b.bankDebtBalance > 0) {
+            const bankInterest = Math.round(b.bankDebtBalance * state.interestRate);
+            const availableForBank = Math.max(0, newCash + opcoDebtAdjustment);
+            const actualBankPayment = Math.min(bankInterest, availableForBank);
+            opcoDebtAdjustment -= actualBankPayment;
+          }
+
+          return updated;
+        });
+
+        newCash = newCash + opcoDebtAdjustment;
+
         // Negative cash triggers restructuring
         let requiresRestructuring = state.requiresRestructuring;
         if (newCash < 0) {
@@ -294,6 +352,7 @@ export const useGameStore = create<GameStore>()(
 
         let gameState: GameState = {
           ...state,
+          businesses: updatedBusinesses,
           cash: Math.round(newCash),
           currentEvent: event,
           requiresRestructuring,
@@ -437,65 +496,19 @@ export const useGameStore = create<GameStore>()(
         const newRoundHistory = [...(state.roundHistory ?? []), roundHistoryEntry];
 
         if (!gameOver) {
-          // Advance to collect phase atomically — compute debt payments in the same set()
-          // to avoid a brief flash where cash/phase are stale.
+          // Advance to collect phase — opco debt is now paid in advanceToEvent (aligned with waterfall)
+          // Only holdco bank debt amortization happens at year-end
           let cashAdjustment = 0;
           let holdcoAmortizationAmount = 0;
 
-          // Process opco-level debt payments
-          const collectBusinesses = updatedBusinesses.map(b => {
-            if (b.status !== 'active') return b;
-            let updated = { ...b };
-
-            if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
-              const interest = Math.round(b.sellerNoteBalance * b.sellerNoteRate);
-              const principal = Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
-              const totalPayment = interest + principal;
-              const availableForPayment = Math.max(0, state.cash + cashAdjustment);
-              const actualPayment = Math.min(totalPayment, availableForPayment);
-              cashAdjustment -= actualPayment;
-              // Only reduce balance by the principal portion actually paid
-              const principalPaid = Math.max(0, actualPayment - interest);
-              updated.sellerNoteBalance = Math.max(0, b.sellerNoteBalance - principalPaid);
-              // Only decrement rounds if full payment made
-              if (actualPayment >= totalPayment) {
-                updated.sellerNoteRoundsRemaining = b.sellerNoteRoundsRemaining - 1;
-              }
-            }
-            if (updated.sellerNoteRoundsRemaining <= 0 && updated.sellerNoteBalance > 0) {
-              const availableForFinal = Math.max(0, state.cash + cashAdjustment);
-              const finalPayment = Math.min(updated.sellerNoteBalance, availableForFinal);
-              cashAdjustment -= finalPayment;
-              updated.sellerNoteBalance = updated.sellerNoteBalance - finalPayment;
-            }
-
-            if (b.earnoutRemaining > 0 && b.earnoutTarget > 0) {
-              const actualGrowth = b.acquisitionEbitda > 0
-                ? (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda
-                : 0;
-              if (actualGrowth >= b.earnoutTarget) {
-                const availableForEarnout = Math.max(0, state.cash + cashAdjustment);
-                const earnoutPayment = Math.min(b.earnoutRemaining, availableForEarnout);
-                cashAdjustment -= earnoutPayment;
-                updated.earnoutRemaining = b.earnoutRemaining - earnoutPayment;
-                if (updated.earnoutRemaining <= 0) {
-                  updated.earnoutTarget = 0;
-                }
-              }
-            }
-
-            return updated;
-          });
-
-          // Holdco bank debt amortization
           let newTotalDebt = state.totalDebt;
           const holdcoDebtStartRound = state.holdcoDebtStartRound;
           if (state.totalDebt > 0 && holdcoDebtStartRound > 0) {
             const yearsWithDebt = newRound - holdcoDebtStartRound;
             if (yearsWithDebt >= 2) {
               const scheduledPayment = Math.round(state.totalDebt * 0.10);
-              const availableCash = state.cash + cashAdjustment;
-              const actualPayment = Math.min(scheduledPayment, Math.max(0, availableCash));
+              const availableCash = Math.max(0, state.cash + cashAdjustment);
+              const actualPayment = Math.min(scheduledPayment, availableCash);
               if (actualPayment > 0) {
                 cashAdjustment -= actualPayment;
                 newTotalDebt = state.totalDebt - actualPayment;
@@ -507,7 +520,7 @@ export const useGameStore = create<GameStore>()(
           const newCash = Math.max(0, state.cash + cashAdjustment);
 
           set({
-            businesses: collectBusinesses,
+            businesses: updatedBusinesses,
             round: newRound,
             metricsHistory: [...state.metricsHistory, historyEntry],
             roundHistory: newRoundHistory,
@@ -519,46 +532,17 @@ export const useGameStore = create<GameStore>()(
             currentEvent: null,
             yearChronicle: null,
             metrics: endMetrics,
-            focusBonus: calculateSectorFocusBonus(collectBusinesses),
+            focusBonus: calculateSectorFocusBonus(updatedBusinesses),
             cash: newCash,
             totalDebt: newTotalDebt,
             cashBeforeDebtPayments: state.cash,
-            debtPaymentThisRound: Math.abs(cashAdjustment),
+            debtPaymentThisRound: holdcoAmortizationAmount,
             holdcoAmortizationThisRound: holdcoAmortizationAmount,
           });
         } else {
-          // Game over — still process final year's debt service for accurate final state
+          // Game over — opco debt already settled in last advanceToEvent
+          // Only process holdco amortization for accurate final state
           let gameOverCashAdj = 0;
-          const gameOverBusinesses = updatedBusinesses.map(b => {
-            if (b.status !== 'active') return b;
-            let updated = { ...b };
-            if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
-              const interest = Math.round(b.sellerNoteBalance * b.sellerNoteRate);
-              const principal = Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
-              const totalPayment = interest + principal;
-              const availableForPayment = Math.max(0, state.cash + gameOverCashAdj);
-              const actualPayment = Math.min(totalPayment, availableForPayment);
-              gameOverCashAdj -= actualPayment;
-              const principalPaid = Math.max(0, actualPayment - interest);
-              updated.sellerNoteBalance = Math.max(0, b.sellerNoteBalance - principalPaid);
-              if (actualPayment >= totalPayment) {
-                updated.sellerNoteRoundsRemaining = b.sellerNoteRoundsRemaining - 1;
-              }
-            }
-            if (b.earnoutRemaining > 0 && b.earnoutTarget > 0) {
-              const actualGrowth = b.acquisitionEbitda > 0
-                ? (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda : 0;
-              if (actualGrowth >= b.earnoutTarget) {
-                const availableForEarnout = Math.max(0, state.cash + gameOverCashAdj);
-                const earnoutPayment = Math.min(b.earnoutRemaining, availableForEarnout);
-                gameOverCashAdj -= earnoutPayment;
-                updated.earnoutRemaining = b.earnoutRemaining - earnoutPayment;
-              }
-            }
-            return updated;
-          });
-
-          // Holdco debt amortization for final year
           let gameOverDebt = state.totalDebt;
           if (state.totalDebt > 0 && state.holdcoDebtStartRound > 0) {
             const yearsWithDebt = newRound - state.holdcoDebtStartRound;
@@ -574,10 +558,10 @@ export const useGameStore = create<GameStore>()(
           }
 
           const gameOverCash = Math.max(0, state.cash + gameOverCashAdj);
-          const gameOverMetrics = calculateMetrics({ ...state, businesses: gameOverBusinesses, cash: gameOverCash, totalDebt: gameOverDebt });
+          const gameOverMetrics = calculateMetrics({ ...state, businesses: updatedBusinesses, cash: gameOverCash, totalDebt: gameOverDebt });
 
           set({
-            businesses: gameOverBusinesses,
+            businesses: updatedBusinesses,
             round: newRound,
             metricsHistory: [...state.metricsHistory, historyEntry],
             roundHistory: newRoundHistory,
@@ -591,7 +575,7 @@ export const useGameStore = create<GameStore>()(
             cash: gameOverCash,
             totalDebt: gameOverDebt,
             metrics: gameOverMetrics,
-            focusBonus: calculateSectorFocusBonus(gameOverBusinesses),
+            focusBonus: calculateSectorFocusBonus(updatedBusinesses),
           });
         }
       },

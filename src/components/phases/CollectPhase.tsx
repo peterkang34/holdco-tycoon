@@ -384,8 +384,8 @@ export function CollectPhase({
         </div>
       </div>
 
-      {/* Year-Start Debt Payments (between years) */}
-      {(debtPaymentThisRound ?? 0) > 0 && (
+      {/* Year-Start Adjustments — holdco amortization only (opco debt is in the waterfall) */}
+      {(holdcoAmortization ?? 0) > 0 && (
         <div className="card mb-6 bg-white/5 border-l-4 border-warning/50">
           <h3 className="font-bold text-sm mb-3">Year-Start Adjustments</h3>
           <div className="space-y-2 text-sm">
@@ -393,25 +393,17 @@ export function CollectPhase({
               <span className="text-text-secondary">Last Year's Ending Cash</span>
               <span className="font-mono">{formatMoney(cashBeforeDebtPayments ?? 0)}</span>
             </div>
-            {((debtPaymentThisRound ?? 0) - (holdcoAmortization ?? 0)) > 0 && (
-              <div className="flex justify-between text-warning">
-                <span>OpCo Debt (seller notes & earnouts)</span>
-                <span className="font-mono">-{formatMoney((debtPaymentThisRound ?? 0) - (holdcoAmortization ?? 0))}</span>
-              </div>
-            )}
-            {(holdcoAmortization ?? 0) > 0 && (
-              <div className="flex justify-between text-warning">
-                <span>Holdco Debt Amortization (10% mandatory)</span>
-                <span className="font-mono">-{formatMoney(holdcoAmortization ?? 0)}</span>
-              </div>
-            )}
+            <div className="flex justify-between text-warning">
+              <span>Holdco Debt Amortization (10% mandatory)</span>
+              <span className="font-mono">-{formatMoney(holdcoAmortization ?? 0)}</span>
+            </div>
             <div className="flex justify-between border-t border-white/10 pt-2 font-bold">
               <span>Starting Cash</span>
               <span className="font-mono">{formatMoney(cash)}</span>
             </div>
           </div>
           <p className="text-xs text-text-muted mt-3 italic">
-            Seller notes, earnouts, and holdco debt amortization are paid automatically before cash collection each year.
+            Holdco debt auto-amortizes 10% annually (after 2-year grace period).
           </p>
         </div>
       )}
