@@ -40,8 +40,9 @@ export function BusinessCard({
 
   // Calculate proper exit valuation
   const exitValuation = calculateExitValuation(business, currentRound, lastEventType);
-  const gainLoss = exitValuation.netProceeds - business.acquisitionPrice;
-  const moic = exitValuation.netProceeds / business.acquisitionPrice;
+  const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
+  const gainLoss = exitValuation.netProceeds - totalInvested;
+  const moic = exitValuation.netProceeds / totalInvested;
 
   const isGrowing = business.ebitda > business.acquisitionEbitda;
   const isDeclining = business.ebitda < business.peakEbitda * 0.7;
@@ -83,10 +84,11 @@ export function BusinessCard({
         <div className="flex flex-col items-end gap-1">
           {isPlatform && (
             <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded relative group/platform cursor-help">
-              Platform {platformScale}/3
+              Scale {platformScale}
               <div className="absolute top-full right-0 mt-2 w-56 p-3 bg-bg-primary border border-white/10 rounded-lg shadow-xl opacity-0 invisible group-hover/platform:opacity-100 group-hover/platform:visible transition-all z-50 text-left">
-                <p className="text-sm text-text-secondary font-normal">This is a roll-up hub. Tuck-in bolt-on acquisitions to increase scale (up to 3/3) and unlock synergies + exit multiple expansion.</p>
-                <p className="text-xs text-accent mt-2 font-normal">Current: {platformScale}/3 scale, {boltOnCount} bolt-on{boltOnCount !== 1 ? 's' : ''}</p>
+                <p className="text-sm text-text-secondary font-normal">This is a roll-up hub. Tuck-in bolt-on acquisitions to increase scale and unlock synergies + exit multiple expansion.</p>
+                <p className="text-xs text-text-muted mt-2 font-normal">Multiple expansion bonus caps at Scale 3 (+1.0x), but bolt-ons can continue beyond that.</p>
+                <p className="text-xs text-accent mt-1 font-normal">Current: Scale {platformScale}, {boltOnCount} bolt-on{boltOnCount !== 1 ? 's' : ''}</p>
               </div>
             </span>
           )}
@@ -140,10 +142,10 @@ export function BusinessCard({
 
       {showDetails && (
         <>
-          <div className="grid grid-cols-3 gap-2 text-xs mb-3">
+          <div className="grid grid-cols-4 gap-2 text-xs mb-3">
             <div>
-              <p className="text-text-muted">Acquired @</p>
-              <p className="font-mono">{business.acquisitionMultiple.toFixed(1)}x</p>
+              <p className="text-text-muted">Invested</p>
+              <p className="font-mono">{formatMoney(totalInvested)}</p>
             </div>
             <div>
               <p className="text-text-muted">MOIC</p>
@@ -156,6 +158,10 @@ export function BusinessCard({
               <p className={`font-mono ${business.organicGrowthRate >= 0 ? 'text-accent' : 'text-danger'}`}>
                 {formatPercent(business.organicGrowthRate)}
               </p>
+            </div>
+            <div>
+              <p className="text-text-muted">Acquired @</p>
+              <p className="font-mono">{business.acquisitionMultiple.toFixed(1)}x</p>
             </div>
           </div>
 
@@ -242,7 +248,7 @@ export function BusinessCard({
                 )}
                 {exitValuation.platformPremium > 0 && (
                   <div className="flex justify-between text-accent">
-                    <span>Platform Scale ({platformScale}/3)</span>
+                    <span>Platform Scale ({platformScale})</span>
                     <span className="font-mono">+{exitValuation.platformPremium.toFixed(1)}x</span>
                   </div>
                 )}

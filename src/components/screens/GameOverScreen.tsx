@@ -44,7 +44,13 @@ export function GameOverScreen({
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
 
-  const allBusinesses = [...businesses, ...exitedBusinesses];
+  // Deduplicate: exitedBusinesses wins over businesses (a sold biz exists in both)
+  // Filter out 'integrated' status (bolt-ons are folded into platform EBITDA)
+  const exitedIds = new Set(exitedBusinesses.map(b => b.id));
+  const allBusinesses = [
+    ...exitedBusinesses.filter(b => b.status !== 'integrated'),
+    ...businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated'),
+  ];
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const canMakeLeaderboard = wouldMakeLeaderboard(enterpriseValue);
   const potentialRank = getLeaderboardRank(enterpriseValue);
@@ -341,9 +347,13 @@ export function GameOverScreen({
                   <span className={`text-xs px-2 py-1 rounded ${
                     business.status === 'active' ? 'bg-accent/20 text-accent' :
                     business.status === 'sold' ? 'bg-blue-500/20 text-blue-400' :
+                    business.status === 'merged' ? 'bg-purple-500/20 text-purple-400' :
                     'bg-danger/20 text-danger'
                   }`}>
-                    {business.status === 'active' ? 'Active' : business.status === 'sold' ? 'Sold' : 'Wound Down'}
+                    {business.status === 'active' ? 'Active' :
+                     business.status === 'sold' ? 'Sold' :
+                     business.status === 'merged' ? 'Merged' :
+                     'Wound Down'}
                   </span>
                 </div>
               </div>

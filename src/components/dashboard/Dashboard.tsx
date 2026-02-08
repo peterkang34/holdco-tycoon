@@ -97,6 +97,12 @@ export function Dashboard({
           subValue="/year"
         />
         <MetricCard
+          label="Net FCF"
+          value={formatMoney(metrics.totalFcf)}
+          subValue="/year"
+          status={metrics.totalFcf > 0 ? 'positive' : metrics.totalFcf < 0 ? 'negative' : 'neutral'}
+        />
+        <MetricCard
           label="FCF/Share"
           value={`$${metrics.fcfPerShare.toFixed(0)}`}
           subValue={`${sharesOutstanding.toFixed(0)} shares`}

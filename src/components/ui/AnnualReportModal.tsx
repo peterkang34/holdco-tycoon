@@ -108,7 +108,7 @@ export function AnnualReportModal({ roundHistory, onClose }: AnnualReportModalPr
                   )}
 
                   {/* Key metrics row */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
                     <div>
                       <p className="text-text-muted text-xs">EBITDA</p>
                       <p className="font-mono font-bold">
@@ -123,6 +123,17 @@ export function AnnualReportModal({ roundHistory, onClose }: AnnualReportModalPr
                     <div>
                       <p className="text-text-muted text-xs">Cash</p>
                       <p className="font-mono font-bold">{formatMoney(entry.cash)}</p>
+                    </div>
+                    <div>
+                      <p className="text-text-muted text-xs">Net FCF</p>
+                      <p className={`font-mono font-bold ${entry.metrics.totalFcf < 0 ? 'text-danger' : ''}`}>
+                        {formatMoney(entry.metrics.totalFcf)}
+                        <MetricDelta
+                          current={entry.metrics.totalFcf}
+                          previous={prevEntry?.metrics.totalFcf}
+                          format={formatMoney}
+                        />
+                      </p>
                     </div>
                     <div>
                       <p className="text-text-muted text-xs">Leverage</p>

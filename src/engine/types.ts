@@ -63,7 +63,7 @@ export interface SectorDefinition {
   subTypes: string[];
 }
 
-export type BusinessStatus = 'active' | 'sold' | 'wound_down' | 'integrated';
+export type BusinessStatus = 'active' | 'sold' | 'wound_down' | 'integrated' | 'merged';
 
 export type QualityRating = 1 | 2 | 3 | 4 | 5;
 

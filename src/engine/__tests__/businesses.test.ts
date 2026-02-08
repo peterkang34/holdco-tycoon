@@ -410,11 +410,11 @@ describe('calculateMultipleExpansion', () => {
     expect(largePlatform).toBeGreaterThan(smallPlatform);
   });
 
-  it('should handle out-of-range scale gracefully', () => {
+  it('should cap multiple expansion bonus at scale 3 for scale 4+', () => {
     const result = calculateMultipleExpansion(5, 1000);
     expect(Number.isNaN(result)).toBe(false);
-    // Scale 5 is out of range, array access returns undefined, || 0 handles it
-    expect(result).toBe(0); // scaleBonus = 0 (undefined || 0)
+    // Scale 5 is capped at scale 3's bonus (1.0x) via Math.min(platformScale, 3)
+    expect(result).toBe(1.0); // scaleBonus = 1.0 (capped at scale 3)
   });
 });
 

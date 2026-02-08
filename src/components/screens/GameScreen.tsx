@@ -81,6 +81,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     generateYearChronicle: generateYearChronicleAction,
     debtPaymentThisRound,
     cashBeforeDebtPayments,
+    actionsThisRound,
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;
@@ -228,6 +229,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             onSourceDeals={sourceDealFlow}
             maFocus={maFocus}
             onSetMAFocus={setMAFocus}
+            actionsThisRound={actionsThisRound}
           />
         );
       default:

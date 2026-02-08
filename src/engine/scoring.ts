@@ -70,7 +70,12 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
 
   const metrics = calculateMetrics(state);
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
-  const allBusinesses = [...state.businesses, ...state.exitedBusinesses];
+  // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons
+  const exitedIds = new Set(state.exitedBusinesses.map(b => b.id));
+  const allBusinesses = [
+    ...state.exitedBusinesses.filter(b => b.status !== 'integrated'),
+    ...state.businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated'),
+  ];
 
   // 1. FCF/Share Growth (25 points max)
   let fcfShareGrowth = 0;
@@ -306,7 +311,12 @@ export function generatePostGameInsights(state: GameState): PostGameInsight[] {
   const insights: PostGameInsight[] = [];
   const metrics = calculateMetrics(state);
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
-  const allBusinesses = [...state.businesses, ...state.exitedBusinesses];
+  // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons
+  const exitedIdsInsights = new Set(state.exitedBusinesses.map(b => b.id));
+  const allBusinesses = [
+    ...state.exitedBusinesses.filter(b => b.status !== 'integrated'),
+    ...state.businesses.filter(b => !exitedIdsInsights.has(b.id) && b.status !== 'integrated'),
+  ];
 
   // Check for patterns
   const neverAcquired = allBusinesses.length <= 1;

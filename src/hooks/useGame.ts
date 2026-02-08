@@ -584,8 +584,12 @@ export const useGameStore = create<GameStore>()(
           totalAcquisitionCost: deal.askingPrice,
         };
 
-        // Update the platform with new bolt-on
-        const newPlatformScale = Math.min(3, platform.platformScale + 1);
+        // Failed integration: restructuring cost + growth drag on platform
+        const restructuringCost = outcome === 'failure' ? Math.round(deal.business.ebitda * 0.10) : 0;
+        const growthDragPenalty = outcome === 'failure' ? -0.015 : 0;
+
+        // Update the platform with new bolt-on (uncapped — multiple expansion bonus caps at scale 3)
+        const newPlatformScale = platform.platformScale + 1;
         const multipleExpansion = calculateMultipleExpansion(
           newPlatformScale,
           platform.ebitda + deal.business.ebitda + synergies
@@ -602,6 +606,7 @@ export const useGameStore = create<GameStore>()(
               synergiesRealized: b.synergiesRealized + synergies,
               totalAcquisitionCost: b.totalAcquisitionCost + deal.askingPrice,
               acquisitionMultiple: b.acquisitionMultiple + multipleExpansion, // Multiple expansion!
+              organicGrowthRate: b.organicGrowthRate + growthDragPenalty, // Growth drag on failure
             };
           }
           return b;
@@ -615,11 +620,13 @@ export const useGameStore = create<GameStore>()(
           ? state.round
           : state.holdcoDebtStartRound;
 
+        const tuckInCash = state.cash - structure.cashRequired - restructuringCost;
+
         set({
-          cash: state.cash - structure.cashRequired,
+          cash: tuckInCash,
           totalDebt: newTotalDebt,
           holdcoDebtStartRound,
-          totalInvestedCapital: state.totalInvestedCapital + deal.askingPrice,
+          totalInvestedCapital: state.totalInvestedCapital + deal.askingPrice + restructuringCost,
           businesses: [...updatedBusinesses, boltOnBusiness],
           dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
           actionsThisRound: [
@@ -634,12 +641,14 @@ export const useGameStore = create<GameStore>()(
                 price: deal.askingPrice,
                 integrationOutcome: outcome,
                 synergies,
+                restructuringCost,
+                growthDragPenalty,
               },
             },
           ],
           metrics: calculateMetrics({
             ...state,
-            cash: state.cash - structure.cashRequired,
+            cash: tuckInCash,
             totalDebt: newTotalDebt,
             businesses: [...updatedBusinesses, boltOnBusiness],
           }),
@@ -672,11 +681,18 @@ export const useGameStore = create<GameStore>()(
         const outcome = determineIntegrationOutcome(biz2, biz1, hasSharedServices, subTypeMatch);
         const synergies = calculateSynergies(outcome, biz1.ebitda + biz2.ebitda, false, subTypeMatch);
 
+        // Failed integration: restructuring cost + growth drag
+        const mergeRestructuringCost = outcome === 'failure' ? Math.round(Math.min(biz1.ebitda, biz2.ebitda) * 0.10) : 0;
+        const mergeGrowthDrag = outcome === 'failure' ? -0.015 : 0;
+
         // Combined entity
         const combinedEbitda = biz1.ebitda + biz2.ebitda + synergies;
-        const combinedTotalCost = biz1.totalAcquisitionCost + biz2.totalAcquisitionCost + mergeCost;
-        const newPlatformScale = Math.min(3, Math.max(biz1.platformScale, biz2.platformScale) + 1);
+        const totalMergeCost = mergeCost + mergeRestructuringCost;
+        const combinedTotalCost = biz1.totalAcquisitionCost + biz2.totalAcquisitionCost + totalMergeCost;
+        const newPlatformScale = Math.max(biz1.platformScale, biz2.platformScale) + 1;
         const multipleExpansion = calculateMultipleExpansion(newPlatformScale, combinedEbitda);
+
+        if (state.cash < totalMergeCost) return;
 
         // Use higher quality rating
         const bestQuality = Math.max(biz1.qualityRating, biz2.qualityRating) as 1 | 2 | 3 | 4 | 5;
@@ -693,7 +709,7 @@ export const useGameStore = create<GameStore>()(
           acquisitionPrice: combinedTotalCost,
           acquisitionRound: Math.min(biz1.acquisitionRound, biz2.acquisitionRound),
           acquisitionMultiple: ((biz1.acquisitionMultiple + biz2.acquisitionMultiple) / 2) + multipleExpansion,
-          organicGrowthRate: (biz1.organicGrowthRate + biz2.organicGrowthRate) / 2 + 0.01, // Slight growth bonus
+          organicGrowthRate: (biz1.organicGrowthRate + biz2.organicGrowthRate) / 2 + 0.01 + mergeGrowthDrag, // Slight growth bonus, drag on failure
           qualityRating: bestQuality,
           dueDiligence: biz1.dueDiligence, // Keep first business's DD
           integrationRoundsRemaining: 2, // Mergers take longer to fully integrate
@@ -727,9 +743,14 @@ export const useGameStore = create<GameStore>()(
         );
 
         set({
-          cash: state.cash - mergeCost,
-          totalInvestedCapital: state.totalInvestedCapital + mergeCost,
+          cash: state.cash - totalMergeCost,
+          totalInvestedCapital: state.totalInvestedCapital + totalMergeCost,
           businesses: [...updatedBusinesses, mergedBusiness],
+          exitedBusinesses: [
+            ...state.exitedBusinesses,
+            { ...biz1, status: 'merged' as const, exitRound: state.round },
+            { ...biz2, status: 'merged' as const, exitRound: state.round },
+          ],
           actionsThisRound: [
             ...state.actionsThisRound,
             {
@@ -740,16 +761,18 @@ export const useGameStore = create<GameStore>()(
                 businessId2,
                 newBusinessId: mergedBusiness.id,
                 newName,
-                mergeCost,
+                mergeCost: totalMergeCost,
                 integrationOutcome: outcome,
                 synergies,
                 combinedEbitda,
+                restructuringCost: mergeRestructuringCost,
+                growthDragPenalty: mergeGrowthDrag,
               },
             },
           ],
           metrics: calculateMetrics({
             ...state,
-            cash: state.cash - mergeCost,
+            cash: state.cash - totalMergeCost,
             businesses: [...updatedBusinesses, mergedBusiness],
           }),
         });
@@ -779,10 +802,14 @@ export const useGameStore = create<GameStore>()(
           return b;
         });
 
-        set({
+        const designateState = {
+          ...state,
           cash: state.cash - setupCost,
           totalInvestedCapital: state.totalInvestedCapital + setupCost,
           businesses: updatedBusinesses,
+        };
+        set({
+          ...designateState,
           actionsThisRound: [
             ...state.actionsThisRound,
             {
@@ -791,6 +818,7 @@ export const useGameStore = create<GameStore>()(
               details: { businessId, setupCost },
             },
           ],
+          metrics: calculateMetrics(designateState),
         });
       },
 
@@ -840,6 +868,7 @@ export const useGameStore = create<GameStore>()(
             ...b,
             ebitda: Math.round(b.ebitda * (1 + ebitdaBoost)),
             organicGrowthRate: b.organicGrowthRate + growthBoost,
+            totalAcquisitionCost: b.totalAcquisitionCost + cost,
             improvements: [
               ...b.improvements,
               { type: improvementType, appliedRound: state.round, effect: ebitdaBoost },
@@ -847,14 +876,19 @@ export const useGameStore = create<GameStore>()(
           };
         });
 
-        set({
+        const improveState = {
+          ...state,
           cash: state.cash - cost,
           totalInvestedCapital: state.totalInvestedCapital + cost,
           businesses: updatedBusinesses,
+        };
+        set({
+          ...improveState,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'improve', round: state.round, details: { businessId, improvementType, cost } },
           ],
+          metrics: calculateMetrics(improveState),
         });
       },
 
@@ -905,13 +939,18 @@ export const useGameStore = create<GameStore>()(
         const actualPayment = Math.min(amount, state.totalDebt, state.cash);
         if (actualPayment <= 0) return;
 
-        set({
+        const payDebtState = {
+          ...state,
           cash: state.cash - actualPayment,
           totalDebt: state.totalDebt - actualPayment,
+        };
+        set({
+          ...payDebtState,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'pay_debt', round: state.round, details: { amount: actualPayment } },
           ],
+          metrics: calculateMetrics(payDebtState),
         });
       },
 
@@ -932,14 +971,19 @@ export const useGameStore = create<GameStore>()(
         // Must maintain majority control (51%+)
         if (newFounderOwnership < MIN_FOUNDER_OWNERSHIP) return;
 
-        set({
+        const issueState = {
+          ...state,
           cash: state.cash + amount,
           sharesOutstanding: newTotalShares,
           equityRaisesUsed: state.equityRaisesUsed + 1,
+        };
+        set({
+          ...issueState,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'issue_equity', round: state.round, details: { amount, newShares, newOwnership: newFounderOwnership } },
           ],
+          metrics: calculateMetrics(issueState),
         });
       },
 
@@ -959,14 +1003,19 @@ export const useGameStore = create<GameStore>()(
         const newTotalShares = state.sharesOutstanding - sharesRepurchased;
         const newFounderOwnership = state.founderShares / newTotalShares;
 
-        set({
+        const buybackState = {
+          ...state,
           cash: state.cash - amount,
           sharesOutstanding: newTotalShares,
           totalBuybacks: state.totalBuybacks + amount,
+        };
+        set({
+          ...buybackState,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'buyback', round: state.round, details: { amount, sharesRepurchased, newOwnership: newFounderOwnership } },
           ],
+          metrics: calculateMetrics(buybackState),
         });
       },
 
@@ -974,13 +1023,18 @@ export const useGameStore = create<GameStore>()(
         const state = get();
         if (state.cash < amount) return;
 
-        set({
+        const distributeState = {
+          ...state,
           cash: state.cash - amount,
           totalDistributions: state.totalDistributions + amount,
+        };
+        set({
+          ...distributeState,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'distribute', round: state.round, details: { amount } },
           ],
+          metrics: calculateMetrics(distributeState),
         });
       },
 
@@ -1021,11 +1075,15 @@ export const useGameStore = create<GameStore>()(
           ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
           : state.sharedServices;
 
-        set({
+        const sellState = {
+          ...state,
           cash: state.cash + netProceeds,
           totalExitProceeds: state.totalExitProceeds + netProceeds,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
+        };
+        set({
+          ...sellState,
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...business, status: 'sold' as const, exitPrice, exitRound: state.round },
@@ -1037,6 +1095,7 @@ export const useGameStore = create<GameStore>()(
               details: { businessId, exitPrice, netProceeds, buyerName: buyerProfile.name, buyerType: buyerProfile.type },
             },
           ],
+          metrics: calculateMetrics(sellState),
         });
       },
 
@@ -1061,10 +1120,14 @@ export const useGameStore = create<GameStore>()(
           ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
           : state.sharedServices;
 
-        set({
+        const windDownState = {
+          ...state,
           cash: newCash,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
+        };
+        set({
+          ...windDownState,
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...business, status: 'wound_down' as const, exitRound: state.round },
@@ -1073,6 +1136,7 @@ export const useGameStore = create<GameStore>()(
             ...state.actionsThisRound,
             { type: 'wind_down', round: state.round, details: { businessId, cost: windDownCost + debtWriteOff } },
           ],
+          metrics: calculateMetrics(windDownState),
         });
       },
 
@@ -1093,10 +1157,14 @@ export const useGameStore = create<GameStore>()(
             : b
         );
 
-        set({
+        const acceptState = {
+          ...state,
           cash: state.cash + netProceeds,
           totalExitProceeds: state.totalExitProceeds + netProceeds,
           businesses: updatedBusinesses,
+        };
+        set({
+          ...acceptState,
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...business, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round },
@@ -1106,6 +1174,7 @@ export const useGameStore = create<GameStore>()(
             ...state.actionsThisRound,
             { type: 'accept_offer', round: state.round, details: { businessId: event.affectedBusinessId, price: event.offerAmount } },
           ],
+          metrics: calculateMetrics(acceptState),
         });
       },
 
@@ -1138,10 +1207,14 @@ export const useGameStore = create<GameStore>()(
             : b
         );
 
-        set({
+        const distressState = {
+          ...state,
           cash: state.cash + netProceeds,
           totalExitProceeds: state.totalExitProceeds + netProceeds,
           businesses: updatedBusinesses,
+        };
+        set({
+          ...distressState,
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...business, status: 'sold' as const, exitPrice, exitRound: state.round },
@@ -1150,6 +1223,7 @@ export const useGameStore = create<GameStore>()(
             ...state.actionsThisRound,
             { type: 'sell', round: state.round, details: { businessId, exitPrice, netProceeds, distressedSale: true } },
           ],
+          metrics: calculateMetrics(distressState),
         });
       },
 
@@ -1163,14 +1237,19 @@ export const useGameStore = create<GameStore>()(
         const newShares = Math.round((amount / emergencyPrice) * 1000) / 1000;
 
         // No 51% ownership floor during emergency
-        set({
+        const emergencyState = {
+          ...state,
           cash: state.cash + amount,
           sharesOutstanding: state.sharesOutstanding + newShares,
           equityRaisesUsed: state.equityRaisesUsed + 1,
+        };
+        set({
+          ...emergencyState,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'issue_equity', round: state.round, details: { amount, newShares, emergency: true } },
           ],
+          metrics: calculateMetrics(emergencyState),
         });
       },
 
@@ -1492,7 +1571,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v8', // v8: financial distress & insolvency system
+      name: 'holdco-tycoon-save-v9', // v9: dedup game-over, uncap bolt-ons, synergy penalties
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

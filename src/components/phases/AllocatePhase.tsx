@@ -6,6 +6,7 @@ import {
   SharedService,
   SharedServiceType,
   OperationalImprovementType,
+  GameAction,
   MAFocus,
   SectorId,
   DealSizePreference,
@@ -18,6 +19,7 @@ import { SECTOR_LIST } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
 import { generateDealStructures, getStructureLabel, getStructureDescription } from '../../engine/deals';
+import { calculateExitValuation } from '../../engine/simulation';
 import { SECTORS } from '../../data/sectors';
 import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES } from '../../data/sharedServices';
 import { MarketGuideModal } from '../ui/MarketGuideModal';
@@ -62,6 +64,7 @@ interface AllocatePhaseProps {
   onSourceDeals: () => void;
   maFocus: MAFocus;
   onSetMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference) => void;
+  actionsThisRound?: GameAction[];
 }
 
 type AllocateTab = 'portfolio' | 'deals' | 'shared_services' | 'capital';
@@ -100,6 +103,7 @@ export function AllocatePhase({
   onSourceDeals,
   maFocus,
   onSetMAFocus,
+  actionsThisRound = [],
 }: AllocatePhaseProps) {
   const [activeTab, setActiveTab] = useState<AllocateTab>('portfolio');
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
@@ -122,6 +126,8 @@ export function AllocatePhase({
   const [mergeName, setMergeName] = useState('');
   const [showMarketGuide, setShowMarketGuide] = useState(false);
   const [showRollUpGuide, setShowRollUpGuide] = useState(false);
+  const [sellConfirmBusiness, setSellConfirmBusiness] = useState<Business | null>(null);
+  const [sellCelebration, setSellCelebration] = useState<{ name: string; moic: number } | null>(null);
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const distressRestrictions = getDistressRestrictions(distressLevel);
@@ -160,8 +166,7 @@ export function AllocatePhase({
     if (!selectedDeal) return null;
 
     const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening || !distressRestrictions.canTakeDebt);
-    const availablePlatformsForDeal = getPlatformsForSector(selectedDeal.business.sectorId)
-      .filter(p => p.platformScale < 3); // Exclude platforms at max scale
+    const availablePlatformsForDeal = getPlatformsForSector(selectedDeal.business.sectorId);
     const canTuckIn = availablePlatformsForDeal.length > 0;
 
     return (
@@ -213,7 +218,7 @@ export function AllocatePhase({
                 <option value="">Acquire as Standalone</option>
                 {availablePlatformsForDeal.map(platform => (
                   <option key={platform.id} value={platform.id}>
-                    {platform.name} (Scale {platform.platformScale}/3, EBITDA: {formatMoney(platform.ebitda)})
+                    {platform.name} (Scale {platform.platformScale}, EBITDA: {formatMoney(platform.ebitda)})
                   </option>
                 ))}
               </select>
@@ -239,13 +244,6 @@ export function AllocatePhase({
               })()}
             </div>
           )}
-          {/* Max scale warning */}
-          {getPlatformsForSector(selectedDeal.business.sectorId).length > 0 && availablePlatformsForDeal.length === 0 && (
-            <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-6 text-sm text-text-muted">
-              Platform at maximum scale (3/3) — acquiring as standalone only
-            </div>
-          )}
-
           <div className="grid grid-cols-3 gap-4 mb-6">
             <div className="card text-center">
               <p className="text-text-muted text-sm">EBITDA</p>
@@ -706,7 +704,7 @@ export function AllocatePhase({
                     <div className="flex flex-wrap gap-2">
                       {platforms.map(p => (
                         <span key={p.id} className="text-xs bg-accent/20 text-accent px-2 py-1 rounded">
-                          {SECTORS[p.sectorId].emoji} {p.name} (Scale {p.platformScale}/3, {p.boltOnIds.length} bolt-ons)
+                          {SECTORS[p.sectorId].emoji} {p.name} (Scale {p.platformScale}, {p.boltOnIds.length} bolt-ons)
                         </span>
                       ))}
                     </div>
@@ -715,12 +713,30 @@ export function AllocatePhase({
               </div>
             )}
 
+            {/* Failed integration warning */}
+            {actionsThisRound.some(a =>
+              (a.type === 'acquire_tuck_in' || a.type === 'merge_businesses') &&
+              a.details?.integrationOutcome === 'failure'
+            ) && (
+              <div className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <span className="text-lg">⚠️</span>
+                  <div>
+                    <h4 className="font-bold text-red-400 text-sm">Integration Failed</h4>
+                    <p className="text-xs text-text-secondary mt-1">
+                      A recent integration failed. A restructuring cost was deducted from cash, and the affected platform's organic growth rate has been permanently reduced by 1.5%.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {activeBusinesses.filter(b => !b.parentPlatformId).map(business => (
                 <BusinessCard
                   key={business.id}
                   business={business}
-                  onSell={() => onSell(business.id)}
+                  onSell={() => setSellConfirmBusiness(business)}
                   onImprove={() => setSelectedBusinessForImprovement(business)}
                   onDesignatePlatform={!business.isPlatform ? () => onDesignatePlatform(business.id) : undefined}
                   onShowRollUpGuide={() => setShowRollUpGuide(true)}
@@ -1395,7 +1411,7 @@ export function AllocatePhase({
                         <div>
                           <p className="text-text-muted">Platform Scale</p>
                           <p className="font-mono font-bold text-lg">
-                            {Math.min(3, Math.max(mergeSelection.first.platformScale || 0, mergeSelection.second.platformScale || 0) + 1)}/3
+                            {Math.max(mergeSelection.first.platformScale || 0, mergeSelection.second.platformScale || 0) + 1}
                           </p>
                           <p className="text-xs text-text-muted">Multiple expansion</p>
                         </div>
@@ -1451,6 +1467,82 @@ export function AllocatePhase({
       {/* Roll-Up Guide Modal */}
       {showRollUpGuide && (
         <RollUpGuideModal onClose={() => setShowRollUpGuide(false)} />
+      )}
+
+      {/* Sell Confirmation Modal */}
+      {sellConfirmBusiness && (() => {
+        const biz = sellConfirmBusiness;
+        const valuation = calculateExitValuation(biz, round, lastEventType);
+        const totalInvested = biz.totalAcquisitionCost || biz.acquisitionPrice;
+        const sellMoic = valuation.netProceeds / totalInvested;
+        return (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+            <div className="bg-bg-primary border border-white/10 rounded-xl max-w-md w-full p-6">
+              <h3 className="text-xl font-bold mb-4">Confirm Sale</h3>
+              <div className="space-y-3 mb-6">
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-muted">Business</span>
+                  <span className="font-bold">{biz.name}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-muted">Est. Exit Price</span>
+                  <span className="font-mono font-bold text-accent">{formatMoney(valuation.exitPrice)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-muted">Net Proceeds</span>
+                  <span className="font-mono font-bold">{formatMoney(valuation.netProceeds)}</span>
+                </div>
+                <div className="flex justify-between text-sm border-t border-white/10 pt-2">
+                  <span className="text-text-muted">Total Invested</span>
+                  <span className="font-mono">{formatMoney(totalInvested)}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-muted">MOIC</span>
+                  <span className={`font-mono font-bold ${sellMoic >= 2 ? 'text-accent' : sellMoic < 1 ? 'text-danger' : ''}`}>
+                    {sellMoic.toFixed(1)}x
+                  </span>
+                </div>
+              </div>
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setSellConfirmBusiness(null)} className="btn-secondary px-6">
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    onSell(biz.id);
+                    setSellConfirmBusiness(null);
+                    if (sellMoic >= 1.5) {
+                      setSellCelebration({ name: biz.name, moic: sellMoic });
+                      setTimeout(() => setSellCelebration(null), 4000);
+                    }
+                  }}
+                  className="btn-primary px-6"
+                >
+                  Sell
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Sell Celebration Overlay */}
+      {sellCelebration && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[60] pointer-events-none">
+          <div className="text-center animate-bounce">
+            <p className="text-6xl mb-4">
+              {sellCelebration.moic >= 3 ? '🎆' : sellCelebration.moic >= 2 ? '🎉' : '✨'}
+            </p>
+            <p className="text-3xl font-bold text-accent mb-2">
+              {sellCelebration.moic >= 3 ? 'Incredible Exit!' :
+               sellCelebration.moic >= 2 ? 'Great Exit!' :
+               'Solid Exit!'}
+            </p>
+            <p className="text-xl text-text-secondary">
+              {sellCelebration.name} — {sellCelebration.moic.toFixed(1)}x MOIC
+            </p>
+          </div>
+        </div>
       )}
 
       {/* End Turn Confirmation Modal */}
