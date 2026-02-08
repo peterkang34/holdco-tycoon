@@ -362,10 +362,12 @@ export const useGameStore = create<GameStore>()(
           }
         }
 
-        // Calculate diversification bonus — 4+ unique sectors = +1.5% growth, 6+ = +2.5%
+        // Calculate diversification bonus — 4+ unique sectors = +3% growth, 6+ = +4.5%
+        // Rationale: focused gets +5% but with amplified volatility + correlated event risk
+        // Diversified gets lower bonus but with uncorrelated risk + event protection
         const uniqueSectors = new Set(activeBusinesses.map(b => b.sectorId)).size;
-        const diversificationGrowthBonus = uniqueSectors >= 6 ? 0.025
-          : uniqueSectors >= 4 ? 0.015
+        const diversificationGrowthBonus = uniqueSectors >= 6 ? 0.045
+          : uniqueSectors >= 4 ? 0.03
           : 0;
 
         // Apply organic growth to all businesses

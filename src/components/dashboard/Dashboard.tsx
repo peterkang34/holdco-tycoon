@@ -169,7 +169,7 @@ export function Dashboard({
         )}
         {diversificationBonus && (
           <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full"
-            title="4+ unique sectors provides a diversification growth bonus">
+            title="4+ unique sectors: +3% growth bonus. 6+: +4.5%. Uncorrelated risk protects against sector shocks.">
             Diversified Portfolio
           </span>
         )}
