@@ -51,30 +51,46 @@ Write 2-3 sentences about what happened at this business this year. Include a sp
 }
 
 function buildYearChroniclePrompt(context: Record<string, unknown>): string {
-  return `You are writing the annual chronicle for a holding company in a business simulation. Be HONEST and balanced — if the financials are stressed, say so. Do not sugarcoat bad numbers.
+  // Build strategic context section
+  const strategicLines: string[] = [];
+  if (context.platformCount && (context.platformCount as number) > 0) {
+    strategicLines.push(`- Platforms: ${context.platformCount} (with ${context.totalBoltOns || 0} bolt-on acquisitions)`);
+  }
+  if (context.avgQuality) strategicLines.push(`- Avg Portfolio Quality: ${context.avgQuality}/5`);
+  if (context.sectors) strategicLines.push(`- Sectors: ${context.sectors}`);
+  if (context.sharedServices) strategicLines.push(`- Shared Services: ${context.sharedServices}`);
+  if (context.fcfPerShare) strategicLines.push(`- FCF/Share: ${context.fcfPerShare}`);
+  if (context.enterpriseValue) strategicLines.push(`- Enterprise Value: ${context.enterpriseValue}`);
+  const strategicSection = strategicLines.length > 0 ? `\nSTRATEGIC POSITION:\n${strategicLines.join('\n')}` : '';
+
+  return `You are writing the annual chronicle for a holding company in a business simulation. The player runs a holdco (not a PE fund). Be HONEST and balanced — acknowledge both progress and challenges.
 
 HOLDCO NAME: ${context.holdcoName}
 YEAR: ${context.year}
 
-FINANCIAL SNAPSHOT:
-- Total EBITDA: ${context.totalEbitda}${context.prevTotalEbitda ? ` (prior year: ${context.prevTotalEbitda})` : ''}
-- Free Cash Flow: ${context.fcf}
-- Cash Position: ${context.cash}
-- Total Debt: ${context.totalDebt}
-- Interest Expense: ${context.interestExpense}
+KEY FINANCIALS:
+- EBITDA: ${context.totalEbitda}${context.prevTotalEbitda ? ` (prior: ${context.prevTotalEbitda})` : ''}${context.ebitdaGrowth ? ` [${context.ebitdaGrowth} YoY]` : ''}
 - Net Debt/EBITDA: ${context.leverage}
-- Portfolio Companies: ${context.portfolioCount}
+- FCF: ${context.fcf}
+- Portfolio: ${context.portfolioCount} companies
+${strategicSection}
 
-THIS YEAR'S ACTIONS:
+THIS YEAR'S ACTIVITY:
 ${context.actions || 'Quiet year of organic growth'}
 
-MARKET CONDITIONS: ${context.marketConditions || 'Normal'}
-${context.concerns ? `\nKEY CONCERNS: ${context.concerns}` : ''}
+MARKET: ${context.marketConditions || 'Normal'}
+${context.concerns ? `\nCONCERNS: ${context.concerns}` : ''}
 ${context.positives ? `\nBRIGHT SPOTS: ${context.positives}` : ''}
 
-IMPORTANT: Your tone MUST match the financial reality. If FCF is negative, leverage is high, or interest is eating EBITDA — the tone should reflect the strain, risk, and pressure. Aggressive acquisitions funded by debt deserve cautious commentary, not celebration. Only be optimistic when the numbers justify it.
+WRITING GUIDELINES:
+- Write a BALANCED chronicle covering M&A activity, operational progress, AND financial health — not just cash and leverage
+- Lead with the most significant development this year (acquisition, exit, organic growth milestone, strategic shift)
+- Mention specific actions taken (acquisitions by name, improvements, platform building) when available
+- Include financial context but don't let it dominate — one financial reference per chronicle is enough
+- If financials are stressed, acknowledge it honestly but also note any strategic progress
+- Tone should match overall trajectory, not just one metric
 
-Write a 3-4 sentence chronicle of this year for ${context.holdcoName}. Use a narrative style like a shareholder letter. Reference specific financial realities (FCF, leverage, cash). Keep it under 80 words. Respond with just the narrative text.`;
+Write 3-4 sentences in a shareholder letter style. Keep it under 80 words. Respond with just the narrative text.`;
 }
 
 function buildDealStoryPrompt(context: Record<string, unknown>): string {

@@ -372,6 +372,7 @@ export async function generateYearChronicle(
     year: number;
     totalEbitda: string;
     prevTotalEbitda?: string;
+    ebitdaGrowth?: string;
     cash: string;
     portfolioCount: number;
     leverage: string;
@@ -382,6 +383,14 @@ export async function generateYearChronicle(
     marketConditions?: string;
     concerns?: string;
     positives?: string;
+    // Strategic context
+    platformCount?: number;
+    totalBoltOns?: number;
+    avgQuality?: string;
+    sectors?: string;
+    sharedServices?: string;
+    fcfPerShare?: string;
+    enterpriseValue?: string;
   }
 ): Promise<string | null> {
   return generateNarrative('year_chronicle', context);
