@@ -123,17 +123,6 @@ export function EventCard({ event, onAcceptOffer, onDeclineOffer, onContinue }: 
         </div>
       )}
 
-      {event.tip && (
-        <div className="bg-white/5 p-3 rounded-lg mb-4 border-l-2 border-accent">
-          <p className="text-sm text-text-secondary italic">
-            {event.tip}
-          </p>
-          {event.tipSource && (
-            <p className="text-xs text-text-muted mt-1">— {event.tipSource}</p>
-          )}
-        </div>
-      )}
-
       {event.type === 'unsolicited_offer' && onAcceptOffer && onDeclineOffer ? (
         <div>
           {event.buyerProfile && (
