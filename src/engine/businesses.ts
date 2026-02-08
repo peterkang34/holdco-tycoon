@@ -434,7 +434,8 @@ export function pickWeightedSector(round: number): SectorId {
 export function generateDealWithSize(
   sectorId: SectorId,
   round: number,
-  sizePreference: DealSizePreference = 'any'
+  sizePreference: DealSizePreference = 'any',
+  portfolioEbitda: number = 0
 ): Deal {
   const sector = SECTORS[sectorId];
   let quality = generateQualityRating();
@@ -448,6 +449,12 @@ export function generateDealWithSize(
   } else if (sizePreference === 'medium') {
     ebitdaMultiplier = 0.8 + Math.random() * 0.4; // 80-120% of base
   }
+
+  // Portfolio-scale multiplier: deals grow as your portfolio grows
+  const portfolioScaler = portfolioEbitda > 3000
+    ? Math.max(1, Math.log2(portfolioEbitda / 3000))
+    : 1;
+  ebitdaMultiplier *= portfolioScaler;
 
   const business = generateBusiness(sectorId, round, quality);
   const adjustedEbitda = Math.round(business.ebitda * ebitdaMultiplier);
@@ -489,7 +496,8 @@ export function generateDealPipeline(
   round: number,
   maFocus?: MAFocus,
   portfolioFocusSector?: SectorId,
-  portfolioFocusTier?: number
+  portfolioFocusTier?: number,
+  portfolioEbitda: number = 0
 ): Deal[] {
   // Age existing deals first
   let pipeline = currentPipeline.map(deal => ({
@@ -512,7 +520,7 @@ export function generateDealPipeline(
     // Add 2 deals in focus sector with preferred size
     for (let i = 0; i < 2; i++) {
       if (pipeline.length >= MAX_DEALS) break;
-      pipeline.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference));
+      pipeline.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda));
     }
   }
 
@@ -521,7 +529,7 @@ export function generateDealPipeline(
     const focusDeals = portfolioFocusTier >= 2 ? 2 : 1;
     for (let i = 0; i < focusDeals; i++) {
       if (pipeline.length >= MAX_DEALS) break;
-      pipeline.push(generateDealWithSize(portfolioFocusSector, round, maFocus?.sizePreference || 'any'));
+      pipeline.push(generateDealWithSize(portfolioFocusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda));
     }
   }
 
@@ -532,7 +540,7 @@ export function generateDealPipeline(
 
   for (const sectorId of shuffledMissing.slice(0, 3)) {
     if (pipeline.length >= MAX_DEALS) break;
-    pipeline.push(generateDealWithSize(sectorId, round, maFocus?.sizePreference || 'any'));
+    pipeline.push(generateDealWithSize(sectorId, round, maFocus?.sizePreference || 'any', portfolioEbitda));
   }
 
   // 4. Fill remaining slots with weighted random deals
@@ -540,13 +548,13 @@ export function generateDealPipeline(
   const targetPipelineLength = Math.min(MAX_DEALS, pipeline.length + targetNewDeals);
   while (pipeline.length < targetPipelineLength) {
     const sectorId = pickWeightedSector(round);
-    pipeline.push(generateDealWithSize(sectorId, round, maFocus?.sizePreference || 'any'));
+    pipeline.push(generateDealWithSize(sectorId, round, maFocus?.sizePreference || 'any', portfolioEbitda));
   }
 
   // Ensure at least 4 deals available
   while (pipeline.length < 4) {
     const sectorId = pickWeightedSector(round);
-    pipeline.push(generateDealWithSize(sectorId, round, 'any'));
+    pipeline.push(generateDealWithSize(sectorId, round, 'any', portfolioEbitda));
   }
 
   return pipeline;
@@ -557,7 +565,8 @@ export function generateDealPipeline(
 export function generateSourcedDeals(
   round: number,
   maFocus?: MAFocus,
-  portfolioFocusSector?: SectorId
+  portfolioFocusSector?: SectorId,
+  portfolioEbitda: number = 0
 ): Deal[] {
   const deals: Deal[] = [];
 
@@ -566,25 +575,25 @@ export function generateSourcedDeals(
 
   // If M&A focus is set, 2 of 3 deals will be in that sector
   if (maFocus?.sectorId) {
-    deals.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference));
-    deals.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference));
+    deals.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda));
+    deals.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda));
 
     // Third deal from a different sector for variety
     const otherSector = portfolioFocusSector && portfolioFocusSector !== maFocus.sectorId
       ? portfolioFocusSector
       : pickWeightedSector(round);
-    deals.push(generateDealWithSize(otherSector, round, maFocus.sizePreference));
+    deals.push(generateDealWithSize(otherSector, round, maFocus.sizePreference, portfolioEbitda));
   } else if (portfolioFocusSector) {
     // No M&A focus but have portfolio focus - generate deals in that sector
-    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any'));
-    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any'));
-    deals.push(generateDealWithSize(pickWeightedSector(round), round, 'any'));
+    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda));
+    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda));
+    deals.push(generateDealWithSize(pickWeightedSector(round), round, 'any', portfolioEbitda));
   } else {
     // No focus set - generate diverse deals
     // M-11: Spread to avoid mutating global SECTOR_LIST
     const sectors = [...SECTOR_LIST].sort(() => Math.random() - 0.5).slice(0, 3);
     sectors.forEach(sector => {
-      deals.push(generateDealWithSize(sector.id, round, 'any'));
+      deals.push(generateDealWithSize(sector.id, round, 'any', portfolioEbitda));
     });
   }
 

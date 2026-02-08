@@ -953,7 +953,7 @@ export function AllocatePhase({
                     <div>
                       <p className="text-text-muted">Holdco Debt</p>
                       <p className="font-mono font-bold text-lg">{formatMoney(totalDebt)}</p>
-                      <p className="text-xs text-text-muted">Manual paydown</p>
+                      <p className="text-xs text-text-muted">Auto-amortizes (10%/yr) + manual</p>
                     </div>
                     <div>
                       <p className="text-text-muted">Opco Seller Notes</p>
@@ -1388,9 +1388,9 @@ export function AllocatePhase({
                         <div>
                           <p className="text-text-muted">Merge Cost</p>
                           <p className="font-mono font-bold text-lg">
-                            {formatMoney(Math.round((mergeSelection.first.ebitda + mergeSelection.second.ebitda) * 0.1))}
+                            {formatMoney(Math.round(Math.min(mergeSelection.first.ebitda, mergeSelection.second.ebitda) * 0.15))}
                           </p>
-                          <p className="text-xs text-text-muted">10% of combined EBITDA</p>
+                          <p className="text-xs text-text-muted">15% of smaller business</p>
                         </div>
                         <div>
                           <p className="text-text-muted">Platform Scale</p>
@@ -1423,10 +1423,10 @@ export function AllocatePhase({
                           setMergeName('');
                         }
                       }}
-                      disabled={!mergeName.trim() || cash < (mergeSelection.first.ebitda + mergeSelection.second.ebitda) * 0.1}
+                      disabled={!mergeName.trim() || cash < Math.round(Math.min(mergeSelection.first.ebitda, mergeSelection.second.ebitda) * 0.15)}
                       className="btn-primary w-full"
                     >
-                      {cash < (mergeSelection.first.ebitda + mergeSelection.second.ebitda) * 0.1
+                      {cash < Math.round(Math.min(mergeSelection.first.ebitda, mergeSelection.second.ebitda) * 0.15)
                         ? 'Not Enough Cash'
                         : 'Complete Merger'}
                     </button>

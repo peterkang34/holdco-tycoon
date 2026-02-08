@@ -74,7 +74,6 @@ interface GameStore extends GameState {
   resetGame: () => void;
 
   // Phase transitions
-  advanceToCollect: () => void;
   advanceToEvent: () => void;
   advanceToAllocate: () => void;
   endRound: () => void;
@@ -210,79 +209,6 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
-      advanceToCollect: () => {
-        const state = get();
-        let cashAdjustment = 0;
-        let holdcoAmortizationAmount = 0;
-
-        // Process opco-level debt payments and earnouts
-        const updatedBusinesses = state.businesses.map(b => {
-          if (b.status !== 'active') return b;
-
-          let updated = { ...b };
-
-          // H-6: Seller note interest payment + principal amortization
-          if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
-            const interest = Math.round(b.sellerNoteBalance * b.sellerNoteRate);
-            const principal = Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
-            cashAdjustment -= (interest + principal); // Deduct both from holdco cash
-            updated.sellerNoteBalance = Math.max(0, b.sellerNoteBalance - principal);
-            updated.sellerNoteRoundsRemaining = b.sellerNoteRoundsRemaining - 1;
-          }
-          // Clean up residual balances when term is done
-          if (updated.sellerNoteRoundsRemaining <= 0 && updated.sellerNoteBalance > 0) {
-            cashAdjustment -= updated.sellerNoteBalance;
-            updated.sellerNoteBalance = 0;
-          }
-
-          // L-12: Evaluate earnout - if EBITDA grew enough, pay the earnout
-          if (b.earnoutRemaining > 0 && b.earnoutTarget > 0) {
-            const actualGrowth = b.acquisitionEbitda > 0
-              ? (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda
-              : 0;
-            if (actualGrowth >= b.earnoutTarget) {
-              // Target met - pay earnout
-              cashAdjustment -= b.earnoutRemaining;
-              updated.earnoutRemaining = 0;
-              updated.earnoutTarget = 0;
-            }
-          }
-
-          return updated;
-        });
-
-        // Holdco bank debt amortization (mandatory after grace period)
-        let newTotalDebt = state.totalDebt;
-        if (state.totalDebt > 0 && state.holdcoDebtStartRound > 0) {
-          const yearsWithDebt = state.round - state.holdcoDebtStartRound;
-          if (yearsWithDebt >= 2) {
-            // After 2-year grace period: mandatory 10% principal payment
-            const scheduledPayment = Math.round(state.totalDebt * 0.10);
-            // Pay what we can — partial payment if cash is insufficient
-            const availableCash = state.cash + cashAdjustment; // cash after opco payments
-            const actualPayment = Math.min(scheduledPayment, Math.max(0, availableCash));
-            if (actualPayment > 0) {
-              cashAdjustment -= actualPayment;
-              newTotalDebt = state.totalDebt - actualPayment;
-              holdcoAmortizationAmount = actualPayment;
-            }
-          }
-        }
-
-        // C-3: Floor cash at 0 after debt payments
-        const newCash = Math.max(0, state.cash + cashAdjustment);
-
-        set({
-          businesses: updatedBusinesses,
-          cash: newCash,
-          totalDebt: newTotalDebt,
-          phase: 'collect',
-          cashBeforeDebtPayments: state.cash,
-          debtPaymentThisRound: Math.abs(cashAdjustment),
-          holdcoAmortizationThisRound: holdcoAmortizationAmount,
-        });
-      },
-
       advanceToEvent: () => {
         const state = get();
         const sharedBenefits = calculateSharedServicesBenefits(state as GameState);
@@ -353,13 +279,18 @@ export const useGameStore = create<GameStore>()(
         const state = get();
         const focusBonus = calculateSectorFocusBonus(state.businesses);
 
+        const totalPortfolioEbitda = state.businesses
+          .filter(b => b.status === 'active')
+          .reduce((sum, b) => sum + b.ebitda, 0);
+
         // Generate new deals with M&A focus and portfolio synergies
         const newPipeline = generateDealPipeline(
           state.dealPipeline,
           state.round,
           state.maFocus,
           focusBonus?.focusGroup,
-          focusBonus?.tier
+          focusBonus?.tier,
+          totalPortfolioEbitda
         );
 
         set({
@@ -451,13 +382,23 @@ export const useGameStore = create<GameStore>()(
             if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
               const interest = Math.round(b.sellerNoteBalance * b.sellerNoteRate);
               const principal = Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
-              cashAdjustment -= (interest + principal);
-              updated.sellerNoteBalance = Math.max(0, b.sellerNoteBalance - principal);
-              updated.sellerNoteRoundsRemaining = b.sellerNoteRoundsRemaining - 1;
+              const totalPayment = interest + principal;
+              const availableForPayment = Math.max(0, state.cash + cashAdjustment);
+              const actualPayment = Math.min(totalPayment, availableForPayment);
+              cashAdjustment -= actualPayment;
+              // Only reduce balance by the principal portion actually paid
+              const principalPaid = Math.max(0, actualPayment - interest);
+              updated.sellerNoteBalance = Math.max(0, b.sellerNoteBalance - principalPaid);
+              // Only decrement rounds if full payment made
+              if (actualPayment >= totalPayment) {
+                updated.sellerNoteRoundsRemaining = b.sellerNoteRoundsRemaining - 1;
+              }
             }
             if (updated.sellerNoteRoundsRemaining <= 0 && updated.sellerNoteBalance > 0) {
-              cashAdjustment -= updated.sellerNoteBalance;
-              updated.sellerNoteBalance = 0;
+              const availableForFinal = Math.max(0, state.cash + cashAdjustment);
+              const finalPayment = Math.min(updated.sellerNoteBalance, availableForFinal);
+              cashAdjustment -= finalPayment;
+              updated.sellerNoteBalance = updated.sellerNoteBalance - finalPayment;
             }
 
             if (b.earnoutRemaining > 0 && b.earnoutTarget > 0) {
@@ -465,9 +406,13 @@ export const useGameStore = create<GameStore>()(
                 ? (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda
                 : 0;
               if (actualGrowth >= b.earnoutTarget) {
-                cashAdjustment -= b.earnoutRemaining;
-                updated.earnoutRemaining = 0;
-                updated.earnoutTarget = 0;
+                const availableForEarnout = Math.max(0, state.cash + cashAdjustment);
+                const earnoutPayment = Math.min(b.earnoutRemaining, availableForEarnout);
+                cashAdjustment -= earnoutPayment;
+                updated.earnoutRemaining = b.earnoutRemaining - earnoutPayment;
+                if (updated.earnoutRemaining <= 0) {
+                  updated.earnoutTarget = 0;
+                }
               }
             }
 
@@ -713,8 +658,8 @@ export const useGameStore = create<GameStore>()(
         // Must be same sector
         if (biz1.sectorId !== biz2.sectorId) return;
 
-        // Merge cost (restructuring, legal, integration)
-        const mergeCost = Math.round((biz1.ebitda + biz2.ebitda) * 0.1);
+        // Merge cost (restructuring, legal, integration) — 15% of smaller business
+        const mergeCost = Math.round(Math.min(biz1.ebitda, biz2.ebitda) * 0.15);
         if (state.cash < mergeCost) return;
 
         // Check if shared services help
@@ -1272,10 +1217,15 @@ export const useGameStore = create<GameStore>()(
         if (state.cash < DEAL_SOURCING_COST) return;
 
         const focusBonus = calculateSectorFocusBonus(state.businesses);
+        const totalPortfolioEbitda = state.businesses
+          .filter(b => b.status === 'active')
+          .reduce((sum, b) => sum + b.ebitda, 0);
+
         const newDeals = generateSourcedDeals(
           state.round,
           state.maFocus,
-          focusBonus?.focusGroup
+          focusBonus?.focusGroup,
+          totalPortfolioEbitda
         );
 
         set({
