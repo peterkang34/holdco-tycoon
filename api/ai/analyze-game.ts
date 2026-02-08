@@ -49,7 +49,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const prompt = `You are an experienced private equity investment advisor reviewing a player's 20-year holdco simulation game. Analyze their performance and provide personalized, actionable feedback.
+    const prompt = `You are an experienced investment advisor reviewing a player's 20-year holding company simulation game. The player runs a holdco (not a PE fund) — never use the term "private equity firm". Analyze their performance and provide personalized, actionable feedback.
 
 GAME RESULTS:
 - Holdco Name: ${holdcoName}

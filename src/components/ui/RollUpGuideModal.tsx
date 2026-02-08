@@ -23,7 +23,7 @@ export function RollUpGuideModal({ onClose }: RollUpGuideModalProps) {
         <div className="card mb-6">
           <h3 className="font-bold text-lg mb-3">What is a Roll-Up?</h3>
           <p className="text-text-secondary text-sm leading-relaxed">
-            A roll-up is a private equity strategy where you acquire a "platform" company and then
+            A roll-up is an acquisition strategy where you acquire a "platform" company and then
             bolt on smaller competitors in the same sector. The combined entity commands a higher
             valuation multiple than the sum of its parts - this is called <span className="text-accent font-medium">multiple expansion</span>.
           </p>

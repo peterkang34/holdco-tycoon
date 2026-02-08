@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? `$${(ebitda / 1000).toFixed(1)}M`
       : `$${ebitda}k`;
 
-    const prompt = `Generate realistic M&A deal content for a private equity acquisition game. Be creative and specific.
+    const prompt = `Generate realistic M&A deal content for a holding company acquisition game. Be creative and specific.
 
 Business Details:
 - Sector: ${sectorName}

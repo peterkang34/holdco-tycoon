@@ -23,7 +23,7 @@ function buildEventPrompt(context: Record<string, unknown>): string {
     portfolioContext += `\nPORTFOLIO: ${allBizNames.join(', ')}`;
   }
 
-  return `You are a financial journalist writing a brief, dramatic narrative for a private equity simulation game. Write 2-3 sentences that bring this economic event to life with specific details and human impact.
+  return `You are a financial journalist writing a brief, dramatic narrative for a holding company simulation game. The player runs a holdco (not a PE fund) — never call it a "private equity firm". Write 2-3 sentences that bring this economic event to life with specific details and human impact.
 
 EVENT: ${context.eventType}
 EFFECT: ${context.effect}
@@ -35,7 +35,7 @@ Write a vivid, present-tense narrative. Keep it under 50 words. Be dramatic but 
 }
 
 function buildBusinessUpdatePrompt(context: Record<string, unknown>): string {
-  return `You are narrating the ongoing story of a business in a private equity portfolio. Write a brief story beat about what happened this year.
+  return `You are narrating the ongoing story of a business in a holding company's portfolio. Write a brief story beat about what happened this year.
 
 BUSINESS: ${context.businessName}
 SECTOR: ${context.sector}
@@ -78,7 +78,7 @@ Write a 3-4 sentence chronicle of this year for ${context.holdcoName}. Use a nar
 }
 
 function buildDealStoryPrompt(context: Record<string, unknown>): string {
-  return `You are creating a rich backstory for an M&A opportunity in a private equity game. Make it feel like a real deal memo.
+  return `You are creating a rich backstory for an M&A opportunity in a holding company simulation game. Make it feel like a real deal memo.
 
 BUSINESS: ${context.businessName}
 SECTOR: ${context.sector}
