@@ -15,19 +15,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const {
       buyerName, buyerType, isStrategic, fundSize,
       sectorName, businessName, ebitda, qualityRating, baseThesis,
+      revenue, ebitdaMargin,
     } = req.body;
 
     if (!buyerName || !sectorName || !businessName) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    const marginNote = ebitdaMargin ? `, ${(ebitdaMargin * 100).toFixed(0)}% EBITDA margins` : '';
+    const revenueNote = revenue ? `, ${revenue} revenue` : '';
+
     const prompt = `You are writing for a holding company acquisition game. Rewrite this investment thesis to be more specific and compelling.
 
 Buyer: ${buyerName} (${buyerType}${isStrategic ? ', strategic acquirer' : ''}${fundSize ? `, ${fundSize}` : ''})
-Target: ${businessName}, a ${sectorName} business with ${ebitda} EBITDA (quality ${qualityRating}/5)
+Target: ${businessName}, a ${sectorName} business with ${ebitda} EBITDA${marginNote}${revenueNote} (quality ${qualityRating}/5)
 Base thesis: ${baseThesis}
 
-Write 2-3 sentences that sound like a real investment committee memo. Be specific about value creation levers. Respond with ONLY the thesis text, no JSON or formatting.`;
+Write 2-3 sentences that sound like a real investment committee memo. Be specific about value creation levers including margin improvement opportunities. Respond with ONLY the thesis text, no JSON or formatting.`;
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',

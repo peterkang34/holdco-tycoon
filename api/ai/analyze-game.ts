@@ -86,6 +86,9 @@ CAPITAL MANAGEMENT:
 
 TRAJECTORY:
 - EBITDA Growth: ${ebitdaGrowth}%
+- Revenue Growth: ${req.body.revenueGrowth || 'N/A'}%
+- Avg EBITDA Margin: ${req.body.avgMargin || 'N/A'}
+- Margin Change: ${req.body.marginChange || 'N/A'}
 - Final Leverage: ${finalLeverage}x Net Debt/EBITDA
 
 Generate a JSON response with these fields:

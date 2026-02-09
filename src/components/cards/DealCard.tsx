@@ -168,10 +168,16 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4 mb-4">
+      <div className="grid grid-cols-4 gap-3 mb-4">
+        <div>
+          <p className="text-xs text-text-muted">Revenue</p>
+          <p className="font-mono font-bold text-lg">{formatMoney(deal.business.revenue)}</p>
+          <p className="text-xs text-text-muted">+{(deal.business.revenueGrowthRate * 100).toFixed(0)}%/yr</p>
+        </div>
         <div>
           <p className="text-xs text-text-muted">EBITDA</p>
           <p className="font-mono font-bold text-lg">{formatMoney(deal.business.ebitda)}</p>
+          <p className="text-xs text-text-muted">{(deal.business.ebitdaMargin * 100).toFixed(0)}% margin</p>
         </div>
         <div>
           <p className="text-xs text-text-muted">Asking Price</p>

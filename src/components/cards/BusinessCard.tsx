@@ -127,11 +127,18 @@ export function BusinessCard({
         </div>
       )}
 
-      <div className="grid grid-cols-2 gap-4 mb-3">
+      <div className="grid grid-cols-3 gap-3 mb-3">
         <div>
-          <p className="text-xs text-text-muted">Annual EBITDA</p>
+          <p className="text-xs text-text-muted">Revenue</p>
+          <p className="font-mono font-bold text-lg">{formatMoney(business.revenue)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-text-muted">EBITDA</p>
           <p className={`font-mono font-bold text-lg ${isDeclining ? 'text-danger' : ''}`}>
             {formatMoney(business.ebitda)}
+          </p>
+          <p className={`text-xs ${business.ebitdaMargin > business.acquisitionMargin ? 'text-accent' : business.ebitdaMargin < business.acquisitionMargin ? 'text-danger' : 'text-text-muted'}`}>
+            {(business.ebitdaMargin * 100).toFixed(1)}% margin {business.ebitdaMargin > business.acquisitionMargin ? '▲' : business.ebitdaMargin < business.acquisitionMargin ? '▼' : ''}
           </p>
         </div>
         <div>

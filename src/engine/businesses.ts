@@ -151,26 +151,35 @@ export function generateBusiness(
   const quality = forceQuality ?? generateQualityRating();
   const dueDiligence = generateDueDiligence(quality, sectorId);
 
-  // Base EBITDA from sector range
-  let ebitda = Math.round(randomInRange(sector.baseEbitda));
-
-  // Quality affects EBITDA
+  // Quality modifier (shared between revenue and margin)
   const qualityModifier = 0.8 + (quality - 1) * 0.1; // 0.8 to 1.2
-  ebitda = Math.round(ebitda * qualityModifier);
 
-  // Calculate organic growth rate based on sector and quality
-  let organicGrowthRate = randomInRange(sector.organicGrowthRange);
-  // Quality bonus: +0.5% per quality star above 3
-  organicGrowthRate += (quality - 3) * 0.005;
-  // Trend adjustment
-  if (dueDiligence.trend === 'growing') organicGrowthRate += 0.02;
-  else if (dueDiligence.trend === 'declining') organicGrowthRate -= 0.03;
+  // Generate margin from sector range (quality-adjusted: Q5 +3ppt, Q1 -3ppt)
+  let ebitdaMargin = randomInRange(sector.baseMargin);
+  ebitdaMargin += (quality - 3) * 0.015; // ±3ppt per 2 quality stars
+  ebitdaMargin = Math.max(0.03, Math.min(0.80, ebitdaMargin));
+
+  // Generate revenue from sector range (quality-adjusted same as EBITDA was)
+  let revenue = Math.round(randomInRange(sector.baseRevenue) * qualityModifier);
+
+  // Derive EBITDA from revenue × margin
+  let ebitda = Math.round(revenue * ebitdaMargin);
+
+  // Revenue growth rate from sector organic growth range (quality bonus)
+  let revenueGrowthRate = randomInRange(sector.organicGrowthRange);
+  revenueGrowthRate += (quality - 3) * 0.005;
+  if (dueDiligence.trend === 'growing') revenueGrowthRate += 0.02;
+  else if (dueDiligence.trend === 'declining') revenueGrowthRate -= 0.03;
+
+  // Margin drift rate from sector range
+  const marginDriftRate = randomInRange(sector.marginDriftRange);
+
+  // Organic growth rate (legacy — kept for compatibility, mirrors revenue growth)
+  const organicGrowthRate = revenueGrowthRate;
 
   // Calculate acquisition multiple
   let multiple = randomInRange(sector.acquisitionMultiple);
-  // Quality affects multiple slightly
   multiple += (quality - 3) * 0.2;
-  // Round to 1 decimal
   multiple = Math.round(multiple * 10) / 10;
 
   const acquisitionPrice = Math.round(ebitda * multiple);
@@ -189,6 +198,13 @@ export function generateBusiness(
     acquisitionPrice,
     acquisitionMultiple: multiple,
     organicGrowthRate,
+    revenue,
+    ebitdaMargin,
+    acquisitionRevenue: revenue,
+    acquisitionMargin: ebitdaMargin,
+    peakRevenue: revenue,
+    revenueGrowthRate,
+    marginDriftRate,
     qualityRating: quality,
     dueDiligence,
     integrationRoundsRemaining: 2,
@@ -561,7 +577,9 @@ export function generateDealWithSize(
   ebitdaMultiplier *= portfolioScaler;
 
   const business = generateBusiness(sectorId, round, quality, options.subType);
-  const adjustedEbitda = Math.round(business.ebitda * ebitdaMultiplier);
+  // Scale revenue by multiplier, derive EBITDA from scaled revenue × margin
+  const adjustedRevenue = Math.round(business.revenue * ebitdaMultiplier);
+  const adjustedEbitda = Math.round(adjustedRevenue * business.ebitdaMargin);
   const adjustedPrice = Math.round(adjustedEbitda * business.acquisitionMultiple);
   const acquisitionType = determineAcquisitionType(adjustedEbitda);
   const tuckInDiscount = acquisitionType === 'tuck_in'
@@ -595,6 +613,9 @@ export function generateDealWithSize(
       peakEbitda: adjustedEbitda,
       acquisitionEbitda: adjustedEbitda,
       acquisitionPrice: adjustedPrice,
+      revenue: adjustedRevenue,
+      acquisitionRevenue: adjustedRevenue,
+      peakRevenue: adjustedRevenue,
     },
     askingPrice: finalAskingPrice,
     freshness,
@@ -828,6 +849,10 @@ export function createStartingBusiness(sectorId: SectorId = 'agency'): Business 
   const targetMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
   const acquisitionPrice = Math.round(targetEbitda * targetMultiple);
 
+  // Derive revenue from target EBITDA and the generated margin
+  const startingMargin = business.ebitdaMargin;
+  const startingRevenue = Math.round(targetEbitda / startingMargin);
+
   return {
     ...business,
     id: generateBusinessId(),
@@ -839,6 +864,9 @@ export function createStartingBusiness(sectorId: SectorId = 'agency'): Business 
     acquisitionEbitda: targetEbitda,
     acquisitionPrice,
     acquisitionMultiple: targetMultiple,
+    revenue: startingRevenue,
+    acquisitionRevenue: startingRevenue,
+    peakRevenue: startingRevenue,
     // Platform fields
     isPlatform: false,
     platformScale: 0,

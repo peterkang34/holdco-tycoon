@@ -28,6 +28,13 @@ export function createMockBusiness(overrides: Partial<Business> = {}): Business 
     acquisitionRound: 1,
     acquisitionMultiple: 4.0,
     organicGrowthRate: 0.05,
+    revenue: 5000,
+    ebitdaMargin: 0.20,
+    acquisitionRevenue: 5000,
+    acquisitionMargin: 0.20,
+    peakRevenue: 5000,
+    revenueGrowthRate: 0.05,
+    marginDriftRate: -0.005,
     qualityRating: 3,
     dueDiligence: createMockDueDiligence(),
     integrationRoundsRemaining: 0,
@@ -78,6 +85,13 @@ export function createMockDeal(overrides: Partial<Deal> = {}): Deal {
       acquisitionPrice: business.acquisitionPrice,
       acquisitionMultiple: business.acquisitionMultiple,
       organicGrowthRate: business.organicGrowthRate,
+      revenue: business.revenue,
+      ebitdaMargin: business.ebitdaMargin,
+      acquisitionRevenue: business.acquisitionRevenue,
+      acquisitionMargin: business.acquisitionMargin,
+      peakRevenue: business.peakRevenue,
+      revenueGrowthRate: business.revenueGrowthRate,
+      marginDriftRate: business.marginDriftRate,
       qualityRating: business.qualityRating,
       dueDiligence: business.dueDiligence,
       integrationRoundsRemaining: business.integrationRoundsRemaining,
@@ -164,16 +178,26 @@ export function createMultiBusinessState(count: number = 3): GameState {
   const sectors: SectorId[] = ['agency', 'saas', 'homeServices', 'consumer', 'industrial'];
 
   for (let i = 0; i < count; i++) {
+    const ebitda = 1000 + i * 500;
+    const margin = 0.20;
+    const rev = Math.round(ebitda / margin);
     businesses.push(
       createMockBusiness({
         id: `biz_${i + 1}`,
         name: `Business ${i + 1}`,
         sectorId: sectors[i % sectors.length],
-        ebitda: 1000 + i * 500,
-        peakEbitda: 1000 + i * 500,
-        acquisitionEbitda: 1000 + i * 500,
-        acquisitionPrice: (1000 + i * 500) * 4,
+        ebitda,
+        peakEbitda: ebitda,
+        acquisitionEbitda: ebitda,
+        acquisitionPrice: ebitda * 4,
         qualityRating: (3 + (i % 3)) as QualityRating,
+        revenue: rev,
+        ebitdaMargin: margin,
+        acquisitionRevenue: rev,
+        acquisitionMargin: margin,
+        peakRevenue: rev,
+        revenueGrowthRate: 0.05,
+        marginDriftRate: -0.005,
       })
     );
   }

@@ -14,7 +14,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const { sectorName, subType, ebitda, qualityRating, acquisitionType } = req.body;
+    const { sectorName, subType, ebitda, qualityRating, acquisitionType, revenue, ebitdaMargin } = req.body;
 
     // Validate required fields
     if (!sectorName || !subType || !ebitda || !qualityRating || !acquisitionType) {
@@ -33,11 +33,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? `$${(ebitda / 1000).toFixed(1)}M`
       : `$${ebitda}k`;
 
+    const revenueFormatted = revenue && revenue >= 1000
+      ? `$${(revenue / 1000).toFixed(1)}M`
+      : revenue ? `$${revenue}k` : 'N/A';
+    const marginFormatted = ebitdaMargin ? `${(ebitdaMargin * 100).toFixed(0)}%` : 'N/A';
+
     const prompt = `Generate realistic M&A deal content for a holding company acquisition game. Be creative and specific.
 
 Business Details:
 - Sector: ${sectorName}
 - Type: ${subType}
+- Annual Revenue: ${revenueFormatted}
+- EBITDA Margin: ${marginFormatted}
 - Annual EBITDA: ${ebitdaFormatted}
 - Quality: ${qualityDescriptions[qualityRating] || 'average'}
 - Deal Type: ${acquisitionType === 'tuck_in' ? 'Small tuck-in acquisition' : acquisitionType === 'platform' ? 'Platform company opportunity' : 'Standalone acquisition'}

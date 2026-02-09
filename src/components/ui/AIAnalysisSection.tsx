@@ -53,6 +53,8 @@ export function AIAnalysisSection({
           round: h.round,
           metrics: {
             totalEbitda: h.metrics.totalEbitda,
+            totalRevenue: h.metrics.totalRevenue ?? 0,
+            avgEbitdaMargin: h.metrics.avgEbitdaMargin ?? 0,
             portfolioRoic: h.metrics.portfolioRoic,
             netDebtToEbitda: h.metrics.netDebtToEbitda,
             fcfPerShare: h.metrics.fcfPerShare,

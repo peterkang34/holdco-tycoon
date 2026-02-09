@@ -62,6 +62,10 @@ export interface SectorDefinition {
   sectorFocusGroup: SectorFocusGroup[];
   subTypes: string[];
   subTypeGroups: number[]; // Parallel to subTypes — same group number = operationally related
+  baseRevenue: [number, number];        // [min, max] in $k
+  baseMargin: [number, number];         // [min, max] as decimals (0.12 = 12%)
+  marginDriftRange: [number, number];   // annual drift in ppt (negative = compression)
+  marginVolatility: number;             // 0-0.05 — random annual margin noise
 }
 
 // How closely related two sub-types are within a sector
@@ -98,6 +102,13 @@ export interface Business {
   acquisitionRound: number;
   acquisitionMultiple: number;
   organicGrowthRate: number;
+  revenue: number;              // annual revenue in $k
+  ebitdaMargin: number;         // 0-1 (e.g. 0.22 = 22%)
+  acquisitionRevenue: number;   // revenue at time of acquisition
+  acquisitionMargin: number;    // margin at time of acquisition
+  peakRevenue: number;          // highest revenue achieved
+  revenueGrowthRate: number;    // annual revenue growth rate
+  marginDriftRate: number;      // annual margin drift (negative = compression)
   qualityRating: QualityRating;
   dueDiligence: DueDiligenceSignals;
   integrationRoundsRemaining: number;
@@ -263,7 +274,7 @@ export type EventType =
 export interface EventImpact {
   businessId?: string;
   businessName?: string;
-  metric: 'ebitda' | 'interestRate' | 'cash' | 'growthRate';
+  metric: 'ebitda' | 'revenue' | 'margin' | 'interestRate' | 'cash' | 'growthRate';
   before: number;
   after: number;
   delta: number;
@@ -305,6 +316,8 @@ export interface Metrics {
   totalDistributions: number;
   totalBuybacks: number;
   totalExitProceeds: number;
+  totalRevenue: number;         // sum of active business revenue
+  avgEbitdaMargin: number;      // weighted avg: totalEbitda / totalRevenue
 }
 
 export interface HistoricalMetrics {
@@ -502,6 +515,8 @@ export interface ExitValuation {
   marketModifier: number;
   sizeTierPremium: number;
   deRiskingPremium: number;
+  ruleOf40Premium: number;
+  marginExpansionPremium: number;
   buyerPoolTier: BuyerPoolTier;
   totalMultiple: number;
   exitPrice: number;

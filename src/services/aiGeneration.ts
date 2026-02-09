@@ -38,6 +38,8 @@ interface GenerationParams {
   ebitda: number;
   qualityRating: QualityRating;
   acquisitionType: 'standalone' | 'tuck_in' | 'platform';
+  revenue?: number;
+  ebitdaMargin?: number;
 }
 
 // Generate AI content for a business via server API
@@ -61,6 +63,8 @@ export async function generateBusinessContent(params: GenerationParams): Promise
         ebitda: params.ebitda,
         qualityRating: params.qualityRating,
         acquisitionType: params.acquisitionType,
+        revenue: params.revenue,
+        ebitdaMargin: params.ebitdaMargin,
       }),
     });
 
@@ -181,6 +185,8 @@ interface GameAnalysisInput {
     round: number;
     metrics: {
       totalEbitda: number;
+      totalRevenue: number;
+      avgEbitdaMargin: number;
       portfolioRoic: number;
       netDebtToEbitda: number;
       fcfPerShare: number;
@@ -240,6 +246,13 @@ export async function generateGameAnalysis(input: GameAnalysisInput): Promise<AI
   const ebitdaGrowth = startMetrics && endMetrics && startMetrics.totalEbitda > 0
     ? ((endMetrics.totalEbitda - startMetrics.totalEbitda) / startMetrics.totalEbitda * 100).toFixed(0)
     : 'N/A';
+  const revenueGrowth = startMetrics && endMetrics && startMetrics.totalRevenue > 0
+    ? ((endMetrics.totalRevenue - startMetrics.totalRevenue) / startMetrics.totalRevenue * 100).toFixed(0)
+    : 'N/A';
+  const avgMargin = endMetrics ? `${(endMetrics.avgEbitdaMargin * 100).toFixed(0)}%` : 'N/A';
+  const marginChange = startMetrics && endMetrics
+    ? `${((endMetrics.avgEbitdaMargin - startMetrics.avgEbitdaMargin) * 100).toFixed(1)} ppt`
+    : 'N/A';
   const finalLeverage = endMetrics?.netDebtToEbitda?.toFixed(1) || 'N/A';
 
   try {
@@ -267,6 +280,9 @@ export async function generateGameAnalysis(input: GameAnalysisInput): Promise<AI
         equityRaisesUsed: input.equityRaisesUsed,
         sharedServicesActive: input.sharedServicesActive,
         ebitdaGrowth,
+        revenueGrowth,
+        avgMargin,
+        marginChange,
         finalLeverage,
       }),
     });
@@ -349,7 +365,9 @@ export async function generateBusinessUpdate(
   recentEvents?: string,
   improvements?: string,
   isPlatform?: boolean,
-  boltOnCount?: number
+  boltOnCount?: number,
+  revenueChange?: string,
+  marginChange?: string,
 ): Promise<string | null> {
   return generateNarrative('business_update', {
     businessName,
@@ -362,6 +380,8 @@ export async function generateBusinessUpdate(
     improvements,
     isPlatform,
     boltOnCount,
+    revenueChange,
+    marginChange,
   });
 }
 
@@ -391,6 +411,11 @@ export async function generateYearChronicle(
     sharedServices?: string;
     fcfPerShare?: string;
     enterpriseValue?: string;
+    // Revenue/margin context
+    totalRevenue?: string;
+    avgMargin?: string;
+    revenueGrowth?: string;
+    marginChange?: string;
   }
 ): Promise<string | null> {
   return generateNarrative('year_chronicle', context);
@@ -453,7 +478,7 @@ export function getFallbackEventNarrative(eventType: string): string {
 // AI-enriched buyer profile — fire-and-forget, deterministic profile works standalone
 export async function generateAIBuyerProfile(
   profile: BuyerProfile,
-  business: { name: string; sectorId: SectorId; ebitda: number; qualityRating: QualityRating }
+  business: { name: string; sectorId: SectorId; ebitda: number; qualityRating: QualityRating; revenue?: number; ebitdaMargin?: number }
 ): Promise<string | null> {
   const isEnabled = await checkAIStatus();
   if (!isEnabled) return null;
@@ -477,6 +502,8 @@ export async function generateAIBuyerProfile(
         ebitda: ebitdaFormatted,
         qualityRating: business.qualityRating,
         baseThesis: profile.investmentThesis,
+        revenue: business.revenue,
+        ebitdaMargin: business.ebitdaMargin,
       }),
     });
 

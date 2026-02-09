@@ -394,6 +394,44 @@ export function generatePostGameInsights(state: GameState): PostGameInsight[] {
     insights.push(POST_GAME_INSIGHTS.hoarded_cash);
   }
 
+  // Revenue & Margin insights
+  // Margin improver: avg margin expanded >3ppt vs acquisition across active businesses
+  const marginExpanders = activeBusinesses.filter(b => b.ebitdaMargin - b.acquisitionMargin >= 0.03);
+  if (marginExpanders.length >= 2) {
+    insights.push(POST_GAME_INSIGHTS.margin_improver);
+  }
+
+  // Margin neglector: avg margin compressed >3ppt vs acquisition
+  const marginCompressors = activeBusinesses.filter(b => b.acquisitionMargin - b.ebitdaMargin >= 0.03);
+  if (marginCompressors.length >= 2 && marginCompressors.length > marginExpanders.length) {
+    insights.push(POST_GAME_INSIGHTS.margin_neglector);
+  }
+
+  // Revenue engine: total revenue grew >100% from first year
+  if (state.metricsHistory.length > 1) {
+    const startRevenue = state.metricsHistory[0]?.metrics.totalRevenue || 0;
+    if (startRevenue > 0 && metrics.totalRevenue > startRevenue * 2) {
+      insights.push(POST_GAME_INSIGHTS.revenue_engine);
+    }
+  }
+
+  // Turnaround artist: bought low-margin businesses and expanded them
+  const turnarounds = activeBusinesses.filter(b =>
+    b.acquisitionMargin < 0.15 && b.ebitdaMargin >= b.acquisitionMargin + 0.05
+  );
+  if (turnarounds.length >= 1) {
+    insights.push(POST_GAME_INSIGHTS.turnaround_artist);
+  }
+
+  // Rule of 40 master: SaaS/education businesses with growth% + margin% >= 40
+  const ro40Businesses = activeBusinesses.filter(b =>
+    (b.sectorId === 'saas' || b.sectorId === 'education') &&
+    (b.revenueGrowthRate * 100 + b.ebitdaMargin * 100) >= 40
+  );
+  if (ro40Businesses.length >= 1) {
+    insights.push(POST_GAME_INSIGHTS.rule_of_40_master);
+  }
+
   // Return top 3 most relevant
   return insights.slice(0, 3);
 }

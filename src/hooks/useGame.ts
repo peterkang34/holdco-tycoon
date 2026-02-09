@@ -164,7 +164,7 @@ migrateV9ToV10();
 // One-time migration from v10 → v11 (adds deal heat + acquisition limits)
 function migrateV10ToV11() {
   try {
-    const v11Key = 'holdco-tycoon-save-v11';
+    const v11Key = 'holdco-tycoon-save-v12';
     const v10Key = 'holdco-tycoon-save-v10';
     if (localStorage.getItem(v11Key)) return;
     const v10Raw = localStorage.getItem(v10Key);
@@ -191,6 +191,60 @@ function migrateV10ToV11() {
   }
 }
 migrateV10ToV11();
+
+// One-time migration from v11 → v12 (adds revenue/margin decomposition)
+function migrateV11ToV12() {
+  try {
+    const v12Key = 'holdco-tycoon-save-v12';
+    const v11Key = 'holdco-tycoon-save-v12';
+    if (localStorage.getItem(v12Key)) return;
+    const v11Raw = localStorage.getItem(v11Key);
+    if (!v11Raw) return;
+    const v11Data = JSON.parse(v11Raw);
+    if (!v11Data?.state) return;
+
+    // Helper: back-compute revenue/margin from EBITDA using sector midpoint margin
+    const addRevenueMargin = (b: any) => {
+      if (b.revenue !== undefined && b.revenue > 0) return b; // Already has fields
+      const sectorDef = SECTORS[b.sectorId];
+      if (!sectorDef) return b;
+      const midMargin = (sectorDef.baseMargin[0] + sectorDef.baseMargin[1]) / 2;
+      const midDrift = (sectorDef.marginDriftRange[0] + sectorDef.marginDriftRange[1]) / 2;
+      return {
+        ...b,
+        ebitdaMargin: midMargin,
+        revenue: Math.round(Math.abs(b.ebitda) / midMargin) || 1000,
+        acquisitionRevenue: Math.round(Math.abs(b.acquisitionEbitda || b.ebitda) / midMargin) || 1000,
+        acquisitionMargin: midMargin,
+        peakRevenue: Math.round(Math.abs(b.peakEbitda || b.ebitda) / midMargin) || 1000,
+        revenueGrowthRate: b.organicGrowthRate || 0.05,
+        marginDriftRate: midDrift,
+      };
+    };
+
+    // Migrate businesses
+    if (Array.isArray(v11Data.state.businesses)) {
+      v11Data.state.businesses = v11Data.state.businesses.map(addRevenueMargin);
+    }
+    if (Array.isArray(v11Data.state.exitedBusinesses)) {
+      v11Data.state.exitedBusinesses = v11Data.state.exitedBusinesses.map(addRevenueMargin);
+    }
+
+    // Migrate pipeline deals
+    if (Array.isArray(v11Data.state.dealPipeline)) {
+      v11Data.state.dealPipeline = v11Data.state.dealPipeline.map((d: any) => ({
+        ...d,
+        business: addRevenueMargin(d.business),
+      }));
+    }
+
+    localStorage.setItem(v12Key, JSON.stringify(v11Data));
+    localStorage.removeItem(v11Key);
+  } catch (e) {
+    console.error('v11→v12 migration failed:', e);
+  }
+}
+migrateV11ToV12();
 
 const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: ReturnType<typeof initializeSharedServices> } = {
   holdcoName: '',
@@ -482,7 +536,9 @@ export const useGameStore = create<GameStore>()(
             focusEbitdaBonus,
             state.inflationRoundsRemaining > 0,
             maxFocusCount,
-            diversificationGrowthBonus
+            diversificationGrowthBonus,
+            state.round,
+            sharedBenefits.marginDefense
           );
         });
 
@@ -742,6 +798,13 @@ export const useGameStore = create<GameStore>()(
           acquisitionRound: state.round,
           acquisitionMultiple: deal.business.acquisitionMultiple,
           organicGrowthRate: deal.business.organicGrowthRate,
+          revenue: deal.business.revenue,
+          ebitdaMargin: deal.business.ebitdaMargin,
+          acquisitionRevenue: deal.business.acquisitionRevenue,
+          acquisitionMargin: deal.business.acquisitionMargin,
+          peakRevenue: deal.business.peakRevenue,
+          revenueGrowthRate: deal.business.revenueGrowthRate,
+          marginDriftRate: deal.business.marginDriftRate,
           qualityRating: deal.business.qualityRating,
           dueDiligence: deal.business.dueDiligence,
           integrationRoundsRemaining: 1, // Tuck-ins integrate faster
@@ -773,6 +836,12 @@ export const useGameStore = create<GameStore>()(
         const multipleExpansion = calculateMultipleExpansion(newPlatformScale, combinedEbitda)
           - calculateMultipleExpansion(platform.platformScale, platform.ebitda);
 
+        // Revenue + margin consolidation
+        const combinedRevenue = platform.revenue + deal.business.revenue;
+        const blendedMargin = combinedRevenue > 0
+          ? combinedEbitda / combinedRevenue
+          : platform.ebitdaMargin;
+
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id === targetPlatformId) {
             return {
@@ -781,10 +850,14 @@ export const useGameStore = create<GameStore>()(
               platformScale: newPlatformScale,
               boltOnIds: [...b.boltOnIds, boltOnId],
               ebitda: b.ebitda + deal.business.ebitda + synergies, // Consolidate EBITDA
+              revenue: combinedRevenue,
+              ebitdaMargin: Math.max(0.03, Math.min(0.80, blendedMargin)),
+              peakRevenue: Math.max(b.peakRevenue, combinedRevenue),
               synergiesRealized: b.synergiesRealized + synergies,
               totalAcquisitionCost: b.totalAcquisitionCost + deal.effectivePrice,
               acquisitionMultiple: b.acquisitionMultiple + multipleExpansion, // Multiple expansion!
               organicGrowthRate: b.organicGrowthRate + growthDragPenalty, // Growth drag on failure
+              revenueGrowthRate: b.revenueGrowthRate + growthDragPenalty,
             };
           }
           return b;
@@ -868,6 +941,10 @@ export const useGameStore = create<GameStore>()(
 
         // Combined entity
         const combinedEbitda = biz1.ebitda + biz2.ebitda + synergies;
+        const combinedRevenue = biz1.revenue + biz2.revenue;
+        const mergedMargin = combinedRevenue > 0
+          ? combinedEbitda / combinedRevenue
+          : (biz1.ebitdaMargin + biz2.ebitdaMargin) / 2;
         const totalMergeCost = mergeCost + mergeRestructuringCost;
         const combinedTotalCost = biz1.totalAcquisitionCost + biz2.totalAcquisitionCost + totalMergeCost;
         const newPlatformScale = Math.max(biz1.platformScale, biz2.platformScale) + 1;
@@ -888,12 +965,21 @@ export const useGameStore = create<GameStore>()(
           sectorId: biz1.sectorId,
           subType: biz1.subType,
           ebitda: combinedEbitda,
-          peakEbitda: combinedEbitda, // C-4: Start tracking peak from combined value (was incorrectly adding both)
+          peakEbitda: combinedEbitda,
           acquisitionEbitda: biz1.acquisitionEbitda + biz2.acquisitionEbitda,
           acquisitionPrice: combinedTotalCost,
           acquisitionRound: Math.min(biz1.acquisitionRound, biz2.acquisitionRound),
           acquisitionMultiple: ((biz1.acquisitionMultiple + biz2.acquisitionMultiple) / 2) + multipleExpansion,
-          organicGrowthRate: (biz1.organicGrowthRate + biz2.organicGrowthRate) / 2 + 0.01 + mergeGrowthDrag, // Slight growth bonus, drag on failure
+          organicGrowthRate: (biz1.organicGrowthRate + biz2.organicGrowthRate) / 2 + 0.01 + mergeGrowthDrag,
+          revenue: combinedRevenue,
+          ebitdaMargin: Math.max(0.03, Math.min(0.80, mergedMargin)),
+          acquisitionRevenue: biz1.acquisitionRevenue + biz2.acquisitionRevenue,
+          acquisitionMargin: (biz1.acquisitionRevenue + biz2.acquisitionRevenue) > 0
+            ? (biz1.acquisitionEbitda + biz2.acquisitionEbitda) / (biz1.acquisitionRevenue + biz2.acquisitionRevenue)
+            : mergedMargin,
+          peakRevenue: combinedRevenue,
+          revenueGrowthRate: (biz1.revenueGrowthRate + biz2.revenueGrowthRate) / 2 + 0.01 + mergeGrowthDrag,
+          marginDriftRate: (biz1.marginDriftRate + biz2.marginDriftRate) / 2,
           qualityRating: bestQuality,
           dueDiligence: biz1.dueDiligence, // Keep first business's DD
           integrationRoundsRemaining: 2, // Mergers take longer to fully integrate
@@ -1017,34 +1103,32 @@ export const useGameStore = create<GameStore>()(
         // M-3: Prevent applying the same improvement type twice to the same business
         if (business.improvements.some(i => i.type === improvementType)) return;
 
-        // Calculate cost based on improvement type
+        // Calculate cost and revenue/margin effects based on improvement type
         let cost: number;
-        let ebitdaBoost: number;
+        let marginBoost = 0;    // ppt change to margin
+        let revenueBoost = 0;   // % change to revenue
         let growthBoost = 0;
-        let volatilityReduction = 0;
 
-        const absEbitda = Math.abs(business.ebitda) || 1; // Floor at 1 to prevent zero costs
+        const absEbitda = Math.abs(business.ebitda) || 1;
         switch (improvementType) {
           case 'operating_playbook':
             cost = Math.round(absEbitda * 0.15);
-            ebitdaBoost = 0.08;
-            volatilityReduction = 0.02;
+            marginBoost = 0.03; // +3 ppt margin
             break;
           case 'pricing_model':
             cost = Math.round(absEbitda * 0.10);
-            ebitdaBoost = 0.05 + Math.random() * 0.07;
+            marginBoost = 0.02; // +2 ppt margin
+            revenueBoost = 0.01; // +1% revenue
             growthBoost = 0.01;
             break;
           case 'service_expansion':
             cost = Math.round(absEbitda * 0.20);
-            ebitdaBoost = 0.10 + Math.random() * 0.08;
+            revenueBoost = 0.08 + Math.random() * 0.04; // +8-12% revenue
+            marginBoost = -0.01; // -1 ppt margin initially (cost of expansion)
             break;
           case 'fix_underperformance':
             cost = Math.round(absEbitda * 0.12);
-            // C-5: Clamp to 0 minimum — if business is already near peak, no boost
-            ebitdaBoost = business.ebitda > 0
-              ? Math.max(0, (business.peakEbitda * 0.8 - business.ebitda) / business.ebitda)
-              : 0.10; // Flat boost for negative EBITDA businesses
+            marginBoost = 0.04; // +4 ppt margin
             break;
           default:
             return;
@@ -1054,10 +1138,18 @@ export const useGameStore = create<GameStore>()(
 
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id !== businessId) return b;
+          const newRevenue = Math.round(b.revenue * (1 + revenueBoost));
+          const newMargin = Math.max(0.03, Math.min(0.80, b.ebitdaMargin + marginBoost));
+          const newEbitda = Math.round(newRevenue * newMargin);
+          const ebitdaBoost = b.ebitda > 0 ? (newEbitda - b.ebitda) / b.ebitda : 0;
           return {
             ...b,
-            ebitda: Math.round(b.ebitda * (1 + ebitdaBoost)),
+            revenue: newRevenue,
+            ebitdaMargin: newMargin,
+            ebitda: newEbitda,
+            peakRevenue: Math.max(b.peakRevenue, newRevenue),
             organicGrowthRate: b.organicGrowthRate + growthBoost,
+            revenueGrowthRate: b.revenueGrowthRate + growthBoost,
             totalAcquisitionCost: b.totalAcquisitionCost + cost,
             improvements: [
               ...b.improvements,
@@ -1759,6 +1851,15 @@ export const useGameStore = create<GameStore>()(
               ? `+${((b.ebitda / b.acquisitionEbitda - 1) * 100).toFixed(0)}% since acquisition`
               : `${((b.ebitda / b.acquisitionEbitda - 1) * 100).toFixed(0)}% since acquisition`;
 
+            // Revenue/margin context for richer narratives
+            const revenueChange = b.acquisitionRevenue > 0
+              ? `${b.revenue > b.acquisitionRevenue ? '+' : ''}${((b.revenue / b.acquisitionRevenue - 1) * 100).toFixed(0)}% since acquisition`
+              : undefined;
+            const marginDelta = b.ebitdaMargin - b.acquisitionMargin;
+            const marginChange = Math.abs(marginDelta) >= 0.01
+              ? `${marginDelta >= 0 ? '+' : ''}${(marginDelta * 100).toFixed(1)} ppt since acquisition (now ${(b.ebitdaMargin * 100).toFixed(0)}%)`
+              : undefined;
+
             const narrative = await generateBusinessUpdate(
               b.name,
               sector.name,
@@ -1769,7 +1870,9 @@ export const useGameStore = create<GameStore>()(
               state.currentEvent?.type,
               b.improvements.length > 0 ? b.improvements.map(i => i.type).join(', ') : undefined,
               b.isPlatform,
-              b.boltOnIds.length
+              b.boltOnIds.length,
+              revenueChange,
+              marginChange,
             );
 
             if (narrative) {
@@ -1917,6 +2020,10 @@ export const useGameStore = create<GameStore>()(
         if (lowQualityBiz.length > 0) concerns.push(`${lowQualityBiz.length} business${lowQualityBiz.length > 1 ? 'es' : ''} rated quality 2 or below`);
         if (ebitdaGrowthPct !== null && ebitdaGrowthPct < -5) concerns.push(`Portfolio EBITDA declined ${Math.abs(ebitdaGrowthPct)}% year-over-year`);
 
+        // Margin concerns
+        const marginCompressingBiz = activeBusinesses.filter(b => b.ebitdaMargin < b.acquisitionMargin - 0.03);
+        if (marginCompressingBiz.length > 0) concerns.push(`${marginCompressingBiz.length} business${marginCompressingBiz.length > 1 ? 'es' : ''} with significant margin compression`);
+
         // Financial positives
         if (fcf > 0 && metrics.totalEbitda > 0) positives.push(`Generating ${formatMoney(fcf)} in free cash flow`);
         if (metrics.netDebtToEbitda < 1 && metrics.netDebtToEbitda >= 0) positives.push('Conservative balance sheet');
@@ -1927,6 +2034,10 @@ export const useGameStore = create<GameStore>()(
         if (platforms.length > 0 && totalBoltOns > 0) positives.push(`Roll-up strategy progressing: ${platforms.length} platform${platforms.length > 1 ? 's' : ''} with ${totalBoltOns} bolt-on${totalBoltOns > 1 ? 's' : ''}`);
         if (parseFloat(avgQuality) >= 4.0) positives.push(`High portfolio quality (avg ${avgQuality}/5)`);
         if (sectors.length >= 4) positives.push(`Well-diversified across ${sectors.length} sectors`);
+
+        // Margin expansion positive
+        const marginExpandingBiz = activeBusinesses.filter(b => b.ebitdaMargin > b.acquisitionMargin + 0.03);
+        if (marginExpandingBiz.length > 0) positives.push(`${marginExpandingBiz.length} business${marginExpandingBiz.length > 1 ? 'es' : ''} with meaningful margin expansion`);
 
         try {
           const chronicle = await generateYearChronicle({
@@ -1953,6 +2064,15 @@ export const useGameStore = create<GameStore>()(
             sharedServices: activeSharedServices.length > 0 ? activeSharedServices.join(', ') : undefined,
             fcfPerShare: formatMoney(metrics.fcfPerShare),
             enterpriseValue: formatMoney(calculateEnterpriseValue(state)),
+            // Revenue/margin context
+            totalRevenue: formatMoney(metrics.totalRevenue),
+            avgMargin: `${(metrics.avgEbitdaMargin * 100).toFixed(0)}%`,
+            revenueGrowth: prevMetrics && prevMetrics.metrics.totalRevenue > 0
+              ? `${Math.round(((metrics.totalRevenue - prevMetrics.metrics.totalRevenue) / prevMetrics.metrics.totalRevenue) * 100)}%`
+              : undefined,
+            marginChange: prevMetrics
+              ? `${((metrics.avgEbitdaMargin - prevMetrics.metrics.avgEbitdaMargin) * 100) >= 0 ? '+' : ''}${((metrics.avgEbitdaMargin - prevMetrics.metrics.avgEbitdaMargin) * 100).toFixed(1)} ppt`
+              : undefined,
           });
 
           set({ yearChronicle: chronicle });
@@ -1992,7 +2112,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v11', // v11: Deal heat + acquisition limits
+      name: 'holdco-tycoon-save-v12', // v11: Deal heat + acquisition limits
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -2064,6 +2184,29 @@ export const useGameStore = create<GameStore>()(
                 heat: d.heat ?? 'warm',
                 effectivePrice: d.effectivePrice ?? d.askingPrice,
               }));
+            }
+            // Backwards compat: add revenue/margin fields if missing
+            const ensureRevMargin = (b: any) => {
+              if (b.revenue !== undefined && b.revenue > 0) return;
+              const sectorDef = SECTORS[b.sectorId];
+              if (!sectorDef) return;
+              const midMargin = (sectorDef.baseMargin[0] + sectorDef.baseMargin[1]) / 2;
+              b.ebitdaMargin = b.ebitdaMargin ?? midMargin;
+              b.revenue = b.revenue ?? (Math.round(Math.abs(b.ebitda) / midMargin) || 1000);
+              b.acquisitionRevenue = b.acquisitionRevenue ?? (Math.round(Math.abs(b.acquisitionEbitda || b.ebitda) / midMargin) || 1000);
+              b.acquisitionMargin = b.acquisitionMargin ?? midMargin;
+              b.peakRevenue = b.peakRevenue ?? (Math.round(Math.abs(b.peakEbitda || b.ebitda) / midMargin) || 1000);
+              b.revenueGrowthRate = b.revenueGrowthRate ?? b.organicGrowthRate ?? 0.05;
+              b.marginDriftRate = b.marginDriftRate ?? (sectorDef.marginDriftRange[0] + sectorDef.marginDriftRange[1]) / 2;
+            };
+            if (Array.isArray(state.businesses)) {
+              state.businesses.forEach(ensureRevMargin);
+            }
+            if (Array.isArray(state.exitedBusinesses)) {
+              state.exitedBusinesses.forEach(ensureRevMargin);
+            }
+            if (Array.isArray(state.dealPipeline)) {
+              state.dealPipeline.forEach((d: any) => ensureRevMargin(d.business));
             }
             const metrics = calculateMetrics(state as GameState);
             const focusBonus = calculateSectorFocusBonus(state.businesses);

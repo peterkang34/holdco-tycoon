@@ -78,11 +78,28 @@ export function calculateExitValuation(
   // De-risking premium — composite de-risking factor
   const deRiskingPremium = calculateDeRiskingPremium(business);
 
+  // Rule of 40 Premium (SaaS/education only)
+  let ruleOf40Premium = 0;
+  if (business.sectorId === 'saas' || business.sectorId === 'education') {
+    const ro40 = (business.revenueGrowthRate * 100) + (business.ebitdaMargin * 100);
+    if (ro40 >= 50) ruleOf40Premium = 1.5;
+    else if (ro40 >= 40) ruleOf40Premium = 0.5 + (ro40 - 40) / 10;
+    else if (ro40 < 25) ruleOf40Premium = -0.3;
+  }
+
+  // Margin Expansion Premium (all sectors)
+  const marginDelta = business.ebitdaMargin - business.acquisitionMargin;
+  let marginExpansionPremium = 0;
+  if (marginDelta >= 0.10) marginExpansionPremium = 0.3;
+  else if (marginDelta >= 0.05) marginExpansionPremium = 0.1 + (marginDelta - 0.05) * 4;
+  else if (marginDelta <= -0.05) marginExpansionPremium = -0.2;
+
   // Calculate exit multiple
   const totalMultiple = Math.max(
     2.0, // Absolute floor - distressed sale
     baseMultiple + growthPremium + qualityPremium + platformPremium + holdPremium +
-    improvementsPremium + marketModifier + sizeTierPremium + deRiskingPremium
+    improvementsPremium + marketModifier + sizeTierPremium + deRiskingPremium +
+    ruleOf40Premium + marginExpansionPremium
   );
 
   const exitPrice = Math.max(0, Math.round(business.ebitda * totalMultiple));
@@ -106,6 +123,8 @@ export function calculateExitValuation(
     marketModifier,
     sizeTierPremium,
     deRiskingPremium,
+    ruleOf40Premium,
+    marginExpansionPremium,
     buyerPoolTier,
     totalMultiple,
     exitPrice,
@@ -261,6 +280,7 @@ export function calculateSharedServicesBenefits(state: GameState): {
   reinvestmentBonus: number;
   talentRetentionBonus: number;
   talentGainBonus: number;
+  marginDefense: number; // ppt offset to margin drift from shared services
 } {
   const activeServices = state.sharedServices.filter(s => s.active);
   const opcoCount = state.businesses.filter(b => b.status === 'active').length;
@@ -275,24 +295,30 @@ export function calculateSharedServicesBenefits(state: GameState): {
   let reinvestmentBonus = 0;
   let talentRetentionBonus = 0;
   let talentGainBonus = 0;
+  let marginDefense = 0;
 
   for (const service of activeServices) {
     switch (service.type) {
       case 'finance_reporting':
         cashConversionBonus += 0.05 * scaleMultiplier;
+        marginDefense += 0.001 * scaleMultiplier; // +0.10 ppt/yr margin defense
         break;
       case 'recruiting_hr':
         talentRetentionBonus += 0.5 * scaleMultiplier;
         talentGainBonus += 0.3 * scaleMultiplier;
+        marginDefense += 0.0015 * scaleMultiplier; // +0.15 ppt/yr margin defense
         break;
       case 'procurement':
         capexReduction += 0.15 * scaleMultiplier;
+        marginDefense += 0.0025 * scaleMultiplier; // +0.25 ppt/yr margin defense
         break;
       case 'marketing_brand':
         growthBonus += 0.015 * scaleMultiplier;
         break;
       case 'technology_systems':
         reinvestmentBonus += 0.2 * scaleMultiplier;
+        growthBonus += 0.005 * scaleMultiplier; // +0.5% revenue growth
+        marginDefense += 0.002 * scaleMultiplier; // +0.20 ppt/yr margin defense
         break;
     }
   }
@@ -304,6 +330,7 @@ export function calculateSharedServicesBenefits(state: GameState): {
     reinvestmentBonus,
     talentRetentionBonus,
     talentGainBonus,
+    marginDefense,
   };
 }
 
@@ -376,74 +403,104 @@ export function applyOrganicGrowth(
   sectorFocusBonus: number,
   inflationActive: boolean,
   concentrationCount?: number, // Number of opcos in same focus group — drives concentration risk
-  diversificationBonus?: number // Growth bonus from portfolio diversification (4+ unique sectors)
+  diversificationBonus?: number, // Growth bonus from portfolio diversification (4+ unique sectors)
+  currentRound?: number, // For progressive onboarding of margin drift
+  sharedServicesMarginDefense?: number // ppt offset to margin drift from shared services
 ): Business {
   const sector = SECTORS[business.sectorId];
 
-  // M-4: Cap the organic growth rate before applying
-  const cappedGrowthRate = Math.min(MAX_ORGANIC_GROWTH_RATE, Math.max(-0.10, business.organicGrowthRate));
+  // --- Revenue Growth ---
+  const cappedGrowthRate = Math.min(MAX_ORGANIC_GROWTH_RATE, Math.max(-0.10, business.revenueGrowthRate));
 
-  // Base annual growth (each round = 1 year)
-  let annualGrowth = cappedGrowthRate;
+  let revenueGrowth = cappedGrowthRate;
 
-  // Sector volatility (random variation within the year)
-  // Concentration risk: 4+ same-sector opcos amplifies volatility (correlated exposure)
+  // Sector volatility with concentration risk
   const concentrationMultiplier = (concentrationCount && concentrationCount >= 4)
-    ? 1 + (concentrationCount - 3) * 0.25 // 4 opcos = 1.25x, 5 = 1.5x, 6 = 1.75x
+    ? 1 + (concentrationCount - 3) * 0.25
     : 1;
-  annualGrowth += sector.volatility * (Math.random() * 2 - 1) * concentrationMultiplier;
+  revenueGrowth += sector.volatility * (Math.random() * 2 - 1) * concentrationMultiplier;
 
-  // Shared services bonus
-  annualGrowth += sharedServicesGrowthBonus;
+  // Shared services bonus (revenue portion)
+  revenueGrowth += sharedServicesGrowthBonus;
 
-  // Sector-specific shared services bonus for agencies and consumer brands
+  // Sector-specific shared services bonus
   if (
     (business.sectorId === 'agency' || business.sectorId === 'consumer') &&
     sharedServicesGrowthBonus > 0
   ) {
-    annualGrowth += 0.01; // Extra 1% annual for these sectors
+    revenueGrowth += 0.01;
   }
 
   // Sector focus bonus
-  annualGrowth += sectorFocusBonus;
+  revenueGrowth += sectorFocusBonus;
 
-  // Diversification bonus — reward for portfolio breadth
+  // Diversification bonus
   if (diversificationBonus && diversificationBonus > 0) {
-    annualGrowth += diversificationBonus;
+    revenueGrowth += diversificationBonus;
   }
 
-  // Integration penalty (first year after acquisition)
+  // Integration penalty
   if (business.integrationRoundsRemaining > 0) {
-    annualGrowth -= (0.03 + Math.random() * 0.05);
+    revenueGrowth -= (0.03 + Math.random() * 0.05);
   }
 
-  // H-2: Inflation increases effective capex, reducing growth
+  // Inflation drags revenue growth
   if (inflationActive) {
-    annualGrowth -= 0.03; // Inflation drags growth by 3% (higher costs)
+    revenueGrowth -= 0.03;
   }
 
-  // Calculate new EBITDA
-  let newEbitda = Math.round(business.ebitda * (1 + annualGrowth));
+  const newRevenue = Math.round(business.revenue * (1 + revenueGrowth));
+
+  // --- Margin Drift ---
+  // Progressive onboarding: margins are static for rounds 1-3, drift begins round 4
+  let newMargin = business.ebitdaMargin;
+  if (currentRound && currentRound >= 4) {
+    let marginChange = business.marginDriftRate;
+
+    // Sector margin volatility (random noise)
+    marginChange += sector.marginVolatility * (Math.random() * 2 - 1);
+
+    // Shared services margin defense (reduces natural drift)
+    if (sharedServicesMarginDefense && sharedServicesMarginDefense > 0) {
+      marginChange += sharedServicesMarginDefense;
+    }
+
+    // Quality-based mean reversion — margins drift toward sector midpoint
+    const sectorMidMargin = (sector.baseMargin[0] + sector.baseMargin[1]) / 2;
+    if (business.ebitdaMargin > sectorMidMargin + 0.10) {
+      marginChange -= 0.005; // slight headwind for very high margins
+    }
+
+    newMargin = Math.max(0.03, Math.min(0.80, business.ebitdaMargin + marginChange));
+  }
+
+  // --- Derive EBITDA ---
+  let newEbitda = Math.round(newRevenue * newMargin);
 
   // Floor at 30% of acquisition EBITDA
   const floor = Math.round(business.acquisitionEbitda * 0.3);
   newEbitda = Math.max(newEbitda, floor);
 
-  // Update peak EBITDA
-  const newPeak = Math.max(business.peakEbitda, newEbitda);
+  // Update peaks
+  const newPeakEbitda = Math.max(business.peakEbitda, newEbitda);
+  const newPeakRevenue = Math.max(business.peakRevenue, newRevenue);
 
-  // Decrease integration period (now in years)
+  // Decrease integration period
   const newIntegration = Math.max(0, business.integrationRoundsRemaining - 1);
 
-  // M-4: Also cap the stored growth rate to prevent runaway accumulation
-  const newGrowthRate = Math.min(MAX_ORGANIC_GROWTH_RATE, Math.max(-0.10, business.organicGrowthRate));
+  // Cap stored growth rates
+  const newGrowthRate = Math.min(MAX_ORGANIC_GROWTH_RATE, Math.max(-0.10, business.revenueGrowthRate));
 
   return {
     ...business,
+    revenue: newRevenue,
+    ebitdaMargin: newMargin,
     ebitda: newEbitda,
-    peakEbitda: newPeak,
+    peakEbitda: newPeakEbitda,
+    peakRevenue: newPeakRevenue,
     integrationRoundsRemaining: newIntegration,
     organicGrowthRate: newGrowthRate,
+    revenueGrowthRate: newGrowthRate,
   };
 }
 
@@ -597,44 +654,50 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
 
   switch (event.type) {
     case 'global_bull_market': {
-      // +5-15% EBITDA for all
-      const boost = 0.05 + Math.random() * 0.10;
+      // Revenue +5-10%, Margin +1-2 ppt
+      const revBoost = 0.05 + Math.random() * 0.05;
+      const marginBoost = 0.01 + Math.random() * 0.01;
       newState.businesses = newState.businesses.map(b => {
         if (b.status !== 'active') return b;
-        const before = b.ebitda;
-        const after = Math.round(b.ebitda * (1 + boost));
+        const beforeEbitda = b.ebitda;
+        const newRevenue = Math.round(b.revenue * (1 + revBoost));
+        const newMargin = Math.max(0.03, Math.min(0.80, b.ebitdaMargin + marginBoost));
+        const afterEbitda = Math.round(newRevenue * newMargin);
         impacts.push({
-          businessId: b.id,
-          businessName: b.name,
-          metric: 'ebitda',
-          before,
-          after,
-          delta: after - before,
-          deltaPercent: boost,
+          businessId: b.id, businessName: b.name, metric: 'revenue',
+          before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: revBoost,
         });
-        return { ...b, ebitda: after };
+        impacts.push({
+          businessId: b.id, businessName: b.name, metric: 'ebitda',
+          before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
+          deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
+        });
+        return { ...b, revenue: newRevenue, ebitdaMargin: newMargin, ebitda: afterEbitda, peakRevenue: Math.max(b.peakRevenue, newRevenue) };
       });
       break;
     }
 
     case 'global_recession': {
-      // Apply recession sensitivity
+      // Revenue -(sensitivity × 10%), Margin -(sensitivity × 2 ppt)
       newState.businesses = newState.businesses.map(b => {
         if (b.status !== 'active') return b;
         const sector = SECTORS[b.sectorId];
-        const impact = sector.recessionSensitivity * 0.15;
-        const before = b.ebitda;
-        const after = Math.round(b.ebitda * (1 - impact));
+        const revImpact = sector.recessionSensitivity * 0.10;
+        const marginImpact = sector.recessionSensitivity * 0.02;
+        const beforeEbitda = b.ebitda;
+        const newRevenue = Math.round(b.revenue * (1 - revImpact));
+        const newMargin = Math.max(0.03, b.ebitdaMargin - marginImpact);
+        const afterEbitda = Math.round(newRevenue * newMargin);
         impacts.push({
-          businessId: b.id,
-          businessName: b.name,
-          metric: 'ebitda',
-          before,
-          after,
-          delta: after - before,
-          deltaPercent: -impact,
+          businessId: b.id, businessName: b.name, metric: 'revenue',
+          before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: -revImpact,
         });
-        return { ...b, ebitda: after };
+        impacts.push({
+          businessId: b.id, businessName: b.name, metric: 'ebitda',
+          before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
+          deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
+        });
+        return { ...b, revenue: newRevenue, ebitdaMargin: newMargin, ebitda: afterEbitda };
       });
       break;
     }
@@ -680,24 +743,29 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
     }
 
     case 'portfolio_star_joins': {
+      // Star hire: +8% revenue, +2 ppt margin
       if (event.affectedBusinessId) {
         newState.businesses = newState.businesses.map(b => {
           if (b.id !== event.affectedBusinessId) return b;
-          const before = b.ebitda;
-          const after = Math.round(b.ebitda * 1.12);
+          const beforeEbitda = b.ebitda;
+          const newRevenue = Math.round(b.revenue * 1.08);
+          const newMargin = Math.max(0.03, Math.min(0.80, b.ebitdaMargin + 0.02));
+          const afterEbitda = Math.round(newRevenue * newMargin);
           impacts.push({
-            businessId: b.id,
-            businessName: b.name,
-            metric: 'ebitda',
-            before,
-            after,
-            delta: after - before,
-            deltaPercent: 0.12,
+            businessId: b.id, businessName: b.name, metric: 'revenue',
+            before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: 0.08,
+          });
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'ebitda',
+            before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
+            deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
           });
           return {
             ...b,
-            ebitda: after,
-            organicGrowthRate: capGrowthRate(b.organicGrowthRate + 0.02), // M-4: Cap
+            revenue: newRevenue, ebitdaMargin: newMargin, ebitda: afterEbitda,
+            peakRevenue: Math.max(b.peakRevenue, newRevenue),
+            organicGrowthRate: capGrowthRate(b.organicGrowthRate + 0.02),
+            revenueGrowthRate: capGrowthRate(b.revenueGrowthRate + 0.02),
           };
         });
       }
@@ -705,24 +773,28 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
     }
 
     case 'portfolio_talent_leaves': {
+      // Talent loss: -6% revenue, -2 ppt margin
       if (event.affectedBusinessId) {
         newState.businesses = newState.businesses.map(b => {
           if (b.id !== event.affectedBusinessId) return b;
-          const before = b.ebitda;
-          const after = Math.round(b.ebitda * 0.90);
+          const beforeEbitda = b.ebitda;
+          const newRevenue = Math.round(b.revenue * 0.94);
+          const newMargin = Math.max(0.03, b.ebitdaMargin - 0.02);
+          const afterEbitda = Math.round(newRevenue * newMargin);
           impacts.push({
-            businessId: b.id,
-            businessName: b.name,
-            metric: 'ebitda',
-            before,
-            after,
-            delta: after - before,
-            deltaPercent: -0.10,
+            businessId: b.id, businessName: b.name, metric: 'revenue',
+            before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: -0.06,
+          });
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'ebitda',
+            before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
+            deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
           });
           return {
             ...b,
-            ebitda: after,
-            organicGrowthRate: capGrowthRate(b.organicGrowthRate - 0.015), // M-4: Cap
+            revenue: newRevenue, ebitdaMargin: newMargin, ebitda: afterEbitda,
+            organicGrowthRate: capGrowthRate(b.organicGrowthRate - 0.015),
+            revenueGrowthRate: capGrowthRate(b.revenueGrowthRate - 0.015),
           };
         });
       }
@@ -730,50 +802,55 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
     }
 
     case 'portfolio_client_signs': {
+      // Client win: +8-12% revenue, margin unchanged
       if (event.affectedBusinessId) {
-        const boost = 0.08 + Math.random() * 0.04;
+        const revBoost = 0.08 + Math.random() * 0.04;
         newState.businesses = newState.businesses.map(b => {
           if (b.id !== event.affectedBusinessId) return b;
-          const before = b.ebitda;
-          const after = Math.round(b.ebitda * (1 + boost));
+          const beforeEbitda = b.ebitda;
+          const newRevenue = Math.round(b.revenue * (1 + revBoost));
+          const afterEbitda = Math.round(newRevenue * b.ebitdaMargin);
           impacts.push({
-            businessId: b.id,
-            businessName: b.name,
-            metric: 'ebitda',
-            before,
-            after,
-            delta: after - before,
-            deltaPercent: boost,
+            businessId: b.id, businessName: b.name, metric: 'revenue',
+            before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: revBoost,
           });
-          return { ...b, ebitda: after };
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'ebitda',
+            before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
+            deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
+          });
+          return { ...b, revenue: newRevenue, ebitda: afterEbitda, peakRevenue: Math.max(b.peakRevenue, newRevenue) };
         });
       }
       break;
     }
 
     case 'portfolio_client_churns': {
+      // Client loss: -12-18% revenue, -1 ppt margin (fixed cost deleverage)
       if (event.affectedBusinessId) {
         const business = newState.businesses.find(b => b.id === event.affectedBusinessId);
         if (business) {
           const sector = SECTORS[business.sectorId];
-          const baseImpact = 0.12 + Math.random() * 0.06;
+          const baseRevImpact = 0.12 + Math.random() * 0.06;
           const concentrationMultiplier =
             sector.clientConcentration === 'high' ? 1.3 : sector.clientConcentration === 'medium' ? 1.0 : 0.7;
-          const impact = baseImpact * concentrationMultiplier;
+          const revImpact = baseRevImpact * concentrationMultiplier;
           newState.businesses = newState.businesses.map(b => {
             if (b.id !== event.affectedBusinessId) return b;
-            const before = b.ebitda;
-            const after = Math.round(b.ebitda * (1 - impact));
+            const beforeEbitda = b.ebitda;
+            const newRevenue = Math.round(b.revenue * (1 - revImpact));
+            const newMargin = Math.max(0.03, b.ebitdaMargin - 0.01);
+            const afterEbitda = Math.round(newRevenue * newMargin);
             impacts.push({
-              businessId: b.id,
-              businessName: b.name,
-              metric: 'ebitda',
-              before,
-              after,
-              delta: after - before,
-              deltaPercent: -impact,
+              businessId: b.id, businessName: b.name, metric: 'revenue',
+              before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: -revImpact,
             });
-            return { ...b, ebitda: after };
+            impacts.push({
+              businessId: b.id, businessName: b.name, metric: 'ebitda',
+              before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
+              deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
+            });
+            return { ...b, revenue: newRevenue, ebitdaMargin: newMargin, ebitda: afterEbitda };
           });
         }
       }
@@ -781,42 +858,46 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
     }
 
     case 'portfolio_breakthrough': {
+      // Operational breakthrough: margin +3 ppt, revenue unchanged
       if (event.affectedBusinessId) {
         newState.businesses = newState.businesses.map(b => {
           if (b.id !== event.affectedBusinessId) return b;
-          const before = b.ebitda;
-          const after = Math.round(b.ebitda * 1.06);
+          const beforeEbitda = b.ebitda;
+          const newMargin = Math.max(0.03, Math.min(0.80, b.ebitdaMargin + 0.03));
+          const afterEbitda = Math.round(b.revenue * newMargin);
           impacts.push({
-            businessId: b.id,
-            businessName: b.name,
-            metric: 'ebitda',
-            before,
-            after,
-            delta: after - before,
-            deltaPercent: 0.06,
+            businessId: b.id, businessName: b.name, metric: 'margin',
+            before: b.ebitdaMargin, after: newMargin, delta: newMargin - b.ebitdaMargin,
           });
-          return { ...b, ebitda: after };
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'ebitda',
+            before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
+            deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
+          });
+          return { ...b, ebitdaMargin: newMargin, ebitda: afterEbitda };
         });
       }
       break;
     }
 
     case 'portfolio_compliance': {
+      // Compliance hit: margin -4 ppt, revenue unchanged
       if (event.affectedBusinessId) {
         newState.businesses = newState.businesses.map(b => {
           if (b.id !== event.affectedBusinessId) return b;
-          const before = b.ebitda;
-          const after = Math.round(b.ebitda * 0.92);
+          const beforeEbitda = b.ebitda;
+          const newMargin = Math.max(0.03, b.ebitdaMargin - 0.04);
+          const afterEbitda = Math.round(b.revenue * newMargin);
           impacts.push({
-            businessId: b.id,
-            businessName: b.name,
-            metric: 'ebitda',
-            before,
-            after,
-            delta: after - before,
-            deltaPercent: -0.08,
+            businessId: b.id, businessName: b.name, metric: 'margin',
+            before: b.ebitdaMargin, after: newMargin, delta: newMargin - b.ebitdaMargin,
           });
-          return { ...b, ebitda: after };
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'ebitda',
+            before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
+            deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
+          });
+          return { ...b, ebitdaMargin: newMargin, ebitda: afterEbitda };
         });
         // C-3: Floor cash at 0 for event costs
         const complianceCost = Math.min(500, state.cash);
@@ -842,47 +923,38 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
           ? randomInRange(sectorEvent.ebitdaEffect as [number, number])
           : sectorEvent.ebitdaEffect;
 
+        // Apply sector event as revenue effect (same magnitude) — margin stays constant
+        // This preserves the existing balance while flowing through revenue/margin
+        const applySectorEvent = (b: Business): Business => {
+          const beforeEbitda = b.ebitda;
+          const newRevenue = Math.round(b.revenue * (1 + ebitdaEffect));
+          const afterEbitda = Math.round(newRevenue * b.ebitdaMargin);
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'revenue',
+            before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: ebitdaEffect,
+          });
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'ebitda',
+            before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
+            deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
+          });
+          let updated = { ...b, revenue: newRevenue, ebitda: afterEbitda, peakRevenue: Math.max(b.peakRevenue, newRevenue) };
+          if (sectorEvent.growthEffect) {
+            updated.organicGrowthRate = capGrowthRate(updated.organicGrowthRate + sectorEvent.growthEffect);
+            updated.revenueGrowthRate = capGrowthRate(updated.revenueGrowthRate + sectorEvent.growthEffect);
+          }
+          return updated;
+        };
+
         if (sectorEvent.affectsAll) {
-          // Apply to all businesses in sector
           newState.businesses = newState.businesses.map(b => {
             if (b.status !== 'active' || b.sectorId !== sectorEvent.sectorId) return b;
-            const before = b.ebitda;
-            const after = Math.round(b.ebitda * (1 + ebitdaEffect));
-            impacts.push({
-              businessId: b.id,
-              businessName: b.name,
-              metric: 'ebitda',
-              before,
-              after,
-              delta: after - before,
-              deltaPercent: ebitdaEffect,
-            });
-            let updated = { ...b, ebitda: after };
-            if (sectorEvent.growthEffect) {
-              updated.organicGrowthRate = capGrowthRate(updated.organicGrowthRate + sectorEvent.growthEffect); // M-4
-            }
-            return updated;
+            return applySectorEvent(b);
           });
         } else if (event.affectedBusinessId) {
-          // Apply to specific business
           newState.businesses = newState.businesses.map(b => {
             if (b.id !== event.affectedBusinessId) return b;
-            const before = b.ebitda;
-            const after = Math.round(b.ebitda * (1 + ebitdaEffect));
-            impacts.push({
-              businessId: b.id,
-              businessName: b.name,
-              metric: 'ebitda',
-              before,
-              after,
-              delta: after - before,
-              deltaPercent: ebitdaEffect,
-            });
-            let updated = { ...b, ebitda: after };
-            if (sectorEvent.growthEffect) {
-              updated.organicGrowthRate = capGrowthRate(updated.organicGrowthRate + sectorEvent.growthEffect); // M-4
-            }
-            return updated;
+            return applySectorEvent(b);
           });
         }
 
@@ -924,6 +996,10 @@ export function calculateMetrics(state: GameState): Metrics {
 
   // Total EBITDA (annual)
   const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
+
+  // Revenue + margin metrics
+  const totalRevenue = activeBusinesses.reduce((sum, b) => sum + b.revenue, 0);
+  const avgEbitdaMargin = totalRevenue > 0 ? totalEbitda / totalRevenue : 0;
 
   // H-5: Shared services annual cost
   const sharedServicesCost = state.sharedServices
@@ -1037,6 +1113,8 @@ export function calculateMetrics(state: GameState): Metrics {
     totalDistributions: state.totalDistributions,
     totalBuybacks: state.totalBuybacks,
     totalExitProceeds: state.totalExitProceeds,
+    totalRevenue,
+    avgEbitdaMargin,
   };
 }
 

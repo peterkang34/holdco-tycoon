@@ -93,16 +93,22 @@ export function EventCard({ event, onAcceptOffer, onDeclineOffer, onContinue }: 
             {event.impacts.map((impact, idx) => (
               <div key={idx} className="flex items-center justify-between text-sm">
                 <span className="text-text-secondary">
-                  {impact.businessName || (impact.metric === 'interestRate' ? 'Interest Rate' : impact.metric === 'cash' ? 'Cash' : 'Portfolio')}
+                  {impact.businessName
+                    ? `${impact.businessName}${impact.metric === 'revenue' ? ' Rev' : impact.metric === 'margin' ? ' Margin' : ''}`
+                    : (impact.metric === 'interestRate' ? 'Interest Rate' : impact.metric === 'cash' ? 'Cash' : impact.metric === 'revenue' ? 'Revenue' : impact.metric === 'margin' ? 'Margin' : 'Portfolio')}
                 </span>
                 <div className="flex items-center gap-3">
-                  {impact.metric === 'interestRate' ? (
+                  {impact.metric === 'interestRate' || impact.metric === 'margin' ? (
                     <>
-                      <span className="text-text-muted font-mono">{formatPercent(impact.before)}</span>
+                      <span className="text-text-muted font-mono">
+                        {impact.metric === 'margin' ? `${(impact.before * 100).toFixed(1)}%` : formatPercent(impact.before)}
+                      </span>
                       <span className="text-text-muted">→</span>
-                      <span className="font-mono font-bold">{formatPercent(impact.after)}</span>
-                      <span className={`font-mono text-xs px-2 py-0.5 rounded ${impact.delta > 0 ? 'bg-danger/20 text-danger' : 'bg-accent/20 text-accent'}`}>
-                        {impact.delta > 0 ? '+' : ''}{formatPercent(impact.delta)}
+                      <span className="font-mono font-bold">
+                        {impact.metric === 'margin' ? `${(impact.after * 100).toFixed(1)}%` : formatPercent(impact.after)}
+                      </span>
+                      <span className={`font-mono text-xs px-2 py-0.5 rounded ${impact.delta > 0 ? (impact.metric === 'margin' ? 'bg-accent/20 text-accent' : 'bg-danger/20 text-danger') : (impact.metric === 'margin' ? 'bg-danger/20 text-danger' : 'bg-accent/20 text-accent')}`}>
+                        {impact.delta > 0 ? '+' : ''}{impact.metric === 'margin' ? `${(impact.delta * 100).toFixed(1)}ppt` : formatPercent(impact.delta)}
                       </span>
                     </>
                   ) : (

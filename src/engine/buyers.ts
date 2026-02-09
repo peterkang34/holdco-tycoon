@@ -177,25 +177,32 @@ function getFundSize(buyerType: BuyerType): string | undefined {
 
 function generateThesis(buyerType: BuyerType, business: Business): string {
   const sectorName = SECTORS[business.sectorId].name;
+  const marginPct = (business.ebitdaMargin * 100).toFixed(0);
+  const marginDelta = business.ebitdaMargin - business.acquisitionMargin;
+  const marginNote = marginDelta >= 0.03
+    ? ` Margin expansion of ${(marginDelta * 100).toFixed(0)} ppt since acquisition demonstrates operational improvement potential.`
+    : marginDelta <= -0.03
+    ? ` Margin compression presents an opportunity for operational turnaround.`
+    : '';
 
   if (buyerType === 'strategic') {
-    return `Seeking to expand ${sectorName} capabilities and cross-sell to existing customer base. Platform synergies expected to drive 15-20% EBITDA uplift within 18 months.`;
+    return `Seeking to expand ${sectorName} capabilities and cross-sell to existing customer base. At ${marginPct}% margins, platform synergies expected to drive 200-400 bps of margin expansion within 18 months.${marginNote}`;
   }
   if (buyerType === 'individual') {
-    return `Experienced operator looking for a ${sectorName.toLowerCase()} business to run. Prefers stable cash flow and hands-on management.`;
+    return `Experienced operator looking for a ${sectorName.toLowerCase()} business to run. ${marginPct}% EBITDA margins provide stable cash flow for hands-on management.`;
   }
   if (buyerType === 'family_office') {
-    return `Seeking cash-flowing ${sectorName.toLowerCase()} assets for long-term hold. Values stability and predictable returns over growth.`;
+    return `Seeking cash-flowing ${sectorName.toLowerCase()} assets at ${marginPct}% margins for long-term hold. Values stability and predictable returns over growth.${marginNote}`;
   }
 
   // PE fund types
   if (business.isPlatform) {
-    return `Platform acquisition thesis — consolidate fragmented ${sectorName.toLowerCase()} market through programmatic M&A. Target 3-5 bolt-ons post-close to drive multiple expansion.`;
+    return `Platform acquisition thesis — consolidate fragmented ${sectorName.toLowerCase()} market through programmatic M&A. Target 3-5 bolt-ons post-close to drive multiple expansion and margin improvement from ${marginPct}% base.`;
   }
   if (business.ebitda >= 10000) {
-    return `Institutional-quality ${sectorName.toLowerCase()} platform with de-risked cash flows. Thesis centers on operational improvements and strategic add-on acquisitions.`;
+    return `Institutional-quality ${sectorName.toLowerCase()} platform with de-risked cash flows at ${marginPct}% margins. Thesis centers on operational improvements and strategic add-on acquisitions.${marginNote}`;
   }
-  return `Attractive ${sectorName.toLowerCase()} acquisition with strong fundamentals. Plan to professionalize operations and accelerate organic growth.`;
+  return `Attractive ${sectorName.toLowerCase()} acquisition at ${marginPct}% EBITDA margins with strong fundamentals. Plan to professionalize operations and accelerate organic growth with margin expansion opportunity.`;
 }
 
 export function generateBuyerProfile(
@@ -260,7 +267,8 @@ export function generateValuationCommentary(
     factors.push('Platform status signals professionalized operations and scalability');
   }
 
-  const summary = `At $${ebitdaM}M platform EBITDA, this attracts ${tier.replace(/_/g, ' ')} attention at ${totalMultiple.toFixed(1)}x`;
+  const marginPct = business.ebitdaMargin ? (business.ebitdaMargin * 100).toFixed(0) : null;
+  const summary = `At $${ebitdaM}M EBITDA${marginPct ? ` (${marginPct}% margins)` : ''}, this attracts ${tier.replace(/_/g, ' ')} attention at ${totalMultiple.toFixed(1)}x`;
 
   return {
     summary,

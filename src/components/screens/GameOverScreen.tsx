@@ -286,9 +286,13 @@ export function GameOverScreen({
       {/* Final Metrics */}
       <div className="card mb-6">
         <h2 className="text-lg font-bold mb-4">Final Portfolio Summary</h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
           <div>
-            <p className="text-text-muted text-sm">Final EBITDA</p>
+            <p className="text-text-muted text-sm">Total Revenue</p>
+            <p className="text-2xl font-bold font-mono">{formatMoney(metrics.totalRevenue)}</p>
+          </div>
+          <div>
+            <p className="text-text-muted text-sm">Final EBITDA <span className="text-xs">({(metrics.avgEbitdaMargin * 100).toFixed(0)}%)</span></p>
             <p className="text-2xl font-bold font-mono">{formatMoney(metrics.totalEbitda)}</p>
           </div>
           <div>
@@ -333,8 +337,16 @@ export function GameOverScreen({
                 </div>
                 <div className="flex items-center gap-4 text-right">
                   <div>
+                    <p className="text-xs text-text-muted">Revenue</p>
+                    <p className="font-mono">{formatMoney(business.revenue)}</p>
+                  </div>
+                  <div>
                     <p className="text-xs text-text-muted">EBITDA</p>
                     <p className="font-mono">{formatMoney(business.status === 'active' ? business.ebitda : business.exitPrice || 0)}</p>
+                    <p className={`text-xs font-mono ${business.ebitdaMargin > business.acquisitionMargin ? 'text-accent' : business.ebitdaMargin < business.acquisitionMargin ? 'text-danger' : 'text-text-muted'}`}>
+                      {(business.ebitdaMargin * 100).toFixed(0)}%
+                      {business.status === 'active' && ` (${((business.ebitdaMargin - business.acquisitionMargin) * 100) >= 0 ? '+' : ''}${((business.ebitdaMargin - business.acquisitionMargin) * 100).toFixed(1)}ppt)`}
+                    </p>
                   </div>
                   <div>
                     <p className="text-xs text-text-muted">MOIC</p>

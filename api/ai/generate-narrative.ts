@@ -35,19 +35,22 @@ Write a vivid, present-tense narrative. Keep it under 50 words. Be dramatic but 
 }
 
 function buildBusinessUpdatePrompt(context: Record<string, unknown>): string {
+  const revenueChange = context.revenueChange ? `\nREVENUE CHANGE: ${context.revenueChange}` : '';
+  const marginChange = context.marginChange ? `\nMARGIN CHANGE: ${context.marginChange}` : '';
+
   return `You are narrating the ongoing story of a business in a holding company's portfolio. Write a brief story beat about what happened this year.
 
 BUSINESS: ${context.businessName}
 SECTOR: ${context.sector}
 SUBTYPE: ${context.subType}
 YEAR IN PORTFOLIO: ${context.yearsOwned}
-EBITDA CHANGE: ${context.ebitdaChange}
+EBITDA CHANGE: ${context.ebitdaChange}${revenueChange}${marginChange}
 QUALITY: ${context.quality}/5
 RECENT EVENTS: ${context.recentEvents || 'None'}
 IMPROVEMENTS MADE: ${context.improvements || 'None'}
 IS PLATFORM: ${context.isPlatform ? 'Yes, with ' + context.boltOnCount + ' bolt-ons' : 'No'}
 
-Write 2-3 sentences about what happened at this business this year. Include a specific detail (a person, customer, project, challenge). Make it feel like a real company story. Keep it under 60 words. Respond with just the narrative text.`;
+Write 2-3 sentences about what happened at this business this year. Include a specific detail (a person, customer, project, challenge). If margins changed significantly, weave that into the narrative (e.g., cost pressures, efficiency gains). Make it feel like a real company story. Keep it under 60 words. Respond with just the narrative text.`;
 }
 
 function buildYearChroniclePrompt(context: Record<string, unknown>): string {
@@ -69,8 +72,8 @@ HOLDCO NAME: ${context.holdcoName}
 YEAR: ${context.year}
 
 KEY FINANCIALS:
-- EBITDA: ${context.totalEbitda}${context.prevTotalEbitda ? ` (prior: ${context.prevTotalEbitda})` : ''}${context.ebitdaGrowth ? ` [${context.ebitdaGrowth} YoY]` : ''}
-- Net Debt/EBITDA: ${context.leverage}
+${context.totalRevenue ? `- Revenue: ${context.totalRevenue}${context.revenueGrowth ? ` [${context.revenueGrowth} YoY]` : ''}\n` : ''}- EBITDA: ${context.totalEbitda}${context.prevTotalEbitda ? ` (prior: ${context.prevTotalEbitda})` : ''}${context.ebitdaGrowth ? ` [${context.ebitdaGrowth} YoY]` : ''}
+${context.avgMargin ? `- Avg EBITDA Margin: ${context.avgMargin}${context.marginChange ? ` [${context.marginChange} vs prior year]` : ''}\n` : ''}- Net Debt/EBITDA: ${context.leverage}
 - FCF: ${context.fcf}
 - Portfolio: ${context.portfolioCount} companies
 ${strategicSection}
@@ -99,7 +102,7 @@ function buildDealStoryPrompt(context: Record<string, unknown>): string {
 BUSINESS: ${context.businessName}
 SECTOR: ${context.sector}
 SUBTYPE: ${context.subType}
-EBITDA: ${context.ebitda}
+${context.revenue ? `REVENUE: ${context.revenue}\n` : ''}EBITDA: ${context.ebitda}${context.ebitdaMargin ? ` (${context.ebitdaMargin} margins)` : ''}
 QUALITY: ${context.quality}/5
 ASKING MULTIPLE: ${context.multiple}x
 DEAL TYPE: ${context.dealType}

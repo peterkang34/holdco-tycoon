@@ -90,6 +90,24 @@ export const METRIC_TOOLTIPS: Record<string, { definition: string; formula: stri
     benchmark: 'Statutory is 30%. Below 25% means your structuring is working. Below 20% is excellent.',
     chapter: 'Ch. VII',
   },
+  totalrevenue: {
+    definition: 'Total annual revenue across all active portfolio companies. Revenue is the top line before any costs.',
+    formula: 'Sum of all opco annual Revenue',
+    benchmark: 'Revenue growth drives EBITDA growth. But revenue without margin is vanity — watch the bottom line too.',
+    chapter: 'Ch. IV',
+  },
+  ebitdamargin: {
+    definition: 'Weighted average EBITDA margin across the portfolio. Shows how efficiently your businesses convert revenue to earnings.',
+    formula: 'Total EBITDA ÷ Total Revenue',
+    benchmark: '>20% is solid for most sectors. >30% indicates strong pricing power or operational efficiency. <15% signals cost pressure.',
+    chapter: 'Ch. III',
+  },
+  revenuegrowth: {
+    definition: 'Annual revenue growth rate for an individual business. Drives top-line expansion before margin effects.',
+    formula: 'Year-over-year change in Revenue',
+    benchmark: '>10% is strong organic growth. >20% often signals market tailwind. Combine with stable margins for quality growth.',
+    chapter: 'Ch. IV',
+  },
 };
 
 export const SITUATION_TIPS: Record<string, Tip> = {
@@ -189,6 +207,36 @@ export const SITUATION_TIPS: Record<string, Tip> = {
     bookReference: 'Ch. VII',
     trigger: 'loss_offset > 0',
   },
+  margin_compression: {
+    id: 'margin_compression',
+    content: 'Margins are compressing. In PE, margin erosion is a silent killer — revenue can grow while profits shrink. Shared services like Procurement can defend margins against natural drift.',
+    bookReference: 'Ch. III',
+    trigger: 'avg_margin_declining > 2ppt',
+  },
+  margin_expansion: {
+    id: 'margin_expansion',
+    content: 'Margins expanding — this is the real value creation lever. Buyers pay premium multiples for businesses with demonstrated margin improvement. Keep investing in operational efficiency.',
+    bookReference: 'Ch. IV',
+    trigger: 'margin_expanded > 3ppt_vs_acquisition',
+  },
+  revenue_without_margin: {
+    id: 'revenue_without_margin',
+    content: 'Revenue is growing but margins are flat or declining. Growth without profitability is a trap — make sure you\'re not buying revenue at the expense of unit economics.',
+    bookReference: 'Ch. IX',
+    trigger: 'revenue_growth > 10% && margin_flat_or_declining',
+  },
+  high_margin_business: {
+    id: 'high_margin_business',
+    content: 'High-margin businesses command premium exit multiples. Protect this margin — it\'s your moat. Operational improvements and pricing discipline are more valuable than chasing revenue growth.',
+    bookReference: 'Ch. III',
+    trigger: 'business_margin > sector_p75',
+  },
+  low_margin_acquisition: {
+    id: 'low_margin_acquisition',
+    content: 'This business has below-sector-average margins. That\'s either a red flag or a turnaround opportunity. If you have the operational playbook to improve margins, the upside can be significant.',
+    bookReference: 'Ch. IV',
+    trigger: 'acquisition_margin < sector_avg - 5ppt',
+  },
 };
 
 export const SHARED_SERVICE_TIPS: Record<string, string> = {
@@ -279,5 +327,30 @@ export const POST_GAME_INSIGHTS: Record<string, { pattern: string; insight: stri
     pattern: 'Tax-efficient structuring',
     insight: 'You used interest shields, management fee deductions, and consolidated loss offsets to lower your effective tax rate. Like TransDigm and Danaher, smart tax structuring is a real competitive advantage.',
     bookReference: 'Ch. VII',
+  },
+  margin_improver: {
+    pattern: 'Margin expansion across portfolio',
+    insight: 'You expanded margins meaningfully across your portfolio — this is the hallmark of great operators. Danaher\'s DBS consistently drives 200-400 bps of annual margin improvement. Buyers pay premium multiples for demonstrated margin expansion.',
+    bookReference: 'Ch. III',
+  },
+  margin_neglector: {
+    pattern: 'Margins drifted down unaddressed',
+    insight: 'Your portfolio margins compressed over time without intervention. Natural margin drift is inevitable — labor costs rise, competition intensifies, pricing power erodes. Active margin management through shared services and improvements is how the best holdcos fight entropy.',
+    bookReference: 'Ch. III',
+  },
+  revenue_engine: {
+    pattern: 'Strong revenue growth engine',
+    insight: 'You built a revenue growth machine. Consistent top-line growth is the foundation of compounding value — but only when paired with stable or expanding margins. Revenue without profitability is a treadmill.',
+    bookReference: 'Ch. IV',
+  },
+  turnaround_artist: {
+    pattern: 'Margin turnaround success',
+    insight: 'You turned around underperforming margins through operational improvements — buying at below-average margins and expanding them is one of the highest-ROIC strategies in PE. This is the playbook that made Danaher legendary.',
+    bookReference: 'Ch. III',
+  },
+  rule_of_40_master: {
+    pattern: 'Rule of 40 excellence (SaaS/Education)',
+    insight: 'Your SaaS or education businesses achieved Rule of 40 status (growth% + margin% >= 40). This is the gold standard for software businesses and commands premium valuations from buyers.',
+    bookReference: 'Ch. III',
   },
 };

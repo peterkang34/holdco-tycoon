@@ -108,9 +108,20 @@ export function AnnualReportModal({ roundHistory, onClose }: AnnualReportModalPr
                   )}
 
                   {/* Key metrics row */}
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">
                     <div>
-                      <p className="text-text-muted text-xs">EBITDA</p>
+                      <p className="text-text-muted text-xs">Revenue</p>
+                      <p className="font-mono font-bold">
+                        {formatMoney(entry.metrics.totalRevenue)}
+                        <MetricDelta
+                          current={entry.metrics.totalRevenue}
+                          previous={prevEntry?.metrics.totalRevenue}
+                          format={formatMoney}
+                        />
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-text-muted text-xs">EBITDA <span className="text-text-muted">({(entry.metrics.avgEbitdaMargin * 100).toFixed(0)}%)</span></p>
                       <p className="font-mono font-bold">
                         {formatMoney(entry.metrics.totalEbitda)}
                         <MetricDelta

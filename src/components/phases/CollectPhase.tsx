@@ -110,9 +110,13 @@ export function CollectPhase({
       {/* EBITDA to FCF Summary */}
       <div className="card mb-6 bg-white/5">
         <h3 className="font-bold mb-4">Portfolio Cash Flow Waterfall</h3>
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-4 text-center text-sm">
+        <div className="grid grid-cols-2 md:grid-cols-7 gap-4 text-center text-sm">
           <div>
-            <p className="text-text-muted">EBITDA</p>
+            <p className="text-text-muted">Revenue</p>
+            <p className="font-mono font-bold text-lg">{formatMoney(activeBusinesses.reduce((s, b) => s + b.revenue, 0))}</p>
+          </div>
+          <div>
+            <p className="text-text-muted">EBITDA <span className="text-text-muted text-xs">({totalEbitda > 0 && activeBusinesses.reduce((s, b) => s + b.revenue, 0) > 0 ? ((totalEbitda / activeBusinesses.reduce((s, b) => s + b.revenue, 0)) * 100).toFixed(0) : 0}%)</span></p>
             <p className="font-mono font-bold text-lg">{formatMoney(totalEbitda)}</p>
           </div>
           <div>

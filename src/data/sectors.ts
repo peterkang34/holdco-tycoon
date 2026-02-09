@@ -28,6 +28,10 @@ export const SECTORS: Record<string, SectorDefinition> = {
     ],
     // Affinity groups: 0=performance/digital, 1=creative/production
     subTypeGroups: [0, 1, 0, 0, 1],
+    baseRevenue: [3200, 25000],    // 800/0.25=3200, 3000/0.12=25000
+    baseMargin: [0.12, 0.25],
+    marginDriftRange: [-0.008, -0.003],
+    marginVolatility: 0.02,
   },
   saas: {
     id: 'saas',
@@ -53,6 +57,10 @@ export const SECTORS: Record<string, SectorDefinition> = {
     ],
     // Affinity groups: 0=product SaaS, 1=infrastructure/tools
     subTypeGroups: [0, 0, 1, 1],
+    baseRevenue: [2667, 22500],    // 1200/0.45=2667, 4500/0.20=22500
+    baseMargin: [0.20, 0.45],
+    marginDriftRange: [-0.003, 0.002],
+    marginVolatility: 0.015,
   },
   homeServices: {
     id: 'homeServices',
@@ -80,6 +88,10 @@ export const SECTORS: Record<string, SectorDefinition> = {
     ],
     // Affinity groups: 0=skilled trades, 1=property services, 2=management
     subTypeGroups: [0, 0, 0, 1, 2, 1],
+    baseRevenue: [3571, 26667],    // 1000/0.28=3571, 4000/0.15=26667
+    baseMargin: [0.15, 0.28],
+    marginDriftRange: [-0.005, -0.001],
+    marginVolatility: 0.01,
   },
   consumer: {
     id: 'consumer',
@@ -107,6 +119,10 @@ export const SECTORS: Record<string, SectorDefinition> = {
     ],
     // Affinity groups: 0=retail/DTC, 1=food/luxury
     subTypeGroups: [0, 0, 1, 0, 1, 1],
+    baseRevenue: [4091, 35000],    // 900/0.22=4091, 3500/0.10=35000
+    baseMargin: [0.10, 0.22],
+    marginDriftRange: [-0.008, -0.003],
+    marginVolatility: 0.025,
   },
   industrial: {
     id: 'industrial',
@@ -133,6 +149,10 @@ export const SECTORS: Record<string, SectorDefinition> = {
     ],
     // Affinity groups: 0=manufacturing, 1=distribution/testing
     subTypeGroups: [0, 0, 1, 1, 0],
+    baseRevenue: [4688, 33333],    // 1500/0.32=4688, 6000/0.18=33333
+    baseMargin: [0.18, 0.32],
+    marginDriftRange: [-0.004, -0.001],
+    marginVolatility: 0.01,
   },
   b2bServices: {
     id: 'b2bServices',
@@ -159,6 +179,10 @@ export const SECTORS: Record<string, SectorDefinition> = {
     ],
     // Affinity groups: 0=tech services, 1=professional services, 2=people services
     subTypeGroups: [0, 1, 2, 1, 0],
+    baseRevenue: [3333, 25333],    // 1000/0.30=3333, 3800/0.15=25333
+    baseMargin: [0.15, 0.30],
+    marginDriftRange: [-0.005, -0.001],
+    marginVolatility: 0.015,
   },
   healthcare: {
     id: 'healthcare',
@@ -185,6 +209,10 @@ export const SECTORS: Record<string, SectorDefinition> = {
     ],
     // Affinity groups: 0=clinical practices, 1=home-based care, 2=behavioral
     subTypeGroups: [0, 0, 0, 1, 2],
+    baseRevenue: [3429, 25000],    // 1200/0.35=3429, 5000/0.20=25000
+    baseMargin: [0.20, 0.35],
+    marginDriftRange: [-0.003, 0.001],
+    marginVolatility: 0.01,
   },
   restaurant: {
     id: 'restaurant',
@@ -211,6 +239,10 @@ export const SECTORS: Record<string, SectorDefinition> = {
     ],
     // Affinity groups: 0=dine-in/takeout, 1=grab-and-go/delivery
     subTypeGroups: [0, 0, 1, 1, 0],
+    baseRevenue: [5000, 43750],    // 900/0.18=5000, 3500/0.08=43750
+    baseMargin: [0.08, 0.18],
+    marginDriftRange: [-0.015, -0.008],
+    marginVolatility: 0.03,
   },
   realEstate: {
     id: 'realEstate',
@@ -237,6 +269,10 @@ export const SECTORS: Record<string, SectorDefinition> = {
     ],
     // Affinity groups: 0=residential/storage, 1=commercial/tech infra, 2=utility
     subTypeGroups: [0, 0, 1, 1, 2],
+    baseRevenue: [3077, 22857],    // 2000/0.65=3077, 8000/0.35=22857
+    baseMargin: [0.35, 0.65],
+    marginDriftRange: [-0.003, 0.000],
+    marginVolatility: 0.01,
   },
   education: {
     id: 'education',
@@ -263,6 +299,10 @@ export const SECTORS: Record<string, SectorDefinition> = {
     ],
     // Affinity groups: 0=digital/online, 1=in-person, 2=supplemental
     subTypeGroups: [0, 1, 0, 1, 2],
+    baseRevenue: [2286, 17778],    // 800/0.35=2286, 3200/0.18=17778
+    baseMargin: [0.18, 0.35],
+    marginDriftRange: [-0.004, 0.001],
+    marginVolatility: 0.015,
   },
 };
 
