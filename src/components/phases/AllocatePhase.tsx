@@ -202,13 +202,21 @@ export function AllocatePhase({
                 {SECTORS[selectedDeal.business.sectorId].emoji} {selectedDeal.business.subType}
               </p>
               <div className="flex items-center gap-2 mt-2">
-                <span className={`text-xs px-2 py-1 rounded inline-block ${
-                  selectedDeal.heat === 'cold' ? 'bg-blue-500/20 text-blue-400' :
-                  selectedDeal.heat === 'warm' ? 'bg-yellow-500/20 text-yellow-400' :
-                  selectedDeal.heat === 'hot' ? 'bg-orange-500/20 text-orange-400' :
-                  'bg-red-500/20 text-red-400 animate-pulse'
-                }`}>
-                  {selectedDeal.heat.charAt(0).toUpperCase() + selectedDeal.heat.slice(1)}
+                <span className="relative group/modalheat">
+                  <span className={`text-xs px-2 py-1 rounded inline-block cursor-help ${
+                    selectedDeal.heat === 'cold' ? 'bg-blue-500/20 text-blue-400' :
+                    selectedDeal.heat === 'warm' ? 'bg-yellow-500/20 text-yellow-400' :
+                    selectedDeal.heat === 'hot' ? 'bg-orange-500/20 text-orange-400' :
+                    'bg-red-500/20 text-red-400 animate-pulse'
+                  }`}>
+                    {selectedDeal.heat.charAt(0).toUpperCase() + selectedDeal.heat.slice(1)}
+                  </span>
+                  <span className="absolute left-0 top-full mt-1 w-56 p-2 bg-bg-primary border border-white/20 rounded-lg shadow-xl text-xs text-text-secondary opacity-0 invisible group-hover/modalheat:opacity-100 group-hover/modalheat:visible transition-all z-50">
+                    {selectedDeal.heat === 'cold' && 'Low buyer interest. No premium over base price.'}
+                    {selectedDeal.heat === 'warm' && 'Moderate competition. 10-15% premium over base.'}
+                    {selectedDeal.heat === 'hot' && 'Multiple competing offers. 20-30% premium.'}
+                    {selectedDeal.heat === 'contested' && 'Bidding war. 30-50% premium and 40% chance a rival snatches it.'}
+                  </span>
                 </span>
                 <span className={`text-xs px-2 py-1 rounded inline-block ${
                   selectedDeal.acquisitionType === 'tuck_in' ? 'bg-accent-secondary/20 text-accent-secondary' :
@@ -963,13 +971,17 @@ export function AllocatePhase({
 
             {/* Acquisition counter */}
             <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <span className={`text-sm font-medium ${acquisitionsThisRound >= maxAcquisitionsPerRound ? 'text-warning' : 'text-text-secondary'}`}>
+              <div className="flex items-center gap-3 relative group/acqlimit">
+                <span className={`text-sm font-medium cursor-help ${acquisitionsThisRound >= maxAcquisitionsPerRound ? 'text-warning' : 'text-text-secondary'}`}>
                   Acquisitions: {maxAcquisitionsPerRound - acquisitionsThisRound}/{maxAcquisitionsPerRound} remaining
                 </span>
                 {acquisitionsThisRound >= maxAcquisitionsPerRound && (
                   <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded">Limit reached</span>
                 )}
+                <div className="absolute left-0 top-full mt-1 w-64 p-3 bg-bg-primary border border-white/10 rounded-lg shadow-xl text-xs text-text-secondary opacity-0 invisible group-hover/acqlimit:opacity-100 group-hover/acqlimit:visible transition-all z-50">
+                  <p className="font-medium text-text-primary mb-1">Acquisition Attempts</p>
+                  <p>You can attempt {maxAcquisitionsPerRound} acquisitions per year{maSourcing.tier >= 1 ? ` (boosted by M&A Sourcing Tier ${maSourcing.tier})` : ''}. Tuck-ins count toward this limit. Contested deals may be snatched by competing buyers, consuming your attempt without spending cash.</p>
+                </div>
               </div>
               {passedDealIds.size > 0 && (
                 <button

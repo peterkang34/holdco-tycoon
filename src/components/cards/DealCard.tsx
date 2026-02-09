@@ -35,10 +35,10 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
 
   const getHeatBadge = (heat: DealHeat) => {
     switch (heat) {
-      case 'cold': return { label: 'Cold', color: 'bg-blue-500/20 text-blue-400', pulse: false };
-      case 'warm': return { label: 'Warm', color: 'bg-yellow-500/20 text-yellow-400', pulse: false };
-      case 'hot': return { label: 'Hot', color: 'bg-orange-500/20 text-orange-400', pulse: false };
-      case 'contested': return { label: 'Contested', color: 'bg-red-500/20 text-red-400', pulse: true };
+      case 'cold': return { label: 'Cold', color: 'bg-blue-500/20 text-blue-400', pulse: false, tip: 'Low buyer interest. No premium, no competition risk.' };
+      case 'warm': return { label: 'Warm', color: 'bg-yellow-500/20 text-yellow-400', pulse: false, tip: 'Moderate interest. 10-15% premium over base price.' };
+      case 'hot': return { label: 'Hot', color: 'bg-orange-500/20 text-orange-400', pulse: false, tip: 'Multiple buyers competing. 20-30% premium over base price.' };
+      case 'contested': return { label: 'Contested', color: 'bg-red-500/20 text-red-400', pulse: true, tip: '30-50% premium and 40% chance another buyer snatches the deal before you close.' };
     }
   };
   const heatBadge = getHeatBadge(deal.heat);
@@ -77,8 +77,13 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
         </div>
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-1">
-            <span className={`text-xs px-2 py-1 rounded ${heatBadge.color} ${heatBadge.pulse ? 'animate-pulse' : ''}`}>
-              {heatBadge.label}
+            <span className="relative group/heat">
+              <span className={`text-xs px-2 py-1 rounded cursor-help ${heatBadge.color} ${heatBadge.pulse ? 'animate-pulse' : ''}`}>
+                {heatBadge.label}
+              </span>
+              <span className="absolute right-0 top-full mt-1 w-48 p-2 bg-bg-primary border border-white/10 rounded-lg shadow-xl text-xs text-text-secondary opacity-0 invisible group-hover/heat:opacity-100 group-hover/heat:visible transition-all z-50">
+                {heatBadge.tip}
+              </span>
             </span>
             <span className={`text-xs px-2 py-1 rounded ${acquisitionBadge.color}`}>
               {acquisitionBadge.label}
@@ -172,9 +177,12 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
           <p className="text-xs text-text-muted">Asking Price</p>
           <p className="font-mono font-bold text-lg">{formatMoney(deal.effectivePrice)}</p>
           {hasHeatPremium ? (
-            <p className="text-xs text-text-muted">
+            <p className="text-xs text-text-muted relative group/price inline-flex items-center gap-1 cursor-help">
               <span className="line-through">{formatMoney(deal.askingPrice)}</span>
-              <span className="ml-1 text-warning">+{premiumPct}%</span>
+              <span className="text-warning">+{premiumPct}%</span>
+              <span className="absolute left-0 top-full mt-1 w-52 p-2 bg-bg-primary border border-white/10 rounded-lg shadow-xl text-xs text-text-secondary opacity-0 invisible group-hover/price:opacity-100 group-hover/price:visible transition-all z-50">
+                Competitive premium: other buyers are bidding up the price. Sourced and off-market deals face less competition.
+              </span>
             </p>
           ) : (
             <p className="text-xs text-text-muted">{deal.business.acquisitionMultiple.toFixed(1)}x EBITDA</p>
