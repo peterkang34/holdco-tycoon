@@ -14,14 +14,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const entries = await kv.zrange(LEADERBOARD_KEY, 0, MAX_ENTRIES - 1, { rev: true });
 
     // entries are stored as JSON strings in the sorted set
+    // Wrap each parse in try/catch so one bad entry doesn't break the whole endpoint
     const parsed = entries.map((entry) => {
-      if (typeof entry === 'string') {
-        return JSON.parse(entry);
+      try {
+        return typeof entry === 'string' ? JSON.parse(entry) : entry;
+      } catch {
+        return null;
       }
-      return entry;
-    });
+    }).filter(Boolean);
 
-    res.setHeader('Cache-Control', 'public, s-maxage=30');
+    res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
     return res.status(200).json(parsed);
   } catch (error) {
     console.error('Leaderboard fetch error:', error);

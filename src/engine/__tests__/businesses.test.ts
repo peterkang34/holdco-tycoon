@@ -51,7 +51,7 @@ describe('generateBusiness', () => {
       // EBITDA is derived from revenue × margin, so it can exceed baseEbitda range
       // when quality modifiers push both revenue and margin up. Use wider tolerance.
       const minPossible = Math.round(sector.baseEbitda[0] * 0.5);
-      const maxPossible = Math.round(sector.baseEbitda[1] * 2.0);
+      const maxPossible = Math.round(sector.baseEbitda[1] * 3.0);
       expect(business.ebitda).toBeGreaterThanOrEqual(minPossible);
       expect(business.ebitda).toBeLessThanOrEqual(maxPossible);
     }

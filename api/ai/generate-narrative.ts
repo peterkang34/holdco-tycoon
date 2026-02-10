@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { checkAIRateLimit, isBodyTooLarge } from '../_lib/rateLimit';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -124,11 +125,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(500).json({ error: 'API key not configured' });
   }
 
+  if (await checkAIRateLimit(req)) {
+    return res.status(429).json({ error: 'Too many requests. Try again in a minute.' });
+  }
+
+  if (isBodyTooLarge(req.body)) {
+    return res.status(413).json({ error: 'Request too large' });
+  }
+
   try {
     const { type, context } = req.body as NarrativeRequest;
 
     if (!type || !context) {
       return res.status(400).json({ error: 'Missing type or context' });
+    }
+
+    // Cap allBusinessNames to prevent prompt inflation
+    if (Array.isArray(context.allBusinessNames)) {
+      context.allBusinessNames = (context.allBusinessNames as string[]).slice(0, 30).map(
+        (n: string) => (typeof n === 'string' ? n.slice(0, 100) : '')
+      );
     }
 
     let prompt: string;
@@ -169,9 +185,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Anthropic API error:', response.status, errorText);
-      return res.status(response.status).json({ error: 'Narrative generation failed' });
+      console.error('Anthropic API error:', response.status);
+      return res.status(502).json({ error: 'AI service temporarily unavailable' });
     }
 
     const data = await response.json();

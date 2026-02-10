@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { checkAIRateLimit, isBodyTooLarge, sanitizeString } from '../_lib/rateLimit';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -19,14 +20,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Check API key is configured
   if (!ANTHROPIC_API_KEY) {
     return res.status(500).json({ error: 'API key not configured' });
   }
 
+  if (await checkAIRateLimit(req)) {
+    return res.status(429).json({ error: 'Too many requests. Try again in a minute.' });
+  }
+
+  if (isBodyTooLarge(req.body)) {
+    return res.status(413).json({ error: 'Request too large' });
+  }
+
   try {
     const {
-      holdcoName,
+      holdcoName: rawHoldcoName,
       score,
       enterpriseValue,
       totalAcquisitions,
@@ -47,7 +55,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       finalLeverage,
     } = req.body;
 
-    // Validate required fields
+    const holdcoName = sanitizeString(rawHoldcoName, 50);
+    const platformSummarySafe = sanitizeString(platformSummary, 500);
+    const sectorSummarySafe = sanitizeString(sectorSummary, 500);
+
     if (!holdcoName || !score) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
@@ -74,8 +85,8 @@ PORTFOLIO ACTIVITY:
 - Average Hold Period: ${avgHoldPeriod} years
 - Average Quality Rating: ${avgQuality}/5
 - Operational Improvements Made: ${totalImprovements}
-- ${platformSummary}
-- Sector Distribution: ${sectorSummary}
+- ${platformSummarySafe}
+- Sector Distribution: ${sectorSummarySafe}
 
 CAPITAL MANAGEMENT:
 - Total Invested Capital: ${formatMoney(totalInvestedCapital)}
@@ -123,9 +134,8 @@ Be direct and specific. Reference their actual numbers. Don't be generic. Respon
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Anthropic API error:', response.status, errorText);
-      return res.status(response.status).json({ error: 'AI analysis failed' });
+      console.error('Anthropic API error:', response.status);
+      return res.status(502).json({ error: 'AI service temporarily unavailable' });
     }
 
     const data = await response.json();

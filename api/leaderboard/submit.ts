@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import crypto from 'crypto';
+import { getClientIp, isBodyTooLarge } from '../_lib/rateLimit';
 
 const LEADERBOARD_KEY = 'leaderboard:global';
 const MAX_ENTRIES = 100;
@@ -8,6 +9,9 @@ const RATE_LIMIT_SECONDS = 60;
 
 const VALID_GRADES = ['S', 'A', 'B', 'C', 'D', 'F'] as const;
 type Grade = typeof VALID_GRADES[number];
+
+// Allowlist: alphanumeric, spaces, and common business name chars
+const HOLDCO_NAME_REGEX = /^[A-Za-z0-9 &'.,\-]+$/;
 
 function gradeMatchesScore(grade: Grade, score: number): boolean {
   switch (grade) {
@@ -20,16 +24,13 @@ function gradeMatchesScore(grade: Grade, score: number): boolean {
   }
 }
 
-function getClientIp(req: VercelRequest): string {
-  const forwarded = req.headers['x-forwarded-for'];
-  if (typeof forwarded === 'string') return forwarded.split(',')[0].trim();
-  if (Array.isArray(forwarded)) return forwarded[0];
-  return req.socket?.remoteAddress || 'unknown';
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
+  }
+
+  if (isBodyTooLarge(req.body)) {
+    return res.status(413).json({ error: 'Request too large' });
   }
 
   try {
@@ -54,9 +55,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'initials must be 2-4 uppercase letters' });
     }
 
-    // holdcoName: 1-50 chars, non-empty
+    // holdcoName: 1-50 chars, non-empty, safe characters only
     if (typeof holdcoName !== 'string' || holdcoName.trim().length === 0 || holdcoName.length > 50) {
       return res.status(400).json({ error: 'holdcoName must be 1-50 non-empty characters' });
+    }
+    if (!HOLDCO_NAME_REGEX.test(holdcoName.trim())) {
+      return res.status(400).json({ error: 'holdcoName contains invalid characters' });
     }
 
     // enterpriseValue: number, 0 ≤ EV ≤ 500,000
@@ -89,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'only full 20-round games are eligible' });
     }
 
-    // --- Rate Limiting ---
+    // --- Rate Limiting (uses x-real-ip, not spoofable x-forwarded-for) ---
     const ip = getClientIp(req);
     const rateLimitKey = `ratelimit:leaderboard:${ip}`;
 
@@ -121,12 +125,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Prune to max entries: remove lowest-scoring entries beyond the limit
     const totalCount = await kv.zcard(LEADERBOARD_KEY);
     if (totalCount > MAX_ENTRIES) {
-      // Remove the lowest entries (indices 0 to overflow-1)
       await kv.zremrangebyrank(LEADERBOARD_KEY, 0, totalCount - MAX_ENTRIES - 1);
     }
 
     // Calculate rank (number of entries with higher EV + 1)
-    // zrank returns 0-based ascending rank; we need descending
     const ascRank = await kv.zrank(LEADERBOARD_KEY, JSON.stringify(entry));
     const currentCount = await kv.zcard(LEADERBOARD_KEY);
     const rank = ascRank !== null ? currentCount - ascRank : 1;

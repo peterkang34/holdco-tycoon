@@ -1,20 +1,36 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { checkAIRateLimit, isBodyTooLarge, sanitizeString } from '../_lib/rateLimit';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Only allow POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Check API key is configured
   if (!ANTHROPIC_API_KEY) {
     return res.status(500).json({ error: 'API key not configured' });
   }
 
+  // Rate limit: 10 requests/minute per IP
+  if (await checkAIRateLimit(req)) {
+    return res.status(429).json({ error: 'Too many requests. Try again in a minute.' });
+  }
+
+  // Body size limit
+  if (isBodyTooLarge(req.body)) {
+    return res.status(413).json({ error: 'Request too large' });
+  }
+
   try {
-    const { sectorName, subType, ebitda, qualityRating, acquisitionType, revenue, ebitdaMargin } = req.body;
+    const body = req.body || {};
+    const sectorName = sanitizeString(body.sectorName, 100);
+    const subType = sanitizeString(body.subType, 100);
+    const ebitda = typeof body.ebitda === 'number' ? body.ebitda : 0;
+    const qualityRating = typeof body.qualityRating === 'number' ? Math.min(5, Math.max(1, body.qualityRating)) : 3;
+    const acquisitionType = sanitizeString(body.acquisitionType, 50);
+    const revenue = typeof body.revenue === 'number' ? body.revenue : undefined;
+    const ebitdaMargin = typeof body.ebitdaMargin === 'number' ? body.ebitdaMargin : undefined;
 
     // Validate required fields
     if (!sectorName || !subType || !ebitda || !qualityRating || !acquisitionType) {
@@ -78,9 +94,8 @@ Respond ONLY with valid JSON, no other text.`;
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Anthropic API error:', response.status, errorText);
-      return res.status(response.status).json({ error: 'AI generation failed' });
+      console.error('Anthropic API error:', response.status);
+      return res.status(502).json({ error: 'AI service temporarily unavailable' });
     }
 
     const data = await response.json();
