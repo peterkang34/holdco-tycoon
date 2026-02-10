@@ -436,10 +436,12 @@ export function generatePostGameInsights(state: GameState): PostGameInsight[] {
   return insights.slice(0, 3);
 }
 
+// --- Local (localStorage) leaderboard functions (offline fallback) ---
+
 /**
  * Load leaderboard from localStorage
  */
-export function loadLeaderboard(): LeaderboardEntry[] {
+export function loadLocalLeaderboard(): LeaderboardEntry[] {
   try {
     const data = localStorage.getItem(LEADERBOARD_KEY);
     if (!data) return [];
@@ -450,10 +452,10 @@ export function loadLeaderboard(): LeaderboardEntry[] {
 }
 
 /**
- * Save a new entry to the leaderboard
+ * Save a new entry to the local leaderboard
  */
-export function saveToLeaderboard(entry: Omit<LeaderboardEntry, 'id' | 'date'>): LeaderboardEntry {
-  const leaderboard = loadLeaderboard();
+export function saveToLocalLeaderboard(entry: Omit<LeaderboardEntry, 'id' | 'date'>): LeaderboardEntry {
+  const leaderboard = loadLocalLeaderboard();
 
   const newEntry: LeaderboardEntry = {
     ...entry,
@@ -474,20 +476,22 @@ export function saveToLeaderboard(entry: Omit<LeaderboardEntry, 'id' | 'date'>):
   return newEntry;
 }
 
+// --- Sync helpers (operate on pre-fetched arrays, used by localStorage) ---
+
 /**
- * Check if a score would make the leaderboard
+ * Check if a score would make the leaderboard (localStorage)
  */
 export function wouldMakeLeaderboard(enterpriseValue: number): boolean {
-  const leaderboard = loadLeaderboard();
+  const leaderboard = loadLocalLeaderboard();
   if (leaderboard.length < MAX_LEADERBOARD_ENTRIES) return true;
   return enterpriseValue > (leaderboard[leaderboard.length - 1]?.enterpriseValue ?? 0);
 }
 
 /**
- * Get leaderboard rank for an entry
+ * Get leaderboard rank for an entry (localStorage)
  */
 export function getLeaderboardRank(enterpriseValue: number): number {
-  const leaderboard = loadLeaderboard();
+  const leaderboard = loadLocalLeaderboard();
   let rank = 1;
   for (const entry of leaderboard) {
     if (entry.enterpriseValue > enterpriseValue) {
@@ -495,4 +499,74 @@ export function getLeaderboardRank(enterpriseValue: number): number {
     }
   }
   return rank;
+}
+
+// --- Sync helpers for pre-fetched arrays (used by UI with global data) ---
+
+const GLOBAL_LEADERBOARD_SIZE = 50;
+
+/**
+ * Check if a score would make a pre-fetched leaderboard
+ */
+export function wouldMakeLeaderboardFromList(entries: LeaderboardEntry[], enterpriseValue: number): boolean {
+  if (entries.length < GLOBAL_LEADERBOARD_SIZE) return true;
+  return enterpriseValue > (entries[entries.length - 1]?.enterpriseValue ?? 0);
+}
+
+/**
+ * Get rank within a pre-fetched leaderboard
+ */
+export function getLeaderboardRankFromList(entries: LeaderboardEntry[], enterpriseValue: number): number {
+  let rank = 1;
+  for (const entry of entries) {
+    if (entry.enterpriseValue > enterpriseValue) {
+      rank++;
+    }
+  }
+  return rank;
+}
+
+// --- Async API functions (global leaderboard) ---
+
+/**
+ * Load leaderboard from global API, with localStorage fallback
+ */
+export async function loadLeaderboard(): Promise<LeaderboardEntry[]> {
+  try {
+    const res = await fetch('/api/leaderboard/get');
+    if (!res.ok) throw new Error('API error');
+    return await res.json();
+  } catch {
+    return loadLocalLeaderboard();
+  }
+}
+
+/**
+ * Submit score to global leaderboard + save locally (dual-write)
+ */
+export async function saveToLeaderboard(
+  entry: Omit<LeaderboardEntry, 'id' | 'date'>,
+  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number }
+): Promise<LeaderboardEntry> {
+  const newEntry: LeaderboardEntry = {
+    ...entry,
+    id: crypto.randomUUID(),
+    date: new Date().toISOString(),
+  };
+
+  try {
+    const res = await fetch('/api/leaderboard/submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...entry, ...extra }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      newEntry.id = data.id;
+    }
+  } catch { /* silent fallback */ }
+
+  // Always save locally too (dual-write)
+  saveToLocalLeaderboard(entry);
+  return newEntry;
 }

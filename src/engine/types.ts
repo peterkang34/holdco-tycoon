@@ -463,6 +463,9 @@ export interface LeaderboardEntry {
   grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
   businessCount: number;
   date: string;
+  // Optional enriched fields (global leaderboard)
+  totalRevenue?: number;
+  avgEbitdaMargin?: number;
 }
 
 // Utility types

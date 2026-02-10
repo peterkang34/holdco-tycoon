@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SectorId } from '../../engine/types';
 import { SECTOR_LIST, SECTORS } from '../../data/sectors';
 import { loadLeaderboard } from '../../engine/scoring';
@@ -13,6 +13,13 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
   const [selectedSector, setSelectedSector] = useState<SectorId>('agency');
   const [showNameError, setShowNameError] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [hasLeaderboardEntries, setHasLeaderboardEntries] = useState(false);
+
+  useEffect(() => {
+    loadLeaderboard().then(entries => {
+      setHasLeaderboardEntries(entries.length > 0);
+    });
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -112,13 +119,13 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
           </button>
         </form>
 
-        {/* High Scores */}
-        {loadLeaderboard().length > 0 && (
+        {/* Global Leaderboard */}
+        {hasLeaderboardEntries && (
           <button
             onClick={() => setShowLeaderboard(true)}
             className="mt-4 text-sm text-text-muted hover:text-accent transition-colors"
           >
-            🏆 High Scores
+            🌍 Global Leaderboard
           </button>
         )}
 

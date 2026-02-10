@@ -14,9 +14,25 @@ function formatDate(dateStr: string) {
 
 export function LeaderboardModal({ onClose, hypotheticalEV }: LeaderboardModalProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const fetchLeaderboard = () => {
+    setLoading(true);
+    setError(false);
+    loadLeaderboard()
+      .then(entries => {
+        setLeaderboard(entries);
+        setLoading(false);
+      })
+      .catch(() => {
+        setError(true);
+        setLoading(false);
+      });
+  };
 
   useEffect(() => {
-    setLeaderboard(loadLeaderboard());
+    fetchLeaderboard();
   }, []);
 
   // Determine ghost row rank
@@ -30,9 +46,9 @@ export function LeaderboardModal({ onClose, hypotheticalEV }: LeaderboardModalPr
         <div className="flex items-start justify-between mb-6">
           <div>
             <h3 className="text-xl font-bold flex items-center gap-2">
-              <span>🏆</span> High Scores
+              <span>🌍</span> Global Leaderboard
             </h3>
-            <p className="text-text-muted text-sm">Top 10 runs by enterprise value</p>
+            <p className="text-text-muted text-sm">Top 50 runs by enterprise value</p>
           </div>
           <button
             onClick={onClose}
@@ -42,12 +58,31 @@ export function LeaderboardModal({ onClose, hypotheticalEV }: LeaderboardModalPr
           </button>
         </div>
 
-        {leaderboard.length === 0 && ghostRank === -1 ? (
+        {loading && (
+          <div className="space-y-2">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="h-14 bg-white/5 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {error && (
           <div className="card text-center text-text-muted py-8">
-            <p>No high scores yet.</p>
+            <p>Failed to load leaderboard.</p>
+            <button onClick={fetchLeaderboard} className="btn-secondary text-sm mt-3">
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!loading && !error && leaderboard.length === 0 && ghostRank === -1 ? (
+          <div className="card text-center text-text-muted py-8">
+            <p>No scores yet.</p>
             <p className="text-sm mt-2">Complete a game to set your first record.</p>
           </div>
-        ) : (
+        ) : null}
+
+        {!loading && !error && (leaderboard.length > 0 || ghostRank !== -1) && (
           <div className="space-y-2">
             {leaderboard.map((entry, index) => (
               <Fragment key={entry.id}>

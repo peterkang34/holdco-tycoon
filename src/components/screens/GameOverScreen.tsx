@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatPercent, formatMultiple, HistoricalMetrics } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
-import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboard, getLeaderboardRank } from '../../engine/scoring';
+import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLeaderboardRankFromList } from '../../engine/scoring';
 import { AIAnalysisSection } from '../ui/AIAnalysisSection';
 
 interface GameOverScreenProps {
@@ -43,6 +43,9 @@ export function GameOverScreen({
   const [hasSaved, setHasSaved] = useState(false);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [savedEntryId, setSavedEntryId] = useState<string | null>(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+  const [leaderboardError, setLeaderboardError] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   // Deduplicate: exitedBusinesses wins over businesses (a sold biz exists in both)
   // Filter out 'integrated' status (bolt-ons are folded into platform EBITDA)
@@ -52,29 +55,75 @@ export function GameOverScreen({
     ...businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated' && b.status !== 'merged'),
   ];
   const activeBusinesses = businesses.filter(b => b.status === 'active');
-  const canMakeLeaderboard = wouldMakeLeaderboard(enterpriseValue);
-  const potentialRank = getLeaderboardRank(enterpriseValue);
+  const canMakeLeaderboard = wouldMakeLeaderboardFromList(leaderboard, enterpriseValue);
+  const potentialRank = getLeaderboardRankFromList(leaderboard, enterpriseValue);
 
-  // Load leaderboard on mount
+  // Load global leaderboard on mount
   useEffect(() => {
-    setLeaderboard(loadLeaderboard());
+    let cancelled = false;
+    setLeaderboardLoading(true);
+    setLeaderboardError(false);
+    loadLeaderboard()
+      .then(entries => {
+        if (!cancelled) {
+          setLeaderboard(entries);
+          setLeaderboardLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLeaderboardError(true);
+          setLeaderboardLoading(false);
+        }
+      });
+    return () => { cancelled = true; };
   }, []);
 
-  const handleSaveScore = () => {
-    if (initials.length < 2 || hasSaved) return;
+  const handleRetryLeaderboard = () => {
+    setLeaderboardLoading(true);
+    setLeaderboardError(false);
+    loadLeaderboard()
+      .then(entries => {
+        setLeaderboard(entries);
+        setLeaderboardLoading(false);
+      })
+      .catch(() => {
+        setLeaderboardError(true);
+        setLeaderboardLoading(false);
+      });
+  };
 
-    const entry = saveToLeaderboard({
-      holdcoName,
-      initials: initials.toUpperCase(),
-      enterpriseValue,
-      score: score.total,
-      grade: score.grade,
-      businessCount: activeBusinesses.length,
-    });
+  const handleSaveScore = async () => {
+    if (initials.length < 2 || hasSaved || saving) return;
 
-    setSavedEntryId(entry.id);
-    setHasSaved(true);
-    setLeaderboard(loadLeaderboard());
+    setSaving(true);
+    try {
+      const entry = await saveToLeaderboard(
+        {
+          holdcoName,
+          initials: initials.toUpperCase(),
+          enterpriseValue,
+          score: score.total,
+          grade: score.grade,
+          businessCount: activeBusinesses.length,
+        },
+        {
+          totalRounds: 20,
+          totalInvestedCapital,
+          totalRevenue: metrics.totalRevenue,
+          avgEbitdaMargin: metrics.avgEbitdaMargin,
+        }
+      );
+
+      setSavedEntryId(entry.id);
+      setHasSaved(true);
+
+      // Reload global leaderboard to show updated rankings
+      const updated = await loadLeaderboard();
+      setLeaderboard(updated);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const getGradeColor = () => {
@@ -180,7 +229,7 @@ export function GameOverScreen({
       </div>
 
       {/* Save to Leaderboard */}
-      {!hasSaved && canMakeLeaderboard && (
+      {!hasSaved && !leaderboardLoading && canMakeLeaderboard && (
         <div className="card mb-6 border-yellow-400/30">
           <div className="text-center">
             <p className="text-yellow-400 font-bold mb-2">
@@ -193,17 +242,17 @@ export function GameOverScreen({
               <input
                 type="text"
                 value={initials}
-                onChange={(e) => setInitials(e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 3).toUpperCase())}
+                onChange={(e) => setInitials(e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase())}
                 placeholder="AAA"
-                maxLength={3}
-                className="w-24 text-center text-2xl font-bold bg-white/10 border border-white/20 rounded-lg py-2 px-4 focus:outline-none focus:border-accent"
+                maxLength={4}
+                className="w-28 text-center text-2xl font-bold bg-white/10 border border-white/20 rounded-lg py-2 px-4 focus:outline-none focus:border-accent"
               />
               <button
                 onClick={handleSaveScore}
-                disabled={initials.length < 2}
+                disabled={initials.length < 2 || saving}
                 className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save Score
+                {saving ? 'Saving...' : 'Save Score'}
               </button>
             </div>
           </div>
@@ -212,17 +261,41 @@ export function GameOverScreen({
 
       {hasSaved && (
         <div className="card mb-6 border-accent/30 text-center">
-          <p className="text-accent font-bold">Score saved to leaderboard!</p>
+          <p className="text-accent font-bold">Score saved to global leaderboard!</p>
         </div>
       )}
 
-      {/* Leaderboard */}
-      {leaderboard.length > 0 && (
-        <div className="card mb-6">
-          <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
-            <span>🏆</span> Leaderboard
-          </h2>
+      {/* Global Leaderboard */}
+      <div className="card mb-6">
+        <h2 className="text-lg font-bold mb-4 flex items-center gap-2">
+          <span>🌍</span> Global Leaderboard
+        </h2>
+
+        {leaderboardLoading && (
           <div className="space-y-2">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-14 bg-white/5 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        )}
+
+        {leaderboardError && (
+          <div className="text-center py-6">
+            <p className="text-text-muted mb-3">Failed to load leaderboard</p>
+            <button onClick={handleRetryLeaderboard} className="btn-secondary text-sm">
+              Retry
+            </button>
+          </div>
+        )}
+
+        {!leaderboardLoading && !leaderboardError && leaderboard.length === 0 && (
+          <div className="text-center text-text-muted py-6">
+            <p>No scores yet. Be the first!</p>
+          </div>
+        )}
+
+        {!leaderboardLoading && !leaderboardError && leaderboard.length > 0 && (
+          <div className="space-y-2 max-h-[400px] overflow-y-auto">
             {leaderboard.map((entry, index) => (
               <div
                 key={entry.id}
@@ -267,8 +340,8 @@ export function GameOverScreen({
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Score Breakdown */}
       <div className="card mb-6">
