@@ -51,7 +51,7 @@ export const GLOBAL_EVENTS: EventDefinition[] = [
     title: 'Inflation Spike',
     description: 'Supply chain disruptions drive costs higher across the economy.',
     probability: 0.05,
-    effectDescription: 'Margin compression -2 ppt for 2 rounds; capex rates +3%',
+    effectDescription: 'Margin compression -2 ppt; revenue growth drag -3% for 2 rounds',
     tip: 'Pricing power is the best inflation hedge. Businesses that can pass costs through to customers will survive.',
     tipSource: 'Ch. III',
   },

@@ -479,7 +479,13 @@ export function applyOrganicGrowth(
 
   // Floor at 30% of acquisition EBITDA
   const floor = Math.round(business.acquisitionEbitda * 0.3);
-  newEbitda = Math.max(newEbitda, floor);
+  if (newEbitda < floor) {
+    newEbitda = floor;
+    // Re-derive margin to maintain EBITDA = Revenue × Margin invariant
+    if (newRevenue > 0) {
+      newMargin = Math.max(0.03, newEbitda / newRevenue);
+    }
+  }
 
   // Update peaks
   const newPeakEbitda = Math.max(business.peakEbitda, newEbitda);
@@ -652,6 +658,17 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
   // M-4: Helper to cap growth rate changes
   const capGrowthRate = (rate: number) => Math.min(MAX_ORGANIC_GROWTH_RATE, Math.max(-0.10, rate));
 
+  // Floor EBITDA at 30% of acquisition EBITDA (same as organic growth) and fix margin to maintain invariant
+  const applyEbitdaFloor = (ebitda: number, revenue: number, margin: number, acquisitionEbitda: number) => {
+    const floor = Math.round(acquisitionEbitda * 0.3);
+    if (ebitda < floor) {
+      const floored = floor;
+      const fixedMargin = revenue > 0 ? Math.max(0.03, floored / revenue) : margin;
+      return { ebitda: floored, margin: fixedMargin };
+    }
+    return { ebitda, margin };
+  };
+
   switch (event.type) {
     case 'global_bull_market': {
       // Revenue +5-10%, Margin +1-2 ppt
@@ -686,18 +703,19 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
         const marginImpact = sector.recessionSensitivity * 0.02;
         const beforeEbitda = b.ebitda;
         const newRevenue = Math.round(b.revenue * (1 - revImpact));
-        const newMargin = Math.max(0.03, b.ebitdaMargin - marginImpact);
-        const afterEbitda = Math.round(newRevenue * newMargin);
+        const rawMargin = Math.max(0.03, b.ebitdaMargin - marginImpact);
+        const rawEbitda = Math.round(newRevenue * rawMargin);
+        const floored = applyEbitdaFloor(rawEbitda, newRevenue, rawMargin, b.acquisitionEbitda);
         impacts.push({
           businessId: b.id, businessName: b.name, metric: 'revenue',
           before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: -revImpact,
         });
         impacts.push({
           businessId: b.id, businessName: b.name, metric: 'ebitda',
-          before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
-          deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
+          before: beforeEbitda, after: floored.ebitda, delta: floored.ebitda - beforeEbitda,
+          deltaPercent: beforeEbitda > 0 ? (floored.ebitda - beforeEbitda) / beforeEbitda : 0,
         });
-        return { ...b, revenue: newRevenue, ebitdaMargin: newMargin, ebitda: afterEbitda };
+        return { ...b, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
       });
       break;
     }
@@ -734,6 +752,24 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
 
     case 'global_inflation': {
       newState.inflationRoundsRemaining = 2;
+      // Immediate margin compression -2 ppt (matching event description)
+      newState.businesses = newState.businesses.map(b => {
+        if (b.status !== 'active') return b;
+        const beforeEbitda = b.ebitda;
+        const rawMargin = Math.max(0.03, b.ebitdaMargin - 0.02);
+        const rawEbitda = Math.round(b.revenue * rawMargin);
+        const floored = applyEbitdaFloor(rawEbitda, b.revenue, rawMargin, b.acquisitionEbitda);
+        impacts.push({
+          businessId: b.id, businessName: b.name, metric: 'margin',
+          before: b.ebitdaMargin, after: floored.margin, delta: floored.margin - b.ebitdaMargin,
+        });
+        impacts.push({
+          businessId: b.id, businessName: b.name, metric: 'ebitda',
+          before: beforeEbitda, after: floored.ebitda, delta: floored.ebitda - beforeEbitda,
+          deltaPercent: beforeEbitda > 0 ? (floored.ebitda - beforeEbitda) / beforeEbitda : 0,
+        });
+        return { ...b, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
+      });
       break;
     }
 
@@ -779,20 +815,21 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
           if (b.id !== event.affectedBusinessId) return b;
           const beforeEbitda = b.ebitda;
           const newRevenue = Math.round(b.revenue * 0.94);
-          const newMargin = Math.max(0.03, b.ebitdaMargin - 0.02);
-          const afterEbitda = Math.round(newRevenue * newMargin);
+          const rawMargin = Math.max(0.03, b.ebitdaMargin - 0.02);
+          const rawEbitda = Math.round(newRevenue * rawMargin);
+          const floored = applyEbitdaFloor(rawEbitda, newRevenue, rawMargin, b.acquisitionEbitda);
           impacts.push({
             businessId: b.id, businessName: b.name, metric: 'revenue',
             before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: -0.06,
           });
           impacts.push({
             businessId: b.id, businessName: b.name, metric: 'ebitda',
-            before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
-            deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
+            before: beforeEbitda, after: floored.ebitda, delta: floored.ebitda - beforeEbitda,
+            deltaPercent: beforeEbitda > 0 ? (floored.ebitda - beforeEbitda) / beforeEbitda : 0,
           });
           return {
             ...b,
-            revenue: newRevenue, ebitdaMargin: newMargin, ebitda: afterEbitda,
+            revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda,
             organicGrowthRate: capGrowthRate(b.organicGrowthRate - 0.015),
             revenueGrowthRate: capGrowthRate(b.revenueGrowthRate - 0.015),
           };
@@ -839,18 +876,19 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
             if (b.id !== event.affectedBusinessId) return b;
             const beforeEbitda = b.ebitda;
             const newRevenue = Math.round(b.revenue * (1 - revImpact));
-            const newMargin = Math.max(0.03, b.ebitdaMargin - 0.01);
-            const afterEbitda = Math.round(newRevenue * newMargin);
+            const rawMargin = Math.max(0.03, b.ebitdaMargin - 0.01);
+            const rawEbitda = Math.round(newRevenue * rawMargin);
+            const floored = applyEbitdaFloor(rawEbitda, newRevenue, rawMargin, b.acquisitionEbitda);
             impacts.push({
               businessId: b.id, businessName: b.name, metric: 'revenue',
               before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: -revImpact,
             });
             impacts.push({
               businessId: b.id, businessName: b.name, metric: 'ebitda',
-              before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
-              deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
+              before: beforeEbitda, after: floored.ebitda, delta: floored.ebitda - beforeEbitda,
+              deltaPercent: beforeEbitda > 0 ? (floored.ebitda - beforeEbitda) / beforeEbitda : 0,
             });
-            return { ...b, revenue: newRevenue, ebitdaMargin: newMargin, ebitda: afterEbitda };
+            return { ...b, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
           });
         }
       }
@@ -886,18 +924,19 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
         newState.businesses = newState.businesses.map(b => {
           if (b.id !== event.affectedBusinessId) return b;
           const beforeEbitda = b.ebitda;
-          const newMargin = Math.max(0.03, b.ebitdaMargin - 0.04);
-          const afterEbitda = Math.round(b.revenue * newMargin);
+          const rawMargin = Math.max(0.03, b.ebitdaMargin - 0.04);
+          const rawEbitda = Math.round(b.revenue * rawMargin);
+          const floored = applyEbitdaFloor(rawEbitda, b.revenue, rawMargin, b.acquisitionEbitda);
           impacts.push({
             businessId: b.id, businessName: b.name, metric: 'margin',
-            before: b.ebitdaMargin, after: newMargin, delta: newMargin - b.ebitdaMargin,
+            before: b.ebitdaMargin, after: floored.margin, delta: floored.margin - b.ebitdaMargin,
           });
           impacts.push({
             businessId: b.id, businessName: b.name, metric: 'ebitda',
-            before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
-            deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
+            before: beforeEbitda, after: floored.ebitda, delta: floored.ebitda - beforeEbitda,
+            deltaPercent: beforeEbitda > 0 ? (floored.ebitda - beforeEbitda) / beforeEbitda : 0,
           });
-          return { ...b, ebitdaMargin: newMargin, ebitda: afterEbitda };
+          return { ...b, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
         });
         // C-3: Floor cash at 0 for event costs
         const complianceCost = Math.min(500, state.cash);

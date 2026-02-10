@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkAIRateLimit, isBodyTooLarge } from '../_lib/rateLimit';
+import { checkAIRateLimit, isBodyTooLarge, sanitizeString } from '../_lib/rateLimit';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
@@ -138,6 +138,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     if (!type || !context) {
       return res.status(400).json({ error: 'Missing type or context' });
+    }
+
+    // Sanitize all string context values to prevent prompt injection
+    for (const key of Object.keys(context)) {
+      if (typeof context[key] === 'string') {
+        context[key] = sanitizeString(context[key], 200);
+      }
     }
 
     // Cap allBusinessNames to prevent prompt inflation

@@ -103,7 +103,7 @@ export const MA_SOURCING_CONFIG: Record<1 | 2 | 3, MASourcingTierConfig> = {
     requiredOpcos: 4,
     description: 'Off-market deal access and proactive outreach',
     effects: [
-      '1 off-market deal per round (15% discount)',
+      '2 off-market deals per round (15% discount)',
       '2-3 sub-type matched deals per round',
       'Quality floor of 3 on sourced deals',
       'Proactive Outreach: $400k for 2 targeted deals',

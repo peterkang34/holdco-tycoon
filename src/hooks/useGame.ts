@@ -753,6 +753,10 @@ export const useGameStore = create<GameStore>()(
       acquireTuckIn: (deal: Deal, structure: DealStructure, targetPlatformId: string) => {
         const state = get();
 
+        // Enforce distress restrictions — covenant breach blocks new acquisitions
+        const restrictions = getDistressRestrictions(calculateMetrics(state).distressLevel);
+        if (!restrictions.canAcquire) return;
+
         // Acquisition limit check
         if (state.acquisitionsThisRound >= state.maxAcquisitionsPerRound) return;
 
@@ -997,10 +1001,15 @@ export const useGameStore = create<GameStore>()(
             ? (biz1.sellerNoteBalance * biz1.sellerNoteRate + biz2.sellerNoteBalance * biz2.sellerNoteRate)
               / (biz1.sellerNoteBalance + biz2.sellerNoteBalance)
             : 0,
-          sellerNoteRoundsRemaining: Math.max(biz1.sellerNoteRoundsRemaining, biz2.sellerNoteRoundsRemaining),
+          sellerNoteRoundsRemaining: (biz1.sellerNoteBalance + biz2.sellerNoteBalance) > 0
+            ? Math.ceil(
+                (biz1.sellerNoteBalance * biz1.sellerNoteRoundsRemaining + biz2.sellerNoteBalance * biz2.sellerNoteRoundsRemaining)
+                / (biz1.sellerNoteBalance + biz2.sellerNoteBalance)
+              )
+            : 0,
           bankDebtBalance: 0, // Bank debt tracked at holdco level, not opco
-          earnoutRemaining: 0,
-          earnoutTarget: 0,
+          earnoutRemaining: biz1.earnoutRemaining + biz2.earnoutRemaining,
+          earnoutTarget: Math.max(biz1.earnoutTarget, biz2.earnoutTarget),
           status: 'active',
           isPlatform: true,
           platformScale: newPlatformScale,
@@ -1010,10 +1019,11 @@ export const useGameStore = create<GameStore>()(
           totalAcquisitionCost: combinedTotalCost,
         };
 
-        // Remove old businesses and add merged one
-        const updatedBusinesses = state.businesses.filter(
-          b => b.id !== businessId1 && b.id !== businessId2
-        );
+        // Remove old businesses, add merged one, and update bolt-on parent references
+        const allBoltOnIds = new Set([...biz1.boltOnIds, ...biz2.boltOnIds]);
+        const updatedBusinesses = state.businesses
+          .filter(b => b.id !== businessId1 && b.id !== businessId2)
+          .map(b => allBoltOnIds.has(b.id) ? { ...b, parentPlatformId: mergedBusiness.id } : b);
 
         set({
           cash: state.cash - totalMergeCost,
@@ -1248,6 +1258,7 @@ export const useGameStore = create<GameStore>()(
 
       issueEquity: (amount: number) => {
         const state = get();
+        if (amount <= 0) return;
 
         // Dilution is the natural consequence — no artificial caps on raises
 
@@ -1360,11 +1371,16 @@ export const useGameStore = create<GameStore>()(
           : lastEvent?.type === 'global_recession' ? -(Math.random() * 0.3)
           : (Math.random() * 0.2 - 0.1);
         const exitPrice = Math.max(0, Math.round(business.ebitda * Math.max(2.0, effectiveMultiple + marketVariance)));
-        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance;
-        const netProceeds = Math.max(0, exitPrice - debtPayoff);
-
         // Also mark bolt-ons as sold when selling a platform
         const boltOnIds = new Set(business.boltOnIds || []);
+
+        // Include bolt-on seller note debt in total debt payoff
+        const boltOnDebt = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + boltOnDebt;
+        const netProceeds = Math.max(0, exitPrice - debtPayoff);
+
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round };
           if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
@@ -1470,11 +1486,15 @@ export const useGameStore = create<GameStore>()(
         const business = state.businesses.find(b => b.id === event.affectedBusinessId);
         if (!business) return;
 
-        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance;
-        const netProceeds = Math.max(0, event.offerAmount - debtPayoff);
-
         // Cascade to bolt-on businesses
         const boltOnIds = new Set(business.boltOnIds || []);
+
+        // Include bolt-on seller note debt in total debt payoff
+        const boltOnDebt = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + boltOnDebt;
+        const netProceeds = Math.max(0, event.offerAmount - debtPayoff);
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id === event.affectedBusinessId) return { ...b, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round };
           if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
@@ -1537,11 +1557,16 @@ export const useGameStore = create<GameStore>()(
         const lastEvent = state.eventHistory[state.eventHistory.length - 1];
         const valuation = calculateExitValuation(business, state.round, lastEvent?.type);
         const exitPrice = Math.round(valuation.exitPrice * 0.70);
-        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance;
-        const netProceeds = Math.max(0, exitPrice - debtPayoff);
 
         // Cascade to bolt-on businesses
         const boltOnIds = new Set(business.boltOnIds || []);
+
+        // Include bolt-on seller note debt in total debt payoff
+        const boltOnDebt = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + boltOnDebt;
+        const netProceeds = Math.max(0, exitPrice - debtPayoff);
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round };
           if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
