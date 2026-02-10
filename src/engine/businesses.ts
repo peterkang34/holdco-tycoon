@@ -560,26 +560,47 @@ export function generateDealWithSize(
     quality = options.qualityFloor;
   }
 
-  // Adjust EBITDA based on size preference
-  let ebitdaMultiplier = 1.0;
-  if (sizePreference === 'small') {
-    ebitdaMultiplier = 0.5 + Math.random() * 0.3; // 50-80% of base
-  } else if (sizePreference === 'large') {
-    ebitdaMultiplier = 1.2 + Math.random() * 0.5; // 120-170% of base
-  } else if (sizePreference === 'medium') {
-    ebitdaMultiplier = 0.8 + Math.random() * 0.4; // 80-120% of base
-  }
-
-  // Portfolio-scale multiplier: deals grow as your portfolio grows
-  const portfolioScaler = portfolioEbitda > 3000
-    ? Math.max(1, Math.log2(portfolioEbitda / 3000))
-    : 1;
-  ebitdaMultiplier *= portfolioScaler;
+  // Absolute EBITDA ranges matching UI labels (in $k):
+  //   Small:  500-1500  ($500k-$1.5M)
+  //   Medium: 1500-3000 ($1.5M-$3M)
+  //   Large:  3000+     ($3M+), portfolio scaler allowed
+  //   Any:    sector base × portfolio scaler (unconstrained)
+  const SIZE_RANGES: Record<string, [number, number]> = {
+    small:  [500, 1500],
+    medium: [1500, 3000],
+    large:  [3000, 8000], // 8000 base cap before portfolio scaler
+  };
 
   const business = generateBusiness(sectorId, round, quality, options.subType);
-  // Scale revenue by multiplier, derive EBITDA from scaled revenue × margin
-  const adjustedRevenue = Math.round(business.revenue * ebitdaMultiplier);
-  const adjustedEbitda = Math.round(adjustedRevenue * business.ebitdaMargin);
+
+  let adjustedEbitda: number;
+  let adjustedRevenue: number;
+
+  if (sizePreference === 'any') {
+    // 'any': keep original sector-based generation, apply portfolio scaler
+    const portfolioScaler = portfolioEbitda > 3000
+      ? Math.max(1, Math.log2(portfolioEbitda / 3000))
+      : 1;
+    adjustedRevenue = Math.round(business.revenue * portfolioScaler);
+    adjustedEbitda = Math.round(adjustedRevenue * business.ebitdaMargin);
+  } else {
+    const [minEbitda, maxEbitda] = SIZE_RANGES[sizePreference];
+    // Pick a random target EBITDA within the absolute range
+    let targetEbitda = minEbitda + Math.random() * (maxEbitda - minEbitda);
+
+    // For 'large', apply portfolio scaler on top of the base range
+    if (sizePreference === 'large') {
+      const portfolioScaler = portfolioEbitda > 3000
+        ? Math.max(1, Math.log2(portfolioEbitda / 3000))
+        : 1;
+      targetEbitda *= portfolioScaler;
+    }
+
+    adjustedEbitda = Math.round(targetEbitda);
+    // Back-solve revenue from target EBITDA and the business's margin
+    // (preserves the margin as a business characteristic)
+    adjustedRevenue = Math.round(adjustedEbitda / business.ebitdaMargin);
+  }
   const adjustedPrice = Math.round(adjustedEbitda * business.acquisitionMultiple);
   const acquisitionType = determineAcquisitionType(adjustedEbitda);
   const tuckInDiscount = acquisitionType === 'tuck_in'
