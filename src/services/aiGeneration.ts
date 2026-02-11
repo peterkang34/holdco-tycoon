@@ -1,4 +1,4 @@
-import { SectorId, AIGeneratedContent, QualityRating, Business, BuyerProfile, ScoreBreakdown } from '../engine/types';
+import { SectorId, AIGeneratedContent, QualityRating, Business, BuyerProfile, ScoreBreakdown, SellerArchetype } from '../engine/types';
 import { SECTORS } from '../data/sectors';
 
 // Cache the AI status to avoid repeated requests
@@ -97,6 +97,21 @@ const FALLBACK_BACKSTORIES: Record<string, string[]> = {
     'Former franchise that went independent. Owner bought out the territory rights.',
     'Started by a master tradesman who trained dozens of apprentices over 20 years.',
   ],
+  insurance: [
+    'Built by a veteran P&C agent who left a national brokerage to go independent. Started with a book of 200 policies and a rolodex.',
+    'Family-owned insurance agency dating back to 1982. The founder\'s daughter now runs the commercial lines division.',
+    'Former carrier underwriter who crossed to the agency side. Known for deep specialty expertise in niche industries.',
+  ],
+  autoServices: [
+    'Started by a mechanic who couldn\'t stand working for dealerships anymore. Opened his own shop with a used lift and a prayer.',
+    'Third-generation auto repair family. They\'ve been at the same intersection since 1971, surviving every competitor that came and went.',
+    'Former fleet manager who noticed independent shops lacked professional systems. Built a tech-forward repair operation from scratch.',
+  ],
+  distribution: [
+    'Founded by a warehouse worker who noticed how many small businesses struggled to source specialty products reliably.',
+    'Began as a one-truck delivery operation serving local restaurants. Now runs 12 routes covering the tri-state area.',
+    'Former procurement executive who leveraged supplier relationships to build a niche distribution company no one else wanted to serve.',
+  ],
   default: [
     'Founded over a decade ago by industry veterans who identified an underserved market niche.',
     'Started as a small operation and grew through consistent service quality and customer referrals.',
@@ -115,6 +130,39 @@ const FALLBACK_MOTIVATIONS = [
   'Key partner passed away and remaining owner prefers to sell rather than run solo.',
 ];
 
+const ARCHETYPE_MOTIVATIONS: Record<SellerArchetype, string[]> = {
+  retiring_founder: [
+    'After 30 years building this company, the founder is ready to retire and watch the grandkids grow up.',
+    'The founder just turned 65 and promised their spouse this would be the last year. Legacy matters more than price.',
+    'A lifelong entrepreneur hanging up the cleats. Wants someone who will take care of the employees.',
+  ],
+  burnt_out_operator: [
+    'The owner hasn\'t taken a vacation in 4 years. Running this business alone has taken its toll.',
+    'Exhausted after navigating COVID, supply chain issues, and staff turnover — the founder just wants out.',
+    'The passion is gone. What was once a dream job feels like a prison. Ready for any reasonable offer.',
+  ],
+  accidental_holdco: [
+    'Corporate parent is divesting non-core assets to refocus on their primary business line.',
+    'This division was acquired as part of a larger deal and never fit the parent company\'s strategy.',
+    'New CEO is cleaning house — every business unit that isn\'t top-2 in its market is on the block.',
+  ],
+  distressed_seller: [
+    'A failed expansion into a new market drained the company\'s reserves. Urgent sale needed to avoid default.',
+    'Owner\'s divorce is forcing a rapid sale. The business itself is sound but the timeline is compressed.',
+    'Health crisis forced the owner off the floor. Without daily oversight, the business needs new leadership fast.',
+  ],
+  mbo_candidate: [
+    'The management team has been running the show for years. The absentee owner is finally ready to let go.',
+    'Strong GM wants to buy the business but lacks capital. Open to a holdco partnership structure.',
+    'The owner wants to sell to the team that built this business — they just need the right financial partner.',
+  ],
+  franchise_breakaway: [
+    'Broke free from a national franchise after disputes over territory and fees. Now independent and thriving.',
+    'Former franchisee who converted to independent operations. Better margins, more control, seeking growth capital.',
+    'Left the franchise system when corporate changed direction. Kept the customers, built their own brand.',
+  ],
+};
+
 const FALLBACK_QUIRKS = [
   'Unusually loyal customer base - average customer tenure is 8+ years.',
   'Owns the real estate where they operate (not included in the deal but available separately).',
@@ -128,13 +176,19 @@ const FALLBACK_QUIRKS = [
 
 export function generateFallbackContent(
   sectorId: SectorId,
-  qualityRating: QualityRating
+  qualityRating: QualityRating,
+  sellerArchetype?: SellerArchetype
 ): AIGeneratedContent {
   const backstories = FALLBACK_BACKSTORIES[sectorId] || FALLBACK_BACKSTORIES.default;
 
+  // Use archetype-specific motivation if available, otherwise generic
+  const motivations = sellerArchetype && ARCHETYPE_MOTIVATIONS[sellerArchetype]
+    ? ARCHETYPE_MOTIVATIONS[sellerArchetype]
+    : FALLBACK_MOTIVATIONS;
+
   const content: AIGeneratedContent = {
     backstory: backstories[Math.floor(Math.random() * backstories.length)],
-    sellerMotivation: FALLBACK_MOTIVATIONS[Math.floor(Math.random() * FALLBACK_MOTIVATIONS.length)],
+    sellerMotivation: motivations[Math.floor(Math.random() * motivations.length)],
     quirks: [
       FALLBACK_QUIRKS[Math.floor(Math.random() * FALLBACK_QUIRKS.length)],
       FALLBACK_QUIRKS[Math.floor(Math.random() * FALLBACK_QUIRKS.length)],

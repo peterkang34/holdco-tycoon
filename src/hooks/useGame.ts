@@ -31,6 +31,8 @@ import {
   generateSourcedDeals,
   generateProactiveOutreachDeals,
   getMaxAcquisitions,
+  generateDealWithSize,
+  pickWeightedSector,
 } from '../engine/businesses';
 import { generateBuyerProfile } from '../engine/buyers';
 import {
@@ -99,6 +101,10 @@ interface GameStore extends GameState {
   windDownBusiness: (businessId: string) => void;
   acceptOffer: () => void;
   declineOffer: () => void;
+  grantEquityDemand: () => void;
+  declineEquityDemand: () => void;
+  acceptSellerNoteRenego: () => void;
+  declineSellerNoteRenego: () => void;
   setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference, subType?: string | null) => void;
 
   // MA Sourcing
@@ -245,6 +251,33 @@ function migrateV11ToV12() {
   }
 }
 migrateV11ToV12();
+
+// One-time migration from v12 → v13 (adds seller archetypes to pipeline deals)
+function migrateV12ToV13() {
+  try {
+    const v13Key = 'holdco-tycoon-save-v13';
+    const v12Key = 'holdco-tycoon-save-v12';
+    if (localStorage.getItem(v13Key)) return;
+    const v12Raw = localStorage.getItem(v12Key);
+    if (!v12Raw) return;
+    const v12Data = JSON.parse(v12Raw);
+    if (!v12Data?.state) return;
+
+    // Pipeline deals get sellerArchetype: undefined (backwards compatible)
+    if (Array.isArray(v12Data.state.dealPipeline)) {
+      v12Data.state.dealPipeline = v12Data.state.dealPipeline.map((d: any) => ({
+        ...d,
+        sellerArchetype: d.sellerArchetype ?? undefined,
+      }));
+    }
+
+    localStorage.setItem(v13Key, JSON.stringify(v12Data));
+    localStorage.removeItem(v12Key);
+  } catch (e) {
+    console.error('v12→v13 migration failed:', e);
+  }
+}
+migrateV12ToV13();
 
 const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: ReturnType<typeof initializeSharedServices> } = {
   holdcoName: '',
@@ -447,8 +480,19 @@ export const useGameStore = create<GameStore>()(
           phase: requiresRestructuring ? 'restructure' as GamePhase : 'event' as GamePhase,
         };
 
-        if (event && event.type !== 'unsolicited_offer' && !requiresRestructuring) {
+        const hasChoices = event && (event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand' || event.type === 'portfolio_seller_note_renego');
+        if (event && !hasChoices && !requiresRestructuring) {
           gameState = applyEventEffects(gameState, event);
+        }
+
+        // Referral deal: inject a quality-3+ cold/warm deal into pipeline
+        if (event && event.type === 'portfolio_referral_deal') {
+          const referralSector = pickWeightedSector(state.round);
+          const referralDeal = generateDealWithSize(referralSector, state.round, 'any', 0, {
+            qualityFloor: 3 as any,
+            source: 'sourced' as any,
+          });
+          gameState.dealPipeline = [...gameState.dealPipeline, referralDeal];
         }
 
         // Decrement tightening/inflation counters
@@ -1140,6 +1184,22 @@ export const useGameStore = create<GameStore>()(
             cost = Math.round(absEbitda * 0.12);
             marginBoost = 0.04; // +4 ppt margin
             break;
+          case 'recurring_revenue_conversion':
+            cost = Math.round(absEbitda * 0.25);
+            marginBoost = -0.02; // -2 ppt margin (upfront investment)
+            growthBoost = 0.03; // +3% permanent growth
+            break;
+          case 'management_professionalization':
+            cost = Math.round(absEbitda * 0.18);
+            marginBoost = 0.01; // +1 ppt margin
+            growthBoost = 0.01; // +1% growth
+            break;
+          case 'digital_transformation':
+            cost = Math.round(absEbitda * 0.22);
+            revenueBoost = 0.03; // +3% immediate revenue
+            marginBoost = business.ebitdaMargin > 0.30 ? 0.01 : 0.02; // halved if >30%
+            growthBoost = 0.02; // +2% permanent growth
+            break;
           default:
             return;
         }
@@ -1152,6 +1212,22 @@ export const useGameStore = create<GameStore>()(
           const newMargin = Math.max(0.03, Math.min(0.80, b.ebitdaMargin + marginBoost));
           const newEbitda = Math.round(newRevenue * newMargin);
           const ebitdaBoost = b.ebitda > 0 ? (newEbitda - b.ebitda) / b.ebitda : 0;
+
+          // Special: management_professionalization upgrades operatorQuality
+          let updatedDueDiligence = b.dueDiligence;
+          if (improvementType === 'management_professionalization') {
+            const upgraded = b.dueDiligence.operatorQuality === 'weak' ? 'moderate' as const
+              : b.dueDiligence.operatorQuality === 'moderate' ? 'strong' as const
+              : 'strong' as const;
+            updatedDueDiligence = { ...b.dueDiligence, operatorQuality: upgraded };
+          }
+
+          // Special: digital_transformation increases marginDriftRate
+          let updatedMarginDriftRate = b.marginDriftRate;
+          if (improvementType === 'digital_transformation') {
+            updatedMarginDriftRate += 0.002;
+          }
+
           return {
             ...b,
             revenue: newRevenue,
@@ -1161,6 +1237,8 @@ export const useGameStore = create<GameStore>()(
             organicGrowthRate: b.organicGrowthRate + growthBoost,
             revenueGrowthRate: b.revenueGrowthRate + growthBoost,
             totalAcquisitionCost: b.totalAcquisitionCost + cost,
+            dueDiligence: updatedDueDiligence,
+            marginDriftRate: updatedMarginDriftRate,
             improvements: [
               ...b.improvements,
               { type: improvementType, appliedRound: state.round, effect: ebitdaBoost },
@@ -1543,6 +1621,99 @@ export const useGameStore = create<GameStore>()(
             ...state.actionsThisRound,
             { type: 'decline_offer', round: state.round, details: {} },
           ],
+          metrics: calculateMetrics(state),
+        });
+      },
+
+      // Event choice actions
+      grantEquityDemand: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_equity_demand' || !event.affectedBusinessId) return;
+        // Parse dilution from choice label
+        const dilutionMatch = event.choices?.[0]?.label.match(/(\d+)/);
+        const dilution = dilutionMatch ? parseInt(dilutionMatch[1]) : 25;
+        const grantState = {
+          ...state,
+          sharesOutstanding: state.sharesOutstanding + dilution,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            const newMargin = Math.max(0.03, Math.min(0.80, b.ebitdaMargin + 0.01));
+            const newEbitda = Math.round(b.revenue * newMargin);
+            return {
+              ...b,
+              ebitdaMargin: newMargin,
+              ebitda: newEbitda,
+              organicGrowthRate: b.organicGrowthRate + 0.02,
+              revenueGrowthRate: b.revenueGrowthRate + 0.02,
+            };
+          }),
+          currentEvent: null,
+        };
+        set({
+          ...grantState,
+          metrics: calculateMetrics(grantState),
+        });
+      },
+
+      declineEquityDemand: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_equity_demand' || !event.affectedBusinessId) return;
+        // 60% chance talent leaves
+        let declineState = { ...state, currentEvent: null };
+        if (Math.random() < 0.60 && event.affectedBusinessId) {
+          declineState.businesses = state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            const newRevenue = Math.round(b.revenue * 0.94);
+            const newMargin = Math.max(0.03, b.ebitdaMargin - 0.02);
+            const newEbitda = Math.round(newRevenue * newMargin);
+            return {
+              ...b,
+              revenue: newRevenue,
+              ebitdaMargin: newMargin,
+              ebitda: newEbitda,
+              organicGrowthRate: b.organicGrowthRate - 0.015,
+              revenueGrowthRate: b.revenueGrowthRate - 0.015,
+            };
+          });
+        }
+        set({
+          ...declineState,
+          metrics: calculateMetrics(declineState),
+        });
+      },
+
+      acceptSellerNoteRenego: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_seller_note_renego' || !event.affectedBusinessId) return;
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+        // Parse discount rate from choice label
+        const pctMatch = event.choices?.[0]?.description.match(/(\d+)%/);
+        const discountRate = pctMatch ? parseInt(pctMatch[1]) / 100 : 0.75;
+        const payoffAmount = Math.round(business.sellerNoteBalance * discountRate);
+        if (state.cash < payoffAmount) return; // Can't afford
+        const renoState = {
+          ...state,
+          cash: state.cash - payoffAmount,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            return { ...b, sellerNoteBalance: 0, sellerNoteRoundsRemaining: 0 };
+          }),
+          currentEvent: null,
+        };
+        set({
+          ...renoState,
+          metrics: calculateMetrics(renoState),
+        });
+      },
+
+      declineSellerNoteRenego: () => {
+        const state = get();
+        set({
+          currentEvent: null,
           metrics: calculateMetrics(state),
         });
       },
@@ -2137,7 +2308,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v12', // v11: Deal heat + acquisition limits
+      name: 'holdco-tycoon-save-v13', // v13: 3 new sectors, seller archetypes, 3 new improvements, 24 new events
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

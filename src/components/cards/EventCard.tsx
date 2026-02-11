@@ -1,13 +1,12 @@
-import { GameEvent, EventImpact, BuyerProfile, formatMoney, formatPercent } from '../../engine/types';
+import { GameEvent, EventImpact, BuyerProfile, EventChoice, formatMoney, formatPercent } from '../../engine/types';
 
 interface EventCardProps {
   event: GameEvent;
-  onAcceptOffer?: () => void;
-  onDeclineOffer?: () => void;
+  onChoice?: (action: string) => void;
   onContinue?: () => void;
 }
 
-export function EventCard({ event, onAcceptOffer, onDeclineOffer, onContinue }: EventCardProps) {
+export function EventCard({ event, onChoice, onContinue }: EventCardProps) {
   const getEventIcon = () => {
     switch (event.type) {
       case 'global_bull_market':
@@ -34,6 +33,12 @@ export function EventCard({ event, onAcceptOffer, onDeclineOffer, onContinue }: 
         return '💡';
       case 'portfolio_compliance':
         return '⚠️';
+      case 'portfolio_referral_deal':
+        return '🤝';
+      case 'portfolio_equity_demand':
+        return '👤';
+      case 'portfolio_seller_note_renego':
+        return '📝';
       case 'unsolicited_offer':
         return '💰';
       case 'sector_event':
@@ -48,6 +53,7 @@ export function EventCard({ event, onAcceptOffer, onDeclineOffer, onContinue }: 
     event.type === 'portfolio_star_joins' ||
     event.type === 'portfolio_client_signs' ||
     event.type === 'portfolio_breakthrough' ||
+    event.type === 'portfolio_referral_deal' ||
     (event.type === 'sector_event' && !event.effect.includes('-'));
 
   const isNegative = event.type === 'global_recession' ||
@@ -129,44 +135,47 @@ export function EventCard({ event, onAcceptOffer, onDeclineOffer, onContinue }: 
         </div>
       )}
 
-      {event.type === 'unsolicited_offer' && onAcceptOffer && onDeclineOffer ? (
-        <div>
-          {event.buyerProfile && (
-            <div className="bg-white/5 rounded-lg p-4 mb-4 border border-white/10">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="font-bold text-sm">{event.buyerProfile.name}</span>
-                <span className="text-xs bg-white/10 text-text-secondary px-2 py-0.5 rounded">
-                  {event.buyerProfile.type === 'strategic' ? 'Strategic' :
-                   event.buyerProfile.type === 'individual' ? 'Individual' :
-                   event.buyerProfile.type === 'family_office' ? 'Family Office' :
-                   event.buyerProfile.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-                </span>
-                {event.buyerProfile.isStrategic && (
-                  <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">Strategic Buyer</span>
-                )}
-              </div>
-              {event.buyerProfile.fundSize && (
-                <p className="text-xs text-text-muted mb-1">{event.buyerProfile.fundSize}</p>
-              )}
-              <p className="text-xs text-text-secondary italic leading-relaxed">
-                "{event.buyerProfile.investmentThesis}"
-              </p>
-            </div>
-          )}
-          <div className="flex gap-3">
-            <button
-              onClick={onDeclineOffer}
-              className="btn-secondary flex-1"
-            >
-              Decline
-            </button>
-            <button
-              onClick={onAcceptOffer}
-              className="btn-primary flex-1"
-            >
-              Accept{event.offerAmount ? ` ${formatMoney(event.offerAmount)}` : ''}
-            </button>
+      {/* Buyer Profile (unsolicited offers) */}
+      {event.buyerProfile && (
+        <div className="bg-white/5 rounded-lg p-4 mb-4 border border-white/10">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="font-bold text-sm">{event.buyerProfile.name}</span>
+            <span className="text-xs bg-white/10 text-text-secondary px-2 py-0.5 rounded">
+              {event.buyerProfile.type === 'strategic' ? 'Strategic' :
+               event.buyerProfile.type === 'individual' ? 'Individual' :
+               event.buyerProfile.type === 'family_office' ? 'Family Office' :
+               event.buyerProfile.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+            </span>
+            {event.buyerProfile.isStrategic && (
+              <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">Strategic Buyer</span>
+            )}
           </div>
+          {event.buyerProfile.fundSize && (
+            <p className="text-xs text-text-muted mb-1">{event.buyerProfile.fundSize}</p>
+          )}
+          <p className="text-xs text-text-secondary italic leading-relaxed">
+            "{event.buyerProfile.investmentThesis}"
+          </p>
+        </div>
+      )}
+
+      {/* Generalized choice buttons */}
+      {event.choices && event.choices.length > 0 && onChoice ? (
+        <div className="flex gap-3">
+          {event.choices.map((choice, idx) => (
+            <button
+              key={idx}
+              onClick={() => onChoice(choice.action)}
+              className={`flex-1 ${
+                choice.variant === 'positive' ? 'btn-primary' :
+                choice.variant === 'negative' ? 'btn-secondary' :
+                'btn-secondary'
+              }`}
+              title={choice.description}
+            >
+              {choice.label}
+            </button>
+          ))}
         </div>
       ) : (
         onContinue && (

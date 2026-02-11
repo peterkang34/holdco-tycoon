@@ -10,7 +10,10 @@ export type SectorId =
   | 'healthcare'
   | 'restaurant'
   | 'realEstate'
-  | 'education';
+  | 'education'
+  | 'insurance'
+  | 'autoServices'
+  | 'distribution';
 
 export type SectorFocusGroup =
   | 'agency'
@@ -22,7 +25,10 @@ export type SectorFocusGroup =
   | 'healthcare'
   | 'restaurant'
   | 'realEstate'
-  | 'education';
+  | 'education'
+  | 'insurance'
+  | 'autoServices'
+  | 'distribution';
 
 export type ConcentrationLevel = 'low' | 'medium' | 'high';
 
@@ -66,6 +72,8 @@ export interface SectorDefinition {
   baseMargin: [number, number];         // [min, max] as decimals (0.12 = 12%)
   marginDriftRange: [number, number];   // annual drift in ppt (negative = compression)
   marginVolatility: number;             // 0-0.05 — random annual margin noise
+  subTypeMarginModifiers?: number[];   // parallel to subTypes, ppt offset at generation
+  subTypeGrowthModifiers?: number[];   // parallel to subTypes, ppt offset at generation
 }
 
 // How closely related two sub-types are within a sector
@@ -146,7 +154,10 @@ export type OperationalImprovementType =
   | 'operating_playbook'
   | 'pricing_model'
   | 'service_expansion'
-  | 'fix_underperformance';
+  | 'fix_underperformance'
+  | 'recurring_revenue_conversion'
+  | 'management_professionalization'
+  | 'digital_transformation';
 
 export interface OperationalImprovement {
   type: OperationalImprovementType;
@@ -181,7 +192,11 @@ export interface Deal {
   aiContent?: AIGeneratedContent; // Rich AI-generated content (optional)
   heat: DealHeat; // Competitive heat level
   effectivePrice: number; // askingPrice * heat premium
+  sellerArchetype?: SellerArchetype; // Seller motivation archetype
 }
+
+export type SellerArchetype = 'retiring_founder' | 'burnt_out_operator' | 'accidental_holdco'
+  | 'distressed_seller' | 'mbo_candidate' | 'franchise_breakaway';
 
 export type DealStructureType = 'all_cash' | 'seller_note' | 'bank_debt' | 'earnout' | 'seller_note_bank_debt';
 
@@ -267,8 +282,18 @@ export type EventType =
   | 'portfolio_client_churns'
   | 'portfolio_breakthrough'
   | 'portfolio_compliance'
+  | 'portfolio_referral_deal'
+  | 'portfolio_equity_demand'
+  | 'portfolio_seller_note_renego'
   | 'unsolicited_offer'
   | 'sector_event';
+
+export interface EventChoice {
+  label: string;
+  description: string;
+  action: string;
+  variant: 'positive' | 'negative' | 'neutral';
+}
 
 // Tracks the actual impact of an event for display
 export interface EventImpact {
@@ -295,6 +320,7 @@ export interface GameEvent {
   impacts?: EventImpact[]; // actual measured impacts from the event
   narrative?: string; // AI-generated narrative context
   buyerProfile?: BuyerProfile; // buyer profile for unsolicited offers
+  choices?: EventChoice[]; // player choices (e.g., accept/decline for offers, equity demands, etc.)
 }
 
 export interface Metrics {

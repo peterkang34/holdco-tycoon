@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Business, ExitValuation, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { calculateExitValuation } from '../../engine/simulation';
+import { Tooltip } from '../ui/Tooltip';
 
 interface BusinessCardProps {
   business: Business;
@@ -85,22 +86,24 @@ export function BusinessCard({
         </div>
         <div className="flex flex-col items-end gap-1">
           {isPlatform && (
-            <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded relative group/platform cursor-help">
-              Scale {platformScale}
-              <div className="absolute top-full right-0 md:right-0 -right-2 mt-2 w-48 md:w-56 p-3 bg-bg-primary border border-white/10 rounded-lg shadow-xl opacity-0 invisible group-hover/platform:opacity-100 group-hover/platform:visible transition-all z-50 text-left">
-                <p className="text-sm text-text-secondary font-normal">This is a roll-up hub. Tuck-in bolt-on acquisitions to increase scale and unlock synergies + exit multiple expansion.</p>
-                <p className="text-xs text-text-muted mt-2 font-normal">Multiple expansion bonus caps at Scale 3 (+1.0x), but bolt-ons can continue beyond that.</p>
-                <p className="text-xs text-accent mt-1 font-normal">Current: Scale {platformScale}, {boltOnCount} bolt-on{boltOnCount !== 1 ? 's' : ''}</p>
-              </div>
-            </span>
+            <Tooltip
+              trigger={<span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded">Scale {platformScale}</span>}
+              align="right"
+              width="w-48 md:w-56"
+            >
+              <p className="text-sm text-text-secondary font-normal">This is a roll-up hub. Tuck-in bolt-on acquisitions to increase scale and unlock synergies + exit multiple expansion.</p>
+              <p className="text-xs text-text-muted mt-2 font-normal">Multiple expansion bonus caps at Scale 3 (+1.0x), but bolt-ons can continue beyond that.</p>
+              <p className="text-xs text-accent mt-1 font-normal">Current: Scale {platformScale}, {boltOnCount} bolt-on{boltOnCount !== 1 ? 's' : ''}</p>
+            </Tooltip>
           )}
           {business.integrationRoundsRemaining > 0 && (
-            <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded relative group/integration cursor-help">
-              Integrating ({business.integrationRoundsRemaining}y)
-              <div className="absolute top-full right-0 mt-2 w-56 p-3 bg-bg-primary border border-white/10 rounded-lg shadow-xl opacity-0 invisible group-hover/integration:opacity-100 group-hover/integration:visible transition-all z-50 text-left">
-                <p className="text-sm text-text-secondary font-normal">Recently acquired — organic growth is dampened during integration. {business.integrationRoundsRemaining} year{business.integrationRoundsRemaining !== 1 ? 's' : ''} remaining until fully integrated.</p>
-              </div>
-            </span>
+            <Tooltip
+              trigger={<span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded">Integrating ({business.integrationRoundsRemaining}y)</span>}
+              align="right"
+              width="w-56"
+            >
+              <p className="text-sm text-text-secondary font-normal">Recently acquired — organic growth is dampened during integration. {business.integrationRoundsRemaining} year{business.integrationRoundsRemaining !== 1 ? 's' : ''} remaining until fully integrated.</p>
+            </Tooltip>
           )}
         </div>
       </div>

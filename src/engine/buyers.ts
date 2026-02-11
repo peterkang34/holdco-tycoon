@@ -119,6 +119,9 @@ const STRATEGIC_TEMPLATES: Record<string, string[]> = {
   restaurant: ['Inspire Brands', 'Restaurant Brands Intl', 'Yum! Brands', 'Dine Brands', 'Jack in the Box'],
   realEstate: ['Brookfield', 'CBRE', 'JLL', 'Cushman & Wakefield', 'Colliers'],
   education: ['Pearson', 'Scholastic', 'Grand Canyon Education', 'Bright Horizons', 'Chegg'],
+  insurance: ['Acrisure', 'Hub International', 'Gallagher', 'AssuredPartners', 'NFP'],
+  autoServices: ['Driven Brands', 'Mavis Discount Tire', 'Caliber Collision', 'Sun Auto Tire', 'Crash Champions'],
+  distribution: ['Watsco', 'Pool Corp', 'Fastenal', 'Grainger', 'HD Supply'],
 };
 
 // ── Buyer Profile Generation ───────────────────────────────────────

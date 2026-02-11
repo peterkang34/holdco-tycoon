@@ -12,6 +12,7 @@ import {
   IntegrationOutcome,
   MASourcingTier,
   SubTypeAffinity,
+  SellerArchetype,
   AIGeneratedContent,
   randomInRange,
   randomInt,
@@ -174,19 +175,33 @@ export function generateBusiness(
   // Margin drift rate from sector range
   const marginDriftRate = randomInRange(sector.marginDriftRange);
 
-  // Organic growth rate (legacy — kept for compatibility, mirrors revenue growth)
-  const organicGrowthRate = revenueGrowthRate;
-
   // Calculate acquisition multiple
   let multiple = randomInRange(sector.acquisitionMultiple);
   multiple += (quality - 3) * 0.2;
   multiple = Math.round(multiple * 10) / 10;
 
-  const acquisitionPrice = Math.round(ebitda * multiple);
-
   const subType = forceSubType && sector.subTypes.includes(forceSubType)
     ? forceSubType
     : pickRandom(sector.subTypes);
+
+  // Apply sub-type financial skews
+  const stIdx = sector.subTypes.indexOf(subType);
+  if (stIdx !== -1) {
+    if (sector.subTypeMarginModifiers?.[stIdx]) {
+      ebitdaMargin += sector.subTypeMarginModifiers[stIdx];
+      ebitdaMargin = Math.max(0.03, Math.min(0.80, ebitdaMargin));
+      // Re-derive EBITDA from revenue × adjusted margin
+      ebitda = Math.round(revenue * ebitdaMargin);
+    }
+    if (sector.subTypeGrowthModifiers?.[stIdx]) {
+      revenueGrowthRate += sector.subTypeGrowthModifiers[stIdx];
+    }
+  }
+
+  // Organic growth rate (legacy — kept for compatibility, mirrors revenue growth)
+  const organicGrowthRate = revenueGrowthRate;
+
+  const acquisitionPrice = Math.round(ebitda * multiple);
 
   return {
     name: getRandomBusinessName(sectorId, subType),
@@ -246,16 +261,73 @@ function calculateTuckInDiscount(quality: QualityRating): number {
   return Math.max(0.05, Math.min(0.25, baseDiscount + qualityAdjustment));
 }
 
+// --- Seller Archetypes ---
+
+export function assignSellerArchetype(quality: QualityRating): SellerArchetype {
+  // Weighted distribution adjusted by quality
+  const weights: { archetype: SellerArchetype; baseWeight: number; qualityAdj: number }[] = [
+    { archetype: 'retiring_founder', baseWeight: 0.30, qualityAdj: quality >= 4 ? 0.10 : quality <= 2 ? -0.10 : 0 },
+    { archetype: 'burnt_out_operator', baseWeight: 0.20, qualityAdj: quality <= 2 ? 0.05 : quality >= 4 ? -0.05 : 0 },
+    { archetype: 'accidental_holdco', baseWeight: 0.10, qualityAdj: 0 },
+    { archetype: 'distressed_seller', baseWeight: 0.10, qualityAdj: quality <= 2 ? 0.10 : quality >= 4 ? -0.08 : 0 },
+    { archetype: 'mbo_candidate', baseWeight: 0.15, qualityAdj: quality >= 4 ? 0.05 : quality <= 2 ? -0.05 : 0 },
+    { archetype: 'franchise_breakaway', baseWeight: 0.15, qualityAdj: quality <= 2 ? -0.05 : 0 },
+  ];
+
+  const adjusted = weights.map(w => ({ ...w, weight: Math.max(0.02, w.baseWeight + w.qualityAdj) }));
+  const total = adjusted.reduce((s, w) => s + w.weight, 0);
+  let roll = Math.random() * total;
+  for (const w of adjusted) {
+    roll -= w.weight;
+    if (roll <= 0) return w.archetype;
+  }
+  return 'retiring_founder';
+}
+
+function getArchetypeHeatModifier(archetype: SellerArchetype): number {
+  switch (archetype) {
+    case 'retiring_founder': return -1;
+    case 'burnt_out_operator': return 0;
+    case 'accidental_holdco': return 1;
+    case 'distressed_seller': return -2;
+    case 'mbo_candidate': return 0;
+    case 'franchise_breakaway': return 0;
+  }
+}
+
+function getArchetypePriceModifier(archetype: SellerArchetype): number {
+  switch (archetype) {
+    case 'retiring_founder': return randomInRange([0, 0.05]);
+    case 'burnt_out_operator': return randomInRange([-0.10, -0.05]);
+    case 'accidental_holdco': return randomInRange([0.05, 0.10]);
+    case 'distressed_seller': return randomInRange([-0.20, -0.10]);
+    case 'mbo_candidate': return randomInRange([0, 0.05]);
+    case 'franchise_breakaway': return randomInRange([0.05, 0.10]);
+  }
+}
+
+function getArchetypeOperatorQuality(archetype: SellerArchetype): 'strong' | 'moderate' | 'weak' | null {
+  switch (archetype) {
+    case 'retiring_founder': return Math.random() > 0.5 ? 'strong' : 'moderate';
+    case 'burnt_out_operator': return Math.random() > 0.5 ? 'weak' : 'moderate';
+    case 'accidental_holdco': return 'moderate';
+    case 'distressed_seller': return 'weak';
+    case 'mbo_candidate': return 'strong';
+    case 'franchise_breakaway': return Math.random() > 0.5 ? 'strong' : 'moderate';
+  }
+}
+
 // --- Deal Heat System ---
 
 const HEAT_LEVELS: DealHeat[] = ['cold', 'warm', 'hot', 'contested'];
 
-// Calculate deal heat based on quality, source, round, and market conditions
+// Calculate deal heat based on quality, source, round, market conditions, and seller archetype
 export function calculateDealHeat(
   quality: QualityRating,
   source: Deal['source'],
   round: number,
-  lastEventType?: EventType
+  lastEventType?: EventType,
+  sellerArchetype?: SellerArchetype
 ): DealHeat {
   // Base distribution: cold 25%, warm 35%, hot 30%, contested 10%
   const roll = Math.random();
@@ -277,8 +349,16 @@ export function calculateDealHeat(
   if (round >= 15) tierIndex += 1;
 
   // Source modifiers — proprietary/sourced = less competition
-  if (source === 'proprietary') tierIndex -= 2;
-  if (source === 'sourced') tierIndex -= 1;
+  // Combine with archetype heat modifier, cap total negative at -3
+  let negativeModifiers = 0;
+  if (source === 'proprietary') negativeModifiers -= 2;
+  if (source === 'sourced') negativeModifiers -= 1;
+  if (sellerArchetype) {
+    const archetypeMod = getArchetypeHeatModifier(sellerArchetype);
+    if (archetypeMod < 0) negativeModifiers += archetypeMod;
+    else tierIndex += archetypeMod; // positive modifiers apply directly
+  }
+  tierIndex += Math.max(-3, negativeModifiers);
 
   // Clamp to valid range
   tierIndex = Math.max(0, Math.min(3, tierIndex));
@@ -493,8 +573,8 @@ export function getSectorWeightsForRound(round: number): Record<SectorId, number
   // Mid game: mixed
   // Late game: premium sectors
 
-  const cheap: SectorId[] = ['agency', 'homeServices', 'b2bServices', 'education'];
-  const mid: SectorId[] = ['consumer', 'restaurant', 'healthcare'];
+  const cheap: SectorId[] = ['agency', 'homeServices', 'b2bServices', 'education', 'autoServices'];
+  const mid: SectorId[] = ['consumer', 'restaurant', 'healthcare', 'insurance', 'distribution'];
   const premium: SectorId[] = ['saas', 'industrial', 'realEstate'];
 
   let cheapWeight: number, midWeight: number, premiumWeight: number;
@@ -607,29 +687,69 @@ export function generateDealWithSize(
     ? calculateTuckInDiscount(quality)
     : undefined;
 
-  // Apply the larger of tuck-in discount or proprietary discount (don't stack)
-  const effectiveDiscount = Math.max(tuckInDiscount ?? 0, options.multipleDiscount ?? 0);
+  // Assign seller archetype
+  const sellerArchetype = assignSellerArchetype(quality);
+
+  // Apply archetype operator quality override
+  const archetypeOperator = getArchetypeOperatorQuality(sellerArchetype);
+  let adjustedBusiness = business;
+  if (archetypeOperator) {
+    const operatorTexts: Record<string, string[]> = {
+      strong: ['Strong management team in place', 'Experienced leadership staying on', 'Proven operational team'],
+      moderate: ['Decent team, some gaps', 'Owner willing to transition slowly', 'Management needs development'],
+      weak: ['Founder looking to exit fully', 'Key person dependency', 'Management transition needed'],
+    };
+    adjustedBusiness = {
+      ...business,
+      dueDiligence: {
+        ...business.dueDiligence,
+        operatorQuality: archetypeOperator,
+        operatorQualityText: pickRandom(operatorTexts[archetypeOperator]),
+      },
+    };
+  }
+
+  // Apply archetype price modifier — use Math.max with proprietary discount (don't stack)
+  const archetypePriceMod = getArchetypePriceModifier(sellerArchetype);
+  const archetypeDiscount = archetypePriceMod < 0 ? Math.abs(archetypePriceMod) : 0;
+  const archetypePremium = archetypePriceMod > 0 ? archetypePriceMod : 0;
+
+  // Apply the larger of tuck-in discount, proprietary discount, or archetype discount (don't stack)
+  const effectiveDiscount = Math.max(tuckInDiscount ?? 0, options.multipleDiscount ?? 0, archetypeDiscount);
   let finalAskingPrice = effectiveDiscount > 0
     ? Math.round(adjustedPrice * (1 - effectiveDiscount))
     : adjustedPrice;
 
+  // Apply premium (positive price modifiers stack on top)
+  if (archetypePremium > 0) {
+    finalAskingPrice = Math.round(finalAskingPrice * (1 + archetypePremium));
+  }
+
+  // Franchise breakaway: +2% growth perk
+  let finalGrowthRate = adjustedBusiness.organicGrowthRate;
+  let finalRevenueGrowthRate = adjustedBusiness.revenueGrowthRate;
+  if (sellerArchetype === 'franchise_breakaway') {
+    finalGrowthRate += 0.02;
+    finalRevenueGrowthRate += 0.02;
+  }
+
   // Include fallback content for richer deals
-  const aiContent = generateFallbackContent(sectorId, quality);
+  const aiContent = generateFallbackContent(sectorId, quality, sellerArchetype);
 
   const baseFreshness = 2;
   const freshness = baseFreshness + (options.freshnessBonus ?? 0);
 
   const dealSource = options.source ?? (Math.random() > 0.4 ? 'inbound' : 'brokered');
 
-  // Calculate deal heat and effective price
-  const heat = calculateDealHeat(quality, dealSource, round, options.lastEventType);
+  // Calculate deal heat and effective price (pass archetype for heat modifier)
+  const heat = calculateDealHeat(quality, dealSource, round, options.lastEventType, sellerArchetype);
   const heatPremium = calculateHeatPremium(heat);
   const effectivePrice = Math.round(finalAskingPrice * heatPremium);
 
   return {
     id: `deal_${generateBusinessId()}`,
     business: {
-      ...business,
+      ...adjustedBusiness,
       ebitda: adjustedEbitda,
       peakEbitda: adjustedEbitda,
       acquisitionEbitda: adjustedEbitda,
@@ -637,6 +757,8 @@ export function generateDealWithSize(
       revenue: adjustedRevenue,
       acquisitionRevenue: adjustedRevenue,
       peakRevenue: adjustedRevenue,
+      organicGrowthRate: finalGrowthRate,
+      revenueGrowthRate: finalRevenueGrowthRate,
     },
     askingPrice: finalAskingPrice,
     freshness,
@@ -647,6 +769,7 @@ export function generateDealWithSize(
     aiContent,
     heat,
     effectivePrice,
+    sellerArchetype,
   };
 }
 

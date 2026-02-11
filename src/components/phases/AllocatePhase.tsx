@@ -463,15 +463,64 @@ export function AllocatePhase({
         available: !appliedTypes.has('fix_underperformance') && business.ebitda < business.peakEbitda * 0.8,
         unavailableReason: appliedTypes.has('fix_underperformance') ? 'Already applied' : 'Business is performing well',
       },
+      {
+        type: 'recurring_revenue_conversion',
+        name: 'Convert to Recurring Revenue',
+        description: 'Shift business model toward recurring/subscription revenue streams.',
+        costPercent: 0.25,
+        ebitdaBoostMin: 0,
+        ebitdaBoostMax: 0,
+        growthBoost: 0.03,
+        extraBenefit: '-2ppt margin now, +0.50x exit premium',
+        available: !appliedTypes.has('recurring_revenue_conversion'),
+        unavailableReason: 'Already applied',
+      },
+      {
+        type: 'management_professionalization',
+        name: 'Professionalize Management',
+        description: 'Install professional management layer with executive coaching and governance.',
+        costPercent: 0.18,
+        ebitdaBoostMin: 0.03,
+        ebitdaBoostMax: 0.06,
+        growthBoost: 0.01,
+        extraBenefit: 'Upgrades operator quality, +0.30x exit premium',
+        available: !appliedTypes.has('management_professionalization'),
+        unavailableReason: 'Already applied',
+      },
+      {
+        type: 'digital_transformation',
+        name: 'Digital Transformation',
+        description: 'Modernize operations with digital tools, automation, and data analytics.',
+        costPercent: 0.22,
+        ebitdaBoostMin: 0.04,
+        ebitdaBoostMax: 0.08,
+        growthBoost: 0.02,
+        extraBenefit: 'Defends margins against drift',
+        available: !appliedTypes.has('digital_transformation'),
+        unavailableReason: 'Already applied',
+      },
     ];
 
-    // Calculate current exit multiple premium from improvements
-    const currentImprovementMultiple = business.improvements.length * 0.15;
+    // Per-type improvement exit premiums (matches simulation.ts)
+    const IMPROVEMENT_EXIT_PREMIUMS: Record<string, number> = {
+      operating_playbook: 0.15,
+      pricing_model: 0.15,
+      service_expansion: 0.15,
+      fix_underperformance: 0.15,
+      recurring_revenue_conversion: 0.50,
+      management_professionalization: 0.30,
+      digital_transformation: 0.15,
+    };
+    const currentImprovementMultiple = Math.min(
+      1.0,
+      business.improvements.reduce((sum, imp) => sum + (IMPROVEMENT_EXIT_PREMIUMS[imp.type] || 0.15), 0)
+    );
     const hasDeRiskingBonus = business.improvements.length >= 2;
+    const totalImprovementTypes = improvements.length;
 
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-        <div className="bg-bg-primary border border-white/10 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <div className="bg-bg-primary border border-white/10 rounded-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-3">
               <span className="text-3xl">{sector.emoji}</span>
@@ -495,7 +544,7 @@ export function AllocatePhase({
             </div>
             <div className="card text-center">
               <p className="text-text-muted text-sm">Improvements Applied</p>
-              <p className="text-2xl font-bold font-mono">{business.improvements.length}/4</p>
+              <p className="text-2xl font-bold font-mono">{business.improvements.length}/{totalImprovementTypes}</p>
             </div>
             <div className="card text-center">
               <p className="text-text-muted text-sm">Exit Multiple Bonus</p>
@@ -515,7 +564,7 @@ export function AllocatePhase({
               </div>
               <div>
                 <p className="text-text-primary font-medium mb-1">Exit Multiple Impact</p>
-                <p>Each improvement adds +0.15x to your exit multiple. At 2+ improvements, an additional +0.2x de-risking premium kicks in.</p>
+                <p>Variable exit premium per improvement (0.15x-0.50x, max 1.0x total). At 2+ improvements, an additional +0.2x de-risking premium kicks in.</p>
               </div>
               <div>
                 <p className="text-text-primary font-medium mb-1">One Per Business</p>
@@ -532,10 +581,7 @@ export function AllocatePhase({
                 {business.improvements.map((imp, idx) => (
                   <span key={idx} className="text-xs bg-accent/15 text-accent px-3 py-1.5 rounded-lg flex items-center gap-1.5">
                     <span>&#10003;</span>
-                    {imp.type === 'operating_playbook' ? 'Operating Playbook' :
-                     imp.type === 'pricing_model' ? 'Pricing Model' :
-                     imp.type === 'service_expansion' ? 'Service Expansion' :
-                     'Fix Underperformance'}
+                    {{ operating_playbook: 'Operating Playbook', pricing_model: 'Pricing Model', service_expansion: 'Service Expansion', fix_underperformance: 'Fix Underperformance', recurring_revenue_conversion: 'Recurring Revenue', management_professionalization: 'Professionalize Mgmt', digital_transformation: 'Digital Transformation' }[imp.type] || imp.type}
                     <span className="text-accent/60 ml-1">(Year {imp.appliedRound}, +{(imp.effect * 100).toFixed(0)}%)</span>
                   </span>
                 ))}
@@ -545,7 +591,7 @@ export function AllocatePhase({
 
           <h4 className="font-bold mb-4">Choose Improvement</h4>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {improvements.map((improvement) => {
               const cost = Math.round(business.ebitda * improvement.costPercent);
               const canAfford = cash >= cost;
@@ -557,9 +603,10 @@ export function AllocatePhase({
               const boostIsRange = improvement.ebitdaBoostMin !== improvement.ebitdaBoostMax;
               const paybackYears = ebitdaGainPerYear > 0 ? cost / ebitdaGainPerYear : Infinity;
 
-              // Exit value impact: +0.15x on current EBITDA, plus potential de-risking bonus
+              // Exit value impact: per-type premium, plus potential de-risking bonus
               const nextImprovementCount = business.improvements.length + 1;
-              const exitMultipleGain = 0.15 + (nextImprovementCount === 2 ? 0.2 : 0);
+              const typePremium = IMPROVEMENT_EXIT_PREMIUMS[improvement.type] || 0.15;
+              const exitMultipleGain = Math.min(typePremium, 1.0 - currentImprovementMultiple) + (nextImprovementCount === 2 ? 0.2 : 0);
               const exitValueGain = Math.round(business.ebitda * exitMultipleGain);
 
               // Total value = remaining years of EBITDA gain + exit value gain

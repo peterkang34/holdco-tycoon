@@ -3,12 +3,11 @@ import { EventCard } from '../cards/EventCard';
 
 interface EventPhaseProps {
   event: GameEvent | null;
-  onAcceptOffer: () => void;
-  onDeclineOffer: () => void;
+  onChoice: (action: string) => void;
   onContinue: () => void;
 }
 
-export function EventPhase({ event, onAcceptOffer, onDeclineOffer, onContinue }: EventPhaseProps) {
+export function EventPhase({ event, onChoice, onContinue }: EventPhaseProps) {
   if (!event) {
     return (
       <div className="max-w-lg mx-auto px-4 sm:px-6 py-6 text-center">
@@ -20,6 +19,8 @@ export function EventPhase({ event, onAcceptOffer, onDeclineOffer, onContinue }:
     );
   }
 
+  const hasChoices = !!(event.choices && event.choices.length > 0);
+
   return (
     <div className="max-w-lg mx-auto px-4 sm:px-6 py-6">
       <div className="text-center mb-6">
@@ -29,9 +30,8 @@ export function EventPhase({ event, onAcceptOffer, onDeclineOffer, onContinue }:
 
       <EventCard
         event={event}
-        onAcceptOffer={event.type === 'unsolicited_offer' ? onAcceptOffer : undefined}
-        onDeclineOffer={event.type === 'unsolicited_offer' ? onDeclineOffer : undefined}
-        onContinue={event.type !== 'unsolicited_offer' ? onContinue : undefined}
+        onChoice={hasChoices ? onChoice : undefined}
+        onContinue={!hasChoices ? onContinue : undefined}
       />
     </div>
   );

@@ -58,6 +58,21 @@ const SECTOR_NAME_PARTS: Record<string, NameParts> = {
     cores: ['Path', 'Forge', 'Hub', 'Pro', 'Step', 'Class', 'Mind', 'Spark', 'Leap', 'Track', 'Way', 'Arc', 'Bridge', 'Gate', 'Rise', 'Quest', 'Edge', 'Reach', 'Zone', 'Tier'],
     suffixes: ['Academy', 'Learning', 'Education', 'Institute', 'Training', 'School', 'Lab', 'Center', 'Pro', ''],
   },
+  insurance: {
+    prefixes: ['Shield', 'Trust', 'Guardian', 'Anchor', 'Harbor', 'Pinnacle', 'Cornerstone', 'Keystone', 'Liberty', 'Patriot', 'Premier', 'Sterling', 'Heritage', 'Evergreen', 'Summit', 'Meridian', 'Alliance', 'Compass', 'Beacon', 'Sentinel'],
+    cores: ['Risk', 'Guard', 'Cover', 'Safe', 'Sure', 'Bond', 'Care', 'Bridge', 'Shield', 'Point', 'Mark', 'Gate', 'Star', 'Crest', 'Peak', 'View', 'Rock', 'Stone', 'Well', 'Line'],
+    suffixes: ['Insurance', 'Benefits', 'Risk Group', 'Agency', 'Brokerage', 'Underwriters', 'Partners', 'Advisors', 'Group', ''],
+  },
+  autoServices: {
+    prefixes: ['Precision', 'Express', 'Metro', 'National', 'Premier', 'Quick', 'Pro', 'Elite', 'Classic', 'Summit', 'Valley', 'Pacific', 'Eagle', 'Patriot', 'Liberty', 'Freedom', 'American', 'Golden', 'Reliable', 'True'],
+    cores: ['Tire', 'Auto', 'Motor', 'Drive', 'Wheel', 'Fleet', 'Wrench', 'Bolt', 'Axle', 'Gear', 'Lube', 'Glass', 'Body', 'Frame', 'Brake', 'Trans', 'Speed', 'Track', 'Road', 'Lane'],
+    suffixes: ['Auto', 'Automotive', 'Tire & Auto', 'Service', 'Collision', 'Fleet', 'Auto Care', 'Garage', 'Shop', ''],
+  },
+  distribution: {
+    prefixes: ['National', 'Regional', 'Metro', 'Central', 'Pacific', 'Atlantic', 'Summit', 'Keystone', 'Core', 'Prime', 'Reliable', 'Express', 'Direct', 'First', 'Swift', 'Pinnacle', 'Apex', 'Gateway', 'Frontier', 'Heritage'],
+    cores: ['Supply', 'Ship', 'Move', 'Link', 'Flow', 'Route', 'Line', 'Haul', 'Pack', 'Port', 'Dock', 'Freight', 'Source', 'Stock', 'Depot', 'Hub', 'Track', 'Cargo', 'Load', 'Bulk'],
+    suffixes: ['Distribution', 'Supply Co', 'Logistics', 'Wholesale', 'Supply Chain', 'Distributors', 'Trading', 'Holdings', 'Inc', ''],
+  },
 };
 
 // Sub-type → suffixes map: ensures the name suffix matches the business sub-type
@@ -123,6 +138,43 @@ const SUBTYPE_SUFFIXES: Record<string, string[]> = {
   'EdTech SaaS': ['Lab', 'Ed', 'Tech', 'Pro', 'Platform'],
   'Corporate Training': ['Training', 'Development', 'Pro', 'Center', 'Workforce'],
   'Test Prep / Tutoring': ['Prep', 'Tutoring', 'Academy', 'School', 'Test Prep'],
+  // New sub-types for existing sectors
+  'PR / Communications': ['Communications', 'PR', 'Public Relations', 'PR Group', 'Comms'],
+  'Influencer / Social Media': ['Social', 'Influencer Co', 'Social Media', 'Creator Co', 'Social Studio'],
+  'Security / Compliance SaaS': ['Security', 'Compliance', 'SecOps', 'Trust', 'Secure'],
+  'Marketplace / Platform': ['Marketplace', 'Exchange', 'Platform', 'Connect', 'Market'],
+  'Landscaping / Lawn Care': ['Landscaping', 'Lawn Care', 'Grounds', 'Landscape Co', 'Outdoor'],
+  'Cleaning / Janitorial': ['Cleaning', 'Janitorial', 'Clean Co', 'Facility Care', 'Cleaning Pro'],
+  'Packaging / Containers': ['Packaging', 'Containers', 'Pack Co', 'Box', 'Packaging Solutions'],
+  'Environmental / Waste Services': ['Environmental', 'Waste', 'Green', 'Eco', 'Environmental Services'],
+  'Insurance Brokerage / TPA': ['Benefits', 'TPA', 'Brokerage', 'Claims', 'Risk Services'],
+  'Commercial Cleaning': ['Cleaning', 'Facility Services', 'Clean Pro', 'Janitorial', 'Building Services'],
+  'Veterinary Services': ['Vet', 'Animal Care', 'Veterinary', 'Pet Health', 'Animal Hospital'],
+  'Physical Therapy / Rehab': ['Rehab', 'Physical Therapy', 'PT', 'Recovery', 'Therapy'],
+  'Catering / Events': ['Catering', 'Events', 'Catering Co', 'Banquet', 'Event Kitchen'],
+  'Bakery / Dessert Concept': ['Bakery', 'Bake Shop', 'Patisserie', 'Sweets', 'Baking Co'],
+  'Childcare / Early Education': ['Childcare', 'Learning Center', 'Early Ed', 'Kids Academy', 'Preschool'],
+  // Insurance sub-types
+  'P&C Agency': ['Insurance', 'P&C', 'Risk Group', 'Agency', 'Coverage'],
+  'Employee Benefits Brokerage': ['Benefits', 'Employee Benefits', 'Benefits Group', 'Brokerage', 'Advisors'],
+  'Life & Annuities': ['Life', 'Annuities', 'Financial', 'Life Group', 'Planning'],
+  'Specialty / Excess Lines': ['Specialty', 'Surplus Lines', 'E&S', 'Specialty Risk', 'Underwriters'],
+  'Personal Lines': ['Insurance', 'Personal Lines', 'Home & Auto', 'Coverage', 'Protection'],
+  'MGA / Program Admin': ['MGA', 'Programs', 'Underwriting', 'Program Admin', 'Risk'],
+  // Auto Services sub-types
+  'Tire & Wheel': ['Tire', 'Tire & Auto', 'Wheel', 'Tire Center', 'Tire Pro'],
+  'Collision / Body': ['Collision', 'Body Shop', 'Auto Body', 'Collision Center', 'Body Works'],
+  'Quick Lube / Maintenance': ['Lube', 'Oil Change', 'Quick Service', 'Auto Care', 'Maintenance'],
+  'Fleet Services': ['Fleet', 'Fleet Services', 'Commercial', 'Fleet Care', 'Fleet Pro'],
+  'Transmission / Drivetrain': ['Transmission', 'Drivetrain', 'Trans Pro', 'Auto Tech', 'Powertrain'],
+  'Auto Glass / Detailing': ['Glass', 'Detailing', 'Auto Glass', 'Detail Pro', 'Glass & Detail'],
+  // Distribution sub-types
+  'Food & Bev Distribution': ['Foods', 'Food Service', 'Beverage', 'Food Distribution', 'Provisions'],
+  'Industrial / MRO Supply': ['Supply', 'MRO', 'Industrial Supply', 'Parts', 'Maintenance Supply'],
+  'Building Materials': ['Building Supply', 'Materials', 'Lumber', 'Building Products', 'Construction Supply'],
+  'Janitorial / Facilities Supply': ['Jan-San', 'Facility Supply', 'Janitorial', 'Supply Co', 'Clean Supply'],
+  'Specialty / Niche': ['Specialty', 'Niche Supply', 'Specialty Distribution', 'Select', 'Specialty Co'],
+  'Last-Mile Delivery': ['Delivery', 'Express', 'Last Mile', 'Courier', 'Logistics'],
 };
 
 // Track used names to avoid duplicates within a game

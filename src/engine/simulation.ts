@@ -3,10 +3,12 @@ import {
   Business,
   GameEvent,
   EventImpact,
+  EventChoice,
   ExitValuation,
   SectorFocusBonus,
   SectorFocusGroup,
   SectorFocusTier,
+  OperationalImprovementType,
   Metrics,
   HistoricalMetrics,
   randomInRange,
@@ -60,8 +62,20 @@ export function calculateExitValuation(
   const yearsHeld = currentRound - business.acquisitionRound;
   const holdPremium = Math.min(0.5, yearsHeld * 0.1);
 
-  // Improvements premium: investments in the business increase value
-  const improvementsPremium = business.improvements.length * 0.15;
+  // Improvements premium: per-type lookup, capped at 1.0x total
+  const IMPROVEMENT_EXIT_PREMIUMS: Record<OperationalImprovementType, number> = {
+    operating_playbook: 0.15,
+    pricing_model: 0.15,
+    service_expansion: 0.15,
+    fix_underperformance: 0.15,
+    recurring_revenue_conversion: 0.50,
+    management_professionalization: 0.30,
+    digital_transformation: 0.15,
+  };
+  const improvementsPremium = Math.min(
+    1.0,
+    business.improvements.reduce((sum, imp) => sum + (IMPROVEMENT_EXIT_PREMIUMS[imp.type] || 0.15), 0)
+  );
 
   // Market conditions modifier
   let marketModifier = 0;
@@ -541,6 +555,19 @@ export function generateEvent(state: GameState): GameEvent | null {
     for (const eventDef of PORTFOLIO_EVENTS) {
       let adjustedProb = eventDef.probability;
 
+      // Trigger conditions for new portfolio events
+      if (eventDef.type === 'portfolio_referral_deal' && activeBusinesses.length < 4) {
+        adjustedProb = 0; // Need 4+ active businesses
+      }
+      if (eventDef.type === 'portfolio_equity_demand') {
+        const eligible = activeBusinesses.filter(b => b.dueDiligence.operatorQuality === 'strong' && b.qualityRating >= 4);
+        if (eligible.length === 0) adjustedProb = 0;
+      }
+      if (eventDef.type === 'portfolio_seller_note_renego') {
+        const eligible = activeBusinesses.filter(b => b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining >= 2);
+        if (eligible.length === 0) adjustedProb = 0;
+      }
+
       // Adjust talent events based on shared services
       // H-1: Clamp adjusted probabilities to prevent exceeding 1.0
       if (eventDef.type === 'portfolio_talent_leaves') {
@@ -552,8 +579,33 @@ export function generateEvent(state: GameState): GameEvent | null {
       cumulativeProb += adjustedProb;
       // H-1: Cap cumulative probability at 1.0
       if (portfolioRoll < Math.min(1.0, cumulativeProb)) {
-        const affectedBusiness = pickRandom(activeBusinesses);
-        if (!affectedBusiness) break; // C-2: Guard against empty array
+        // Select the right affected business based on event type
+        let affectedBusiness = pickRandom(activeBusinesses);
+        let choices: EventChoice[] | undefined;
+
+        if (eventDef.type === 'portfolio_equity_demand') {
+          const eligible = activeBusinesses.filter(b => b.dueDiligence.operatorQuality === 'strong' && b.qualityRating >= 4);
+          affectedBusiness = pickRandom(eligible) || affectedBusiness;
+          const dilution = randomInt(20, 30);
+          choices = [
+            { label: `Grant Equity (${dilution} shares)`, description: `Dilute ${dilution} shares, +2% growth, +1ppt margin`, action: 'grantEquityDemand', variant: 'positive' },
+            { label: 'Decline', description: '60% chance talent leaves', action: 'declineEquityDemand', variant: 'negative' },
+          ];
+        } else if (eventDef.type === 'portfolio_seller_note_renego') {
+          const eligible = activeBusinesses.filter(b => b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining >= 2);
+          affectedBusiness = pickRandom(eligible) || affectedBusiness;
+          const discountRate = 0.70 + Math.random() * 0.10; // 70-80%
+          const discountAmt = Math.round(affectedBusiness!.sellerNoteBalance * discountRate);
+          choices = [
+            { label: `Pay Early (${formatMoney(discountAmt)})`, description: `Pay ${Math.round(discountRate * 100)}% of remaining balance now`, action: 'acceptSellerNoteRenego', variant: 'positive' },
+            { label: 'Decline', description: 'Note continues normally', action: 'declineSellerNoteRenego', variant: 'neutral' },
+          ];
+        } else if (eventDef.type === 'portfolio_referral_deal') {
+          // Referral deal — no affectedBusiness needed, deal injected in applyEventEffects
+          affectedBusiness = undefined as unknown as typeof affectedBusiness;
+        }
+
+        if (!affectedBusiness && eventDef.type !== 'portfolio_referral_deal') break;
         return {
           id: `event_${state.round}_${eventDef.type}`,
           type: eventDef.type,
@@ -562,7 +614,8 @@ export function generateEvent(state: GameState): GameEvent | null {
           effect: eventDef.effectDescription,
           tip: eventDef.tip,
           tipSource: eventDef.tipSource,
-          affectedBusinessId: affectedBusiness.id,
+          affectedBusinessId: affectedBusiness?.id,
+          choices,
         };
       }
     }
@@ -1012,6 +1065,15 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
       break;
     }
 
+    // Referral deal: no immediate state change — deal injection happens in store
+    case 'portfolio_referral_deal':
+      break;
+
+    // Equity demand and seller note renego: choices handled by store actions
+    case 'portfolio_equity_demand':
+    case 'portfolio_seller_note_renego':
+      break;
+
     // Unsolicited offer handling is done separately when player accepts/declines
     case 'unsolicited_offer':
       break;
@@ -1021,8 +1083,11 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
       break;
   }
 
+  // Events with choices should pass through with choices preserved
+  const hasChoices = event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand' || event.type === 'portfolio_seller_note_renego';
+
   // Attach impacts to the event in state
-  newState.currentEvent = event.type !== 'unsolicited_offer' && impacts.length > 0
+  newState.currentEvent = !hasChoices && impacts.length > 0
     ? { ...event, impacts }
     : event;
 

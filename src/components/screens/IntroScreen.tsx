@@ -87,7 +87,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
           <label className="block text-left mb-2 text-sm text-text-muted">
             Choose your first acquisition
           </label>
-          <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="grid grid-cols-3 gap-2 mb-4">
             {SECTOR_LIST.map(sector => (
               <button
                 key={sector.id}

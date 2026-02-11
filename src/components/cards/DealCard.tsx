@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { Deal, DealHeat, formatMoney, formatPercent, Business } from '../../engine/types';
+import { Deal, DealHeat, SellerArchetype, formatMoney, formatPercent, Business } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
+import { Tooltip } from '../ui/Tooltip';
 
 interface DealCardProps {
   deal: Deal;
@@ -42,6 +43,20 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
     }
   };
   const heatBadge = getHeatBadge(deal.heat);
+
+  const getArchetypeBadge = (archetype?: SellerArchetype) => {
+    switch (archetype) {
+      case 'retiring_founder': return { label: 'Retiring', color: 'bg-blue-500/20 text-blue-400' };
+      case 'burnt_out_operator': return { label: 'Burnt Out', color: 'bg-orange-500/20 text-orange-400' };
+      case 'accidental_holdco': return { label: 'Divestiture', color: 'bg-purple-500/20 text-purple-400' };
+      case 'distressed_seller': return { label: 'Distressed', color: 'bg-red-500/20 text-red-400' };
+      case 'mbo_candidate': return { label: 'MBO', color: 'bg-green-500/20 text-green-400' };
+      case 'franchise_breakaway': return { label: 'Ex-Franchise', color: 'bg-teal-500/20 text-teal-400' };
+      default: return null;
+    }
+  };
+  const archetypeBadge = getArchetypeBadge(deal.sellerArchetype);
+
   const hasHeatPremium = deal.effectivePrice > deal.askingPrice;
   const premiumPct = hasHeatPremium ? Math.round(((deal.effectivePrice / deal.askingPrice) - 1) * 100) : 0;
 
@@ -77,18 +92,22 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
         </div>
         <div className="flex flex-col items-end gap-1">
           <div className="flex items-center gap-1">
-            <span className="relative group/heat">
-              <span className={`text-xs px-2 py-1 rounded cursor-help ${heatBadge.color} ${heatBadge.pulse ? 'animate-pulse' : ''}`}>
-                {heatBadge.label}
-              </span>
-              <span className="absolute right-0 top-full mt-1 w-48 p-2 bg-bg-primary border border-white/10 rounded-lg shadow-xl text-xs text-text-secondary opacity-0 invisible group-hover/heat:opacity-100 group-hover/heat:visible transition-all z-50">
-                {heatBadge.tip}
-              </span>
-            </span>
+            <Tooltip
+              trigger={<span className={`text-xs px-2 py-1 rounded ${heatBadge.color} ${heatBadge.pulse ? 'animate-pulse' : ''}`}>{heatBadge.label}</span>}
+              align="right"
+              width="w-48"
+            >
+              {heatBadge.tip}
+            </Tooltip>
             <span className={`text-xs px-2 py-1 rounded ${acquisitionBadge.color}`}>
               {acquisitionBadge.label}
             </span>
           </div>
+          {archetypeBadge && (
+            <span className={`text-xs px-2 py-1 rounded ${archetypeBadge.color}`}>
+              {archetypeBadge.label}
+            </span>
+          )}
           <span className={`text-xs px-2 py-1 rounded ${
             deal.freshness === 1 ? 'bg-warning/20 text-warning' : 'bg-white/10 text-text-muted'
           }`}>
@@ -183,13 +202,18 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
           <p className="text-xs text-text-muted">Asking Price</p>
           <p className="font-mono font-bold text-lg">{formatMoney(deal.effectivePrice)}</p>
           {hasHeatPremium ? (
-            <p className="text-xs text-text-muted relative group/price inline-flex items-center gap-1 cursor-help">
-              <span className="line-through">{formatMoney(deal.askingPrice)}</span>
-              <span className="text-warning">+{premiumPct}%</span>
-              <span className="absolute left-0 top-full mt-1 w-52 p-2 bg-bg-primary border border-white/10 rounded-lg shadow-xl text-xs text-text-secondary opacity-0 invisible group-hover/price:opacity-100 group-hover/price:visible transition-all z-50">
-                Competitive premium: other buyers are bidding up the price. Sourced and off-market deals face less competition.
-              </span>
-            </p>
+            <Tooltip
+              trigger={
+                <span className="text-xs text-text-muted inline-flex items-center gap-1">
+                  <span className="line-through">{formatMoney(deal.askingPrice)}</span>
+                  <span className="text-warning">+{premiumPct}%</span>
+                </span>
+              }
+              align="left"
+              width="w-52"
+            >
+              Competitive premium: other buyers are bidding up the price. Sourced and off-market deals face less competition.
+            </Tooltip>
           ) : (
             <p className="text-xs text-text-muted">{deal.business.acquisitionMultiple.toFixed(1)}x EBITDA</p>
           )}

@@ -197,7 +197,7 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   } else if (activeBusinesses.length >= 4) {
     // Reward diversification — now competitive with focus scoring
     const uniqueSectors = new Set(activeBusinesses.map(b => b.sectorId));
-    sectorFocusScore = Math.min(5, uniqueSectors.size >= 6 ? 5 : uniqueSectors.size >= 4 ? 4 : uniqueSectors.size);
+    sectorFocusScore = Math.min(5, uniqueSectors.size >= 8 ? 5 : uniqueSectors.size >= 4 ? 4 : uniqueSectors.size);
   }
 
   // Shared services ROI (5 points)

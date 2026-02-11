@@ -72,6 +72,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     improveBusiness,
     acceptOffer,
     declineOffer,
+    grantEquityDemand,
+    declineEquityDemand,
+    acceptSellerNoteRenego,
+    declineSellerNoteRenego,
     maFocus,
     setMAFocus,
     maSourcing,
@@ -97,6 +101,18 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;
+
+  const handleEventChoice = (action: string) => {
+    switch (action) {
+      case 'acceptOffer': acceptOffer(); break;
+      case 'declineOffer': declineOffer(); break;
+      case 'grantEquityDemand': grantEquityDemand(); break;
+      case 'declineEquityDemand': declineEquityDemand(); break;
+      case 'acceptSellerNoteRenego': acceptSellerNoteRenego(); break;
+      case 'declineSellerNoteRenego': declineSellerNoteRenego(); break;
+    }
+    advanceToAllocate();
+  };
 
   // Show tutorial on new game start or first visit
   useEffect(() => {
@@ -222,8 +238,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         return (
           <EventPhase
             event={currentEvent}
-            onAcceptOffer={acceptOffer}
-            onDeclineOffer={declineOffer}
+            onChoice={handleEventChoice}
             onContinue={advanceToAllocate}
           />
         );
