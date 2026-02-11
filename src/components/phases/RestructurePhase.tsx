@@ -53,14 +53,14 @@ export function RestructurePhase({
   const canContinue = actionsTaken > 0;
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 pb-8">
       {/* Danger Banner */}
       <div className="bg-red-900/40 border-2 border-red-500/60 rounded-xl p-6 mb-8 text-center">
         <h2 className="text-3xl font-bold text-red-400 mb-2">Financial Distress</h2>
         <p className="text-lg text-red-300 mb-4">
           Your lenders require immediate corrective action
         </p>
-        <div className="grid grid-cols-3 gap-4 text-center">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 text-center">
           <div>
             <p className="text-text-muted text-sm">Cash</p>
             <p className="text-2xl font-bold font-mono text-red-400">{formatMoney(cash)}</p>

@@ -11,7 +11,7 @@ interface EventPhaseProps {
 export function EventPhase({ event, onAcceptOffer, onDeclineOffer, onContinue }: EventPhaseProps) {
   if (!event) {
     return (
-      <div className="max-w-lg mx-auto p-6 text-center">
+      <div className="max-w-lg mx-auto px-4 sm:px-6 py-6 text-center">
         <p className="text-text-muted mb-4">No event this year.</p>
         <button onClick={onContinue} className="btn-primary">
           Continue to Allocate →
@@ -21,7 +21,7 @@ export function EventPhase({ event, onAcceptOffer, onDeclineOffer, onContinue }:
   }
 
   return (
-    <div className="max-w-lg mx-auto p-6">
+    <div className="max-w-lg mx-auto px-4 sm:px-6 py-6">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold mb-2">Market Event</h2>
         <p className="text-text-secondary">Economic conditions affect your portfolio</p>

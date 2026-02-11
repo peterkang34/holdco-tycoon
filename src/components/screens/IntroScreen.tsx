@@ -38,7 +38,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8 relative overflow-hidden">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 sm:px-8 py-8 relative overflow-hidden">
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 text-6xl opacity-10 animate-pulse">🏭</div>

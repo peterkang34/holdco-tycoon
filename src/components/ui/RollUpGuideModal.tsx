@@ -5,7 +5,7 @@ interface RollUpGuideModalProps {
 export function RollUpGuideModal({ onClose }: RollUpGuideModalProps) {
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-      <div className="bg-bg-primary border border-white/10 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
+      <div className="bg-bg-primary border border-white/10 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <div className="flex items-start justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold">Roll-Up Strategy Guide</h2>
@@ -131,7 +131,7 @@ export function RollUpGuideModal({ onClose }: RollUpGuideModalProps) {
             operator strength, and whether you have shared services active.
           </p>
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
             <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-3 text-center">
               <p className="text-green-400 font-bold">Success</p>
               <p className="text-xl font-mono mt-1">+10-20%</p>
@@ -154,7 +154,7 @@ export function RollUpGuideModal({ onClose }: RollUpGuideModalProps) {
         <div className="card mb-6">
           <h3 className="font-bold text-lg mb-4">Merge vs Tuck-In</h3>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="bg-white/5 rounded-lg p-4">
               <h4 className="font-bold text-accent-secondary mb-2">Tuck-In</h4>
               <ul className="text-sm text-text-secondary space-y-1">

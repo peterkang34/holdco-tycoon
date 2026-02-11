@@ -171,7 +171,7 @@ export function GameOverScreen({
   };
 
   return (
-    <div className="min-h-screen p-8 max-w-4xl mx-auto">
+    <div className="min-h-screen px-4 sm:px-8 py-8 pb-16 max-w-4xl mx-auto">
       {/* Bankruptcy Header (replaces normal header) */}
       {bankruptRound ? (
         <div className="text-center mb-8">
@@ -189,7 +189,7 @@ export function GameOverScreen({
               Your holding company couldn't service its debt obligations and was forced into bankruptcy.
               All equity value was wiped out.
             </p>
-            <div className="mt-4 grid grid-cols-2 gap-4 text-center">
+            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-center">
               <div>
                 <p className="text-text-muted text-sm">Final Debt</p>
                 <p className="text-2xl font-bold font-mono text-red-400">{formatMoney(metrics.totalDebt)}</p>
@@ -359,7 +359,7 @@ export function GameOverScreen({
       {/* Final Metrics */}
       <div className="card mb-6">
         <h2 className="text-lg font-bold mb-4">Final Portfolio Summary</h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 text-center">
           <div>
             <p className="text-text-muted text-sm">Total Revenue</p>
             <p className="text-2xl font-bold font-mono">{formatMoney(metrics.totalRevenue)}</p>
@@ -408,7 +408,7 @@ export function GameOverScreen({
                     <p className="text-xs text-text-muted">{sector.name}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-4 text-right">
+                <div className="hidden sm:flex items-center gap-2 sm:gap-4 text-right">
                   <div>
                     <p className="text-xs text-text-muted">Revenue</p>
                     <p className="font-mono">{formatMoney(business.revenue)}</p>

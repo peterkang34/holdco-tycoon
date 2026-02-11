@@ -91,7 +91,7 @@ export function EventCard({ event, onAcceptOffer, onDeclineOffer, onContinue }: 
           <p className="text-xs text-text-muted font-medium mb-3 uppercase tracking-wide">Impact Summary</p>
           <div className="space-y-2">
             {event.impacts.map((impact, idx) => (
-              <div key={idx} className="flex items-center justify-between text-sm">
+              <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between text-sm gap-1 sm:gap-0">
                 <span className="text-text-secondary">
                   {impact.businessName
                     ? `${impact.businessName}${impact.metric === 'revenue' ? ' Rev' : impact.metric === 'margin' ? ' Margin' : ''}`

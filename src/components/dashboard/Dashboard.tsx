@@ -89,7 +89,7 @@ export function Dashboard({
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2 sm:gap-3">
         <MetricCard
           label="Cash"
           value={formatMoney(liveCash)}

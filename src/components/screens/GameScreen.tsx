@@ -332,7 +332,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             Reset
           </button>
         </div>
-        <div className="flex items-center gap-4 text-sm">
+        <div className="hidden sm:flex items-center gap-2 sm:gap-4 text-sm">
           <span className={`px-3 py-1 rounded-full ${
             phase === 'collect' ? 'bg-accent text-bg-primary' :
             'bg-white/10 text-text-muted'

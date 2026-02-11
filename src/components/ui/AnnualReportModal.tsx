@@ -51,7 +51,7 @@ export function AnnualReportModal({ roundHistory, onClose }: AnnualReportModalPr
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-      <div className="bg-bg-primary border border-white/10 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
+      <div className="bg-bg-primary border border-white/10 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <div className="flex items-start justify-between mb-6">
           <div>
             <h3 className="text-xl font-bold">Annual Reports</h3>
@@ -108,7 +108,7 @@ export function AnnualReportModal({ roundHistory, onClose }: AnnualReportModalPr
                   )}
 
                   {/* Key metrics row */}
-                  <div className="grid grid-cols-2 md:grid-cols-6 gap-3 text-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 text-sm">
                     <div>
                       <p className="text-text-muted text-xs">Revenue</p>
                       <p className="font-mono font-bold">
@@ -212,7 +212,7 @@ export function AnnualReportModal({ roundHistory, onClose }: AnnualReportModalPr
                       </div>
 
                       {/* Extended metrics */}
-                      <div className="grid grid-cols-3 gap-3 mt-4 text-xs">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mt-4 text-xs">
                         <div>
                           <p className="text-text-muted">ROIC</p>
                           <p className="font-mono">{formatPercent(entry.metrics.portfolioRoic)}</p>

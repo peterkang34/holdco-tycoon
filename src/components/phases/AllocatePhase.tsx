@@ -194,7 +194,7 @@ export function AllocatePhase({
 
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-        <div className="bg-bg-primary border border-white/10 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6">
+        <div className="bg-bg-primary border border-white/10 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <div className="flex items-start justify-between mb-6">
             <div>
               <h3 className="text-xl font-bold">{selectedDeal.business.name}</h3>
@@ -471,7 +471,7 @@ export function AllocatePhase({
 
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-        <div className="bg-bg-primary border border-white/10 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
+        <div className="bg-bg-primary border border-white/10 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <div className="flex items-start justify-between mb-6">
             <div className="flex items-center gap-3">
               <span className="text-3xl">{sector.emoji}</span>
@@ -656,7 +656,7 @@ export function AllocatePhase({
   };
 
   return (
-    <div className="p-6">
+    <div className="px-4 sm:px-6 py-6 pb-8">
       {/* Distress Warning Banner */}
       {distressLevel === 'stressed' && (
         <div className="bg-orange-900/30 border border-orange-500/40 rounded-xl p-4 mb-6">
@@ -1567,7 +1567,7 @@ export function AllocatePhase({
       {/* Merge Modal */}
       {showMergeModal && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-bg-primary border border-white/10 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-6">
+          <div className="bg-bg-primary border border-white/10 rounded-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
             <div className="flex items-start justify-between mb-6">
               <div>
                 <h3 className="text-xl font-bold">Merge Businesses</h3>

@@ -79,8 +79,8 @@ export function BusinessCard({
         <div className="flex items-center gap-2">
           <span className="text-2xl">{sector.emoji}</span>
           <div>
-            <h3 className="font-bold">{business.name}</h3>
-            <p className="text-xs text-text-muted">{business.subType}</p>
+            <h3 className="font-bold truncate">{business.name}</h3>
+            <p className="text-xs text-text-muted truncate">{business.subType}</p>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -127,7 +127,7 @@ export function BusinessCard({
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-3 mb-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-3">
         <div>
           <p className="text-xs text-text-muted">Revenue</p>
           <p className="font-mono font-bold text-lg">{formatMoney(business.revenue)}</p>
@@ -151,7 +151,7 @@ export function BusinessCard({
 
       {showDetails && (
         <>
-          <div className="grid grid-cols-4 gap-2 text-xs mb-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-3">
             <div>
               <p className="text-text-muted">Invested</p>
               <p className="font-mono">{formatMoney(totalInvested)}</p>

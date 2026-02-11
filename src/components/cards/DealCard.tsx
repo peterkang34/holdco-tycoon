@@ -71,8 +71,8 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
         <div className="flex items-center gap-2">
           <span className="text-2xl">{sector.emoji}</span>
           <div>
-            <h3 className="font-bold">{deal.business.name}</h3>
-            <p className="text-xs text-text-muted">{deal.business.subType}</p>
+            <h3 className="font-bold truncate">{deal.business.name}</h3>
+            <p className="text-xs text-text-muted truncate">{deal.business.subType}</p>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
@@ -168,7 +168,7 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
         </div>
       )}
 
-      <div className="grid grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
         <div>
           <p className="text-xs text-text-muted">Revenue</p>
           <p className="font-mono font-bold text-lg">{formatMoney(deal.business.revenue)}</p>

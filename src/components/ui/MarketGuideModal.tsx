@@ -65,7 +65,7 @@ export function MarketGuideModal({ onClose }: MarketGuideModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-      <div className="bg-bg-primary border border-white/10 rounded-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-6">
+      <div className="bg-bg-primary border border-white/10 rounded-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <div className="flex items-start justify-between mb-6">
           <div>
             <h3 className="text-xl font-bold">Market Guide: Sector Multiples</h3>

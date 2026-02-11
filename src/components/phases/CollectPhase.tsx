@@ -92,7 +92,7 @@ export function CollectPhase({
   const projectedCash = cash + netFcf;
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 pb-8">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold mb-2">Year {round} — Cash Flow Collection</h2>
         <p className="text-text-secondary">EBITDA converts to Free Cash Flow after deductions</p>
@@ -110,7 +110,7 @@ export function CollectPhase({
       {/* EBITDA to FCF Summary */}
       <div className="card mb-6 bg-white/5">
         <h3 className="font-bold mb-4">Portfolio Cash Flow Waterfall</h3>
-        <div className="grid grid-cols-2 md:grid-cols-7 gap-4 text-center text-sm">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 lg:gap-4 text-center text-sm">
           <div>
             <p className="text-text-muted">Revenue</p>
             <p className="font-mono font-bold text-lg">{formatMoney(activeBusinesses.reduce((s, b) => s + b.revenue, 0))}</p>
@@ -240,7 +240,7 @@ export function CollectPhase({
                   }`}
                   onClick={() => setExpandedBusiness(isExpanded ? null : business.id)}
                 >
-                  <div className="flex items-center gap-2 w-48">
+                  <div className="flex items-center gap-2 w-32 sm:w-48">
                     <span className="text-xl">{sector.emoji}</span>
                     <div className="truncate">
                       <p className="font-medium truncate">{business.name}</p>
