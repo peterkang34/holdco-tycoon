@@ -4,10 +4,15 @@ export function generateDealStructures(
   deal: Deal,
   playerCash: number,
   interestRate: number,
-  creditTightening: boolean
+  creditTightening: boolean,
+  maxRounds: number = 20
 ): DealStructure[] {
   const askingPrice = deal.effectivePrice;
   const structures: DealStructure[] = [];
+
+  // Scale debt terms by game duration
+  const sellerNoteTerms = Math.max(2, Math.ceil(maxRounds * 0.15)); // 3 for 20yr, 2 for 10yr
+  const bankDebtTerms = Math.max(4, Math.ceil(maxRounds * 0.50));   // 10 for 20yr, 5 for 10yr
 
   // Seed pseudo-random from deal ID for deterministic structures per deal
   // (prevents structures from changing on re-render)
@@ -37,7 +42,7 @@ export function generateDealStructures(
       sellerNote: {
         amount: sellerNoteAmount,
         rate: sellerNoteRate,
-        termRounds: 3, // 3 years
+        termRounds: sellerNoteTerms,
       },
       leverage: Math.round((sellerNoteAmount / deal.business.ebitda) * 10) / 10,
       risk: 'medium',
@@ -57,7 +62,7 @@ export function generateDealStructures(
         bankDebt: {
           amount: bankDebtAmount,
           rate: interestRate,
-          termRounds: 10, // 10 years
+          termRounds: bankDebtTerms,
         },
         leverage: Math.round((bankDebtAmount / deal.business.ebitda) * 10) / 10,
         risk: 'high',
@@ -102,12 +107,12 @@ export function generateDealStructures(
         sellerNote: {
           amount: lboNoteAmount,
           rate: lboNoteRate,
-          termRounds: 3,
+          termRounds: sellerNoteTerms,
         },
         bankDebt: {
           amount: lboBankAmount,
           rate: interestRate,
-          termRounds: 10,
+          termRounds: bankDebtTerms,
         },
         leverage: Math.round((combinedDebt / deal.business.ebitda) * 10) / 10,
         risk: 'high',

@@ -53,7 +53,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       sharedServicesActive,
       ebitdaGrowth,
       finalLeverage,
+      totalRounds: rawTotalRounds,
+      difficulty: rawDifficulty,
+      founderEquityValue: rawFEV,
+      founderOwnership: rawOwnership,
     } = req.body;
+
+    const totalRounds = typeof rawTotalRounds === 'number' ? rawTotalRounds : 20;
+    const difficulty = rawDifficulty === 'normal' ? 'Normal (Self-Funded)' : 'Easy (Institutional Fund)';
+    const founderEquityValue = typeof rawFEV === 'number' ? rawFEV : enterpriseValue;
+    const founderOwnership = typeof rawOwnership === 'number' ? `${Math.round(rawOwnership * 100)}%` : 'N/A';
 
     const holdcoName = sanitizeString(rawHoldcoName, 50);
     const platformSummarySafe = sanitizeString(platformSummary, 500);
@@ -63,13 +72,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    const prompt = `You are an experienced investment advisor reviewing a player's 20-year holding company simulation game. The player runs a holdco (not a PE fund) — never use the term "private equity firm". Analyze their performance and provide personalized, actionable feedback.
+    const prompt = `You are an experienced investment advisor reviewing a player's ${totalRounds}-year holding company simulation game. The player runs a holdco (not a PE fund) — never use the term "private equity firm". Analyze their performance and provide personalized, actionable feedback.
 
 GAME RESULTS:
 - Holdco Name: ${holdcoName}
+- Difficulty: ${difficulty}
+- Duration: ${totalRounds} years
 - Final Grade: ${score.grade} (${score.total}/100 points)
 - Title: ${score.title}
-- Enterprise Value: ${formatMoney(enterpriseValue)}
+- Founder Equity Value: ${formatMoney(founderEquityValue)} (founder's share of NAV)
+- Enterprise Value: ${formatMoney(enterpriseValue)} (total portfolio value)
+- Founder Ownership: ${founderOwnership}
 
 SCORE BREAKDOWN:
 - FCF/Share Growth: ${score.fcfShareGrowth}/25

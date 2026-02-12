@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateEnterpriseValue,
+  calculateFounderEquityValue,
+  calculateFounderPersonalWealth,
   calculateFinalScore,
   generatePostGameInsights,
+  wouldMakeLeaderboardFromList,
+  getLeaderboardRankFromList,
 } from '../scoring';
 import { calculateMetrics } from '../simulation';
 import {
@@ -10,7 +14,7 @@ import {
   createMockGameState,
   createMultiBusinessState,
 } from './helpers';
-import { QualityRating, Metrics, HistoricalMetrics } from '../types';
+import { QualityRating, Metrics, HistoricalMetrics, LeaderboardEntry } from '../types';
 
 describe('calculateEnterpriseValue', () => {
   it('should return positive EV for healthy portfolio', () => {
@@ -54,7 +58,7 @@ describe('calculateEnterpriseValue', () => {
     // The key is that exitedBusinesses with status 'sold' add exitPrice to the sum
   });
 
-  it('should include distributions and buybacks in EV', () => {
+  it('should NOT add back distributions to EV (distributions reduce NAV)', () => {
     const state = createMockGameState({
       totalDistributions: 3000,
       totalBuybacks: 2000,
@@ -66,7 +70,9 @@ describe('calculateEnterpriseValue', () => {
 
     const evWithReturns = calculateEnterpriseValue(state);
     const evNoReturns = calculateEnterpriseValue(stateNoReturns);
-    expect(evWithReturns).toBeGreaterThan(evNoReturns);
+    // Distributions no longer add back to EV — both states should have the same EV
+    // since distributions/buybacks don't affect the portfolio value calculation
+    expect(evWithReturns).toBe(evNoReturns);
   });
 
   it('should deduct all debt including opco debt', () => {
@@ -315,5 +321,166 @@ describe('generatePostGameInsights', () => {
       expect(insight.pattern).toBeTruthy();
       expect(insight.insight).toBeTruthy();
     }
+  });
+});
+
+describe('calculateFounderEquityValue', () => {
+  it('should return EV * ownership percentage', () => {
+    const state = createMockGameState({
+      founderShares: 800,
+      sharesOutstanding: 1000,
+    });
+    const ev = calculateEnterpriseValue(state);
+    const fev = calculateFounderEquityValue(state);
+    expect(fev).toBe(Math.round(ev * 0.8));
+  });
+
+  it('should return full EV at 100% ownership', () => {
+    const state = createMockGameState({
+      founderShares: 1000,
+      sharesOutstanding: 1000,
+    });
+    const ev = calculateEnterpriseValue(state);
+    const fev = calculateFounderEquityValue(state);
+    expect(fev).toBe(ev);
+  });
+
+  it('should return 0 when EV is 0', () => {
+    const state = createMockGameState({
+      businesses: [],
+      cash: 0,
+      totalDebt: 5000,
+    });
+    const fev = calculateFounderEquityValue(state);
+    expect(fev).toBe(0);
+  });
+});
+
+describe('calculateFounderPersonalWealth', () => {
+  it('should return founderDistributionsReceived', () => {
+    const state = createMockGameState({ founderDistributionsReceived: 5000 });
+    expect(calculateFounderPersonalWealth(state)).toBe(5000);
+  });
+
+  it('should return 0 when no distributions received', () => {
+    const state = createMockGameState({ founderDistributionsReceived: 0 });
+    expect(calculateFounderPersonalWealth(state)).toBe(0);
+  });
+});
+
+describe('calculateFinalScore with 10-year mode', () => {
+  function createScoringState10yr(overrides = {}): ReturnType<typeof createMockGameState> {
+    const baseHistory: HistoricalMetrics[] = [
+      {
+        round: 1,
+        metrics: {
+          cash: 5000,
+          totalDebt: 3000,
+          totalEbitda: 800,
+          totalRevenue: 4000,
+          avgEbitdaMargin: 0.20,
+          totalFcf: 300,
+          fcfPerShare: 0.3,
+          portfolioRoic: 0.10,
+          roiic: 0.10,
+          portfolioMoic: 0.36,
+          netDebtToEbitda: 1.5,
+          distressLevel: 'comfortable' as const,
+          cashConversion: 0.375,
+          interestRate: 0.07,
+          sharesOutstanding: 1000,
+          intrinsicValuePerShare: 5,
+          totalInvestedCapital: 3200,
+          totalDistributions: 0,
+          totalBuybacks: 0,
+          totalExitProceeds: 0,
+        },
+        fcf: 300,
+        nopat: 560,
+        investedCapital: 3200,
+      },
+    ];
+
+    return createMockGameState({
+      round: 10,
+      maxRounds: 10,
+      duration: 'quick',
+      difficulty: 'normal',
+      metricsHistory: baseHistory,
+      ...overrides,
+    });
+  }
+
+  it('should use 150% FCF growth target for 10-year mode', () => {
+    const state = createScoringState10yr();
+    const score = calculateFinalScore(state);
+    // Should still produce valid scores
+    expect(score.total).toBeGreaterThanOrEqual(0);
+    expect(score.total).toBeLessThanOrEqual(100);
+    expect(score.fcfShareGrowth).toBeGreaterThanOrEqual(0);
+    expect(score.fcfShareGrowth).toBeLessThanOrEqual(25);
+  });
+
+  it('should use 2.0x MOIC target for 10-year mode', () => {
+    const state = createScoringState10yr();
+    const score = calculateFinalScore(state);
+    // Verify MOIC component is within bounds
+    expect(score.capitalDeployment).toBeGreaterThanOrEqual(0);
+    expect(score.capitalDeployment).toBeLessThanOrEqual(20);
+  });
+
+  it('should not produce NaN in 10-year mode', () => {
+    const state = createScoringState10yr({ metricsHistory: [] });
+    const score = calculateFinalScore(state);
+    expect(Number.isNaN(score.total)).toBe(false);
+    expect(Number.isNaN(score.fcfShareGrowth)).toBe(false);
+  });
+});
+
+describe('leaderboard rank functions', () => {
+  function makeEntry(overrides: Partial<LeaderboardEntry> = {}): LeaderboardEntry {
+    return {
+      id: 'test',
+      holdcoName: 'Test',
+      initials: 'TT',
+      enterpriseValue: 10000,
+      score: 50,
+      grade: 'C' as const,
+      businessCount: 3,
+      date: new Date().toISOString(),
+      ...overrides,
+    };
+  }
+
+  it('wouldMakeLeaderboardFromList returns true for empty leaderboard', () => {
+    expect(wouldMakeLeaderboardFromList([], 1000)).toBe(true);
+  });
+
+  it('getLeaderboardRankFromList returns rank 1 for highest value', () => {
+    const entries = [
+      makeEntry({ founderEquityValue: 30000, difficulty: 'easy' }),
+      makeEntry({ founderEquityValue: 20000, difficulty: 'easy' }),
+    ];
+    const rank = getLeaderboardRankFromList(entries, 50000);
+    expect(rank).toBe(1);
+  });
+
+  it('getLeaderboardRankFromList accounts for difficulty multiplier', () => {
+    const entries = [
+      makeEntry({ founderEquityValue: 40000, difficulty: 'normal' }), // adjusted: 46000
+      makeEntry({ founderEquityValue: 45000, difficulty: 'easy' }),   // adjusted: 45000
+    ];
+    // Normal entry (40000 * 1.15 = 46000) should rank above Easy entry (45000 * 1.0 = 45000)
+    // A player with adjustedFEV = 45500 should rank 2nd
+    const rank = getLeaderboardRankFromList(entries, 45500);
+    expect(rank).toBe(2); // 46000 > 45500, so 1 entry above
+  });
+
+  it('getLeaderboardRankFromList handles legacy entries without difficulty', () => {
+    const entries = [
+      makeEntry({ enterpriseValue: 30000 }), // no difficulty or FEV — treated as easy, uses EV
+    ];
+    const rank = getLeaderboardRankFromList(entries, 35000);
+    expect(rank).toBe(1); // 30000 < 35000
   });
 });

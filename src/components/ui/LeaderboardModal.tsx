@@ -35,9 +35,14 @@ export function LeaderboardModal({ onClose, hypotheticalEV }: LeaderboardModalPr
     fetchLeaderboard();
   }, []);
 
-  // Determine ghost row rank
+  // Determine ghost row rank (compare adjusted FEV vs adjusted FEV)
+  const DIFF_MULT: Record<string, number> = { easy: 1.0, normal: 1.15 };
   const ghostRank = hypotheticalEV && hypotheticalEV > 0
-    ? leaderboard.filter(e => e.enterpriseValue > hypotheticalEV).length
+    ? leaderboard.filter(e => {
+        const raw = e.founderEquityValue ?? e.enterpriseValue;
+        const adjusted = Math.round(raw * (DIFF_MULT[e.difficulty ?? 'easy'] ?? 1.0));
+        return adjusted > hypotheticalEV;
+      }).length
     : -1;
 
   return (
@@ -48,7 +53,7 @@ export function LeaderboardModal({ onClose, hypotheticalEV }: LeaderboardModalPr
             <h3 className="text-xl font-bold flex items-center gap-2">
               <span>🌍</span> Global Leaderboard
             </h3>
-            <p className="text-text-muted text-sm">Top 50 runs by enterprise value</p>
+            <p className="text-text-muted text-sm">Top 50 runs by founder equity value</p>
           </div>
           <button
             onClick={onClose}
@@ -127,8 +132,8 @@ function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number
       </div>
       <div className="flex items-center gap-3 sm:gap-6 text-right">
         <div>
-          <p className="text-xs text-text-muted">EV</p>
-          <p className="font-mono font-bold text-accent">{formatMoney(entry.enterpriseValue)}</p>
+          <p className="text-xs text-text-muted">{entry.founderEquityValue ? 'FEV' : 'EV'}</p>
+          <p className="font-mono font-bold text-accent">{formatMoney(entry.founderEquityValue ?? entry.enterpriseValue)}</p>
         </div>
         <div>
           <p className="text-xs text-text-muted">Score</p>
@@ -142,7 +147,12 @@ function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number
             'text-text-secondary'
           }`}>{entry.score} ({entry.grade})</p>
         </div>
-        <div className="text-xs text-text-muted">
+        {entry.difficulty && (
+          <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
+            {entry.difficulty === 'normal' ? 'N' : 'E'}{entry.duration === 'quick' ? '/10' : ''}
+          </span>
+        )}
+        <div className="text-xs text-text-muted hidden sm:block">
           {formatDate(entry.date)}
         </div>
       </div>
@@ -161,7 +171,7 @@ function GhostRow({ rank, ev }: { rank: number; ev: number }) {
         </div>
       </div>
       <div className="text-right">
-        <p className="text-xs text-text-muted">EV</p>
+        <p className="text-xs text-text-muted">FEV</p>
         <p className="font-mono font-bold text-accent">{formatMoney(ev)}</p>
       </div>
     </div>

@@ -64,7 +64,8 @@ function buildYearChroniclePrompt(context: Record<string, unknown>): string {
   if (context.sectors) strategicLines.push(`- Sectors: ${context.sectors}`);
   if (context.sharedServices) strategicLines.push(`- Shared Services: ${context.sharedServices}`);
   if (context.fcfPerShare) strategicLines.push(`- FCF/Share: ${context.fcfPerShare}`);
-  if (context.enterpriseValue) strategicLines.push(`- Enterprise Value: ${context.enterpriseValue}`);
+  if (context.founderEquityValue) strategicLines.push(`- Founder Equity Value: ${context.founderEquityValue}`);
+  else if (context.enterpriseValue) strategicLines.push(`- Enterprise Value: ${context.enterpriseValue}`);
   const strategicSection = strategicLines.length > 0 ? `\nSTRATEGIC POSITION:\n${strategicLines.join('\n')}` : '';
 
   return `You are writing the annual chronicle for a holding company in a business simulation. The player runs a holdco (not a PE fund). Be HONEST and balanced — acknowledge both progress and challenges.

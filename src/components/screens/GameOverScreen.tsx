@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatPercent, formatMultiple, HistoricalMetrics } from '../../engine/types';
+import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatPercent, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLeaderboardRankFromList } from '../../engine/scoring';
 import { AIAnalysisSection } from '../ui/AIAnalysisSection';
+import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../../hooks/useGame';
 
 interface GameOverScreenProps {
   holdcoName: string;
@@ -12,6 +13,11 @@ interface GameOverScreenProps {
   exitedBusinesses: Business[];
   metrics: Metrics;
   enterpriseValue: number;
+  founderEquityValue: number;
+  founderPersonalWealth: number;
+  difficulty?: GameDifficulty;
+  duration?: GameDuration;
+  maxRounds?: number;
   metricsHistory: HistoricalMetrics[];
   totalDistributions: number;
   totalBuybacks: number;
@@ -30,6 +36,11 @@ export function GameOverScreen({
   exitedBusinesses,
   metrics,
   enterpriseValue,
+  founderEquityValue,
+  founderPersonalWealth,
+  difficulty = 'easy',
+  duration = 'standard',
+  maxRounds = 20,
   metricsHistory,
   totalDistributions,
   totalBuybacks,
@@ -55,8 +66,10 @@ export function GameOverScreen({
     ...businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated' && b.status !== 'merged'),
   ];
   const activeBusinesses = businesses.filter(b => b.status === 'active');
-  const canMakeLeaderboard = wouldMakeLeaderboardFromList(leaderboard, enterpriseValue);
-  const potentialRank = getLeaderboardRankFromList(leaderboard, enterpriseValue);
+  const difficultyMultiplier = DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0;
+  const adjustedFEV = Math.round(founderEquityValue * difficultyMultiplier);
+  const canMakeLeaderboard = wouldMakeLeaderboardFromList(leaderboard, adjustedFEV);
+  const potentialRank = getLeaderboardRankFromList(leaderboard, adjustedFEV);
 
   // Load global leaderboard on mount
   useEffect(() => {
@@ -108,10 +121,14 @@ export function GameOverScreen({
           businessCount: activeBusinesses.length,
         },
         {
-          totalRounds: 20,
+          totalRounds: maxRounds,
           totalInvestedCapital,
           totalRevenue: metrics.totalRevenue,
           avgEbitdaMargin: metrics.avgEbitdaMargin,
+          difficulty,
+          duration,
+          founderEquityValue,
+          founderPersonalWealth,
         }
       );
 
@@ -212,19 +229,38 @@ export function GameOverScreen({
           {score.grade}
         </div>
         <p className="text-xl text-text-secondary">{score.title}</p>
+        {(difficulty || duration) && (
+          <div className="flex justify-center gap-2 mt-3">
+            <span className={`text-xs px-2 py-0.5 rounded ${difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
+              {difficulty === 'normal' ? 'Normal' : 'Easy'}
+            </span>
+            <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-text-secondary">
+              {maxRounds}yr
+            </span>
+          </div>
+        )}
       </div>
       )}
 
-      {/* Enterprise Value - Hero Display */}
+      {/* Founder Equity Value - Hero Display */}
       <div className="card mb-6 bg-gradient-to-r from-accent/20 to-accent-secondary/20 border-accent/30">
         <div className="text-center">
-          <p className="text-text-muted text-sm mb-1">Final Enterprise Value</p>
+          <p className="text-text-muted text-sm mb-1">Founder Equity Value</p>
           <p className="text-5xl font-bold font-mono text-accent mb-2">
-            {formatMoney(enterpriseValue)}
+            {formatMoney(founderEquityValue)}
           </p>
-          <p className="text-text-secondary text-sm">
-            This is your high score - total value created for shareholders
-          </p>
+          <div className="flex justify-center gap-6 mt-3">
+            <div>
+              <p className="text-text-muted text-xs">Enterprise Value</p>
+              <p className="font-mono text-text-secondary">{formatMoney(enterpriseValue)}</p>
+            </div>
+            {founderPersonalWealth > 0 && (
+              <div>
+                <p className="text-text-muted text-xs">Personal Wealth</p>
+                <p className="font-mono text-text-secondary">{formatMoney(founderPersonalWealth)}</p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -319,10 +355,10 @@ export function GameOverScreen({
                     <p className="text-xs text-text-muted">{entry.holdcoName}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-6 text-right">
+                <div className="flex items-center gap-4 sm:gap-6 text-right">
                   <div>
-                    <p className="text-xs text-text-muted">EV</p>
-                    <p className="font-mono font-bold text-accent">{formatMoney(entry.enterpriseValue)}</p>
+                    <p className="text-xs text-text-muted">{entry.founderEquityValue ? 'FEV' : 'EV'}</p>
+                    <p className="font-mono font-bold text-accent">{formatMoney(entry.founderEquityValue ?? entry.enterpriseValue)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-text-muted">Score</p>
@@ -333,7 +369,12 @@ export function GameOverScreen({
                       'text-text-secondary'
                     }`}>{entry.score} ({entry.grade})</p>
                   </div>
-                  <div className="text-xs text-text-muted">
+                  {entry.difficulty && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
+                      {entry.difficulty === 'normal' ? 'N' : 'E'}{entry.duration === 'quick' ? '/10' : ''}
+                    </span>
+                  )}
+                  <div className="text-xs text-text-muted hidden sm:block">
                     {formatDate(entry.date)}
                   </div>
                 </div>
@@ -465,6 +506,10 @@ export function GameOverScreen({
         totalInvestedCapital={totalInvestedCapital}
         equityRaisesUsed={equityRaisesUsed}
         sharedServicesActive={sharedServicesActive}
+        maxRounds={maxRounds}
+        difficulty={difficulty}
+        founderEquityValue={founderEquityValue}
+        founderOwnership={enterpriseValue > 0 ? founderEquityValue / enterpriseValue : 1}
       />
 
       {/* Actions */}

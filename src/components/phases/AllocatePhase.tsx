@@ -45,6 +45,7 @@ interface AllocatePhaseProps {
   dealPipeline: Deal[];
   sharedServices: SharedService[];
   round: number;
+  maxRounds?: number;
   equityRaisesUsed: number;
   sharesOutstanding: number;
   founderShares: number;
@@ -92,6 +93,7 @@ export function AllocatePhase({
   dealPipeline,
   sharedServices,
   round,
+  maxRounds: maxRoundsFromStore,
   equityRaisesUsed,
   sharesOutstanding,
   founderShares,
@@ -188,7 +190,7 @@ export function AllocatePhase({
   const renderDealStructuring = () => {
     if (!selectedDeal) return null;
 
-    const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening || !distressRestrictions.canTakeDebt);
+    const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening || !distressRestrictions.canTakeDebt, maxRoundsFromStore ?? 20);
     const availablePlatformsForDeal = getPlatformsForSector(selectedDeal.business.sectorId);
     const canTuckIn = availablePlatformsForDeal.length > 0;
 
@@ -404,7 +406,7 @@ export function AllocatePhase({
     const business = selectedBusinessForImprovement;
     const sector = SECTORS[business.sectorId];
     const appliedTypes = new Set(business.improvements.map(i => i.type));
-    const remainingYears = 20 - round;
+    const remainingYears = (maxRoundsFromStore ?? 20) - round;
 
     const improvements: {
       type: OperationalImprovementType;

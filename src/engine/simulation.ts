@@ -419,7 +419,8 @@ export function applyOrganicGrowth(
   concentrationCount?: number, // Number of opcos in same focus group — drives concentration risk
   diversificationBonus?: number, // Growth bonus from portfolio diversification (4+ unique sectors)
   currentRound?: number, // For progressive onboarding of margin drift
-  sharedServicesMarginDefense?: number // ppt offset to margin drift from shared services
+  sharedServicesMarginDefense?: number, // ppt offset to margin drift from shared services
+  maxRounds?: number // 20 or 10 — scales margin drift start
 ): Business {
   const sector = SECTORS[business.sectorId];
 
@@ -466,9 +467,10 @@ export function applyOrganicGrowth(
   const newRevenue = Math.round(business.revenue * (1 + revenueGrowth));
 
   // --- Margin Drift ---
-  // Progressive onboarding: margins are static for rounds 1-3, drift begins round 4
+  // Progressive onboarding: margins are static early, drift begins at ~20% through the game
+  const marginDriftStart = Math.max(2, Math.ceil((maxRounds ?? 20) * 0.20));
   let newMargin = business.ebitdaMargin;
-  if (currentRound && currentRound >= 4) {
+  if (currentRound && currentRound >= marginDriftStart) {
     let marginChange = business.marginDriftRate;
 
     // Sector margin volatility (random noise)

@@ -8,10 +8,11 @@ interface InstructionsModalProps {
   firstBusinessName?: string;
   firstBusinessPrice?: number;
   startingCash?: number;
+  maxRounds?: number;
   onClose: () => void;
 }
 
-export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, firstBusinessName, firstBusinessPrice, startingCash, onClose }: InstructionsModalProps) {
+export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, firstBusinessName, firstBusinessPrice, startingCash, maxRounds = 20, onClose }: InstructionsModalProps) {
   const [page, setPage] = useState(0);
 
   const pages = [
@@ -21,8 +22,10 @@ export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, 
       content: (
         <>
           <p className="text-text-secondary mb-4">
-            You sold 20% of {holdcoName} to outside investors, raising <strong className="text-accent">{formatMoney(initialRaise)}</strong> in
-            equity capital to fund your first acquisition and future deals.
+            {founderOwnership < 1
+              ? <>You sold {Math.round((1 - founderOwnership) * 100)}% of {holdcoName} to outside investors, raising <strong className="text-accent">{formatMoney(initialRaise)}</strong> in equity capital to fund your first acquisition and future deals.</>
+              : <>You raised <strong className="text-accent">{formatMoney(initialRaise)}</strong> from personal savings and bank debt to fund your self-funded search and first acquisition.</>
+            }
           </p>
 
           {/* Sources & Uses */}
@@ -30,7 +33,7 @@ export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, 
             <p className="text-sm font-bold mb-3">Sources & Uses of Funds</p>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-text-muted">Equity raise (20% sold to investors)</span>
+                <span className="text-text-muted">{founderOwnership < 1 ? `Equity raise (${Math.round((1 - founderOwnership) * 100)}% sold to investors)` : 'Total capital (equity + debt)'}</span>
                 <span className="font-mono text-accent">{formatMoney(initialRaise)}</span>
               </div>
               {firstBusinessName && firstBusinessPrice && (
@@ -63,7 +66,7 @@ export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, 
           </div>
 
           <p className="text-text-secondary mb-4">
-            Your mission: <strong className="text-accent">maximize Enterprise Value over 20 years</strong> through
+            Your mission: <strong className="text-accent">maximize Founder Equity Value over {maxRounds} years</strong> through
             smart acquisitions, operational improvements, and disciplined capital allocation.
           </p>
         </>

@@ -158,6 +158,10 @@ export function createMockGameState(overrides: Partial<GameState> = {}): GameSta
     acquisitionsThisRound: 0,
     maxAcquisitionsPerRound: 2,
     lastAcquisitionResult: null,
+    difficulty: 'easy',
+    duration: 'standard',
+    maxRounds: 20,
+    founderDistributionsReceived: 0,
     ...overrides,
   };
 }

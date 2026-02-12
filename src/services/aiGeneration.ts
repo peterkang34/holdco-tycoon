@@ -233,6 +233,9 @@ interface GameAnalysisInput {
   score: ScoreBreakdown;
   enterpriseValue: number;
   totalRounds: number;
+  difficulty?: string;
+  founderEquityValue?: number;
+  founderOwnership?: number;
   businesses: Business[];
   exitedBusinesses: Business[];
   metricsHistory: Array<{
@@ -338,6 +341,10 @@ export async function generateGameAnalysis(input: GameAnalysisInput): Promise<AI
         avgMargin,
         marginChange,
         finalLeverage,
+        totalRounds: input.totalRounds,
+        difficulty: input.difficulty,
+        founderEquityValue: input.founderEquityValue,
+        founderOwnership: input.founderOwnership,
       }),
     });
 
@@ -465,6 +472,7 @@ export async function generateYearChronicle(
     sharedServices?: string;
     fcfPerShare?: string;
     enterpriseValue?: string;
+    founderEquityValue?: string;
     // Revenue/margin context
     totalRevenue?: string;
     avgMargin?: string;
@@ -657,7 +665,7 @@ export function generateFallbackAnalysis(input: GameAnalysisInput): AIGameAnalys
   }
 
   const avgHoldPeriod = allBusinesses.length > 0
-    ? allBusinesses.reduce((sum, b) => sum + ((b.exitRound || 20) - b.acquisitionRound), 0) / allBusinesses.length
+    ? allBusinesses.reduce((sum, b) => sum + ((b.exitRound || input.totalRounds) - b.acquisitionRound), 0) / allBusinesses.length
     : 0;
   if (avgHoldPeriod < 3) {
     specificLessons.push({
@@ -678,7 +686,7 @@ export function generateFallbackAnalysis(input: GameAnalysisInput): AIGameAnalys
   // Generate overall assessment
   let overallAssessment = '';
   if (input.score.grade === 'S' || input.score.grade === 'A') {
-    overallAssessment = `${input.holdcoName} performed exceptionally well over 20 years. Your disciplined approach to capital allocation and business building created substantial value for shareholders.`;
+    overallAssessment = `${input.holdcoName} performed exceptionally well over ${input.totalRounds} years. Your disciplined approach to capital allocation and business building created substantial value for shareholders.`;
   } else if (input.score.grade === 'B') {
     overallAssessment = `${input.holdcoName} showed solid fundamentals with room for improvement. You made some good decisions but missed opportunities to compound returns more aggressively.`;
   } else if (input.score.grade === 'C') {
@@ -694,7 +702,7 @@ export function generateFallbackAnalysis(input: GameAnalysisInput): AIGameAnalys
   } else if (platforms.length === 0) {
     whatIfScenario = 'Building a platform in your most concentrated sector could have enabled 3-4 tuck-in acquisitions with synergies and multiple expansion.';
   } else if (input.totalDistributions > input.totalInvestedCapital * 0.5 && input.score.portfolioRoic > 0.15) {
-    whatIfScenario = 'Reinvesting distributions while ROIC was above 15% could have compounded your returns significantly over 20 years.';
+    whatIfScenario = `Reinvesting distributions while ROIC was above 15% could have compounded your returns significantly over ${input.totalRounds} years.`;
   } else {
     whatIfScenario = 'Focusing on fewer, higher-quality acquisitions with longer hold periods typically produces better risk-adjusted returns.';
   }

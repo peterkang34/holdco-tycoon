@@ -3,12 +3,15 @@ import { kv } from '@vercel/kv';
 import crypto from 'crypto';
 import { getClientIp, isBodyTooLarge } from '../_lib/rateLimit';
 
-const LEADERBOARD_KEY = 'leaderboard:global';
+const LEADERBOARD_KEY = 'leaderboard:v2';
 const MAX_ENTRIES = 100;
 const RATE_LIMIT_SECONDS = 60;
 
 const VALID_GRADES = ['S', 'A', 'B', 'C', 'D', 'F'] as const;
 type Grade = typeof VALID_GRADES[number];
+const VALID_DIFFICULTIES = ['easy', 'normal'] as const;
+const VALID_DURATIONS = ['standard', 'quick'] as const;
+const DIFFICULTY_MULTIPLIER: Record<string, number> = { easy: 1.0, normal: 1.15 };
 
 // Allowlist: alphanumeric, spaces, and common business name chars
 const HOLDCO_NAME_REGEX = /^[A-Za-z0-9 &'.,\-]+$/;
@@ -48,6 +51,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       totalInvestedCapital,
       totalRevenue,
       avgEbitdaMargin,
+      difficulty,
+      duration,
+      founderEquityValue,
+      founderPersonalWealth,
     } = body || {};
 
     // initials: 2-4 uppercase alpha chars
@@ -88,10 +95,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'businessCount must be an integer between 1 and 30' });
     }
 
-    // totalRounds: must equal 20 (full game only)
-    if (totalRounds !== 20) {
-      return res.status(400).json({ error: 'only full 20-round games are eligible' });
+    // totalRounds: 10 or 20
+    if (typeof totalRounds !== 'number' || (totalRounds !== 10 && totalRounds !== 20)) {
+      return res.status(400).json({ error: 'totalRounds must be 10 or 20' });
     }
+
+    // difficulty: valid difficulty
+    const validDifficulty = typeof difficulty === 'string' && (VALID_DIFFICULTIES as readonly string[]).includes(difficulty) ? difficulty : 'easy';
+
+    // duration: valid duration
+    const validDuration = typeof duration === 'string' && (VALID_DURATIONS as readonly string[]).includes(duration) ? duration : 'standard';
+
+    // founderEquityValue: number, 0 ≤ FEV ≤ 500,000
+    const validFEV = typeof founderEquityValue === 'number' && founderEquityValue >= 0 && founderEquityValue <= 500000
+      ? Math.round(founderEquityValue) : Math.round(enterpriseValue);
+
+    // founderPersonalWealth: number, 0 ≤ PW ≤ 500,000
+    const validPersonalWealth = typeof founderPersonalWealth === 'number' && founderPersonalWealth >= 0 && founderPersonalWealth <= 500000
+      ? Math.round(founderPersonalWealth) : 0;
 
     // --- Rate Limiting (uses x-real-ip, not spoofable x-forwarded-for) ---
     const ip = getClientIp(req);
@@ -106,11 +127,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // --- Store Entry ---
     const id = crypto.randomUUID();
+    const multiplier = DIFFICULTY_MULTIPLIER[validDifficulty] ?? 1.0;
+    const adjustedFEV = Math.round(validFEV * multiplier);
+
     const entry = {
       id,
       holdcoName: holdcoName.trim(),
       initials,
       enterpriseValue: Math.round(enterpriseValue),
+      founderEquityValue: validFEV,
+      founderPersonalWealth: validPersonalWealth,
+      difficulty: validDifficulty,
+      duration: validDuration,
       score,
       grade,
       businessCount,
@@ -119,8 +147,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       avgEbitdaMargin: typeof avgEbitdaMargin === 'number' ? Math.round(avgEbitdaMargin * 1000) / 1000 : undefined,
     };
 
-    // Add to sorted set with EV as the score
-    await kv.zadd(LEADERBOARD_KEY, { score: entry.enterpriseValue, member: JSON.stringify(entry) });
+    // Add to sorted set with adjusted FEV as the ranking score
+    await kv.zadd(LEADERBOARD_KEY, { score: adjustedFEV, member: JSON.stringify(entry) });
 
     // Prune to max entries: remove lowest-scoring entries beyond the limit
     const totalCount = await kv.zcard(LEADERBOARD_KEY);

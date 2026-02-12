@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useGameStore, getFinalScore, getPostGameInsights, getEnterpriseValue } from './hooks/useGame';
+import { useGameStore, getFinalScore, getPostGameInsights, getEnterpriseValue, getFounderEquityValue, getFounderPersonalWealth } from './hooks/useGame';
 import { IntroScreen } from './components/screens/IntroScreen';
 import { GameScreen } from './components/screens/GameScreen';
 import { GameOverScreen } from './components/screens/GameOverScreen';
-import { SectorId } from './engine/types';
+import { SectorId, GameDifficulty, GameDuration } from './engine/types';
 
 type Screen = 'intro' | 'game' | 'gameOver';
 
@@ -25,6 +25,9 @@ function App() {
     equityRaisesUsed,
     sharedServices,
     bankruptRound,
+    difficulty,
+    duration,
+    maxRounds,
     startGame,
     resetGame,
   } = useGameStore();
@@ -38,8 +41,8 @@ function App() {
     }
   }, []);
 
-  const handleStart = (name: string, startingSector: SectorId) => {
-    startGame(name, startingSector);
+  const handleStart = (name: string, startingSector: SectorId, difficulty: GameDifficulty = 'easy', duration: GameDuration = 'standard') => {
+    startGame(name, startingSector, difficulty, duration);
     setIsNewGame(true);
     setScreen('game');
   };
@@ -57,6 +60,8 @@ function App() {
   const score = useMemo(() => screen === 'gameOver' ? getFinalScore() : undefined, [screen]);
   const insights = useMemo(() => screen === 'gameOver' ? getPostGameInsights() : undefined, [screen]);
   const enterpriseValue = useMemo(() => screen === 'gameOver' ? getEnterpriseValue() : undefined, [screen]);
+  const founderEquityValue = useMemo(() => screen === 'gameOver' ? getFounderEquityValue() : undefined, [screen]);
+  const founderPersonalWealth = useMemo(() => screen === 'gameOver' ? getFounderPersonalWealth() : undefined, [screen]);
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary">
@@ -71,6 +76,11 @@ function App() {
           exitedBusinesses={exitedBusinesses}
           metrics={metrics}
           enterpriseValue={enterpriseValue!}
+          founderEquityValue={founderEquityValue!}
+          founderPersonalWealth={founderPersonalWealth!}
+          difficulty={difficulty}
+          duration={duration}
+          maxRounds={maxRounds}
           metricsHistory={metricsHistory}
           totalDistributions={totalDistributions}
           totalBuybacks={totalBuybacks}

@@ -19,6 +19,10 @@ interface AIAnalysisSectionProps {
   totalInvestedCapital: number;
   equityRaisesUsed: number;
   sharedServicesActive: number;
+  maxRounds?: number;
+  difficulty?: string;
+  founderEquityValue?: number;
+  founderOwnership?: number;
 }
 
 export function AIAnalysisSection({
@@ -33,6 +37,10 @@ export function AIAnalysisSection({
   totalInvestedCapital,
   equityRaisesUsed,
   sharedServicesActive,
+  maxRounds = 20,
+  difficulty,
+  founderEquityValue,
+  founderOwnership,
 }: AIAnalysisSectionProps) {
   const [analysis, setAnalysis] = useState<AIGameAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -46,7 +54,10 @@ export function AIAnalysisSection({
         holdcoName,
         score,
         enterpriseValue,
-        totalRounds: 20,
+        totalRounds: maxRounds,
+        difficulty,
+        founderEquityValue,
+        founderOwnership,
         businesses,
         exitedBusinesses,
         metricsHistory: metricsHistory.map(h => ({

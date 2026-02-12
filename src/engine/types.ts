@@ -30,6 +30,9 @@ export type SectorFocusGroup =
   | 'autoServices'
   | 'distribution';
 
+export type GameDifficulty = 'easy' | 'normal';
+export type GameDuration = 'standard' | 'quick';  // 20 or 10 rounds
+
 export type ConcentrationLevel = 'low' | 'medium' | 'high';
 
 export type BuyerPoolTier = 'individual' | 'small_pe' | 'lower_middle_pe' | 'institutional_pe' | 'large_pe';
@@ -371,6 +374,9 @@ export interface GameState {
   round: number;
   phase: GamePhase;
   gameOver: boolean;
+  difficulty: GameDifficulty;
+  duration: GameDuration;
+  maxRounds: number; // 20 or 10
 
   // Portfolio
   businesses: Business[];
@@ -433,6 +439,9 @@ export interface GameState {
   acquisitionsThisRound: number;
   maxAcquisitionsPerRound: number;
   lastAcquisitionResult: 'success' | 'snatched' | null;
+
+  // Founder tracking
+  founderDistributionsReceived: number; // cumulative founder's share of distributions
 }
 
 export type GameActionType =
@@ -492,6 +501,11 @@ export interface LeaderboardEntry {
   // Optional enriched fields (global leaderboard)
   totalRevenue?: number;
   avgEbitdaMargin?: number;
+  // Game mode fields
+  difficulty?: GameDifficulty;
+  duration?: GameDuration;
+  founderEquityValue?: number;
+  founderPersonalWealth?: number;
 }
 
 // Utility types

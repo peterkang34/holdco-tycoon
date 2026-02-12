@@ -11,7 +11,8 @@ import { RestructurePhase } from '../phases/RestructurePhase';
 import { InstructionsModal } from '../ui/InstructionsModal';
 import { AnnualReportModal } from '../ui/AnnualReportModal';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
-import { calculateEnterpriseValue } from '../../engine/scoring';
+import { calculateFounderEquityValue } from '../../engine/scoring';
+import { DIFFICULTY_CONFIG } from '../../hooks/useGame';
 
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
 
@@ -97,6 +98,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     actionsThisRound,
     acquisitionsThisRound,
     maxAcquisitionsPerRound,
+    maxRounds,
+    difficulty,
     lastAcquisitionResult,
   } = useGameStore();
 
@@ -255,6 +258,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             dealPipeline={dealPipeline}
             sharedServices={sharedServices}
             round={round}
+            maxRounds={maxRounds}
             lastEventType={lastEventType}
             equityRaisesUsed={equityRaisesUsed}
             sharesOutstanding={sharesOutstanding}
@@ -305,6 +309,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
           firstBusinessName={businesses.length > 0 ? businesses[0].name : undefined}
           firstBusinessPrice={businesses.length > 0 ? businesses[0].acquisitionPrice : undefined}
           startingCash={cash}
+          maxRounds={maxRounds}
           onClose={handleCloseTutorial}
         />
       )}
@@ -314,6 +319,11 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         <div className="flex items-center gap-3">
           <span className="text-2xl">🏛️</span>
           <h1 className="text-xl font-bold">{holdcoName}</h1>
+          {difficulty && (
+            <span className={`text-xs px-2 py-0.5 rounded ${difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
+              {difficulty === 'normal' ? 'Normal' : 'Easy'}{maxRounds && maxRounds < 20 ? ` / ${maxRounds}yr` : ''}
+            </span>
+          )}
           {roundHistory && roundHistory.length > 0 && (
             <button
               onClick={() => setShowAnnualReports(true)}
@@ -381,7 +391,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         sharesOutstanding={sharesOutstanding}
         founderOwnership={founderOwnership}
         round={round}
-        totalRounds={20}
+        totalRounds={maxRounds || 20}
         sharedServicesCount={activeServicesCount}
         focusTier={focusBonus?.tier}
         focusSector={focusBonus?.focusGroup}
@@ -406,7 +416,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
       {/* Leaderboard Modal */}
       {showLeaderboard && (
         <LeaderboardModal
-          hypotheticalEV={calculateEnterpriseValue(useGameStore.getState())}
+          hypotheticalEV={Math.round(calculateFounderEquityValue(useGameStore.getState()) * (DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0))}
           onClose={() => setShowLeaderboard(false)}
         />
       )}

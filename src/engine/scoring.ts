@@ -1,5 +1,6 @@
 import {
   GameState,
+  GameDifficulty,
   ScoreBreakdown,
   PostGameInsight,
   LeaderboardEntry,
@@ -10,12 +11,24 @@ import { POST_GAME_INSIGHTS } from '../data/tips';
 const LEADERBOARD_KEY = 'holdco-tycoon-leaderboard';
 const MAX_LEADERBOARD_ENTRIES = 10;
 
+const DIFFICULTY_MULTIPLIER: Record<string, number> = { easy: 1.0, normal: 1.15 };
+
+/** Compute adjusted FEV for a leaderboard entry (applies difficulty multiplier) */
+function getAdjustedFEV(entry: LeaderboardEntry): number {
+  const raw = entry.founderEquityValue ?? entry.enterpriseValue;
+  const multiplier = DIFFICULTY_MULTIPLIER[entry.difficulty ?? 'easy'] ?? 1.0;
+  return Math.round(raw * multiplier);
+}
+
 /**
  * Calculate Enterprise Value at game end
  * EV = (Portfolio EBITDA × Blended Exit Multiple) + Cash - Total Debt
+ * Note: Distributions are NOT added back — they reduce NAV.
+ * Founders who distribute cash trade EV for Personal Wealth.
  */
 export function calculateEnterpriseValue(state: GameState): number {
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
+  const maxRounds = state.maxRounds || 20;
 
   if (activeBusinesses.length === 0) {
     // No active businesses - EV is just cash minus debt
@@ -27,17 +40,13 @@ export function calculateEnterpriseValue(state: GameState): number {
   let weightedMultiple = 0;
 
   for (const business of activeBusinesses) {
-    const valuation = calculateExitValuation(business, 20); // End of game = round 20
+    const valuation = calculateExitValuation(business, maxRounds);
     totalEbitda += business.ebitda;
     weightedMultiple += business.ebitda * valuation.totalMultiple;
   }
 
   const blendedMultiple = totalEbitda > 0 ? weightedMultiple / totalEbitda : 0;
   const portfolioValue = totalEbitda * blendedMultiple;
-
-  // M-6: Distributions represent value already returned to shareholders (reduces cash, so add back)
-  // Buybacks are NOT added: their benefit is captured in fewer shares outstanding → higher per-share value
-  const distributionsReturned = state.totalDistributions;
 
   // Calculate total holdco-level debt including opco-level seller notes
   // L-13: Only include sellerNoteBalance (bank debt is tracked at holdco level in state.totalDebt)
@@ -47,10 +56,28 @@ export function calculateEnterpriseValue(state: GameState): number {
   );
   const totalDebt = state.totalDebt + opcoDebt;
 
-  // EV = Portfolio Value + Cash + Distributions Returned - All Debt
-  const ev = portfolioValue + state.cash + distributionsReturned - totalDebt;
+  // EV = Portfolio Value + Cash - All Debt (no distribution add-back)
+  const ev = portfolioValue + state.cash - totalDebt;
 
   return Math.round(Math.max(0, ev));
+}
+
+/**
+ * Calculate Founder Equity Value = NAV × ownership%
+ * This is the PRIMARY leaderboard ranking metric.
+ */
+export function calculateFounderEquityValue(state: GameState): number {
+  const ev = calculateEnterpriseValue(state);
+  const ownership = state.founderShares / state.sharesOutstanding;
+  return Math.round(ev * ownership);
+}
+
+/**
+ * Calculate Founder Personal Wealth = cumulative founder share of distributions
+ * This is the SECONDARY leaderboard metric ("Cash Kings" board).
+ */
+export function calculateFounderPersonalWealth(state: GameState): number {
+  return state.founderDistributionsReceived || 0;
 }
 
 export function calculateFinalScore(state: GameState): ScoreBreakdown {
@@ -80,13 +107,14 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
 
   // 1. FCF/Share Growth (25 points max)
   let fcfShareGrowth = 0;
+  const maxRounds = state.maxRounds || 20;
+  const fcfGrowthTarget = maxRounds >= 20 ? 3.0 : 1.5; // 300% for 20yr, 150% for 10yr
   if (state.metricsHistory.length > 1) {
     const startFcfPerShare = state.metricsHistory[0]?.metrics.fcfPerShare ?? 0;
     const endFcfPerShare = metrics.fcfPerShare;
     if (startFcfPerShare > 0) {
       const growth = (endFcfPerShare - startFcfPerShare) / startFcfPerShare;
-      // 300%+ growth = 25 points, scaled down linearly
-      fcfShareGrowth = Math.min(25, Math.max(0, (growth / 3) * 25));
+      fcfShareGrowth = Math.min(25, Math.max(0, (growth / fcfGrowthTarget) * 25));
     } else if (endFcfPerShare > 0) {
       fcfShareGrowth = 15; // Started from 0, grew to positive
     }
@@ -119,7 +147,7 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
       returns = business.exitPrice;
     } else if (business.status === 'active') {
       // Use full valuation engine for current value
-      const valuation = calculateExitValuation(business, 20);
+      const valuation = calculateExitValuation(business, maxRounds);
       returns = business.ebitda * valuation.totalMultiple;
     }
 
@@ -129,12 +157,13 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
 
   const avgMoic = totalCapitalDeployed > 0 ? totalMoicWeighted / totalCapitalDeployed : 1;
 
-  // MOIC component (10 points)
+  // MOIC component (10 points) — scale target by duration
+  const moicFullMarks = maxRounds >= 20 ? 2.5 : 2.0;
   let moicScore = 0;
-  if (avgMoic >= 2.5) {
+  if (avgMoic >= moicFullMarks) {
     moicScore = 10;
   } else if (avgMoic >= 1.5) {
-    moicScore = 5 + ((avgMoic - 1.5) / 1.0) * 5;
+    moicScore = 5 + ((avgMoic - 1.5) / (moicFullMarks - 1.5)) * 5;
   } else {
     moicScore = Math.max(0, (avgMoic / 1.5) * 5);
   }
@@ -465,8 +494,8 @@ export function saveToLocalLeaderboard(entry: Omit<LeaderboardEntry, 'id' | 'dat
 
   leaderboard.push(newEntry);
 
-  // Sort by enterprise value (highest first)
-  leaderboard.sort((a, b) => b.enterpriseValue - a.enterpriseValue);
+  // Sort by adjusted FEV (applies difficulty multiplier for fair cross-difficulty comparison)
+  leaderboard.sort((a, b) => getAdjustedFEV(b) - getAdjustedFEV(a));
 
   // Keep only top entries
   const trimmed = leaderboard.slice(0, MAX_LEADERBOARD_ENTRIES);
@@ -506,20 +535,24 @@ export function getLeaderboardRank(enterpriseValue: number): number {
 const GLOBAL_LEADERBOARD_SIZE = 50;
 
 /**
- * Check if a score would make a pre-fetched leaderboard
+ * Check if a score would make a pre-fetched leaderboard.
+ * Value should be the adjusted FEV (with difficulty multiplier already applied).
  */
-export function wouldMakeLeaderboardFromList(entries: LeaderboardEntry[], enterpriseValue: number): boolean {
+export function wouldMakeLeaderboardFromList(entries: LeaderboardEntry[], adjustedValue: number): boolean {
   if (entries.length < GLOBAL_LEADERBOARD_SIZE) return true;
-  return enterpriseValue > (entries[entries.length - 1]?.enterpriseValue ?? 0);
+  const lowestEntry = entries[entries.length - 1];
+  const lowestAdjusted = lowestEntry ? getAdjustedFEV(lowestEntry) : 0;
+  return adjustedValue > lowestAdjusted;
 }
 
 /**
- * Get rank within a pre-fetched leaderboard
+ * Get rank within a pre-fetched leaderboard.
+ * Value should be the adjusted FEV (with difficulty multiplier already applied).
  */
-export function getLeaderboardRankFromList(entries: LeaderboardEntry[], enterpriseValue: number): number {
+export function getLeaderboardRankFromList(entries: LeaderboardEntry[], adjustedValue: number): number {
   let rank = 1;
   for (const entry of entries) {
-    if (entry.enterpriseValue > enterpriseValue) {
+    if (getAdjustedFEV(entry) > adjustedValue) {
       rank++;
     }
   }
@@ -546,7 +579,7 @@ export async function loadLeaderboard(): Promise<LeaderboardEntry[]> {
  */
 export async function saveToLeaderboard(
   entry: Omit<LeaderboardEntry, 'id' | 'date'>,
-  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number }
+  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number }
 ): Promise<LeaderboardEntry> {
   const newEntry: LeaderboardEntry = {
     ...entry,
@@ -566,7 +599,14 @@ export async function saveToLeaderboard(
     }
   } catch { /* silent fallback */ }
 
-  // Always save locally too (dual-write)
-  saveToLocalLeaderboard(entry);
+  // Always save locally too (dual-write) — merge extra fields so local has FEV/difficulty
+  const localEntry = {
+    ...entry,
+    ...(extra?.founderEquityValue != null ? { founderEquityValue: extra.founderEquityValue } : {}),
+    ...(extra?.founderPersonalWealth != null ? { founderPersonalWealth: extra.founderPersonalWealth } : {}),
+    ...(extra?.difficulty ? { difficulty: extra.difficulty as GameDifficulty } : {}),
+    ...(extra?.duration ? { duration: extra.duration as 'standard' | 'quick' } : {}),
+  };
+  saveToLocalLeaderboard(localEntry);
   return newEntry;
 }

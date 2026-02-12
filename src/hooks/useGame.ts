@@ -59,18 +59,53 @@ import {
   calculateExitValuation,
 } from '../engine/simulation';
 import { executeDealStructure } from '../engine/deals';
-import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue } from '../engine/scoring';
+import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue, calculateFounderEquityValue, calculateFounderPersonalWealth } from '../engine/scoring';
 import { calculateDistressLevel, getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
 
-// Capital structure constants
-const INITIAL_RAISE = 20000; // $20M raised from investors (in thousands)
-const FOUNDER_OWNERSHIP = 0.80; // Founder keeps 80% after initial raise
-const STARTING_SHARES = 1000; // Total shares outstanding
-const FOUNDER_SHARES = 800; // Founder owns 800 of 1000 shares (80%)
+import type { GameDifficulty, GameDuration } from '../engine/types';
+
+// Capital structure constants (defaults for Easy mode — overridden by DIFFICULTY_CONFIG)
+const INITIAL_RAISE = 20000;
+const FOUNDER_OWNERSHIP = 0.80;
+const STARTING_SHARES = 1000;
+const FOUNDER_SHARES = 800;
 const STARTING_INTEREST_RATE = 0.07;
-const TOTAL_ROUNDS = 20;
-const MIN_FOUNDER_OWNERSHIP = 0.51; // Must maintain majority control
+const MIN_FOUNDER_OWNERSHIP = 0.51;
+
+const DIFFICULTY_CONFIG = {
+  easy: {
+    initialCash: 20000,          // $20M
+    founderShares: 800,
+    totalShares: 1000,           // 80% ownership
+    startingDebt: 0,
+    startingEbitda: 1000,        // $1M
+    startingMultipleCap: undefined as number | undefined,
+    startingQuality: 3 as const,
+    holdcoDebtStartRound: 0,
+    leaderboardMultiplier: 1.0,
+    label: 'Easy — Institutional Fund',
+    description: '$20M from patient LPs. 80% ownership. Clean balance sheet.',
+  },
+  normal: {
+    initialCash: 5000,           // $5M ($2M equity + $3M bank debt)
+    founderShares: 1000,
+    totalShares: 1000,           // 100% ownership
+    startingDebt: 3000,          // $3M conventional bank debt at holdco level
+    startingEbitda: 800,         // $800K
+    startingMultipleCap: 4.0 as number | undefined,    // Cap at 4x to prevent cash trap in premium sectors
+    startingQuality: 3 as const,
+    holdcoDebtStartRound: 1,
+    leaderboardMultiplier: 1.15, // Compensates for harder start without double-rewarding 100% ownership
+    label: 'Normal — Self-Funded Search',
+    description: '$2M personal equity + $3M bank debt. 100% ownership. Real leverage from day one.',
+  },
+} as const;
+
+const DURATION_CONFIG = {
+  standard: { rounds: 20, label: 'Full Game (20 Years)' },
+  quick: { rounds: 10, label: 'Quick Play (10 Years)' },
+} as const;
 
 interface GameStore extends GameState {
   // Computed
@@ -78,7 +113,7 @@ interface GameStore extends GameState {
   focusBonus: ReturnType<typeof calculateSectorFocusBonus>;
 
   // Actions
-  startGame: (holdcoName: string, startingSector: SectorId) => void;
+  startGame: (holdcoName: string, startingSector: SectorId, difficulty?: GameDifficulty, duration?: GameDuration) => void;
   resetGame: () => void;
 
   // Phase transitions
@@ -280,11 +315,42 @@ function migrateV12ToV13() {
 }
 migrateV12ToV13();
 
+// One-time migration from v13 → v14 (adds game modes + founder tracking)
+function migrateV13ToV14() {
+  try {
+    const v14Key = 'holdco-tycoon-save-v14';
+    const v13Key = 'holdco-tycoon-save-v13';
+    if (localStorage.getItem(v14Key)) return;
+    const v13Raw = localStorage.getItem(v13Key);
+    if (!v13Raw) return;
+    const v13Data = JSON.parse(v13Raw);
+    if (!v13Data?.state) return;
+
+    // Add new fields with defaults (existing saves are Easy/20yr)
+    v13Data.state.difficulty = 'easy';
+    v13Data.state.duration = 'standard';
+    v13Data.state.maxRounds = 20;
+    v13Data.state.founderDistributionsReceived = Math.round(
+      (v13Data.state.totalDistributions || 0) *
+      (v13Data.state.founderShares / (v13Data.state.sharesOutstanding || 1))
+    );
+
+    localStorage.setItem(v14Key, JSON.stringify(v13Data));
+    localStorage.removeItem(v13Key);
+  } catch (e) {
+    console.error('v13→v14 migration failed:', e);
+  }
+}
+migrateV13ToV14();
+
 const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: ReturnType<typeof initializeSharedServices> } = {
   holdcoName: '',
   round: 0,
   phase: 'collect' as GamePhase,
   gameOver: false,
+  difficulty: 'easy' as GameDifficulty,
+  duration: 'standard' as GameDuration,
+  maxRounds: 20,
   businesses: [],
   exitedBusinesses: [],
   cash: INITIAL_RAISE,
@@ -319,6 +385,7 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   acquisitionsThisRound: 0,
   maxAcquisitionsPerRound: 2,
   lastAcquisitionResult: null,
+  founderDistributionsReceived: 0,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -328,27 +395,38 @@ export const useGameStore = create<GameStore>()(
       metrics: calculateMetrics(initialState as GameState),
       focusBonus: null,
 
-      startGame: (holdcoName: string, startingSector: SectorId) => {
+      startGame: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty = 'easy', duration: GameDuration = 'standard') => {
         resetBusinessIdCounter();
         resetUsedNames();
 
-        const startingBusiness = createStartingBusiness(startingSector);
-        const initialDealPipeline = generateDealPipeline([], 1);
+        const diffConfig = DIFFICULTY_CONFIG[difficulty];
+        const durConfig = DURATION_CONFIG[duration];
+        const maxRounds = durConfig.rounds;
+
+        const startingBusiness = createStartingBusiness(startingSector, diffConfig.startingEbitda, diffConfig.startingMultipleCap);
+        const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds);
 
         const newState: GameState = {
           ...initialState,
           holdcoName,
+          difficulty,
+          duration,
+          maxRounds,
           round: 1,
           phase: 'collect',
           businesses: [startingBusiness],
-          cash: INITIAL_RAISE - startingBusiness.acquisitionPrice, // Cash remaining after first acquisition
+          cash: diffConfig.initialCash - startingBusiness.acquisitionPrice,
+          totalDebt: diffConfig.startingDebt,
           totalInvestedCapital: startingBusiness.acquisitionPrice,
-          founderShares: FOUNDER_SHARES,
-          initialRaiseAmount: INITIAL_RAISE,
-          initialOwnershipPct: FOUNDER_OWNERSHIP,
+          founderShares: diffConfig.founderShares,
+          sharesOutstanding: diffConfig.totalShares,
+          initialRaiseAmount: diffConfig.initialCash,
+          initialOwnershipPct: diffConfig.founderShares / diffConfig.totalShares,
+          holdcoDebtStartRound: diffConfig.holdcoDebtStartRound,
           sharedServices: initializeSharedServices(),
           dealPipeline: initialDealPipeline,
           maSourcing: { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 },
+          founderDistributionsReceived: 0,
         };
 
         set({
@@ -488,10 +566,11 @@ export const useGameStore = create<GameStore>()(
 
         // Referral deal: inject a quality-3+ cold/warm deal into pipeline
         if (event && event.type === 'portfolio_referral_deal') {
-          const referralSector = pickWeightedSector(state.round);
+          const referralSector = pickWeightedSector(state.round, state.maxRounds);
           const referralDeal = generateDealWithSize(referralSector, state.round, 'any', 0, {
             qualityFloor: 3 as any,
             source: 'sourced' as any,
+            maxRounds: state.maxRounds,
           });
           gameState.dealPipeline = [...gameState.dealPipeline, referralDeal];
         }
@@ -534,7 +613,8 @@ export const useGameStore = create<GameStore>()(
           totalPortfolioEbitda,
           state.maSourcing.tier,
           state.maSourcing.active,
-          lastEvt
+          lastEvt,
+          state.maxRounds
         );
 
         set({
@@ -583,7 +663,8 @@ export const useGameStore = create<GameStore>()(
             maxFocusCount,
             diversificationGrowthBonus,
             state.round,
-            sharedBenefits.marginDefense
+            sharedBenefits.marginDefense,
+            state.maxRounds
           );
         });
 
@@ -618,7 +699,7 @@ export const useGameStore = create<GameStore>()(
         }
 
         const newRound = state.round + 1;
-        const gameOver = newRound > TOTAL_ROUNDS || gameOverFromBankruptcy;
+        const gameOver = newRound > state.maxRounds || gameOverFromBankruptcy;
 
         // Persist round history snapshot
         const roundHistoryEntry: RoundHistoryEntry = {
@@ -645,9 +726,10 @@ export const useGameStore = create<GameStore>()(
 
           let newTotalDebt = state.totalDebt;
           const holdcoDebtStartRound = state.holdcoDebtStartRound;
+          const gracePeriod = Math.max(2, Math.ceil(state.maxRounds * 0.10));
           if (state.totalDebt > 0 && holdcoDebtStartRound > 0) {
             const yearsWithDebt = newRound - holdcoDebtStartRound;
-            if (yearsWithDebt >= 2) {
+            if (yearsWithDebt >= gracePeriod) {
               const scheduledPayment = Math.round(state.totalDebt * 0.10);
               const availableCash = Math.max(0, state.cash + cashAdjustment);
               const actualPayment = Math.min(scheduledPayment, availableCash);
@@ -688,9 +770,10 @@ export const useGameStore = create<GameStore>()(
           // Only process holdco amortization for accurate final state
           let gameOverCashAdj = 0;
           let gameOverDebt = state.totalDebt;
+          const gameOverGracePeriod = Math.max(2, Math.ceil(state.maxRounds * 0.10));
           if (state.totalDebt > 0 && state.holdcoDebtStartRound > 0) {
             const yearsWithDebt = newRound - state.holdcoDebtStartRound;
-            if (yearsWithDebt >= 2) {
+            if (yearsWithDebt >= gameOverGracePeriod) {
               const scheduledPayment = Math.round(state.totalDebt * 0.10);
               const availableCash = Math.max(0, state.cash + gameOverCashAdj);
               const actualPayment = Math.min(scheduledPayment, availableCash);
@@ -1412,16 +1495,20 @@ export const useGameStore = create<GameStore>()(
         const restrictions = getDistressRestrictions(calculateMetrics(state).distressLevel);
         if (!restrictions.canDistribute) return;
 
+        // Track founder's portion of distribution incrementally (at current ownership %)
+        const founderPortion = Math.round(amount * (state.founderShares / state.sharesOutstanding));
+
         const distributeState = {
           ...state,
           cash: state.cash - amount,
           totalDistributions: state.totalDistributions + amount,
+          founderDistributionsReceived: (state.founderDistributionsReceived || 0) + founderPortion,
         };
         set({
           ...distributeState,
           actionsThisRound: [
             ...state.actionsThisRound,
-            { type: 'distribute', round: state.round, details: { amount } },
+            { type: 'distribute', round: state.round, details: { amount, founderPortion } },
           ],
           metrics: calculateMetrics(distributeState),
         });
@@ -1867,7 +1954,8 @@ export const useGameStore = create<GameStore>()(
           state.maFocus,
           focusBonus?.focusGroup,
           totalPortfolioEbitda,
-          state.maSourcing.active ? state.maSourcing.tier : 0
+          state.maSourcing.active ? state.maSourcing.tier : 0,
+          state.maxRounds
         );
 
         set({
@@ -1952,7 +2040,8 @@ export const useGameStore = create<GameStore>()(
         const newDeals = generateProactiveOutreachDeals(
           state.round,
           state.maFocus,
-          totalPortfolioEbitda
+          totalPortfolioEbitda,
+          state.maxRounds
         );
 
         set({
@@ -2257,7 +2346,7 @@ export const useGameStore = create<GameStore>()(
             sectors: sectors.join(', '),
             sharedServices: activeSharedServices.length > 0 ? activeSharedServices.join(', ') : undefined,
             fcfPerShare: formatMoney(metrics.fcfPerShare),
-            enterpriseValue: formatMoney(calculateEnterpriseValue(state)),
+            founderEquityValue: formatMoney(calculateFounderEquityValue(state)),
             // Revenue/margin context
             totalRevenue: formatMoney(metrics.totalRevenue),
             avgMargin: `${(metrics.avgEbitdaMargin * 100).toFixed(0)}%`,
@@ -2307,12 +2396,15 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v13', // v13: 3 new sectors, seller archetypes, 3 new improvements, 24 new events
+      name: 'holdco-tycoon-save-v14', // v14: game modes (difficulty + duration), FEV scoring
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
         phase: state.phase,
         gameOver: state.gameOver,
+        difficulty: state.difficulty,
+        duration: state.duration,
+        maxRounds: state.maxRounds,
         businesses: state.businesses,
         exitedBusinesses: state.exitedBusinesses,
         cash: state.cash,
@@ -2331,13 +2423,13 @@ export const useGameStore = create<GameStore>()(
         dealPipeline: state.dealPipeline,
         maFocus: state.maFocus,
         maSourcing: state.maSourcing,
-        currentEvent: state.currentEvent, // L-2: Persist current event across page refreshes
+        currentEvent: state.currentEvent,
         eventHistory: state.eventHistory,
         creditTighteningRoundsRemaining: state.creditTighteningRoundsRemaining,
         inflationRoundsRemaining: state.inflationRoundsRemaining,
         metricsHistory: state.metricsHistory,
         roundHistory: state.roundHistory,
-        actionsThisRound: state.actionsThisRound, // M-14: Persist actions for acquisition limit tracking
+        actionsThisRound: state.actionsThisRound,
         debtPaymentThisRound: state.debtPaymentThisRound,
         cashBeforeDebtPayments: state.cashBeforeDebtPayments,
         holdcoDebtStartRound: state.holdcoDebtStartRound,
@@ -2349,10 +2441,20 @@ export const useGameStore = create<GameStore>()(
         acquisitionsThisRound: state.acquisitionsThisRound,
         maxAcquisitionsPerRound: state.maxAcquisitionsPerRound,
         lastAcquisitionResult: state.lastAcquisitionResult,
+        founderDistributionsReceived: state.founderDistributionsReceived,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.holdcoName) {
           try {
+            // Backwards compat: game mode fields
+            if (!(state as any).difficulty) (state as any).difficulty = 'easy';
+            if (!(state as any).duration) (state as any).duration = 'standard';
+            if (!(state as any).maxRounds) (state as any).maxRounds = 20;
+            if ((state as any).founderDistributionsReceived === undefined) {
+              (state as any).founderDistributionsReceived = Math.round(
+                (state.totalDistributions || 0) * (state.founderShares / (state.sharesOutstanding || 1))
+              );
+            }
             // Backwards compat: initialize maSourcing if missing
             if (!state.maSourcing) {
               (state as any).maSourcing = { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 };
@@ -2445,3 +2547,6 @@ export const usePlatforms = () => useGameStore(state =>
 export const getFinalScore = () => calculateFinalScore(useGameStore.getState());
 export const getPostGameInsights = () => generatePostGameInsights(useGameStore.getState());
 export const getEnterpriseValue = () => calculateEnterpriseValue(useGameStore.getState());
+export const getFounderEquityValue = () => calculateFounderEquityValue(useGameStore.getState());
+export const getFounderPersonalWealth = () => calculateFounderPersonalWealth(useGameStore.getState());
+export { DIFFICULTY_CONFIG, DURATION_CONFIG };

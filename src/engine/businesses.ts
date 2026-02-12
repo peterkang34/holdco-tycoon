@@ -327,7 +327,8 @@ export function calculateDealHeat(
   source: Deal['source'],
   round: number,
   lastEventType?: EventType,
-  sellerArchetype?: SellerArchetype
+  sellerArchetype?: SellerArchetype,
+  maxRounds: number = 20
 ): DealHeat {
   // Base distribution: cold 25%, warm 35%, hot 30%, contested 10%
   const roll = Math.random();
@@ -346,7 +347,8 @@ export function calculateDealHeat(
   if (lastEventType === 'global_recession') tierIndex -= 1;
 
   // Late game: more capital in market
-  if (round >= 15) tierIndex += 1;
+  const lateGameRound = Math.ceil(maxRounds * 0.75);
+  if (round >= lateGameRound) tierIndex += 1;
 
   // Source modifiers — proprietary/sourced = less competition
   // Combine with archetype heat modifier, cap total negative at -3
@@ -568,7 +570,7 @@ export async function enhanceDealsWithAI(deals: Deal[]): Promise<Deal[]> {
   return [...existingDeals, ...enhancedNew];
 }
 
-export function getSectorWeightsForRound(round: number): Record<SectorId, number> {
+export function getSectorWeightsForRound(round: number, maxRounds: number = 20): Record<SectorId, number> {
   // Early game: cheaper sectors
   // Mid game: mixed
   // Late game: premium sectors
@@ -579,11 +581,14 @@ export function getSectorWeightsForRound(round: number): Record<SectorId, number
 
   let cheapWeight: number, midWeight: number, premiumWeight: number;
 
-  if (round <= 5) {
+  const earlyEnd = Math.ceil(maxRounds * 0.25);
+  const midEnd = Math.ceil(maxRounds * 0.60);
+
+  if (round <= earlyEnd) {
     cheapWeight = 0.60;
     midWeight = 0.30;
     premiumWeight = 0.10;
-  } else if (round <= 12) {
+  } else if (round <= midEnd) {
     cheapWeight = 0.30;
     midWeight = 0.40;
     premiumWeight = 0.30;
@@ -602,8 +607,8 @@ export function getSectorWeightsForRound(round: number): Record<SectorId, number
   return weights as Record<SectorId, number>;
 }
 
-export function pickWeightedSector(round: number): SectorId {
-  const weights = getSectorWeightsForRound(round);
+export function pickWeightedSector(round: number, maxRounds: number = 20): SectorId {
+  const weights = getSectorWeightsForRound(round, maxRounds);
   const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
   let random = Math.random() * totalWeight;
 
@@ -622,6 +627,7 @@ export interface DealGenerationOptions {
   freshnessBonus?: number;
   multipleDiscount?: number; // e.g., 0.15 = 15% off asking price
   lastEventType?: EventType; // for deal heat calculation
+  maxRounds?: number; // 20 or 10 — for scaling heat/weights
 }
 
 // Generate a deal with size preference
@@ -742,7 +748,7 @@ export function generateDealWithSize(
   const dealSource = options.source ?? (Math.random() > 0.4 ? 'inbound' : 'brokered');
 
   // Calculate deal heat and effective price (pass archetype for heat modifier)
-  const heat = calculateDealHeat(quality, dealSource, round, options.lastEventType, sellerArchetype);
+  const heat = calculateDealHeat(quality, dealSource, round, options.lastEventType, sellerArchetype, options.maxRounds ?? 20);
   const heatPremium = calculateHeatPremium(heat);
   const effectivePrice = Math.round(finalAskingPrice * heatPremium);
 
@@ -782,7 +788,8 @@ export function generateDealPipeline(
   portfolioEbitda: number = 0,
   maSourcingTier: number = 0,
   maSourcingActive: boolean = false,
-  lastEventType?: EventType
+  lastEventType?: EventType,
+  maxRounds: number = 20
 ): Deal[] {
   // Age existing deals first
   let pipeline = currentPipeline.map(deal => ({
@@ -800,8 +807,8 @@ export function generateDealPipeline(
   const sectorsInPipeline = new Set(pipeline.map(d => d.business.sectorId));
   const allSectorIds = SECTOR_LIST.map(s => s.id);
 
-  // Shared options to pass lastEventType for heat calculation
-  const heatOpts: DealGenerationOptions = lastEventType ? { lastEventType } : {};
+  // Shared options to pass lastEventType and maxRounds for heat calculation
+  const heatOpts: DealGenerationOptions = { lastEventType, maxRounds };
 
   // 1. Generate deals based on M&A focus (if set)
   if (maFocus?.sectorId && pipeline.length < MAX_DEALS) {
@@ -814,11 +821,12 @@ export function generateDealPipeline(
 
   // 1b. MA Sourcing bonus deals (Tier 1+, active)
   if (maSourcingActive && maSourcingTier >= 1 && pipeline.length < MAX_DEALS) {
-    const focusSector = maFocus?.sectorId ?? pickWeightedSector(round);
+    const focusSector = maFocus?.sectorId ?? pickWeightedSector(round, maxRounds);
     const sourcingOptions: DealGenerationOptions = {
       freshnessBonus: 1, // Focus deals last 3 rounds
       source: 'sourced',
       lastEventType,
+      maxRounds,
     };
 
     // Tier 2+: sub-type targeting + quality floor
@@ -891,13 +899,13 @@ export function generateDealPipeline(
   // H-4: Compute target once before loop to prevent infinite loop
   const targetPipelineLength = Math.min(MAX_DEALS, pipeline.length + targetNewDeals);
   while (pipeline.length < targetPipelineLength) {
-    const sectorId = pickWeightedSector(round);
+    const sectorId = pickWeightedSector(round, maxRounds);
     pipeline.push(generateDealWithSize(sectorId, round, maFocus?.sizePreference || 'any', portfolioEbitda, heatOpts));
   }
 
   // Ensure at least 4 deals available
   while (pipeline.length < 4) {
-    const sectorId = pickWeightedSector(round);
+    const sectorId = pickWeightedSector(round, maxRounds);
     pipeline.push(generateDealWithSize(sectorId, round, 'any', portfolioEbitda, heatOpts));
   }
 
@@ -911,12 +919,13 @@ export function generateSourcedDeals(
   maFocus?: MAFocus,
   portfolioFocusSector?: SectorId,
   portfolioEbitda: number = 0,
-  maSourcingTier: number = 0
+  maSourcingTier: number = 0,
+  maxRounds: number = 20
 ): Deal[] {
   const deals: Deal[] = [];
 
   // Build options based on MA sourcing tier
-  const sourcingOptions: DealGenerationOptions = { source: 'sourced' };
+  const sourcingOptions: DealGenerationOptions = { source: 'sourced', maxRounds };
   if (maSourcingTier >= 2) {
     sourcingOptions.qualityFloor = 2;
     if (maFocus?.subType) sourcingOptions.subType = maFocus.subType;
@@ -936,13 +945,13 @@ export function generateSourcedDeals(
     // Third deal from a different sector for variety
     const otherSector = portfolioFocusSector && portfolioFocusSector !== maFocus.sectorId
       ? portfolioFocusSector
-      : pickWeightedSector(round);
+      : pickWeightedSector(round, maxRounds);
     deals.push(generateDealWithSize(otherSector, round, maFocus.sizePreference, portfolioEbitda, sourcingOptions));
   } else if (portfolioFocusSector) {
     // No M&A focus but have portfolio focus - generate deals in that sector
     deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda, sourcingOptions));
     deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda, sourcingOptions));
-    deals.push(generateDealWithSize(pickWeightedSector(round), round, 'any', portfolioEbitda, sourcingOptions));
+    deals.push(generateDealWithSize(pickWeightedSector(round, maxRounds), round, 'any', portfolioEbitda, sourcingOptions));
   } else {
     // No focus set - generate diverse deals
     // M-11: Spread to avoid mutating global SECTOR_LIST
@@ -964,10 +973,11 @@ export function generateSourcedDeals(
 export function generateProactiveOutreachDeals(
   round: number,
   maFocus: MAFocus,
-  portfolioEbitda: number = 0
+  portfolioEbitda: number = 0,
+  maxRounds: number = 20
 ): Deal[] {
   const deals: Deal[] = [];
-  const sectorId = maFocus.sectorId ?? pickWeightedSector(round);
+  const sectorId = maFocus.sectorId ?? pickWeightedSector(round, maxRounds);
 
   for (let i = 0; i < 2; i++) {
     deals.push(generateDealWithSize(
@@ -976,6 +986,7 @@ export function generateProactiveOutreachDeals(
         subType: maFocus.subType ?? undefined,
         qualityFloor: 3,
         source: 'proprietary',
+        maxRounds,
       }
     ));
   }
@@ -983,14 +994,16 @@ export function generateProactiveOutreachDeals(
   return deals;
 }
 
-export function createStartingBusiness(sectorId: SectorId = 'agency'): Business {
+export function createStartingBusiness(sectorId: SectorId = 'agency', targetEbitdaParam: number = 1000, multipleCap?: number): Business {
   const sector = SECTORS[sectorId];
   const business = generateBusiness(sectorId, 1, 3); // Start with a fair quality business
 
-  // Starting business: ~$1M EBITDA, sector-appropriate multiple
-  // This uses ~20% of the $20M raise, leaving cash for future acquisitions
-  const targetEbitda = 1000; // $1M EBITDA
-  const targetMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
+  // Starting business: sector-appropriate multiple (optionally capped for Normal difficulty)
+  const targetEbitda = targetEbitdaParam;
+  const sectorAvgMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
+  const targetMultiple = multipleCap
+    ? Math.min(multipleCap, sectorAvgMultiple)
+    : sectorAvgMultiple;
   const acquisitionPrice = Math.round(targetEbitda * targetMultiple);
 
   // Derive revenue from target EBITDA and the generated margin
