@@ -38,6 +38,7 @@ import { generateBuyerProfile } from '../engine/buyers';
 import {
   generateEventNarrative,
   getFallbackEventNarrative,
+  getFallbackBusinessStory,
   isAIEnabled,
   generateBusinessUpdate,
   generateYearChronicle,
@@ -2071,19 +2072,16 @@ export const useGameStore = create<GameStore>()(
               marginChange,
             );
 
-            if (narrative) {
-              const newBeat = {
-                round: state.round,
-                narrative,
-                type: hasRecentImprovement ? 'milestone' as const : 'update' as const,
-              };
-              return {
-                ...b,
-                storyBeats: [...(b.storyBeats || []), newBeat].slice(-5), // Keep last 5 beats
-              };
-            }
-
-            return b;
+            const storyText = narrative || getFallbackBusinessStory(b.ebitda, b.acquisitionEbitda, yearsOwned);
+            const newBeat = {
+              round: state.round,
+              narrative: storyText,
+              type: hasRecentImprovement ? 'milestone' as const : 'update' as const,
+            };
+            return {
+              ...b,
+              storyBeats: [...(b.storyBeats || []), newBeat].slice(-5), // Keep last 5 beats
+            };
           })
         );
 
@@ -2271,7 +2269,8 @@ export const useGameStore = create<GameStore>()(
               : undefined,
           });
 
-          set({ yearChronicle: chronicle });
+          const fallbackChronicle = `Year ${state.round} saw ${state.holdcoName} continue to build its portfolio. ${actionsSummary}`;
+          set({ yearChronicle: chronicle || fallbackChronicle });
         } catch (error) {
           console.error('Failed to generate year chronicle:', error);
           set({

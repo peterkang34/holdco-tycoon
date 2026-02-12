@@ -529,6 +529,49 @@ export function getFallbackEventNarrative(eventType: string): string {
   return narratives[Math.floor(Math.random() * narratives.length)];
 }
 
+// Fallback business story templates for when AI is not available
+const FALLBACK_BUSINESS_STORIES = {
+  growing: [
+    'The team delivered another strong quarter, with customer inquiries up and the pipeline fuller than ever.',
+    'Operations hummed along smoothly. The investments made last year are starting to pay dividends.',
+    'Revenue momentum continued as the team executed well against plan. The outlook remains bright.',
+  ],
+  declining: [
+    'A challenging year as headwinds took their toll. Management is working on a turnaround plan.',
+    'Growth slowed as competitive pressures intensified. The team is focused on protecting margins.',
+    'An off year, with revenue below expectations. Cost control became the priority.',
+  ],
+  stable: [
+    'Business as usual — steady operations with no major surprises. The team kept their heads down and delivered.',
+    'A quiet but productive year. The fundamentals remain intact and the team is well-positioned.',
+    'The business continued to generate consistent cash flows. No fireworks, but no fires either.',
+  ],
+  new: [
+    'The first year under new ownership is always about learning the business. Integration is underway.',
+    'Early days as the new management team gets oriented. Lots of potential to unlock.',
+    'The acquisition closed smoothly and the transition is progressing. First impressions are positive.',
+  ],
+};
+
+export function getFallbackBusinessStory(
+  ebitda: number,
+  acquisitionEbitda: number,
+  yearsOwned: number,
+): string {
+  let bucket: keyof typeof FALLBACK_BUSINESS_STORIES;
+  if (yearsOwned <= 1) {
+    bucket = 'new';
+  } else if (ebitda > acquisitionEbitda * 1.05) {
+    bucket = 'growing';
+  } else if (ebitda < acquisitionEbitda * 0.95) {
+    bucket = 'declining';
+  } else {
+    bucket = 'stable';
+  }
+  const stories = FALLBACK_BUSINESS_STORIES[bucket];
+  return stories[Math.floor(Math.random() * stories.length)];
+}
+
 // AI-enriched buyer profile — fire-and-forget, deterministic profile works standalone
 export async function generateAIBuyerProfile(
   profile: BuyerProfile,

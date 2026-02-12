@@ -68,7 +68,7 @@ export const GLOBAL_EVENTS: EventDefinition[] = [
     type: 'global_quiet',
     title: 'Quiet Year',
     description: 'Markets are stable. Business as usual.',
-    probability: 0.22,
+    probability: 0.10,
     effectDescription: 'No special effects',
   },
 ];

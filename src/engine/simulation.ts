@@ -689,6 +689,10 @@ export function generateEvent(state: GameState): GameEvent | null {
           offerAmount,
           offerMultiple,
           buyerProfile,
+          choices: [
+            { label: 'Decline', description: 'Keep the business', action: 'declineOffer', variant: 'negative' as const },
+            { label: `Accept ${formatMoney(offerAmount)}`, description: 'Sell the business at offer price', action: 'acceptOffer', variant: 'positive' as const },
+          ],
         };
       }
     }
