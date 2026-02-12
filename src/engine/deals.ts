@@ -9,6 +9,11 @@ export function generateDealStructures(
   const askingPrice = deal.effectivePrice;
   const structures: DealStructure[] = [];
 
+  // Seed pseudo-random from deal ID for deterministic structures per deal
+  // (prevents structures from changing on re-render)
+  const seed = deal.id.split('').reduce((sum, c) => sum + c.charCodeAt(0), 0);
+  const seededRandom = (min: number, max: number) => min + ((seed * 9301 + 49297) % 233280) / 233280 * (max - min);
+
   // Option A: All Cash (always available if player has enough)
   if (playerCash >= askingPrice) {
     structures.push({
@@ -20,10 +25,10 @@ export function generateDealStructures(
   }
 
   // Option B: Cash + Seller Note (usually available)
-  const sellerNoteCashPercent = 0.4 + Math.random() * 0.2; // 40-60%
+  const sellerNoteCashPercent = 0.40; // 40% equity
   const sellerNoteCash = Math.round(askingPrice * sellerNoteCashPercent);
   const sellerNoteAmount = askingPrice - sellerNoteCash;
-  const sellerNoteRate = 0.05 + Math.random() * 0.01; // 5-6%
+  const sellerNoteRate = 0.05 + seededRandom(0, 0.01); // 5-6%
 
   if (playerCash >= sellerNoteCash) {
     structures.push({
@@ -41,7 +46,7 @@ export function generateDealStructures(
 
   // Option C: Cash + Bank Debt (not available during credit tightening)
   if (!creditTightening) {
-    const bankDebtCashPercent = 0.30 + Math.random() * 0.1; // M-12: 30-40% equity (was 15-25%, too powerful)
+    const bankDebtCashPercent = 0.35; // 35% equity
     const bankDebtCash = Math.round(askingPrice * bankDebtCashPercent);
     const bankDebtAmount = askingPrice - bankDebtCash;
 
@@ -60,9 +65,9 @@ export function generateDealStructures(
     }
   }
 
-  // Option D: Earn-out (available for some deals, especially higher quality)
-  if (deal.business.qualityRating >= 3 && Math.random() > 0.4) {
-    const earnoutUpfrontPercent = 0.5 + Math.random() * 0.2; // 50-70%
+  // Option D: Earn-out (available for quality 3+ deals)
+  if (deal.business.qualityRating >= 3 && (seed % 10) >= 4) {
+    const earnoutUpfrontPercent = 0.55; // 55% upfront
     const earnoutCash = Math.round(askingPrice * earnoutUpfrontPercent);
     const earnoutAmount = askingPrice - earnoutCash;
 
@@ -72,7 +77,7 @@ export function generateDealStructures(
         cashRequired: earnoutCash,
         earnout: {
           amount: earnoutAmount,
-          targetEbitdaGrowth: 0.07 + Math.random() * 0.05, // 7-12% growth target
+          targetEbitdaGrowth: 0.07 + seededRandom(0, 0.05), // 7-12% growth target
         },
         leverage: 0, // Earnouts don't add leverage in the traditional sense
         risk: 'medium',
@@ -82,12 +87,12 @@ export function generateDealStructures(
 
   // Option E: LBO Combo — Cash + Seller Note + Bank Debt (not available during credit tightening)
   if (!creditTightening) {
-    const lboCashPercent = 0.20 + Math.random() * 0.10; // 20-30% equity
-    const lboNotePercent = 0.30 + Math.random() * 0.10; // 30-40% seller note
+    const lboCashPercent = 0.25; // 25% equity
+    const lboNotePercent = 0.35; // 35% seller note
     const lboCash = Math.round(askingPrice * lboCashPercent);
     const lboNoteAmount = Math.round(askingPrice * lboNotePercent);
     const lboBankAmount = askingPrice - lboCash - lboNoteAmount; // remainder as bank debt
-    const lboNoteRate = 0.05 + Math.random() * 0.01; // 5-6%
+    const lboNoteRate = 0.05 + seededRandom(0, 0.01); // 5-6%
 
     if (playerCash >= lboCash && lboBankAmount > 0) {
       const combinedDebt = lboNoteAmount + lboBankAmount;

@@ -80,13 +80,12 @@ describe('generateDealStructures', () => {
   });
 
   it('should earn-out only for quality >= 3', () => {
-    vi.spyOn(Math, 'random').mockReturnValue(0.6); // 0.6 > 0.4 so earnout passes the random check
-
-    const highQualDeal = createMockDeal();
+    // Use deal ID whose seed % 10 >= 4 to pass the deterministic earnout check
+    const highQualDeal = createMockDeal({ id: 'deal_earnout' });
     highQualDeal.business.qualityRating = 4;
     const structsHigh = generateDealStructures(highQualDeal, 10000, 0.07, false);
 
-    const lowQualDeal = createMockDeal();
+    const lowQualDeal = createMockDeal({ id: 'deal_test_low' });
     lowQualDeal.business.qualityRating = 2;
     const structsLow = generateDealStructures(lowQualDeal, 10000, 0.07, false);
 
@@ -96,8 +95,6 @@ describe('generateDealStructures', () => {
     // High quality should have earnout, low quality should not (qualityRating < 3)
     expect(earnoutHigh).toBeDefined();
     expect(earnoutLow).toBeUndefined();
-
-    vi.restoreAllMocks();
   });
 
   it('should include LBO combo (seller_note_bank_debt) when credit is normal', () => {

@@ -314,7 +314,7 @@ export function AllocatePhase({
           {structures.length === 0 ? (
             <div className="card text-center text-text-muted py-8">
               <p>You don't have enough cash to structure this deal.</p>
-              <p className="text-sm mt-2">Need at least {formatMoney(selectedDeal.askingPrice * 0.15)} for minimum down payment.</p>
+              <p className="text-sm mt-2">Need at least {formatMoney(selectedDeal.effectivePrice * 0.25)} for minimum down payment (25% equity).</p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -1049,7 +1049,7 @@ export function AllocatePhase({
                   key={deal.id}
                   deal={deal}
                   onSelect={() => setSelectedDeal(deal)}
-                  disabled={cash < deal.effectivePrice * 0.15 || !distressRestrictions.canAcquire || acquisitionsThisRound >= maxAcquisitionsPerRound}
+                  disabled={cash < deal.effectivePrice * 0.25 || !distressRestrictions.canAcquire || acquisitionsThisRound >= maxAcquisitionsPerRound}
                   availablePlatforms={getPlatformsForSector(deal.business.sectorId)}
                   isPassed={passedDealIds.has(deal.id)}
                   onPass={() => {
