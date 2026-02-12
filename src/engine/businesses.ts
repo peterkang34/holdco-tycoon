@@ -975,7 +975,7 @@ export function generateProactiveOutreachDeals(
       {
         subType: maFocus.subType ?? undefined,
         qualityFloor: 3,
-        source: 'sourced',
+        source: 'proprietary',
       }
     ));
   }
