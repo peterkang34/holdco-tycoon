@@ -224,9 +224,35 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
         </div>
         <div>
           <p className="text-xs text-text-muted">Quality</p>
-          <p className="font-mono font-bold text-lg">
-            {'★'.repeat(qualityRating)}{'☆'.repeat(5 - qualityRating)}
-          </p>
+          <Tooltip
+            trigger={
+              <span className="font-mono font-bold text-lg">
+                {'★'.repeat(qualityRating)}{'☆'.repeat(5 - qualityRating)}
+              </span>
+            }
+            align="right"
+            width="w-56"
+          >
+            <p className="font-medium text-text-primary mb-1">
+              {qualityRating === 1 ? 'Struggling Business' :
+               qualityRating === 2 ? 'Below Average' :
+               qualityRating === 3 ? 'Solid Performer' :
+               qualityRating === 4 ? 'Well-Run Business' : 'Best-in-Class'}
+            </p>
+            <div className="space-y-1 text-text-muted">
+              <p>Exit multiple: <span className={`font-mono ${(qualityRating - 3) * 0.4 >= 0 ? 'text-accent' : 'text-danger'}`}>
+                {(qualityRating - 3) * 0.4 >= 0 ? '+' : ''}{((qualityRating - 3) * 0.4).toFixed(1)}x
+              </span></p>
+              <p>Integration: <span className="text-text-secondary">
+                {qualityRating >= 4 ? 'easier success' : qualityRating <= 2 ? 'higher failure risk' : 'standard odds'}
+              </span></p>
+              {qualityRating >= 3 && <p className="text-accent">Eligible for earn-out deals</p>}
+              {qualityRating <= 2 && <p className="text-danger">Larger tuck-in discounts available</p>}
+            </div>
+            <p className="text-[10px] text-text-muted mt-1.5 pt-1.5 border-t border-white/10">
+              Affects exit valuation, bolt-on integration, and deal heat.
+            </p>
+          </Tooltip>
         </div>
       </div>
 
