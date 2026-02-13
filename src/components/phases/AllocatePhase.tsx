@@ -405,7 +405,8 @@ export function AllocatePhase({
   const renderImprovementModal = () => {
     if (!selectedBusinessForImprovement) return null;
 
-    const business = selectedBusinessForImprovement;
+    // Look up fresh business from props so applied improvements are reflected
+    const business = businesses.find(b => b.id === selectedBusinessForImprovement.id) ?? selectedBusinessForImprovement;
     const sector = SECTORS[business.sectorId];
     const appliedTypes = new Set(business.improvements.map(i => i.type));
     const remainingYears = (maxRoundsFromStore ?? 20) - round;
@@ -624,7 +625,6 @@ export function AllocatePhase({
                   onClick={() => {
                     if (!disabled) {
                       onImprove(business.id, improvement.type);
-                      setSelectedBusinessForImprovement(null);
                     }
                   }}
                 >
@@ -1552,7 +1552,7 @@ export function AllocatePhase({
                     } else {
                       const shareCount = parseInt(buybackAmount) || 0;
                       if (shareCount > 0 && intrinsicValuePerShare > 0) {
-                        const internalAmount = Math.round(shareCount * intrinsicValuePerShare);
+                        const internalAmount = Math.floor(shareCount * intrinsicValuePerShare);
                         if (internalAmount > 0) {
                           onBuyback(internalAmount);
                           setBuybackAmount('');
@@ -1568,7 +1568,7 @@ export function AllocatePhase({
                     } else {
                       const shareCount = parseInt(buybackAmount) || 0;
                       const outsideShares = sharesOutstanding - founderShares;
-                      const cost = Math.round(shareCount * intrinsicValuePerShare);
+                      const cost = Math.floor(shareCount * intrinsicValuePerShare);
                       return shareCount < 1 || shareCount > outsideShares || cost > cash || intrinsicValuePerShare <= 0;
                     }
                   })()}
@@ -1584,7 +1584,7 @@ export function AllocatePhase({
               {/* Preview for shares mode */}
               {buybackMode === 'shares' && buybackAmount && parseInt(buybackAmount) >= 1 && intrinsicValuePerShare > 0 && (() => {
                 const shareCount = parseInt(buybackAmount) || 0;
-                const cost = Math.round(shareCount * intrinsicValuePerShare);
+                const cost = Math.floor(shareCount * intrinsicValuePerShare);
                 return (
                   <p className="text-xs text-text-muted mt-1">= {formatMoney(cost)} ({shareCount} shares @ {formatMoney(intrinsicValuePerShare)}/share)</p>
                 );
@@ -1599,7 +1599,7 @@ export function AllocatePhase({
                 } else {
                   const shareCount = parseInt(buybackAmount) || 0;
                   if (shareCount < 1) return null;
-                  internalAmt = Math.round(shareCount * intrinsicValuePerShare);
+                  internalAmt = Math.floor(shareCount * intrinsicValuePerShare);
                 }
                 const sharesRepurchased = Math.round((internalAmt / intrinsicValuePerShare) * 1000) / 1000;
                 const outsideShares = sharesOutstanding - founderShares;

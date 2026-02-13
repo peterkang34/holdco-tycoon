@@ -454,6 +454,13 @@ export function applyOrganicGrowth(
     revenueGrowth += diversificationBonus;
   }
 
+  // Competitive position modifier: leaders grow faster, commoditized face headwinds
+  if (business.dueDiligence?.competitivePosition === 'leader') {
+    revenueGrowth += 0.015; // +1.5% annual growth edge
+  } else if (business.dueDiligence?.competitivePosition === 'commoditized') {
+    revenueGrowth -= 0.015; // -1.5% annual drag from price competition
+  }
+
   // Integration penalty
   if (business.integrationRoundsRemaining > 0) {
     revenueGrowth -= (0.03 + Math.random() * 0.05);

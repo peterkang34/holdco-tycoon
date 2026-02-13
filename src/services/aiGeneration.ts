@@ -40,6 +40,12 @@ interface GenerationParams {
   acquisitionType: 'standalone' | 'tuck_in' | 'platform';
   revenue?: number;
   ebitdaMargin?: number;
+  operatorQuality?: string;
+  revenueConcentration?: string;
+  marketTrend?: string;
+  competitivePosition?: string;
+  customerRetention?: number;
+  sellerArchetype?: string;
 }
 
 // Generate AI content for a business via server API
@@ -65,6 +71,12 @@ export async function generateBusinessContent(params: GenerationParams): Promise
         acquisitionType: params.acquisitionType,
         revenue: params.revenue,
         ebitdaMargin: params.ebitdaMargin,
+        operatorQuality: params.operatorQuality,
+        revenueConcentration: params.revenueConcentration,
+        marketTrend: params.marketTrend,
+        competitivePosition: params.competitivePosition,
+        customerRetention: params.customerRetention,
+        sellerArchetype: params.sellerArchetype,
       }),
     });
 
@@ -163,16 +175,33 @@ const ARCHETYPE_MOTIVATIONS: Record<SellerArchetype, string[]> = {
   ],
 };
 
-const FALLBACK_QUIRKS = [
-  'Unusually loyal customer base - average customer tenure is 8+ years.',
-  'Owns the real estate where they operate (not included in the deal but available separately).',
-  'Has an exclusive supplier relationship that competitors have tried to replicate.',
-  'Former employee went on to become a minor celebrity, still endorses the business.',
-  'Developed proprietary software that could be spun off or licensed.',
-  'Located next to a major employer that provides steady referral business.',
-  'Has a waiting list for new customers in peak season.',
-  'Founder wrote an industry book that drives inbound leads.',
-];
+// Quality-tiered quirks so fallback stories match the star rating
+const FALLBACK_QUIRKS_BY_QUALITY: Record<'low' | 'mid' | 'high', string[]> = {
+  low: [ // 1-2 stars
+    'Staff turnover is notably high — the break room whiteboard is a revolving door of names.',
+    'The accounting system is a patchwork of spreadsheets and sticky notes.',
+    'Most of the equipment is past its expected useful life but still running... barely.',
+    'The customer list hasn\'t been updated in years. Some entries are duplicates.',
+    'The owner\'s nephew handles IT. He\'s 19 and self-taught from YouTube.',
+    'Google reviews are a mix of 5-star raves and 1-star horror stories.',
+  ],
+  mid: [ // 3 stars
+    'Owns the real estate where they operate (not included in the deal but available separately).',
+    'Located next to a major employer that provides steady referral business.',
+    'Has a solid repeat customer base, though retention tracking is informal.',
+    'The team is small but capable — they just need better systems.',
+    'Revenue is seasonal but predictable. Q4 accounts for 40% of annual sales.',
+    'Former employee went on to become a minor celebrity, still endorses the business.',
+  ],
+  high: [ // 4-5 stars
+    'Unusually loyal customer base — average customer tenure is 8+ years.',
+    'Has an exclusive supplier relationship that competitors have tried to replicate.',
+    'Developed proprietary software that could be spun off or licensed.',
+    'Has a waiting list for new customers in peak season.',
+    'Founder wrote an industry book that drives inbound leads.',
+    'Net Promoter Score consistently above 70 — customers actively refer friends.',
+  ],
+};
 
 export function generateFallbackContent(
   sectorId: SectorId,
@@ -186,30 +215,52 @@ export function generateFallbackContent(
     ? ARCHETYPE_MOTIVATIONS[sellerArchetype]
     : FALLBACK_MOTIVATIONS;
 
+  // Pick quality-appropriate quirks
+  const quirkTier = qualityRating <= 2 ? 'low' : qualityRating >= 4 ? 'high' : 'mid';
+  const quirkPool = FALLBACK_QUIRKS_BY_QUALITY[quirkTier];
+
   const content: AIGeneratedContent = {
     backstory: backstories[Math.floor(Math.random() * backstories.length)],
     sellerMotivation: motivations[Math.floor(Math.random() * motivations.length)],
     quirks: [
-      FALLBACK_QUIRKS[Math.floor(Math.random() * FALLBACK_QUIRKS.length)],
-      FALLBACK_QUIRKS[Math.floor(Math.random() * FALLBACK_QUIRKS.length)],
+      quirkPool[Math.floor(Math.random() * quirkPool.length)],
+      quirkPool[Math.floor(Math.random() * quirkPool.length)],
     ].filter((v, i, a) => a.indexOf(v) === i), // Remove duplicates
   };
 
   // Add red flags for lower quality businesses
   if (qualityRating <= 2) {
-    content.redFlags = [
-      qualityRating === 1
-        ? 'Financial records are disorganized and may require forensic accounting.'
-        : 'Some customer contracts are month-to-month with no switching costs.',
+    const lowRedFlags = [
+      'Financial records are disorganized and may require forensic accounting.',
+      'Some customer contracts are month-to-month with no switching costs.',
+      'Key supplier contract expires in 6 months with no renewal commitment.',
+      'Owner is the primary salesperson — unclear if revenue survives transition.',
     ];
+    content.redFlags = [
+      lowRedFlags[Math.floor(Math.random() * lowRedFlags.length)],
+    ];
+    if (qualityRating === 1) {
+      // Add a second red flag for 1-star businesses
+      const second = lowRedFlags.filter(f => f !== content.redFlags![0]);
+      content.redFlags.push(second[Math.floor(Math.random() * second.length)]);
+    }
   }
 
   // Add opportunities for higher quality
   if (qualityRating >= 4) {
-    content.opportunities = [
+    const highOpps = [
       'Adjacent market expansion could double addressable market.',
       'Price increases have not been tested in several years.',
+      'Existing customer base could support a subscription upsell model.',
+      'Geographic expansion into neighboring markets is wide open.',
     ];
+    content.opportunities = [
+      highOpps[Math.floor(Math.random() * highOpps.length)],
+    ];
+    if (qualityRating === 5) {
+      const second = highOpps.filter(o => o !== content.opportunities![0]);
+      content.opportunities.push(second[Math.floor(Math.random() * second.length)]);
+    }
   }
 
   return content;

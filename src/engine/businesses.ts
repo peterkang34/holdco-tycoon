@@ -541,6 +541,14 @@ export async function enhanceDealWithAI(deal: Deal): Promise<Deal> {
       ebitda: deal.business.ebitda,
       qualityRating: deal.business.qualityRating,
       acquisitionType: deal.acquisitionType,
+      revenue: deal.business.revenue,
+      ebitdaMargin: deal.business.ebitdaMargin,
+      operatorQuality: deal.business.dueDiligence.operatorQuality,
+      revenueConcentration: deal.business.dueDiligence.revenueConcentration,
+      marketTrend: deal.business.dueDiligence.trend,
+      competitivePosition: deal.business.dueDiligence.competitivePosition,
+      customerRetention: deal.business.dueDiligence.customerRetention,
+      sellerArchetype: deal.sellerArchetype,
     });
 
     if (aiContent) {

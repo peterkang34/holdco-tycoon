@@ -1462,12 +1462,13 @@ export const useGameStore = create<GameStore>()(
         if (!restrictions.canBuyback) return;
         // M-5: Guard against division by zero or negative intrinsic value
         if (metrics.intrinsicValuePerShare <= 0) return;
-        const sharesRepurchased = Math.round((amount / metrics.intrinsicValuePerShare) * 1000) / 1000;
+        let sharesRepurchased = Math.round((amount / metrics.intrinsicValuePerShare) * 1000) / 1000;
 
         // Can only buy back non-founder shares (outside investors' shares)
         const outsideShares = state.sharesOutstanding - state.founderShares;
         if (outsideShares <= 0) return; // No outside shares to buy back
-        if (sharesRepurchased > outsideShares) return; // Can't buy more than outside investors own
+        // Cap to outside shares (prevents floating-point rounding from exceeding by a fraction)
+        sharesRepurchased = Math.min(sharesRepurchased, outsideShares);
 
         const newTotalShares = state.sharesOutstanding - sharesRepurchased;
         const newFounderOwnership = state.founderShares / newTotalShares;
