@@ -32,7 +32,16 @@ function calculateFcfBreakdown(business: Business, interestRate: number) {
     : 0;
   const bankDebtInterest = Math.round(business.bankDebtBalance * interestRate);
 
-  const totalDeductions = capex + sellerNoteInterest + sellerNotePrincipal + bankDebtInterest;
+  // Earn-out: triggers when cumulative EBITDA growth meets target
+  let earnoutPayment = 0;
+  if (business.earnoutRemaining > 0 && business.earnoutTarget > 0 && business.acquisitionEbitda > 0) {
+    const growth = (business.ebitda - business.acquisitionEbitda) / business.acquisitionEbitda;
+    if (growth >= business.earnoutTarget) {
+      earnoutPayment = business.earnoutRemaining;
+    }
+  }
+
+  const totalDeductions = capex + sellerNoteInterest + sellerNotePrincipal + bankDebtInterest + earnoutPayment;
   const fcf = ebitda - totalDeductions;
 
   return {
@@ -44,8 +53,23 @@ function calculateFcfBreakdown(business: Business, interestRate: number) {
     sellerNoteBalance: business.sellerNoteBalance,
     bankDebtInterest,
     bankDebtBalance: business.bankDebtBalance,
+    earnoutPayment,
     fcf,
   };
+}
+
+// Calculate earn-out payments for integrated (tuck-in) businesses using platform growth
+function calculateIntegratedEarnouts(businesses: Business[]): number {
+  return businesses
+    .filter(b => b.status === 'integrated' && b.earnoutRemaining > 0 && b.earnoutTarget > 0 && b.parentPlatformId)
+    .reduce((sum, b) => {
+      const platform = businesses.find(p => p.id === b.parentPlatformId && p.status === 'active');
+      if (platform && platform.acquisitionEbitda > 0) {
+        const growth = (platform.ebitda - platform.acquisitionEbitda) / platform.acquisitionEbitda;
+        if (growth >= b.earnoutTarget) return sum + b.earnoutRemaining;
+      }
+      return sum;
+    }, 0);
 }
 
 export function CollectPhase({
@@ -77,6 +101,9 @@ export function CollectPhase({
   const totalBusinessFcf = businessBreakdowns.reduce((sum, { breakdown }) => sum + breakdown.fcf, 0);
   const totalEbitda = businessBreakdowns.reduce((sum, { breakdown }) => sum + breakdown.ebitda, 0);
 
+  // Earn-out payments from integrated (tuck-in) businesses (platform growth as proxy)
+  const integratedEarnouts = calculateIntegratedEarnouts(businesses);
+
   // Portfolio-level tax with all deductions
   const taxBreakdown = calculatePortfolioTax(activeBusinesses, totalDebt, interestRate, sharedServicesCost);
   const hasDeductions = taxBreakdown.totalTaxSavings > 0;
@@ -85,17 +112,18 @@ export function CollectPhase({
   // Calculate annual interest expense (holdco level)
   const holdcoInterest = Math.round(totalDebt * interestRate);
 
-  // Net FCF after tax, holdco interest, shared services, and MA sourcing
-  const netFcf = totalBusinessFcf - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost;
+  // Net FCF after tax, holdco interest, shared services, MA sourcing, and tuck-in earnouts
+  const netFcf = totalBusinessFcf - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - integratedEarnouts;
 
   // What cash will be after collection
   const projectedCash = cash + netFcf;
 
   // Coverage ratios
+  const totalEarnouts = businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.earnoutPayment, 0) + integratedEarnouts;
   const totalInterestExpense = holdcoInterest +
     businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNoteInterest + breakdown.bankDebtInterest, 0);
   const totalDebtService = totalInterestExpense +
-    businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNotePrincipal, 0);
+    businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNotePrincipal, 0) + totalEarnouts;
   const interestCoverage = totalInterestExpense > 0 ? totalEbitda / totalInterestExpense : Infinity;
   const debtServiceCoverage = totalDebtService > 0 ? netFcf / totalDebtService : Infinity;
   const hasDebtObligations = totalDebtService > 0;
@@ -146,7 +174,7 @@ export function CollectPhase({
             <p className="text-text-muted"><span className="hidden sm:inline">OpCo </span>Debt</p>
             <p className="font-mono font-bold text-sm sm:text-lg text-danger">
               -{formatMoney(businessBreakdowns.reduce((s, { breakdown }) =>
-                s + breakdown.sellerNoteInterest + breakdown.sellerNotePrincipal + breakdown.bankDebtInterest, 0))}
+                s + breakdown.sellerNoteInterest + breakdown.sellerNotePrincipal + breakdown.bankDebtInterest + breakdown.earnoutPayment, 0) + integratedEarnouts)}
             </p>
           </div>
           <div>
@@ -368,6 +396,13 @@ export function CollectPhase({
                             <td className="py-1">(-) Bank Debt Interest</td>
                             <td className="py-1 text-right font-mono">-{formatMoney(breakdown.bankDebtInterest)}</td>
                             <td className="py-1 text-right text-text-muted text-xs">{formatPercent(interestRate)}</td>
+                          </tr>
+                        )}
+                        {breakdown.earnoutPayment > 0 && (
+                          <tr className="text-danger">
+                            <td className="py-1">(-) Earn-out Payment</td>
+                            <td className="py-1 text-right font-mono">-{formatMoney(breakdown.earnoutPayment)}</td>
+                            <td className="py-1 text-right text-text-muted text-xs">Target met</td>
                           </tr>
                         )}
                         <tr className="border-t border-white/10">

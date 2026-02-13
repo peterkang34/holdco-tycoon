@@ -59,7 +59,7 @@ function buildYearChroniclePrompt(context: Record<string, unknown>): string {
   if (context.platformCount && (context.platformCount as number) > 0) {
     strategicLines.push(`- Platforms: ${context.platformCount} (with ${context.totalBoltOns || 0} bolt-on acquisitions)`);
   }
-  if (context.avgQuality) strategicLines.push(`- Avg Portfolio Quality: ${context.avgQuality}/5`);
+  // avgQuality intentionally omitted — was producing unhelpful "portfolio quality of 4.0/5" mentions
   if (context.sectors) strategicLines.push(`- Sectors: ${context.sectors}`);
   if (context.sharedServices) strategicLines.push(`- Shared Services: ${context.sharedServices}`);
   if (context.fcfPerShare) strategicLines.push(`- FCF/Share: ${context.fcfPerShare}`);
@@ -93,6 +93,8 @@ WRITING GUIDELINES:
 - Include financial context but don't let it dominate — one financial reference per chronicle is enough
 - If financials are stressed, acknowledge it honestly but also note any strategic progress
 - Tone should match overall trajectory, not just one metric
+- Use ONLY the exact financial figures provided above — do NOT invent, calculate, or round your own numbers
+- Do NOT mention portfolio quality ratings or scores
 
 Write 3-4 sentences in a shareholder letter style. Keep it under 80 words. Respond with just the narrative text.`;
 }

@@ -180,7 +180,7 @@ export function BusinessCard({
             </div>
           </div>
 
-          {(business.sellerNoteBalance > 0 || business.bankDebtBalance > 0) && (
+          {(business.sellerNoteBalance > 0 || business.bankDebtBalance > 0 || business.earnoutRemaining > 0) && (
             <div className="text-xs mb-3 p-2 bg-white/5 rounded border border-white/10">
               <p className="text-text-muted font-medium mb-1">Opco-Level Debt</p>
               {business.sellerNoteBalance > 0 && (
@@ -193,6 +193,12 @@ export function BusinessCard({
                 <p className="text-text-secondary">
                   Bank Debt: {formatMoney(business.bankDebtBalance)}
                   <span className="text-text-muted"> (paid on exit)</span>
+                </p>
+              )}
+              {business.earnoutRemaining > 0 && (
+                <p className="text-text-secondary">
+                  Earn-out: {formatMoney(business.earnoutRemaining)}
+                  <span className="text-text-muted"> (if {Math.round(business.earnoutTarget * 100)}%+ EBITDA growth)</span>
                 </p>
               )}
             </div>
@@ -301,11 +307,11 @@ export function BusinessCard({
                   <span>= Exit Price</span>
                   <span className="font-mono">{formatMoney(exitValuation.exitPrice)}</span>
                 </div>
-                {(business.sellerNoteBalance > 0 || business.bankDebtBalance > 0) && (
+                {(business.sellerNoteBalance > 0 || business.bankDebtBalance > 0 || business.earnoutRemaining > 0) && (
                   <>
                     <div className="flex justify-between text-danger">
                       <span>- Debt Payoff</span>
-                      <span className="font-mono">-{formatMoney(business.sellerNoteBalance + business.bankDebtBalance)}</span>
+                      <span className="font-mono">-{formatMoney(business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining)}</span>
                     </div>
                     <div className="flex justify-between font-bold text-accent">
                       <span>= Net Proceeds</span>

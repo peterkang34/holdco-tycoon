@@ -124,8 +124,8 @@ export function calculateExitValuation(
 
   const exitPrice = Math.max(0, Math.round(business.ebitda * totalMultiple));
 
-  // Net proceeds after debt payoff
-  const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance;
+  // Net proceeds after debt payoff (includes remaining earn-out obligation)
+  const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining;
   const netProceeds = Math.max(0, exitPrice - debtPayoff);
 
   // Generate valuation commentary

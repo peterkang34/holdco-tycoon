@@ -7,9 +7,21 @@
 
 import type { GameState, Business, Metrics } from '../engine/types';
 import { formatMoney } from '../engine/types';
-import { calculateMetrics } from '../engine/simulation';
+import { calculateMetrics, calculatePortfolioTax } from '../engine/simulation';
 import { calculateFounderEquityValue } from '../engine/scoring';
 import { SECTORS } from '../data/sectors';
+import { getMASourcingAnnualCost } from '../data/sharedServices';
+
+/** Human-readable labels for improvement type enums. */
+const IMPROVEMENT_LABELS: Record<string, string> = {
+  operating_playbook: 'Operating Playbook',
+  pricing_model: 'Pricing Model',
+  service_expansion: 'Service Expansion',
+  fix_underperformance: 'Fix Underperformance',
+  recurring_revenue_conversion: 'Recurring Revenue',
+  management_professionalization: 'Professionalize Mgmt',
+  digital_transformation: 'Digital Transformation',
+};
 
 /** Shape of the context object consumed by generateYearChronicle(). */
 export interface ChronicleContext {
@@ -87,7 +99,10 @@ function buildActionsSummary(actionsThisRound: GameState['actionsThisRound']): s
     actionParts.push(`Sold ${saleDetails.join(', ')}`);
   }
   if (improvements.length > 0) {
-    const improvTypes = improvements.map(a => (a.details?.improvementType as string) || 'operational').filter((v, i, a) => a.indexOf(v) === i);
+    const improvTypes = improvements.map(a => {
+      const raw = (a.details?.improvementType as string) || 'operational';
+      return IMPROVEMENT_LABELS[raw] || raw.replace(/_/g, ' ');
+    }).filter((v, i, a) => a.indexOf(v) === i);
     actionParts.push(`Made ${improvements.length} improvement${improvements.length > 1 ? 's' : ''} (${improvTypes.join(', ')})`);
   }
   if (sharedServiceUnlocks.length > 0) {
@@ -143,7 +158,6 @@ function buildConcernsAndPositives(
   ebitdaGrowthPct: number | null,
   platforms: Business[],
   totalBoltOns: number,
-  avgQuality: string,
   sectors: string[],
 ): { concerns: string[]; positives: string[] } {
   const concerns: string[] = [];
@@ -175,7 +189,7 @@ function buildConcernsAndPositives(
   // Operational/strategic positives
   if (ebitdaGrowthPct !== null && ebitdaGrowthPct > 10) positives.push(`Portfolio EBITDA grew ${ebitdaGrowthPct}% year-over-year`);
   if (platforms.length > 0 && totalBoltOns > 0) positives.push(`Roll-up strategy progressing: ${platforms.length} platform${platforms.length > 1 ? 's' : ''} with ${totalBoltOns} bolt-on${totalBoltOns > 1 ? 's' : ''}`);
-  if (parseFloat(avgQuality) >= 4.0) positives.push(`High portfolio quality (avg ${avgQuality}/5)`);
+  // Quality rating removed from chronicle — was unhelpful ("portfolio quality of 4.0/5")
   if (sectors.length >= 4) positives.push(`Well-diversified across ${sectors.length} sectors`);
 
   // Margin expansion positive
@@ -200,7 +214,44 @@ export function buildChronicleContext(state: GameState): ChronicleContext {
   // Financial health signals
   const totalDebt = metrics.totalDebt;
   const interestExpense = Math.round(totalDebt * metrics.interestRate);
-  const fcf = metrics.totalFcf;
+
+  // Compute FCF matching CollectPhase waterfall (includes ALL opco debt service)
+  const sharedServicesCost = state.sharedServices
+    .filter(s => s.active)
+    .reduce((sum, s) => sum + s.annualCost, 0);
+  const maSourcingCost = state.maSourcing?.active
+    ? getMASourcingAnnualCost(state.maSourcing.tier)
+    : 0;
+  const totalDeductibleCosts = sharedServicesCost + maSourcingCost;
+  const totalBusinessFcf = activeBusinesses.reduce((sum, b) => {
+    const sector = SECTORS[b.sectorId];
+    const capex = Math.round(b.ebitda * sector.capexRate);
+    const snInterest = Math.round(b.sellerNoteBalance * b.sellerNoteRate);
+    const snPrincipal = b.sellerNoteRoundsRemaining > 0
+      ? Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining) : 0;
+    const bankInterest = Math.round(b.bankDebtBalance * state.interestRate);
+    // Earn-out: triggers when cumulative EBITDA growth meets target
+    let earnout = 0;
+    if (b.earnoutRemaining > 0 && b.earnoutTarget > 0 && b.acquisitionEbitda > 0) {
+      const growth = (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda;
+      if (growth >= b.earnoutTarget) earnout = b.earnoutRemaining;
+    }
+    return sum + (b.ebitda - capex - snInterest - snPrincipal - bankInterest - earnout);
+  }, 0);
+  // Earn-out from integrated (tuck-in) businesses using platform growth as proxy
+  const integratedEarnouts = state.businesses
+    .filter(b => b.status === 'integrated' && b.earnoutRemaining > 0 && b.earnoutTarget > 0 && b.parentPlatformId)
+    .reduce((sum, b) => {
+      const platform = state.businesses.find(p => p.id === b.parentPlatformId && p.status === 'active');
+      if (platform && platform.acquisitionEbitda > 0) {
+        const growth = (platform.ebitda - platform.acquisitionEbitda) / platform.acquisitionEbitda;
+        if (growth >= b.earnoutTarget) return sum + b.earnoutRemaining;
+      }
+      return sum;
+    }, 0);
+  const taxBreakdown = calculatePortfolioTax(activeBusinesses, state.totalDebt, state.interestRate, totalDeductibleCosts);
+  const holdcoInterest = Math.round(state.totalDebt * state.interestRate);
+  const fcf = totalBusinessFcf - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - integratedEarnouts;
 
   // EBITDA growth
   const prevMetrics = state.metricsHistory.length > 0
@@ -226,7 +277,6 @@ export function buildChronicleContext(state: GameState): ChronicleContext {
     ebitdaGrowthPct,
     platforms,
     totalBoltOns,
-    avgQuality,
     sectors,
   );
 

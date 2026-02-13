@@ -294,8 +294,10 @@ export const useGameStore = create<GameStore>()(
         // This aligns with the waterfall display — all deductions happen at collection time
         let opcoDebtAdjustment = 0;
         let hadSkippedPayments = false;
+        const earnoutPayments: { name: string; amount: number }[] = [];
         const updatedBusinesses = state.businesses.map(b => {
-          if (b.status !== 'active') return b;
+          // Active + integrated businesses have debt obligations (tuck-ins keep seller notes & earnouts)
+          if (b.status !== 'active' && b.status !== 'integrated') return b;
           let updated = { ...b };
 
           // Seller note: interest + principal
@@ -323,16 +325,27 @@ export const useGameStore = create<GameStore>()(
 
           // Earnout payments (conditional on growth targets)
           if (b.earnoutRemaining > 0 && b.earnoutTarget > 0) {
-            const actualGrowth = b.acquisitionEbitda > 0
-              ? (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda
-              : 0;
+            // For integrated (tuck-in) businesses, use parent platform's EBITDA growth as proxy
+            // since the tuck-in's own EBITDA is folded into the platform and doesn't grow independently
+            let actualGrowth = 0;
+            if (b.status === 'integrated' && b.parentPlatformId) {
+              const platform = state.businesses.find(p => p.id === b.parentPlatformId && p.status === 'active');
+              if (platform && platform.acquisitionEbitda > 0) {
+                actualGrowth = (platform.ebitda - platform.acquisitionEbitda) / platform.acquisitionEbitda;
+              }
+            } else if (b.acquisitionEbitda > 0) {
+              actualGrowth = (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda;
+            }
             if (actualGrowth >= b.earnoutTarget) {
               const availableForEarnout = Math.max(0, newCash + opcoDebtAdjustment);
               const earnoutPayment = Math.min(b.earnoutRemaining, availableForEarnout);
-              opcoDebtAdjustment -= earnoutPayment;
-              updated.earnoutRemaining = b.earnoutRemaining - earnoutPayment;
-              if (updated.earnoutRemaining <= 0) {
-                updated.earnoutTarget = 0;
+              if (earnoutPayment > 0) {
+                opcoDebtAdjustment -= earnoutPayment;
+                updated.earnoutRemaining = b.earnoutRemaining - earnoutPayment;
+                earnoutPayments.push({ name: b.name, amount: earnoutPayment });
+                if (updated.earnoutRemaining <= 0) {
+                  updated.earnoutTarget = 0;
+                }
               }
             }
           }
@@ -351,8 +364,17 @@ export const useGameStore = create<GameStore>()(
 
         newCash = newCash + opcoDebtAdjustment;
 
-        // Fire financial stress toasts
+        // Fire earn-out payment toasts
         const addToast = useToastStore.getState().addToast;
+        for (const ep of earnoutPayments) {
+          addToast({
+            message: `Earn-out paid: ${formatMoney(ep.amount)} for ${ep.name}`,
+            detail: 'Growth target met — seller earn-out obligation fulfilled.',
+            type: 'info',
+          });
+        }
+
+        // Fire financial stress toasts
         const cashChange = newCash - state.cash;
 
         // Negative cash triggers restructuring
@@ -695,7 +717,7 @@ export const useGameStore = create<GameStore>()(
             {
               type: 'acquire',
               round: state.round,
-              details: { businessId: newBusiness.id, structure: structure.type, price: deal.effectivePrice, heat: deal.heat },
+              details: { businessId: newBusiness.id, businessName: deal.business.name, sector: SECTORS[deal.business.sectorId].name, structure: structure.type, price: deal.effectivePrice, askingPrice: deal.effectivePrice, heat: deal.heat },
             },
           ],
           metrics: calculateMetrics({
@@ -854,9 +876,12 @@ export const useGameStore = create<GameStore>()(
               round: state.round,
               details: {
                 businessId: boltOnId,
+                businessName: deal.business.name,
+                sector: SECTORS[deal.business.sectorId].name,
                 platformId: targetPlatformId,
                 structure: structure.type,
                 price: deal.effectivePrice,
+                askingPrice: deal.effectivePrice,
                 integrationOutcome: outcome,
                 synergies,
                 restructuringCost,
@@ -1376,11 +1401,11 @@ export const useGameStore = create<GameStore>()(
         // Also mark bolt-ons as sold when selling a platform
         const boltOnIds = new Set(business.boltOnIds || []);
 
-        // Include bolt-on seller note debt in total debt payoff
+        // Include bolt-on debt + earn-out obligations in total debt payoff
         const boltOnDebt = state.businesses
           .filter(b => boltOnIds.has(b.id))
-          .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
-        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + boltOnDebt;
+          .reduce((sum, b) => sum + b.sellerNoteBalance + b.earnoutRemaining, 0);
+        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
         const netProceeds = Math.max(0, exitPrice - debtPayoff);
 
         const updatedBusinesses = state.businesses.map(b => {
@@ -1491,11 +1516,11 @@ export const useGameStore = create<GameStore>()(
         // Cascade to bolt-on businesses
         const boltOnIds = new Set(business.boltOnIds || []);
 
-        // Include bolt-on seller note debt in total debt payoff
+        // Include bolt-on debt + earn-out obligations in total debt payoff
         const boltOnDebt = state.businesses
           .filter(b => boltOnIds.has(b.id))
-          .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
-        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + boltOnDebt;
+          .reduce((sum, b) => sum + b.sellerNoteBalance + b.earnoutRemaining, 0);
+        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
         const netProceeds = Math.max(0, event.offerAmount - debtPayoff);
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id === event.affectedBusinessId) return { ...b, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round };
@@ -1656,11 +1681,11 @@ export const useGameStore = create<GameStore>()(
         // Cascade to bolt-on businesses
         const boltOnIds = new Set(business.boltOnIds || []);
 
-        // Include bolt-on seller note debt in total debt payoff
+        // Include bolt-on debt + earn-out obligations in total debt payoff
         const boltOnDebt = state.businesses
           .filter(b => boltOnIds.has(b.id))
-          .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
-        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + boltOnDebt;
+          .reduce((sum, b) => sum + b.sellerNoteBalance + b.earnoutRemaining, 0);
+        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
         const netProceeds = Math.max(0, exitPrice - debtPayoff);
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round };
