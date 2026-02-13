@@ -611,12 +611,48 @@ export function GameOverScreen({
                       {formatMultiple(moic)}
                     </p>
                   </div>
-                  <div className="flex items-center gap-1">
-                    {Array(5).fill(0).map((_, i) => (
-                      <span key={i} className={`text-xs ${i < business.qualityRating ? 'text-yellow-400' : 'text-white/20'}`}>
-                        ★
-                      </span>
-                    ))}
+                  <div className="relative group">
+                    <div className="flex flex-col items-center cursor-help">
+                      <p className="text-xs text-text-muted">Quality</p>
+                      <div className="flex items-center gap-0.5">
+                        {Array(5).fill(0).map((_, i) => (
+                          <span key={i} className={`text-xs ${i < business.qualityRating ? 'text-yellow-400' : 'text-white/20'}`}>
+                            ★
+                          </span>
+                        ))}
+                      </div>
+                      <p className={`text-xs ${business.qualityRating >= 4 ? 'text-accent' : business.qualityRating <= 2 ? 'text-danger' : 'text-text-muted'}`}>
+                        {business.qualityRating === 1 ? 'Struggling' :
+                         business.qualityRating === 2 ? 'Below Avg' :
+                         business.qualityRating === 3 ? 'Solid' :
+                         business.qualityRating === 4 ? 'Well-Run' : 'Best-in-Class'}
+                      </p>
+                    </div>
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-3 bg-card border border-white/10 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 text-left">
+                      <p className="text-xs font-medium text-text-primary mb-1.5">
+                        Quality Rating: {business.qualityRating}/5
+                      </p>
+                      <div className="space-y-1 text-xs text-text-muted">
+                        <p>
+                          Exit multiple: <span className={`font-mono ${(business.qualityRating - 3) * 0.4 >= 0 ? 'text-accent' : 'text-danger'}`}>
+                            {(business.qualityRating - 3) * 0.4 >= 0 ? '+' : ''}{((business.qualityRating - 3) * 0.4).toFixed(1)}x
+                          </span>
+                        </p>
+                        <p>
+                          Integration: <span className="text-text-secondary">
+                            {business.qualityRating >= 4 ? 'easier' : business.qualityRating <= 2 ? 'harder' : 'normal'}
+                          </span>
+                        </p>
+                        <p>
+                          Operator: <span className="text-text-secondary">
+                            {business.dueDiligence.operatorQuality}
+                          </span>
+                        </p>
+                      </div>
+                      <p className="text-[10px] text-text-muted mt-1.5 pt-1.5 border-t border-white/10">
+                        Set at acquisition, affects exit valuation and bolt-on integration success.
+                      </p>
+                    </div>
                   </div>
                   <span className={`text-xs px-2 py-1 rounded ${
                     business.status === 'active' ? 'bg-accent/20 text-accent' :
