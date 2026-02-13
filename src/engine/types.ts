@@ -13,7 +13,9 @@ export type SectorId =
   | 'education'
   | 'insurance'
   | 'autoServices'
-  | 'distribution';
+  | 'distribution'
+  | 'wealthManagement'
+  | 'environmental';
 
 export type SectorFocusGroup = SectorId;
 
