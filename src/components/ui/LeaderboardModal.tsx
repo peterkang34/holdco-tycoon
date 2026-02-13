@@ -149,7 +149,7 @@ function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number
         </div>
         {entry.difficulty && (
           <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
-            {entry.difficulty === 'normal' ? 'N' : 'E'}{entry.duration === 'quick' ? '/10' : ''}
+            {entry.difficulty === 'normal' ? 'H' : 'E'}{entry.duration === 'quick' ? '/10' : ''}
           </span>
         )}
         <div className="text-xs text-text-muted hidden sm:block">

@@ -97,7 +97,7 @@ const DIFFICULTY_CONFIG = {
     startingQuality: 3 as const,
     holdcoDebtStartRound: 1,
     leaderboardMultiplier: 1.15, // Compensates for harder start without double-rewarding 100% ownership
-    label: 'Normal — Self-Funded Search',
+    label: 'Hard — Self-Funded Search',
     description: '$2M personal equity + $3M bank debt. 100% ownership. Real leverage from day one.',
   },
 } as const;

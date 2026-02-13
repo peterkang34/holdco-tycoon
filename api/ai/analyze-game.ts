@@ -60,7 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } = req.body;
 
     const totalRounds = typeof rawTotalRounds === 'number' ? rawTotalRounds : 20;
-    const difficulty = rawDifficulty === 'normal' ? 'Normal (Self-Funded)' : 'Easy (Institutional Fund)';
+    const difficulty = rawDifficulty === 'normal' ? 'Hard (Self-Funded)' : 'Easy (Institutional Fund)';
     const founderEquityValue = typeof rawFEV === 'number' ? rawFEV : enterpriseValue;
     const founderOwnership = typeof rawOwnership === 'number' ? `${Math.round(rawOwnership * 100)}%` : 'N/A';
 

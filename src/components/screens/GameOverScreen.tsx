@@ -203,7 +203,7 @@ export function GameOverScreen({
           {(difficulty || duration) && (
             <div className="flex justify-center gap-2 mt-3">
               <span className={`text-xs px-2 py-0.5 rounded ${difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
-                {difficulty === 'normal' ? 'Normal' : 'Easy'}
+                {difficulty === 'normal' ? 'Hard' : 'Easy'}
               </span>
               <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-text-secondary">
                 {maxRounds}yr
@@ -242,7 +242,7 @@ export function GameOverScreen({
         {(difficulty || duration) && (
           <div className="flex justify-center gap-2 mt-3">
             <span className={`text-xs px-2 py-0.5 rounded ${difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
-              {difficulty === 'normal' ? 'Normal' : 'Easy'}
+              {difficulty === 'normal' ? 'Hard' : 'Easy'}
             </span>
             <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-text-secondary">
               {maxRounds}yr
@@ -381,7 +381,7 @@ export function GameOverScreen({
                   </div>
                   {entry.difficulty && (
                     <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
-                      {entry.difficulty === 'normal' ? 'N' : 'E'}{entry.duration === 'quick' ? '/10' : ''}
+                      {entry.difficulty === 'normal' ? 'H' : 'E'}{entry.duration === 'quick' ? '/10' : ''}
                     </span>
                   )}
                   <div className="text-xs text-text-muted hidden sm:block">

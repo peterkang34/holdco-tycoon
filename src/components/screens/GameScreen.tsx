@@ -322,7 +322,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             <h1 className="text-base sm:text-xl font-bold truncate max-w-[120px] sm:max-w-none">{holdcoName}</h1>
             {difficulty && (
               <span className={`text-xs px-1.5 sm:px-2 py-0.5 rounded whitespace-nowrap ${difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
-                {difficulty === 'normal' ? 'N' : 'E'}{maxRounds && maxRounds < 20 ? `/${maxRounds}` : ''}
+                {difficulty === 'normal' ? 'H' : 'E'}{maxRounds && maxRounds < 20 ? `/${maxRounds}` : ''}
               </span>
             )}
           </div>
