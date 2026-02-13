@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Deal, DealHeat, SellerArchetype, formatMoney, formatPercent, Business } from '../../engine/types';
+import { Deal, DealHeat, SellerArchetype, formatMoney, Business } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { Tooltip } from '../ui/Tooltip';
 

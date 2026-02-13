@@ -1,4 +1,4 @@
-import { GameEvent, EventImpact, BuyerProfile, EventChoice, Business, formatMoney, formatPercent } from '../../engine/types';
+import { GameEvent, Business, formatMoney, formatPercent } from '../../engine/types';
 import { calculateExitValuation } from '../../engine/simulation';
 import { SECTORS } from '../../data/sectors';
 

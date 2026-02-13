@@ -13,11 +13,11 @@ import {
   MASourcingTier,
   SubTypeAffinity,
   SellerArchetype,
-  AIGeneratedContent,
   randomInRange,
   randomInt,
   pickRandom,
 } from './types';
+import { clampMargin } from './helpers';
 import { SECTORS, SECTOR_LIST } from '../data/sectors';
 import { getRandomBusinessName } from '../data/names';
 import {
@@ -78,7 +78,7 @@ function generateDueDiligence(quality: QualityRating, sectorId: SectorId): DueDi
     medium: ['Top client is 20-25% of revenue', 'Some customer concentration', 'Moderate client diversity'],
     high: ['Top client is 40%+ of revenue', 'Significant customer concentration', 'Key account dependency'],
   };
-  revenueConcentrationText = pickRandom(concentrationTexts[revenueConcentration]);
+  revenueConcentrationText = pickRandom(concentrationTexts[revenueConcentration])!;
 
   // Operator quality
   let operatorQuality: 'strong' | 'moderate' | 'weak';
@@ -91,7 +91,7 @@ function generateDueDiligence(quality: QualityRating, sectorId: SectorId): DueDi
     moderate: ['Decent team, some gaps', 'Owner willing to transition slowly', 'Management needs development'],
     weak: ['Founder looking to exit fully', 'Key person dependency', 'Management transition needed'],
   };
-  const operatorQualityText = pickRandom(operatorTexts[operatorQuality]);
+  const operatorQualityText = pickRandom(operatorTexts[operatorQuality])!;
 
   // Trend
   let trend: 'growing' | 'flat' | 'declining';
@@ -104,7 +104,7 @@ function generateDueDiligence(quality: QualityRating, sectorId: SectorId): DueDi
     flat: ['EBITDA flat for 2 years', 'Stable but not growing', 'Revenue plateau'],
     declining: ['EBITDA declining 5-10% annually', 'Business in contraction', 'Shrinking market share'],
   };
-  const trendText = pickRandom(trendTexts[trend]);
+  const trendText = pickRandom(trendTexts[trend])!;
 
   // Customer retention
   let customerRetention: number;
@@ -126,7 +126,7 @@ function generateDueDiligence(quality: QualityRating, sectorId: SectorId): DueDi
     competitive: ['Solid competitive position', 'Well-regarded in market', 'Good reputation'],
     commoditized: ['Commoditized market', 'Price competition pressure', 'Low differentiation'],
   };
-  const competitivePositionText = pickRandom(positionTexts[competitivePosition]);
+  const competitivePositionText = pickRandom(positionTexts[competitivePosition])!;
 
   return {
     revenueConcentration,
@@ -144,7 +144,7 @@ function generateDueDiligence(quality: QualityRating, sectorId: SectorId): DueDi
 
 export function generateBusiness(
   sectorId: SectorId,
-  round: number,
+  _round: number,
   forceQuality?: QualityRating,
   forceSubType?: string
 ): Omit<Business, 'id' | 'acquisitionRound' | 'improvements' | 'status'> {
@@ -158,7 +158,7 @@ export function generateBusiness(
   // Generate margin from sector range (quality-adjusted: Q5 +3ppt, Q1 -3ppt)
   let ebitdaMargin = randomInRange(sector.baseMargin);
   ebitdaMargin += (quality - 3) * 0.015; // ±3ppt per 2 quality stars
-  ebitdaMargin = Math.max(0.03, Math.min(0.80, ebitdaMargin));
+  ebitdaMargin = clampMargin(ebitdaMargin);
 
   // Generate revenue from sector range (quality-adjusted same as EBITDA was)
   let revenue = Math.round(randomInRange(sector.baseRevenue) * qualityModifier);
@@ -182,14 +182,14 @@ export function generateBusiness(
 
   const subType = forceSubType && sector.subTypes.includes(forceSubType)
     ? forceSubType
-    : pickRandom(sector.subTypes);
+    : pickRandom(sector.subTypes)!;
 
   // Apply sub-type financial skews
   const stIdx = sector.subTypes.indexOf(subType);
   if (stIdx !== -1) {
     if (sector.subTypeMarginModifiers?.[stIdx]) {
       ebitdaMargin += sector.subTypeMarginModifiers[stIdx];
-      ebitdaMargin = Math.max(0.03, Math.min(0.80, ebitdaMargin));
+      ebitdaMargin = clampMargin(ebitdaMargin);
       // Re-derive EBITDA from revenue × adjusted margin
       ebitda = Math.round(revenue * ebitdaMargin);
     }
@@ -646,7 +646,6 @@ export function generateDealWithSize(
   portfolioEbitda: number = 0,
   options: DealGenerationOptions = {}
 ): Deal {
-  const sector = SECTORS[sectorId];
   let quality = generateQualityRating();
 
   // Apply quality floor
@@ -718,7 +717,7 @@ export function generateDealWithSize(
       dueDiligence: {
         ...business.dueDiligence,
         operatorQuality: archetypeOperator,
-        operatorQualityText: pickRandom(operatorTexts[archetypeOperator]),
+        operatorQualityText: pickRandom(operatorTexts[archetypeOperator])!,
       },
     };
   }

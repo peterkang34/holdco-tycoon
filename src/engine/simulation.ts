@@ -26,9 +26,24 @@ import {
 } from './buyers';
 import { calculateDistressLevel } from './distress';
 import { getMASourcingAnnualCost } from '../data/sharedServices';
+import {
+  clampMargin,
+  capGrowthRate,
+  applyEbitdaFloor,
+} from './helpers';
 
 export const TAX_RATE = 0.30;
-const MAX_ORGANIC_GROWTH_RATE = 0.20; // M-4: Cap on growth rate accumulation
+
+// Per-type exit premiums for operational improvements (module-level to avoid re-allocation)
+const IMPROVEMENT_EXIT_PREMIUMS: Record<OperationalImprovementType, number> = {
+  operating_playbook: 0.15,
+  pricing_model: 0.15,
+  service_expansion: 0.15,
+  fix_underperformance: 0.15,
+  recurring_revenue_conversion: 0.50,
+  management_professionalization: 0.30,
+  digital_transformation: 0.15,
+};
 
 // Calculate exit valuation for a business with full breakdown
 export function calculateExitValuation(
@@ -63,15 +78,6 @@ export function calculateExitValuation(
   const holdPremium = Math.min(0.5, yearsHeld * 0.1);
 
   // Improvements premium: per-type lookup, capped at 1.0x total
-  const IMPROVEMENT_EXIT_PREMIUMS: Record<OperationalImprovementType, number> = {
-    operating_playbook: 0.15,
-    pricing_model: 0.15,
-    service_expansion: 0.15,
-    fix_underperformance: 0.15,
-    recurring_revenue_conversion: 0.50,
-    management_professionalization: 0.30,
-    digital_transformation: 0.15,
-  };
   const improvementsPremium = Math.min(
     1.0,
     business.improvements.reduce((sum, imp) => sum + (IMPROVEMENT_EXIT_PREMIUMS[imp.type] || 0.15), 0)
@@ -425,7 +431,7 @@ export function applyOrganicGrowth(
   const sector = SECTORS[business.sectorId];
 
   // --- Revenue Growth ---
-  const cappedGrowthRate = Math.min(MAX_ORGANIC_GROWTH_RATE, Math.max(-0.10, business.revenueGrowthRate));
+  const cappedGrowthRate = capGrowthRate(business.revenueGrowthRate);
 
   let revenueGrowth = cappedGrowthRate;
 
@@ -494,21 +500,16 @@ export function applyOrganicGrowth(
       marginChange -= 0.005; // slight headwind for very high margins
     }
 
-    newMargin = Math.max(0.03, Math.min(0.80, business.ebitdaMargin + marginChange));
+    newMargin = clampMargin(business.ebitdaMargin + marginChange);
   }
 
   // --- Derive EBITDA ---
   let newEbitda = Math.round(newRevenue * newMargin);
 
-  // Floor at 30% of acquisition EBITDA
-  const floor = Math.round(business.acquisitionEbitda * 0.3);
-  if (newEbitda < floor) {
-    newEbitda = floor;
-    // Re-derive margin to maintain EBITDA = Revenue × Margin invariant
-    if (newRevenue > 0) {
-      newMargin = Math.max(0.03, newEbitda / newRevenue);
-    }
-  }
+  // Floor at EBITDA_FLOOR_PCT of acquisition EBITDA
+  const floored = applyEbitdaFloor(newEbitda, newRevenue, newMargin, business.acquisitionEbitda);
+  newEbitda = floored.ebitda;
+  newMargin = floored.margin;
 
   // Update peaks
   const newPeakEbitda = Math.max(business.peakEbitda, newEbitda);
@@ -518,7 +519,7 @@ export function applyOrganicGrowth(
   const newIntegration = Math.max(0, business.integrationRoundsRemaining - 1);
 
   // Cap stored growth rates
-  const newGrowthRate = Math.min(MAX_ORGANIC_GROWTH_RATE, Math.max(-0.10, business.revenueGrowthRate));
+  const newGrowthRate = capGrowthRate(business.revenueGrowthRate);
 
   return {
     ...business,
@@ -589,7 +590,7 @@ export function generateEvent(state: GameState): GameEvent | null {
       // H-1: Cap cumulative probability at 1.0
       if (portfolioRoll < Math.min(1.0, cumulativeProb)) {
         // Select the right affected business based on event type
-        let affectedBusiness = pickRandom(activeBusinesses);
+        let affectedBusiness = pickRandom(activeBusinesses)!;
         let choices: EventChoice[] | undefined;
 
         if (eventDef.type === 'portfolio_equity_demand') {
@@ -643,7 +644,7 @@ export function generateEvent(state: GameState): GameEvent | null {
       if (sectorRoll < cumulativeProb) {
         const sectorBusinesses = activeBusinesses.filter(b => b.sectorId === eventDef.sectorId);
         if (sectorBusinesses.length === 0) continue; // C-2: Guard against empty array
-        const affectedBusiness = eventDef.affectsAll ? undefined : pickRandom(sectorBusinesses);
+        const affectedBusiness = eventDef.affectsAll ? undefined : pickRandom(sectorBusinesses)!;
 
         return {
           id: `event_${state.round}_${eventDef.sectorId}_${eventDef.title.replace(/\s+/g, '_')}`,
@@ -721,20 +722,6 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
   let newState = { ...state };
   const impacts: EventImpact[] = [];
 
-  // M-4: Helper to cap growth rate changes
-  const capGrowthRate = (rate: number) => Math.min(MAX_ORGANIC_GROWTH_RATE, Math.max(-0.10, rate));
-
-  // Floor EBITDA at 30% of acquisition EBITDA (same as organic growth) and fix margin to maintain invariant
-  const applyEbitdaFloor = (ebitda: number, revenue: number, margin: number, acquisitionEbitda: number) => {
-    const floor = Math.round(acquisitionEbitda * 0.3);
-    if (ebitda < floor) {
-      const floored = floor;
-      const fixedMargin = revenue > 0 ? Math.max(0.03, floored / revenue) : margin;
-      return { ebitda: floored, margin: fixedMargin };
-    }
-    return { ebitda, margin };
-  };
-
   switch (event.type) {
     case 'global_bull_market': {
       // Revenue +5-10%, Margin +1-2 ppt
@@ -744,7 +731,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
         if (b.status !== 'active') return b;
         const beforeEbitda = b.ebitda;
         const newRevenue = Math.round(b.revenue * (1 + revBoost));
-        const newMargin = Math.max(0.03, Math.min(0.80, b.ebitdaMargin + marginBoost));
+        const newMargin = clampMargin(b.ebitdaMargin + marginBoost);
         const afterEbitda = Math.round(newRevenue * newMargin);
         impacts.push({
           businessId: b.id, businessName: b.name, metric: 'revenue',
@@ -769,7 +756,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
         const marginImpact = sector.recessionSensitivity * 0.02;
         const beforeEbitda = b.ebitda;
         const newRevenue = Math.round(b.revenue * (1 - revImpact));
-        const rawMargin = Math.max(0.03, b.ebitdaMargin - marginImpact);
+        const rawMargin = clampMargin(b.ebitdaMargin - marginImpact);
         const rawEbitda = Math.round(newRevenue * rawMargin);
         const floored = applyEbitdaFloor(rawEbitda, newRevenue, rawMargin, b.acquisitionEbitda);
         impacts.push({
@@ -822,7 +809,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
       newState.businesses = newState.businesses.map(b => {
         if (b.status !== 'active') return b;
         const beforeEbitda = b.ebitda;
-        const rawMargin = Math.max(0.03, b.ebitdaMargin - 0.02);
+        const rawMargin = clampMargin(b.ebitdaMargin - 0.02);
         const rawEbitda = Math.round(b.revenue * rawMargin);
         const floored = applyEbitdaFloor(rawEbitda, b.revenue, rawMargin, b.acquisitionEbitda);
         impacts.push({
@@ -851,7 +838,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
           if (b.id !== event.affectedBusinessId) return b;
           const beforeEbitda = b.ebitda;
           const newRevenue = Math.round(b.revenue * 1.08);
-          const newMargin = Math.max(0.03, Math.min(0.80, b.ebitdaMargin + 0.02));
+          const newMargin = clampMargin(b.ebitdaMargin + 0.02);
           const afterEbitda = Math.round(newRevenue * newMargin);
           impacts.push({
             businessId: b.id, businessName: b.name, metric: 'revenue',
@@ -881,7 +868,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
           if (b.id !== event.affectedBusinessId) return b;
           const beforeEbitda = b.ebitda;
           const newRevenue = Math.round(b.revenue * 0.94);
-          const rawMargin = Math.max(0.03, b.ebitdaMargin - 0.02);
+          const rawMargin = clampMargin(b.ebitdaMargin - 0.02);
           const rawEbitda = Math.round(newRevenue * rawMargin);
           const floored = applyEbitdaFloor(rawEbitda, newRevenue, rawMargin, b.acquisitionEbitda);
           impacts.push({
@@ -942,7 +929,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
             if (b.id !== event.affectedBusinessId) return b;
             const beforeEbitda = b.ebitda;
             const newRevenue = Math.round(b.revenue * (1 - revImpact));
-            const rawMargin = Math.max(0.03, b.ebitdaMargin - 0.01);
+            const rawMargin = clampMargin(b.ebitdaMargin - 0.01);
             const rawEbitda = Math.round(newRevenue * rawMargin);
             const floored = applyEbitdaFloor(rawEbitda, newRevenue, rawMargin, b.acquisitionEbitda);
             impacts.push({
@@ -967,7 +954,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
         newState.businesses = newState.businesses.map(b => {
           if (b.id !== event.affectedBusinessId) return b;
           const beforeEbitda = b.ebitda;
-          const newMargin = Math.max(0.03, Math.min(0.80, b.ebitdaMargin + 0.03));
+          const newMargin = clampMargin(b.ebitdaMargin + 0.03);
           const afterEbitda = Math.round(b.revenue * newMargin);
           impacts.push({
             businessId: b.id, businessName: b.name, metric: 'margin',
@@ -990,7 +977,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
         newState.businesses = newState.businesses.map(b => {
           if (b.id !== event.affectedBusinessId) return b;
           const beforeEbitda = b.ebitda;
-          const rawMargin = Math.max(0.03, b.ebitdaMargin - 0.04);
+          const rawMargin = clampMargin(b.ebitdaMargin - 0.04);
           const rawEbitda = Math.round(b.revenue * rawMargin);
           const floored = applyEbitdaFloor(rawEbitda, b.revenue, rawMargin, b.acquisitionEbitda);
           impacts.push({

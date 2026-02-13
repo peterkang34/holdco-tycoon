@@ -57,7 +57,7 @@ export function CollectPhase({
   maSourcingCost = 0,
   round,
   yearChronicle,
-  debtPaymentThisRound,
+  debtPaymentThisRound: _debtPaymentThisRound,
   cashBeforeDebtPayments,
   holdcoAmortization,
   interestPenalty,

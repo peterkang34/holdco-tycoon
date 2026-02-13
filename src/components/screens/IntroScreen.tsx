@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { SectorId, GameDifficulty, GameDuration } from '../../engine/types';
-import { SECTOR_LIST, SECTORS } from '../../data/sectors';
+import { SECTOR_LIST } from '../../data/sectors';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
-import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../../hooks/useGame';
+import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../../data/gameConfig';
 
 interface IntroScreenProps {
   onStart: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty, duration: GameDuration) => void;

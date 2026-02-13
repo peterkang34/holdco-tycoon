@@ -6,12 +6,10 @@ import {
   Business,
   Deal,
   DealStructure,
-  SharedService,
   QualityRating,
   SectorId,
   GamePhase,
   DueDiligenceSignals,
-  Metrics,
 } from '../types';
 import { initializeSharedServices } from '../../data/sharedServices';
 

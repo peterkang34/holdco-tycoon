@@ -5,7 +5,6 @@ import {
   calculateAnnualFcf,
   calculatePortfolioTax,
   calculateSharedServicesBenefits,
-  calculateExitValuation,
   TAX_RATE,
 } from '../../engine/simulation';
 import { getMASourcingAnnualCost } from '../../data/sharedServices';
@@ -244,7 +243,6 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
   }
 
   function renderFcfShare() {
-    const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
     const holdcoInterest = Math.round(state.totalDebt * state.interestRate);
     const opcoInterest = activeBusinesses.reduce(
       (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate), 0
@@ -444,9 +442,6 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
   }
 
   function renderMoic() {
-    const maxRounds = state.maxRounds || 20;
-    const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
-
     const portfolioValue = activeBusinesses.reduce((sum, b) => {
       const sector = SECTORS[b.sectorId];
       const avgMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;

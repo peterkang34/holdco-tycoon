@@ -15,20 +15,7 @@ export type SectorId =
   | 'autoServices'
   | 'distribution';
 
-export type SectorFocusGroup =
-  | 'agency'
-  | 'saas'
-  | 'homeServices'
-  | 'consumer'
-  | 'industrial'
-  | 'b2bServices'
-  | 'healthcare'
-  | 'restaurant'
-  | 'realEstate'
-  | 'education'
-  | 'insurance'
-  | 'autoServices'
-  | 'distribution';
+export type SectorFocusGroup = SectorId;
 
 export type GameDifficulty = 'easy' | 'normal';
 export type GameDuration = 'standard' | 'quick';  // 20 or 10 rounds
@@ -511,40 +498,11 @@ export interface LeaderboardEntry {
 // Utility types
 export type Range = [number, number];
 
-export function randomInRange(range: Range): number {
-  return range[0] + Math.random() * (range[1] - range[0]);
-}
+export { randomInRange, randomInt, formatMoney, formatPercent, formatMultiple } from './utils';
 
-export function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-export function pickRandom<T>(array: T[]): T {
-  if (array.length === 0) return undefined as T;
+export function pickRandom<T>(array: T[]): T | undefined {
+  if (array.length === 0) return undefined;
   return array[Math.floor(Math.random() * array.length)];
-}
-
-// All internal values are stored in thousands (e.g., 1000 = $1M, 16000 = $16M)
-export function formatMoney(amountInThousands: number): string {
-  const amount = amountInThousands * 1000; // Convert to actual dollars
-  if (Math.abs(amount) >= 1000000000) {
-    return `$${(amount / 1000000000).toFixed(1)}B`;
-  }
-  if (Math.abs(amount) >= 1000000) {
-    return `$${(amount / 1000000).toFixed(1)}M`;
-  }
-  if (Math.abs(amount) >= 1000) {
-    return `$${(amount / 1000).toFixed(0)}k`;
-  }
-  return `$${amount.toFixed(0)}`;
-}
-
-export function formatPercent(value: number): string {
-  return `${(value * 100).toFixed(1)}%`;
-}
-
-export function formatMultiple(value: number): string {
-  return `${value.toFixed(1)}x`;
 }
 
 // Exit valuation breakdown for transparency

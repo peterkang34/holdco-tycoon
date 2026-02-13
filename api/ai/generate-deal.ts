@@ -1,26 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkAIRateLimit, isBodyTooLarge, sanitizeString } from '../_lib/rateLimit.js';
-
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+import { sanitizeString } from '../_lib/rateLimit.js';
+import { validateAIRequest, callAnthropic, formatMoneyForPrompt } from '../_lib/ai.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  if (!ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'API key not configured' });
-  }
-
-  // Rate limit: 10 requests/minute per IP
-  if (await checkAIRateLimit(req)) {
-    return res.status(429).json({ error: 'Too many requests. Try again in a minute.' });
-  }
-
-  // Body size limit
-  if (isBodyTooLarge(req.body)) {
-    return res.status(413).json({ error: 'Request too large' });
-  }
+  if (await validateAIRequest(req, res)) return;
 
   try {
     const body = req.body || {};
@@ -45,13 +28,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       5: 'exceptional, best-in-class',
     };
 
-    const ebitdaFormatted = ebitda >= 1000
-      ? `$${(ebitda / 1000).toFixed(1)}M`
-      : `$${ebitda}k`;
+    const ebitdaFormatted = formatMoneyForPrompt(ebitda);
 
-    const revenueFormatted = revenue && revenue >= 1000
-      ? `$${(revenue / 1000).toFixed(1)}M`
-      : revenue ? `$${revenue}k` : 'N/A';
+    const revenueFormatted = revenue ? formatMoneyForPrompt(revenue) : 'N/A';
     const marginFormatted = ebitdaMargin ? `${(ebitdaMargin * 100).toFixed(0)}%` : 'N/A';
 
     // Due diligence signals
@@ -101,43 +80,18 @@ Generate a JSON object with these fields:
 
 Respond ONLY with valid JSON, no other text.`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 500,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-      }),
-    });
+    const result = await callAnthropic(prompt, 500);
 
-    if (!response.ok) {
-      console.error('Anthropic API error:', response.status);
-      return res.status(502).json({ error: 'AI service temporarily unavailable' });
-    }
-
-    const data = await response.json();
-    const content = data.content?.[0]?.text;
-
-    if (!content) {
-      return res.status(500).json({ error: 'No content generated' });
+    if (!result.content) {
+      return res.status(502).json({ error: result.error || 'AI service temporarily unavailable' });
     }
 
     // L-8: Parse and validate the JSON response with error handling
     let parsed;
     try {
-      parsed = JSON.parse(content);
+      parsed = JSON.parse(result.content);
     } catch {
-      console.error('Failed to parse AI response as JSON:', content.slice(0, 200));
+      console.error('Failed to parse AI response as JSON:', result.content.slice(0, 200));
       return res.status(500).json({ error: 'AI returned invalid JSON' });
     }
 

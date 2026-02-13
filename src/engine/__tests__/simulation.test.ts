@@ -13,14 +13,13 @@ import {
   calculateMetrics,
   recordHistoricalMetrics,
   calculateExitValuation,
-  TAX_RATE,
 } from '../simulation';
 import {
   createMockBusiness,
   createMockGameState,
-  createMultiBusinessState,
+  createMockDueDiligence,
 } from './helpers';
-import { Business, GameState, Metrics, SectorId } from '../types';
+import { Metrics } from '../types';
 
 describe('calculateAnnualFcf', () => {
   it('should calculate pre-tax FCF correctly for a basic business', () => {
@@ -778,5 +777,253 @@ describe('recordHistoricalMetrics', () => {
     expect(Number.isNaN(entry.fcf)).toBe(false);
     expect(Number.isNaN(entry.nopat)).toBe(false);
     expect(entry.investedCapital).toBe(state.totalInvestedCapital);
+  });
+});
+
+describe('Margin Drift (within applyOrganicGrowth)', () => {
+  beforeEach(() => {
+    // Fix random to 0.5 so volatility noise is zero (0.5 * 2 - 1 = 0)
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  });
+
+  it('should not apply margin drift before marginDriftStart (early rounds)', () => {
+    const business = createMockBusiness({
+      ebitda: 1000,
+      revenue: 5000,
+      ebitdaMargin: 0.20,
+      marginDriftRate: -0.01,
+    });
+    // currentRound = 2, maxRounds = 20, marginDriftStart = max(2, ceil(20*0.20)) = 4
+    const result = applyOrganicGrowth(business, 0, 0, false, undefined, undefined, 2, 0, 20);
+    // Margin should be unchanged because round 2 < 4
+    expect(result.ebitdaMargin).toBe(0.20);
+  });
+
+  it('should apply margin drift after marginDriftStart', () => {
+    const business = createMockBusiness({
+      ebitda: 1000,
+      revenue: 5000,
+      ebitdaMargin: 0.20,
+      marginDriftRate: -0.01,
+    });
+    // currentRound = 5, maxRounds = 20, marginDriftStart = 4
+    const result = applyOrganicGrowth(business, 0, 0, false, undefined, undefined, 5, 0, 20);
+    // Margin should have drifted downward by ~marginDriftRate
+    expect(result.ebitdaMargin).toBeLessThan(0.20);
+  });
+
+  it('should scale marginDriftStart with maxRounds', () => {
+    const business = createMockBusiness({
+      ebitda: 1000,
+      revenue: 5000,
+      ebitdaMargin: 0.20,
+      marginDriftRate: -0.01,
+    });
+    // maxRounds = 10: marginDriftStart = max(2, ceil(10*0.20)) = 2
+    // At round 2 (== marginDriftStart), drift SHOULD apply
+    const result10yr = applyOrganicGrowth(business, 0, 0, false, undefined, undefined, 2, 0, 10);
+    expect(result10yr.ebitdaMargin).toBeLessThan(0.20);
+
+    // maxRounds = 20: marginDriftStart = max(2, ceil(20*0.20)) = 4
+    // At round 2 (< marginDriftStart), drift should NOT apply
+    const result20yr = applyOrganicGrowth(business, 0, 0, false, undefined, undefined, 2, 0, 20);
+    expect(result20yr.ebitdaMargin).toBe(0.20);
+  });
+
+  it('should not overshoot margin below MIN_MARGIN (0.03)', () => {
+    const business = createMockBusiness({
+      ebitda: 150,
+      revenue: 5000,
+      ebitdaMargin: 0.04, // Very close to floor
+      acquisitionEbitda: 150,
+      marginDriftRate: -0.02, // Aggressive drift
+    });
+    const result = applyOrganicGrowth(business, 0, 0, false, undefined, undefined, 10, 0, 20);
+    expect(result.ebitdaMargin).toBeGreaterThanOrEqual(0.03);
+  });
+
+  it('should apply shared services margin defense to reduce drift', () => {
+    const business = createMockBusiness({
+      ebitda: 1000,
+      revenue: 5000,
+      ebitdaMargin: 0.20,
+      marginDriftRate: -0.01,
+    });
+    // With margin defense
+    const withDefense = applyOrganicGrowth(business, 0, 0, false, undefined, undefined, 5, 0.005, 20);
+    // Without margin defense
+    const withoutDefense = applyOrganicGrowth(business, 0, 0, false, undefined, undefined, 5, 0, 20);
+    // Margin defense should make the margin higher (less drift)
+    expect(withDefense.ebitdaMargin).toBeGreaterThanOrEqual(withoutDefense.ebitdaMargin);
+  });
+});
+
+describe('Competitive Position Modifier (within applyOrganicGrowth)', () => {
+  beforeEach(() => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+  });
+
+  it('should give leader businesses +1.5% annual revenue growth bonus', () => {
+    const leader = createMockBusiness({
+      ebitda: 1000,
+      revenue: 5000,
+      ebitdaMargin: 0.20,
+      organicGrowthRate: 0.05,
+      revenueGrowthRate: 0.05,
+      dueDiligence: createMockDueDiligence({ competitivePosition: 'leader' }),
+    });
+    const competitive = createMockBusiness({
+      ebitda: 1000,
+      revenue: 5000,
+      ebitdaMargin: 0.20,
+      organicGrowthRate: 0.05,
+      revenueGrowthRate: 0.05,
+      dueDiligence: createMockDueDiligence({ competitivePosition: 'competitive' }),
+    });
+
+    const leaderResult = applyOrganicGrowth(leader, 0, 0, false);
+    const competitiveResult = applyOrganicGrowth(competitive, 0, 0, false);
+
+    expect(leaderResult.revenue).toBeGreaterThan(competitiveResult.revenue);
+  });
+
+  it('should give commoditized businesses -1.5% annual drag', () => {
+    const commoditized = createMockBusiness({
+      ebitda: 1000,
+      revenue: 5000,
+      ebitdaMargin: 0.20,
+      organicGrowthRate: 0.05,
+      revenueGrowthRate: 0.05,
+      dueDiligence: createMockDueDiligence({ competitivePosition: 'commoditized' }),
+    });
+    const competitive = createMockBusiness({
+      ebitda: 1000,
+      revenue: 5000,
+      ebitdaMargin: 0.20,
+      organicGrowthRate: 0.05,
+      revenueGrowthRate: 0.05,
+      dueDiligence: createMockDueDiligence({ competitivePosition: 'competitive' }),
+    });
+
+    const commoditizedResult = applyOrganicGrowth(commoditized, 0, 0, false);
+    const competitiveResult = applyOrganicGrowth(competitive, 0, 0, false);
+
+    expect(commoditizedResult.revenue).toBeLessThan(competitiveResult.revenue);
+  });
+
+  it('should have no modifier for competitive (default) position', () => {
+    // Two businesses with same stats, both competitive — should produce same revenue
+    const biz1 = createMockBusiness({
+      ebitda: 1000,
+      revenue: 5000,
+      ebitdaMargin: 0.20,
+      organicGrowthRate: 0.05,
+      revenueGrowthRate: 0.05,
+      dueDiligence: createMockDueDiligence({ competitivePosition: 'competitive' }),
+    });
+    const biz2 = createMockBusiness({
+      ebitda: 1000,
+      revenue: 5000,
+      ebitdaMargin: 0.20,
+      organicGrowthRate: 0.05,
+      revenueGrowthRate: 0.05,
+      dueDiligence: createMockDueDiligence({ competitivePosition: 'competitive' }),
+    });
+
+    const result1 = applyOrganicGrowth(biz1, 0, 0, false);
+    const result2 = applyOrganicGrowth(biz2, 0, 0, false);
+
+    expect(result1.revenue).toBe(result2.revenue);
+  });
+});
+
+describe('Rule of 40 + Margin Expansion Exit Premiums', () => {
+  it('should award Rule of 40 premium for SaaS with growth% + margin% >= 40', () => {
+    const saasBiz = createMockBusiness({
+      sectorId: 'saas',
+      ebitda: 2000,
+      revenue: 8000,
+      ebitdaMargin: 0.25, // 25%
+      revenueGrowthRate: 0.20, // 20%
+      acquisitionEbitda: 2000,
+      acquisitionMultiple: 5.0,
+      acquisitionMargin: 0.25,
+    });
+    // Rule of 40: 20 + 25 = 45 >= 40 -> premium should be > 0
+    const valuation = calculateExitValuation(saasBiz, 5);
+    expect(valuation.ruleOf40Premium).toBeGreaterThan(0);
+  });
+
+  it('should not award Rule of 40 for non-SaaS/education sectors', () => {
+    const agencyBiz = createMockBusiness({
+      sectorId: 'agency',
+      ebitda: 2000,
+      revenueGrowthRate: 0.30,
+      ebitdaMargin: 0.30,
+      acquisitionMultiple: 4.0,
+    });
+    const valuation = calculateExitValuation(agencyBiz, 5);
+    expect(valuation.ruleOf40Premium).toBe(0);
+  });
+
+  it('should penalize SaaS with Rule of 40 < 25', () => {
+    const weakSaaS = createMockBusiness({
+      sectorId: 'saas',
+      ebitda: 500,
+      revenue: 5000,
+      ebitdaMargin: 0.10, // 10%
+      revenueGrowthRate: 0.05, // 5%
+      acquisitionEbitda: 500,
+      acquisitionMultiple: 5.0,
+      acquisitionMargin: 0.10,
+    });
+    // Rule of 40: 5 + 10 = 15 < 25 -> penalty
+    const valuation = calculateExitValuation(weakSaaS, 5);
+    expect(valuation.ruleOf40Premium).toBe(-0.3);
+  });
+
+  it('should award margin expansion premium when margin expanded >= 5ppt', () => {
+    const expandedBiz = createMockBusiness({
+      ebitda: 2000,
+      ebitdaMargin: 0.25,
+      acquisitionMargin: 0.15, // +10ppt expansion
+      acquisitionMultiple: 4.0,
+      acquisitionEbitda: 1000,
+    });
+    const valuation = calculateExitValuation(expandedBiz, 5);
+    expect(valuation.marginExpansionPremium).toBeGreaterThan(0);
+  });
+
+  it('should penalize margin compression >= 5ppt', () => {
+    const compressedBiz = createMockBusiness({
+      ebitda: 800,
+      ebitdaMargin: 0.10,
+      acquisitionMargin: 0.20, // -10ppt compression
+      acquisitionMultiple: 4.0,
+      acquisitionEbitda: 1000,
+    });
+    const valuation = calculateExitValuation(compressedBiz, 5);
+    expect(valuation.marginExpansionPremium).toBe(-0.2);
+  });
+
+  it('should stack Rule of 40 and margin expansion premiums', () => {
+    const saasBiz = createMockBusiness({
+      sectorId: 'saas',
+      ebitda: 3000,
+      revenue: 10000,
+      ebitdaMargin: 0.30, // 30%
+      revenueGrowthRate: 0.25, // 25%
+      acquisitionEbitda: 1500,
+      acquisitionMultiple: 5.0,
+      acquisitionMargin: 0.15, // +15ppt expansion
+    });
+    const valuation = calculateExitValuation(saasBiz, 5);
+    // Both premiums should be positive
+    expect(valuation.ruleOf40Premium).toBeGreaterThan(0);
+    expect(valuation.marginExpansionPremium).toBeGreaterThan(0);
+    // Total multiple should include both
+    expect(valuation.totalMultiple).toBeGreaterThan(
+      saasBiz.acquisitionMultiple + valuation.ruleOf40Premium + valuation.marginExpansionPremium - 1
+    );
   });
 });

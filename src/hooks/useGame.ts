@@ -7,13 +7,10 @@ import {
   Deal,
   DealStructure,
   SharedServiceType,
-  GameAction,
   OperationalImprovementType,
   Metrics,
-  MAFocus,
   SectorId,
   DealSizePreference,
-  IntegrationOutcome,
   RoundHistoryEntry,
   MASourcingTier,
   MASourcingState,
@@ -39,13 +36,11 @@ import {
   generateEventNarrative,
   getFallbackEventNarrative,
   getFallbackBusinessStory,
-  isAIEnabled,
   generateBusinessUpdate,
   generateYearChronicle,
 } from '../services/aiGeneration';
-import { formatMoney } from '../engine/types';
 import { resetUsedNames } from '../data/names';
-import { initializeSharedServices, MIN_OPCOS_FOR_SHARED_SERVICES, getMASourcingUpgradeCost, getMASourcingAnnualCost, MA_SOURCING_CONFIG } from '../data/sharedServices';
+import { initializeSharedServices, MIN_OPCOS_FOR_SHARED_SERVICES, getMASourcingAnnualCost, MA_SOURCING_CONFIG } from '../data/sharedServices';
 import {
   calculatePortfolioFcf,
   calculateSharedServicesBenefits,
@@ -60,7 +55,7 @@ import {
 } from '../engine/simulation';
 import { executeDealStructure } from '../engine/deals';
 import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue, calculateFounderEquityValue, calculateFounderPersonalWealth } from '../engine/scoring';
-import { calculateDistressLevel, getDistressRestrictions } from '../engine/distress';
+import { getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
 
 import type { GameDifficulty, GameDuration } from '../engine/types';
@@ -73,39 +68,10 @@ const FOUNDER_SHARES = 800;
 const STARTING_INTEREST_RATE = 0.07;
 const MIN_FOUNDER_OWNERSHIP = 0.51;
 
-const DIFFICULTY_CONFIG = {
-  easy: {
-    initialCash: 20000,          // $20M
-    founderShares: 800,
-    totalShares: 1000,           // 80% ownership
-    startingDebt: 0,
-    startingEbitda: 1000,        // $1M
-    startingMultipleCap: undefined as number | undefined,
-    startingQuality: 3 as const,
-    holdcoDebtStartRound: 0,
-    leaderboardMultiplier: 1.0,
-    label: 'Easy — Institutional Fund',
-    description: '$20M from patient LPs. 80% ownership. Clean balance sheet.',
-  },
-  normal: {
-    initialCash: 5000,           // $5M ($2M equity + $3M bank debt)
-    founderShares: 1000,
-    totalShares: 1000,           // 100% ownership
-    startingDebt: 3000,          // $3M conventional bank debt at holdco level
-    startingEbitda: 800,         // $800K
-    startingMultipleCap: 4.0 as number | undefined,    // Cap at 4x to prevent cash trap in premium sectors
-    startingQuality: 3 as const,
-    holdcoDebtStartRound: 1,
-    leaderboardMultiplier: 1.15, // Compensates for harder start without double-rewarding 100% ownership
-    label: 'Hard — Self-Funded Search',
-    description: '$2M personal equity + $3M bank debt. 100% ownership. Real leverage from day one.',
-  },
-} as const;
-
-const DURATION_CONFIG = {
-  standard: { rounds: 20, label: 'Full Game (20 Years)' },
-  quick: { rounds: 10, label: 'Quick Play (10 Years)' },
-} as const;
+import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../data/gameConfig';
+import { clampMargin } from '../engine/helpers';
+import { runAllMigrations } from './migrations';
+import { buildChronicleContext } from '../services/chronicleContext';
 
 interface GameStore extends GameState {
   // Computed
@@ -179,169 +145,8 @@ const DEAL_SOURCING_COST_BASE = 500; // $500k base cost
 const DEAL_SOURCING_COST_TIER1 = 300; // $300k with MA Sourcing Tier 1+
 const PROACTIVE_OUTREACH_COST = 400; // $400k (Tier 3 only)
 
-// One-time migration from v9 → v10 (adds maSourcing + maFocus.subType)
-function migrateV9ToV10() {
-  try {
-    const v10Key = 'holdco-tycoon-save-v10';
-    const v9Key = 'holdco-tycoon-save-v9';
-    if (localStorage.getItem(v10Key)) return;
-    const v9Raw = localStorage.getItem(v9Key);
-    if (!v9Raw) return;
-    const v9Data = JSON.parse(v9Raw);
-    if (!v9Data?.state) return;
-    if (!v9Data.state.maSourcing) {
-      v9Data.state.maSourcing = { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 };
-    }
-    if (v9Data.state.maFocus && v9Data.state.maFocus.subType === undefined) {
-      v9Data.state.maFocus.subType = null;
-    }
-    localStorage.setItem(v10Key, JSON.stringify(v9Data));
-    localStorage.removeItem(v9Key);
-  } catch (e) {
-    console.error('v9→v10 migration failed:', e);
-  }
-}
-migrateV9ToV10();
-
-// One-time migration from v10 → v11 (adds deal heat + acquisition limits)
-function migrateV10ToV11() {
-  try {
-    const v11Key = 'holdco-tycoon-save-v12';
-    const v10Key = 'holdco-tycoon-save-v10';
-    if (localStorage.getItem(v11Key)) return;
-    const v10Raw = localStorage.getItem(v10Key);
-    if (!v10Raw) return;
-    const v10Data = JSON.parse(v10Raw);
-    if (!v10Data?.state) return;
-    // Add deal heat fields to state
-    v10Data.state.acquisitionsThisRound = 0;
-    const tier = v10Data.state.maSourcing?.tier ?? 0;
-    v10Data.state.maxAcquisitionsPerRound = tier >= 2 ? 4 : tier >= 1 ? 3 : 2;
-    v10Data.state.lastAcquisitionResult = null;
-    // Add heat + effectivePrice to existing pipeline deals
-    if (Array.isArray(v10Data.state.dealPipeline)) {
-      v10Data.state.dealPipeline = v10Data.state.dealPipeline.map((d: any) => ({
-        ...d,
-        heat: d.heat ?? 'warm',
-        effectivePrice: d.effectivePrice ?? d.askingPrice,
-      }));
-    }
-    localStorage.setItem(v11Key, JSON.stringify(v10Data));
-    localStorage.removeItem(v10Key);
-  } catch (e) {
-    console.error('v10→v11 migration failed:', e);
-  }
-}
-migrateV10ToV11();
-
-// One-time migration from v11 → v12 (adds revenue/margin decomposition)
-function migrateV11ToV12() {
-  try {
-    const v12Key = 'holdco-tycoon-save-v12';
-    const v11Key = 'holdco-tycoon-save-v12';
-    if (localStorage.getItem(v12Key)) return;
-    const v11Raw = localStorage.getItem(v11Key);
-    if (!v11Raw) return;
-    const v11Data = JSON.parse(v11Raw);
-    if (!v11Data?.state) return;
-
-    // Helper: back-compute revenue/margin from EBITDA using sector midpoint margin
-    const addRevenueMargin = (b: any) => {
-      if (b.revenue !== undefined && b.revenue > 0) return b; // Already has fields
-      const sectorDef = SECTORS[b.sectorId];
-      if (!sectorDef) return b;
-      const midMargin = (sectorDef.baseMargin[0] + sectorDef.baseMargin[1]) / 2;
-      const midDrift = (sectorDef.marginDriftRange[0] + sectorDef.marginDriftRange[1]) / 2;
-      return {
-        ...b,
-        ebitdaMargin: midMargin,
-        revenue: Math.round(Math.abs(b.ebitda) / midMargin) || 1000,
-        acquisitionRevenue: Math.round(Math.abs(b.acquisitionEbitda || b.ebitda) / midMargin) || 1000,
-        acquisitionMargin: midMargin,
-        peakRevenue: Math.round(Math.abs(b.peakEbitda || b.ebitda) / midMargin) || 1000,
-        revenueGrowthRate: b.organicGrowthRate || 0.05,
-        marginDriftRate: midDrift,
-      };
-    };
-
-    // Migrate businesses
-    if (Array.isArray(v11Data.state.businesses)) {
-      v11Data.state.businesses = v11Data.state.businesses.map(addRevenueMargin);
-    }
-    if (Array.isArray(v11Data.state.exitedBusinesses)) {
-      v11Data.state.exitedBusinesses = v11Data.state.exitedBusinesses.map(addRevenueMargin);
-    }
-
-    // Migrate pipeline deals
-    if (Array.isArray(v11Data.state.dealPipeline)) {
-      v11Data.state.dealPipeline = v11Data.state.dealPipeline.map((d: any) => ({
-        ...d,
-        business: addRevenueMargin(d.business),
-      }));
-    }
-
-    localStorage.setItem(v12Key, JSON.stringify(v11Data));
-    localStorage.removeItem(v11Key);
-  } catch (e) {
-    console.error('v11→v12 migration failed:', e);
-  }
-}
-migrateV11ToV12();
-
-// One-time migration from v12 → v13 (adds seller archetypes to pipeline deals)
-function migrateV12ToV13() {
-  try {
-    const v13Key = 'holdco-tycoon-save-v13';
-    const v12Key = 'holdco-tycoon-save-v12';
-    if (localStorage.getItem(v13Key)) return;
-    const v12Raw = localStorage.getItem(v12Key);
-    if (!v12Raw) return;
-    const v12Data = JSON.parse(v12Raw);
-    if (!v12Data?.state) return;
-
-    // Pipeline deals get sellerArchetype: undefined (backwards compatible)
-    if (Array.isArray(v12Data.state.dealPipeline)) {
-      v12Data.state.dealPipeline = v12Data.state.dealPipeline.map((d: any) => ({
-        ...d,
-        sellerArchetype: d.sellerArchetype ?? undefined,
-      }));
-    }
-
-    localStorage.setItem(v13Key, JSON.stringify(v12Data));
-    localStorage.removeItem(v12Key);
-  } catch (e) {
-    console.error('v12→v13 migration failed:', e);
-  }
-}
-migrateV12ToV13();
-
-// One-time migration from v13 → v14 (adds game modes + founder tracking)
-function migrateV13ToV14() {
-  try {
-    const v14Key = 'holdco-tycoon-save-v14';
-    const v13Key = 'holdco-tycoon-save-v13';
-    if (localStorage.getItem(v14Key)) return;
-    const v13Raw = localStorage.getItem(v13Key);
-    if (!v13Raw) return;
-    const v13Data = JSON.parse(v13Raw);
-    if (!v13Data?.state) return;
-
-    // Add new fields with defaults (existing saves are Easy/20yr)
-    v13Data.state.difficulty = 'easy';
-    v13Data.state.duration = 'standard';
-    v13Data.state.maxRounds = 20;
-    v13Data.state.founderDistributionsReceived = Math.round(
-      (v13Data.state.totalDistributions || 0) *
-      (v13Data.state.founderShares / (v13Data.state.sharesOutstanding || 1))
-    );
-
-    localStorage.setItem(v14Key, JSON.stringify(v13Data));
-    localStorage.removeItem(v13Key);
-  } catch (e) {
-    console.error('v13→v14 migration failed:', e);
-  }
-}
-migrateV13ToV14();
+// Run all save-version migrations (v9→v10→...→v14) before store creation
+runAllMigrations();
 
 const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: ReturnType<typeof initializeSharedServices> } = {
   holdcoName: '',
@@ -983,7 +788,7 @@ export const useGameStore = create<GameStore>()(
               boltOnIds: [...b.boltOnIds, boltOnId],
               ebitda: b.ebitda + deal.business.ebitda + synergies, // Consolidate EBITDA
               revenue: combinedRevenue,
-              ebitdaMargin: Math.max(0.03, Math.min(0.80, blendedMargin)),
+              ebitdaMargin: clampMargin(blendedMargin),
               peakRevenue: Math.max(b.peakRevenue, combinedRevenue),
               synergiesRealized: b.synergiesRealized + synergies,
               totalAcquisitionCost: b.totalAcquisitionCost + deal.effectivePrice,
@@ -1104,7 +909,7 @@ export const useGameStore = create<GameStore>()(
           acquisitionMultiple: ((biz1.acquisitionMultiple + biz2.acquisitionMultiple) / 2) + multipleExpansion,
           organicGrowthRate: (biz1.organicGrowthRate + biz2.organicGrowthRate) / 2 + 0.01 + mergeGrowthDrag,
           revenue: combinedRevenue,
-          ebitdaMargin: Math.max(0.03, Math.min(0.80, mergedMargin)),
+          ebitdaMargin: clampMargin(mergedMargin),
           acquisitionRevenue: biz1.acquisitionRevenue + biz2.acquisitionRevenue,
           acquisitionMargin: (biz1.acquisitionRevenue + biz2.acquisitionRevenue) > 0
             ? (biz1.acquisitionEbitda + biz2.acquisitionEbitda) / (biz1.acquisitionRevenue + biz2.acquisitionRevenue)
@@ -1293,7 +1098,7 @@ export const useGameStore = create<GameStore>()(
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id !== businessId) return b;
           const newRevenue = Math.round(b.revenue * (1 + revenueBoost));
-          const newMargin = Math.max(0.03, Math.min(0.80, b.ebitdaMargin + marginBoost));
+          const newMargin = clampMargin(b.ebitdaMargin + marginBoost);
           const newEbitda = Math.round(newRevenue * newMargin);
           const ebitdaBoost = b.ebitda > 0 ? (newEbitda - b.ebitda) / b.ebitda : 0;
 
@@ -1351,7 +1156,6 @@ export const useGameStore = create<GameStore>()(
         const service = state.sharedServices.find(s => s.type === serviceType);
         if (!service || service.active) return;
 
-        const activeCount = state.sharedServices.filter(s => s.active).length;
         const opcoCount = state.businesses.filter(b => b.status === 'active').length;
 
         // No cap on active shared services — annual cost is the natural limiter
@@ -1728,7 +1532,7 @@ export const useGameStore = create<GameStore>()(
           sharesOutstanding: state.sharesOutstanding + dilution,
           businesses: state.businesses.map(b => {
             if (b.id !== event.affectedBusinessId) return b;
-            const newMargin = Math.max(0.03, Math.min(0.80, b.ebitdaMargin + 0.01));
+            const newMargin = clampMargin(b.ebitdaMargin + 0.01);
             const newEbitda = Math.round(b.revenue * newMargin);
             return {
               ...b,
@@ -1756,7 +1560,7 @@ export const useGameStore = create<GameStore>()(
           declineState.businesses = state.businesses.map(b => {
             if (b.id !== event.affectedBusinessId) return b;
             const newRevenue = Math.round(b.revenue * 0.94);
-            const newMargin = Math.max(0.03, b.ebitdaMargin - 0.02);
+            const newMargin = clampMargin(b.ebitdaMargin - 0.02);
             const newEbitda = Math.round(newRevenue * newMargin);
             return {
               ...b,
@@ -1903,7 +1707,6 @@ export const useGameStore = create<GameStore>()(
       },
 
       advanceFromRestructure: () => {
-        const state = get();
         // Must have taken some action (cash >= 0 is enforced by the floor)
         set({
           requiresRestructuring: false,
@@ -2122,7 +1925,6 @@ export const useGameStore = create<GameStore>()(
 
       generateBusinessStories: async () => {
         const state = get();
-        const activeBusinesses = state.businesses.filter(b => b.status === 'active');
 
         // Generate stories for businesses that had significant changes
         const updatedBusinesses = await Promise.all(
@@ -2181,191 +1983,16 @@ export const useGameStore = create<GameStore>()(
 
       generateYearChronicle: async () => {
         const state = get();
-        const activeBusinesses = state.businesses.filter(b => b.status === 'active');
-        const metrics = calculateMetrics(state);
-
-        // Build detailed actions summary
-        const actionsThisRound = state.actionsThisRound;
-        const actionParts: string[] = [];
-
-        const acquisitions = actionsThisRound.filter(a => a.type === 'acquire' || a.type === 'acquire_tuck_in');
-        const sales = actionsThisRound.filter(a => a.type === 'sell');
-        const improvements = actionsThisRound.filter(a => a.type === 'improve');
-        const debtPaydowns = actionsThisRound.filter(a => a.type === 'pay_debt');
-        const equityRaises = actionsThisRound.filter(a => a.type === 'issue_equity');
-        const distributions = actionsThisRound.filter(a => a.type === 'distribute');
-        const buybacks = actionsThisRound.filter(a => a.type === 'buyback');
-
-        // Build detailed acquisition info
-        const merges = actionsThisRound.filter(a => a.type === 'merge_businesses');
-        const platformDesignations = actionsThisRound.filter(a => a.type === 'designate_platform');
-        const sharedServiceUnlocks = actionsThisRound.filter(a => a.type === 'unlock_shared_service');
-        const maSourcingUpgrades = actionsThisRound.filter(a => a.type === 'upgrade_ma_sourcing');
-
-        if (acquisitions.length > 0) {
-          const acqDetails = acquisitions.map(a => {
-            const name = (a.details?.businessName as string) || 'a business';
-            const sector = (a.details?.sector as string) || '';
-            const isTuckIn = a.type === 'acquire_tuck_in';
-            return isTuckIn ? `${name} (tuck-in, ${sector})` : `${name} (${sector})`;
-          });
-          const totalSpent = acquisitions.reduce((sum, a) => sum + ((a.details?.cost as number) || (a.details?.askingPrice as number) || 0), 0);
-          actionParts.push(`Acquired ${acqDetails.join(', ')}${totalSpent > 0 ? ` for ${formatMoney(totalSpent)} total` : ''}`);
-        }
-        if (merges.length > 0) {
-          actionParts.push(`Merged ${merges.length} business pair${merges.length > 1 ? 's' : ''} to create scale`);
-        }
-        if (platformDesignations.length > 0) {
-          const names = platformDesignations.map(a => (a.details?.businessName as string) || 'a business');
-          actionParts.push(`Designated ${names.join(', ')} as platform${names.length > 1 ? 's' : ''}`);
-        }
-        if (sales.length > 0) {
-          const saleDetails = sales.map(a => {
-            const name = (a.details?.businessName as string) || 'a business';
-            const moic = a.details?.moic as number | undefined;
-            return moic ? `${name} (${moic.toFixed(1)}x MOIC)` : name;
-          });
-          actionParts.push(`Sold ${saleDetails.join(', ')}`);
-        }
-        if (improvements.length > 0) {
-          const improvTypes = improvements.map(a => (a.details?.improvementType as string) || 'operational').filter((v, i, a) => a.indexOf(v) === i);
-          actionParts.push(`Made ${improvements.length} improvement${improvements.length > 1 ? 's' : ''} (${improvTypes.join(', ')})`);
-        }
-        if (sharedServiceUnlocks.length > 0) {
-          actionParts.push('Invested in shared services infrastructure');
-        }
-        if (maSourcingUpgrades.length > 0) {
-          actionParts.push('Upgraded M&A sourcing capabilities');
-        }
-        if (debtPaydowns.length > 0) {
-          const totalPaid = debtPaydowns.reduce((sum, a) => sum + ((a.details?.amount as number) || 0), 0);
-          if (totalPaid > 0) actionParts.push(`Paid down ${formatMoney(totalPaid)} in debt`);
-        }
-        if (equityRaises.length > 0) {
-          actionParts.push('Raised equity capital');
-        }
-        if (distributions.length > 0) {
-          const totalDist = distributions.reduce((sum, a) => sum + ((a.details?.amount as number) || 0), 0);
-          actionParts.push(`Distributed ${totalDist > 0 ? formatMoney(totalDist) : 'cash'} to owners`);
-        }
-        if (buybacks.length > 0) {
-          actionParts.push('Bought back shares');
-        }
-
-        const actionsSummary = actionParts.length > 0
-          ? actionParts.join('. ') + '.'
-          : 'Focused on organic growth and portfolio management.';
-
-        // Get market conditions from last event
-        const lastEvent = state.eventHistory[state.eventHistory.length - 1];
-        let marketConditions = 'Normal market conditions';
-        if (lastEvent) {
-          if (lastEvent.type === 'global_recession') marketConditions = 'Recessionary environment';
-          else if (lastEvent.type === 'global_bull_market') marketConditions = 'Bull market conditions';
-          else if (lastEvent.type === 'global_inflation') marketConditions = 'Inflationary pressures';
-          else if (lastEvent.type === 'global_credit_tightening') marketConditions = 'Tight credit markets';
-          else if (lastEvent.type === 'global_interest_hike') marketConditions = 'Rising interest rates';
-          else if (lastEvent.type === 'global_interest_cut') marketConditions = 'Falling interest rates';
-        }
-
-        // Calculate financial health signals
-        const totalDebt = metrics.totalDebt;
-        const interestExpense = Math.round(totalDebt * metrics.interestRate);
-        const fcf = metrics.totalFcf;
-
-        // Calculate organic EBITDA growth rate
-        const prevMetrics = state.metricsHistory.length > 0
-          ? state.metricsHistory[state.metricsHistory.length - 1]
-          : null;
-        const prevTotalEbitda = prevMetrics ? formatMoney(prevMetrics.metrics.totalEbitda) : undefined;
-        const ebitdaGrowthPct = prevMetrics && prevMetrics.metrics.totalEbitda > 0
-          ? Math.round(((metrics.totalEbitda - prevMetrics.metrics.totalEbitda) / prevMetrics.metrics.totalEbitda) * 100)
-          : null;
-
-        // Portfolio composition
-        const platforms = activeBusinesses.filter(b => b.isPlatform);
-        const totalBoltOns = platforms.reduce((sum, p) => sum + (p.boltOnIds?.length || 0), 0);
-        const avgQuality = activeBusinesses.length > 0
-          ? (activeBusinesses.reduce((sum, b) => sum + b.qualityRating, 0) / activeBusinesses.length).toFixed(1)
-          : '0';
-        const sectors = [...new Set(activeBusinesses.map(b => SECTORS[b.sectorId]?.name || b.sectorId))];
-        const activeSharedServices = state.sharedServices.filter(s => s.active).map(s => s.name);
-
-        // Build concerns and positives — balanced across financial, operational, strategic
-        const concerns: string[] = [];
-        const positives: string[] = [];
-
-        // Financial concerns
-        if (fcf < 0) concerns.push(`Negative free cash flow of ${formatMoney(fcf)}`);
-        if (metrics.netDebtToEbitda > 3) concerns.push(`High leverage at ${metrics.netDebtToEbitda.toFixed(1)}x net debt/EBITDA`);
-        if (interestExpense > metrics.totalEbitda * 0.3) concerns.push(`Interest consuming ${Math.round(interestExpense / metrics.totalEbitda * 100)}% of EBITDA`);
-
-        // Operational concerns
-        const lowQualityBiz = activeBusinesses.filter(b => b.qualityRating <= 2);
-        if (lowQualityBiz.length > 0) concerns.push(`${lowQualityBiz.length} business${lowQualityBiz.length > 1 ? 'es' : ''} rated quality 2 or below`);
-        if (ebitdaGrowthPct !== null && ebitdaGrowthPct < -5) concerns.push(`Portfolio EBITDA declined ${Math.abs(ebitdaGrowthPct)}% year-over-year`);
-
-        // Margin concerns
-        const marginCompressingBiz = activeBusinesses.filter(b => b.ebitdaMargin < b.acquisitionMargin - 0.03);
-        if (marginCompressingBiz.length > 0) concerns.push(`${marginCompressingBiz.length} business${marginCompressingBiz.length > 1 ? 'es' : ''} with significant margin compression`);
-
-        // Financial positives
-        if (fcf > 0 && metrics.totalEbitda > 0) positives.push(`Generating ${formatMoney(fcf)} in free cash flow`);
-        if (metrics.netDebtToEbitda < 1 && metrics.netDebtToEbitda >= 0) positives.push('Conservative balance sheet');
-        if (metrics.portfolioRoic > 0.15) positives.push(`Strong ${Math.round(metrics.portfolioRoic * 100)}% ROIC`);
-
-        // Operational/strategic positives
-        if (ebitdaGrowthPct !== null && ebitdaGrowthPct > 10) positives.push(`Portfolio EBITDA grew ${ebitdaGrowthPct}% year-over-year`);
-        if (platforms.length > 0 && totalBoltOns > 0) positives.push(`Roll-up strategy progressing: ${platforms.length} platform${platforms.length > 1 ? 's' : ''} with ${totalBoltOns} bolt-on${totalBoltOns > 1 ? 's' : ''}`);
-        if (parseFloat(avgQuality) >= 4.0) positives.push(`High portfolio quality (avg ${avgQuality}/5)`);
-        if (sectors.length >= 4) positives.push(`Well-diversified across ${sectors.length} sectors`);
-
-        // Margin expansion positive
-        const marginExpandingBiz = activeBusinesses.filter(b => b.ebitdaMargin > b.acquisitionMargin + 0.03);
-        if (marginExpandingBiz.length > 0) positives.push(`${marginExpandingBiz.length} business${marginExpandingBiz.length > 1 ? 'es' : ''} with meaningful margin expansion`);
+        const context = buildChronicleContext(state);
 
         try {
-          const chronicle = await generateYearChronicle({
-            holdcoName: state.holdcoName,
-            year: state.round,
-            totalEbitda: formatMoney(metrics.totalEbitda),
-            prevTotalEbitda,
-            ebitdaGrowth: ebitdaGrowthPct !== null ? `${ebitdaGrowthPct > 0 ? '+' : ''}${ebitdaGrowthPct}%` : undefined,
-            cash: formatMoney(state.cash),
-            portfolioCount: activeBusinesses.length,
-            leverage: metrics.netDebtToEbitda < 0 ? 'Net cash position' : `${metrics.netDebtToEbitda.toFixed(1)}x`,
-            totalDebt: formatMoney(totalDebt),
-            fcf: formatMoney(fcf),
-            interestExpense: formatMoney(interestExpense),
-            actions: actionsSummary,
-            marketConditions,
-            concerns: concerns.length > 0 ? concerns.join('; ') : undefined,
-            positives: positives.length > 0 ? positives.join('; ') : undefined,
-            // Strategic context
-            platformCount: platforms.length,
-            totalBoltOns,
-            avgQuality,
-            sectors: sectors.join(', '),
-            sharedServices: activeSharedServices.length > 0 ? activeSharedServices.join(', ') : undefined,
-            fcfPerShare: formatMoney(metrics.fcfPerShare),
-            founderEquityValue: formatMoney(calculateFounderEquityValue(state)),
-            // Revenue/margin context
-            totalRevenue: formatMoney(metrics.totalRevenue),
-            avgMargin: `${(metrics.avgEbitdaMargin * 100).toFixed(0)}%`,
-            revenueGrowth: prevMetrics && prevMetrics.metrics.totalRevenue > 0
-              ? `${Math.round(((metrics.totalRevenue - prevMetrics.metrics.totalRevenue) / prevMetrics.metrics.totalRevenue) * 100)}%`
-              : undefined,
-            marginChange: prevMetrics
-              ? `${((metrics.avgEbitdaMargin - prevMetrics.metrics.avgEbitdaMargin) * 100) >= 0 ? '+' : ''}${((metrics.avgEbitdaMargin - prevMetrics.metrics.avgEbitdaMargin) * 100).toFixed(1)} ppt`
-              : undefined,
-          });
-
-          const fallbackChronicle = `Year ${state.round} saw ${state.holdcoName} continue to build its portfolio. ${actionsSummary}`;
+          const chronicle = await generateYearChronicle(context);
+          const fallbackChronicle = `Year ${state.round} saw ${state.holdcoName} continue to build its portfolio. ${context.actions}`;
           set({ yearChronicle: chronicle || fallbackChronicle });
         } catch (error) {
           console.error('Failed to generate year chronicle:', error);
           set({
-            yearChronicle: `Year ${state.round} saw ${state.holdcoName} continue to build its portfolio. ${actionsSummary}`,
+            yearChronicle: `Year ${state.round} saw ${state.holdcoName} continue to build its portfolio. ${context.actions}`,
           });
         }
       },
@@ -2555,4 +2182,5 @@ export const getPostGameInsights = () => generatePostGameInsights(useGameStore.g
 export const getEnterpriseValue = () => calculateEnterpriseValue(useGameStore.getState());
 export const getFounderEquityValue = () => calculateFounderEquityValue(useGameStore.getState());
 export const getFounderPersonalWealth = () => calculateFounderPersonalWealth(useGameStore.getState());
-export { DIFFICULTY_CONFIG, DURATION_CONFIG };
+// Re-export for backwards compatibility (imported from data/gameConfig.ts)
+export { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../data/gameConfig';

@@ -1,6 +1,8 @@
 import { Fragment, useEffect, useState } from 'react';
 import { LeaderboardEntry, formatMoney } from '../../engine/types';
 import { loadLeaderboard } from '../../engine/scoring';
+import { getGradeColor, getRankColor } from '../../utils/gradeColors';
+import { Modal } from './Modal';
 
 interface LeaderboardModalProps {
   onClose: () => void;
@@ -11,6 +13,8 @@ function formatDate(dateStr: string) {
   const d = new Date(dateStr);
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
+
+const DIFF_MULT: Record<string, number> = { easy: 1.0, normal: 1.15 };
 
 export function LeaderboardModal({ onClose, hypotheticalEV }: LeaderboardModalProps) {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
@@ -36,7 +40,6 @@ export function LeaderboardModal({ onClose, hypotheticalEV }: LeaderboardModalPr
   }, []);
 
   // Determine ghost row rank (compare adjusted FEV vs adjusted FEV)
-  const DIFF_MULT: Record<string, number> = { easy: 1.0, normal: 1.15 };
   const ghostRank = hypotheticalEV && hypotheticalEV > 0
     ? leaderboard.filter(e => {
         const raw = e.founderEquityValue ?? e.enterpriseValue;
@@ -46,78 +49,69 @@ export function LeaderboardModal({ onClose, hypotheticalEV }: LeaderboardModalPr
     : -1;
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-      <div className="bg-bg-primary border border-white/10 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h3 className="text-xl font-bold flex items-center gap-2">
-              <span>🌍</span> Global Leaderboard
-            </h3>
-            <p className="text-text-muted text-sm">Top 50 runs by founder equity value</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-text-muted hover:text-text-primary text-2xl"
-          >
-            ×
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      header={
+        <>
+          <h3 className="text-xl font-bold flex items-center gap-2">
+            <span>🌍</span> Global Leaderboard
+          </h3>
+          <p className="text-text-muted text-sm">Top 50 runs by founder equity value</p>
+        </>
+      }
+      size="md"
+    >
+      {loading && (
+        <div className="space-y-2">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="h-14 bg-white/5 rounded-lg animate-pulse" />
+          ))}
+        </div>
+      )}
+
+      {error && (
+        <div className="card text-center text-text-muted py-8">
+          <p>Failed to load leaderboard.</p>
+          <button onClick={fetchLeaderboard} className="btn-secondary text-sm mt-3">
+            Retry
           </button>
         </div>
+      )}
 
-        {loading && (
-          <div className="space-y-2">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="h-14 bg-white/5 rounded-lg animate-pulse" />
-            ))}
-          </div>
-        )}
+      {!loading && !error && leaderboard.length === 0 && ghostRank === -1 ? (
+        <div className="card text-center text-text-muted py-8">
+          <p>No scores yet.</p>
+          <p className="text-sm mt-2">Complete a game to set your first record.</p>
+        </div>
+      ) : null}
 
-        {error && (
-          <div className="card text-center text-text-muted py-8">
-            <p>Failed to load leaderboard.</p>
-            <button onClick={fetchLeaderboard} className="btn-secondary text-sm mt-3">
-              Retry
-            </button>
-          </div>
-        )}
-
-        {!loading && !error && leaderboard.length === 0 && ghostRank === -1 ? (
-          <div className="card text-center text-text-muted py-8">
-            <p>No scores yet.</p>
-            <p className="text-sm mt-2">Complete a game to set your first record.</p>
-          </div>
-        ) : null}
-
-        {!loading && !error && (leaderboard.length > 0 || ghostRank !== -1) && (
-          <div className="space-y-2">
-            {leaderboard.map((entry, index) => (
-              <Fragment key={entry.id}>
-                {/* Ghost row inserted before correct position */}
-                {ghostRank === index && (
-                  <GhostRow rank={index + 1} ev={hypotheticalEV!} />
-                )}
-                <LeaderboardRow
-                  entry={entry}
-                  rank={index < ghostRank || ghostRank === -1 ? index + 1 : index + 2}
-                />
-              </Fragment>
-            ))}
-            {/* Ghost row at end if it's after all entries */}
-            {ghostRank === leaderboard.length && (
-              <GhostRow rank={leaderboard.length + 1} ev={hypotheticalEV!} />
-            )}
-          </div>
-        )}
-      </div>
-    </div>
+      {!loading && !error && (leaderboard.length > 0 || ghostRank !== -1) && (
+        <div className="space-y-2">
+          {leaderboard.map((entry, index) => (
+            <Fragment key={entry.id}>
+              {/* Ghost row inserted before correct position */}
+              {ghostRank === index && (
+                <GhostRow rank={index + 1} ev={hypotheticalEV!} />
+              )}
+              <LeaderboardRow
+                entry={entry}
+                rank={index < ghostRank || ghostRank === -1 ? index + 1 : index + 2}
+              />
+            </Fragment>
+          ))}
+          {/* Ghost row at end if it's after all entries */}
+          {ghostRank === leaderboard.length && (
+            <GhostRow rank={leaderboard.length + 1} ev={hypotheticalEV!} />
+          )}
+        </div>
+      )}
+    </Modal>
   );
 }
 
 function RankBadge({ rank }: { rank: number }) {
-  const color = rank === 1 ? 'text-yellow-400' :
-    rank === 2 ? 'text-gray-300' :
-    rank === 3 ? 'text-orange-400' :
-    'text-text-muted';
-  return <span className={`text-lg font-bold tabular-nums w-10 text-center inline-block ${color}`}>#{rank}</span>;
+  return <span className={`text-lg font-bold tabular-nums w-10 text-center inline-block ${getRankColor(rank)}`}>#{rank}</span>;
 }
 
 function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
@@ -137,15 +131,7 @@ function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number
         </div>
         <div className="min-w-[3.5rem]">
           <p className="text-xs text-text-muted">Score</p>
-          <p className={`font-mono tabular-nums ${
-            entry.grade === 'S' ? 'text-yellow-400' :
-            entry.grade === 'A' ? 'text-accent' :
-            entry.grade === 'B' ? 'text-blue-400' :
-            entry.grade === 'C' ? 'text-warning' :
-            entry.grade === 'D' ? 'text-orange-500' :
-            entry.grade === 'F' ? 'text-danger' :
-            'text-text-secondary'
-          }`}>{entry.score} ({entry.grade})</p>
+          <p className={`font-mono tabular-nums ${getGradeColor(entry.grade)}`}>{entry.score} ({entry.grade})</p>
         </div>
         <div className="w-8 flex justify-center">
           {entry.difficulty ? (

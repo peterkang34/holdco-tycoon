@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   generateDealStructures,
   executeDealStructure,
@@ -6,7 +6,7 @@ import {
   getStructureDescription,
 } from '../deals';
 import { createMockDeal, createMockDealStructure } from './helpers';
-import { Deal, DealStructure } from '../types';
+import { DealStructure } from '../types';
 
 describe('generateDealStructures', () => {
   it('should include all-cash option when player can afford it', () => {

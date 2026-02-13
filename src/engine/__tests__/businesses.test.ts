@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import {
   generateBusiness,
   generateBusinessId,
@@ -17,9 +17,10 @@ import {
   calculateDealHeat,
   calculateHeatPremium,
   getMaxAcquisitions,
+  assignSellerArchetype,
 } from '../businesses';
 import { SECTORS, SECTOR_LIST } from '../../data/sectors';
-import { SectorId, QualityRating, DealHeat, MASourcingTier } from '../types';
+import { SectorId, QualityRating, DealHeat } from '../types';
 
 describe('generateBusinessId', () => {
   beforeEach(() => {
@@ -121,11 +122,9 @@ describe('generateDeal', () => {
 
   it('should apply tuck-in discount when applicable', () => {
     // Generate many deals and check that tuck-ins have discounts
-    let foundTuckIn = false;
     for (let i = 0; i < 50; i++) {
       const deal = generateDeal('agency', 1);
       if (deal.acquisitionType === 'tuck_in') {
-        foundTuckIn = true;
         expect(deal.tuckInDiscount).toBeDefined();
         expect(deal.tuckInDiscount!).toBeGreaterThan(0);
         expect(deal.tuckInDiscount!).toBeLessThanOrEqual(0.25);
@@ -672,7 +671,6 @@ describe('Revenue & Margin: generateBusiness', () => {
   });
 
   it('should generate margin within sector range (±quality adjustment)', () => {
-    const sector = SECTORS['agency'];
     for (let i = 0; i < 50; i++) {
       const biz = generateBusiness('agency', 1);
       // Margin should be within baseMargin range ±4.5ppt (quality adjustment of ±3ppt + buffer)
@@ -730,5 +728,61 @@ describe('Revenue & Margin: createStartingBusiness', () => {
     expect(biz.ebitdaMargin).toBeGreaterThan(0);
     // Revenue = EBITDA / margin (rounded)
     expect(Math.abs(biz.revenue - Math.round(biz.ebitda / biz.ebitdaMargin))).toBeLessThanOrEqual(1);
+  });
+});
+
+describe('Seller Archetypes: assignSellerArchetype', () => {
+  it('should return a valid archetype for each quality rating', () => {
+    const validArchetypes = [
+      'retiring_founder', 'burnt_out_operator', 'accidental_holdco',
+      'distressed_seller', 'mbo_candidate', 'franchise_breakaway',
+    ];
+    for (let q = 1; q <= 5; q++) {
+      for (let i = 0; i < 20; i++) {
+        const archetype = assignSellerArchetype(q as QualityRating);
+        expect(validArchetypes).toContain(archetype);
+      }
+    }
+  });
+
+  it('should favor retiring_founder for high quality (>=4)', () => {
+    let retiringCount = 0;
+    for (let i = 0; i < 500; i++) {
+      if (assignSellerArchetype(5) === 'retiring_founder') retiringCount++;
+    }
+    // Retiring founder has baseWeight 0.30 + 0.10 = 0.40 for quality 5
+    // Should appear frequently
+    expect(retiringCount).toBeGreaterThan(100);
+  });
+
+  it('should favor distressed_seller for low quality (<=2)', () => {
+    let distressedCount = 0;
+    for (let i = 0; i < 500; i++) {
+      if (assignSellerArchetype(1) === 'distressed_seller') distressedCount++;
+    }
+    // Distressed seller has baseWeight 0.10 + 0.10 = 0.20 for quality 1
+    expect(distressedCount).toBeGreaterThan(30);
+  });
+
+  it('should produce all 6 archetypes across many samples', () => {
+    const seen = new Set<string>();
+    for (let i = 0; i < 1000; i++) {
+      seen.add(assignSellerArchetype(3));
+    }
+    expect(seen.size).toBe(6);
+  });
+
+  it('should integrate into deal generation (deals have sellerArchetype)', () => {
+    resetBusinessIdCounter();
+    for (let i = 0; i < 10; i++) {
+      const deal = generateDeal('agency', 5);
+      // sellerArchetype may or may not be set on older deals, but newly generated should have it
+      if (deal.sellerArchetype) {
+        expect([
+          'retiring_founder', 'burnt_out_operator', 'accidental_holdco',
+          'distressed_seller', 'mbo_candidate', 'franchise_breakaway',
+        ]).toContain(deal.sellerArchetype);
+      }
+    }
   });
 });

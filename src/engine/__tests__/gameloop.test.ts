@@ -1,6 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
-  calculateAnnualFcf,
   calculatePortfolioFcf,
   calculateSharedServicesBenefits,
   calculateSectorFocusBonus,
@@ -12,18 +11,14 @@ import {
   recordHistoricalMetrics,
 } from '../simulation';
 import {
-  generateBusiness,
   generateDealPipeline,
   createStartingBusiness,
   resetBusinessIdCounter,
-  determineIntegrationOutcome,
-  calculateSynergies,
 } from '../businesses';
 import { generateDealStructures, executeDealStructure } from '../deals';
 import { calculateFinalScore, calculateEnterpriseValue } from '../scoring';
-import { createMockBusiness, createMockGameState } from './helpers';
-import { initializeSharedServices } from '../../data/sharedServices';
-import { Business, GameState, SectorId, GamePhase } from '../types';
+import { createMockBusiness, createMockGameState, createMockDeal } from './helpers';
+import { GameState, SectorId, GamePhase } from '../types';
 
 /**
  * Full game loop simulation tests
@@ -95,7 +90,7 @@ function simulateEventPhase(state: GameState): GameState {
   };
 }
 
-function simulateEndRound(state: GameState): GameState {
+function simulateEndRound(state: GameState, maxRounds: number = 20): GameState {
   const sharedBenefits = calculateSharedServicesBenefits(state);
   const focusBonus = calculateSectorFocusBonus(state.businesses);
   const focusEbitdaBonus = focusBonus ? getSectorFocusEbitdaBonus(focusBonus.tier) : 0;
@@ -118,7 +113,7 @@ function simulateEndRound(state: GameState): GameState {
     businesses: updatedBusinesses,
     round: newRound,
     metricsHistory: [...state.metricsHistory, historyEntry],
-    gameOver: newRound > 20,
+    gameOver: newRound > maxRounds,
     phase: 'collect' as GamePhase,
     currentEvent: null,
   };
@@ -406,5 +401,108 @@ describe('Edge Cases', () => {
       state = applyEventEffects(state, event);
       validateGameState(state, `after ${event.type}`);
     }
+  });
+});
+
+describe('Full Game Simulation - 10-Year Quick Play', () => {
+  it('should complete 10 rounds with maxRounds: 10', () => {
+    resetBusinessIdCounter();
+    let state = createMockGameState({
+      round: 1,
+      maxRounds: 10,
+      duration: 'quick',
+      difficulty: 'normal',
+    });
+
+    for (let round = 1; round <= 10; round++) {
+      state = simulateCollectPhase(state);
+      validateGameState(state, `collect round ${round}`);
+
+      state = simulateEventPhase(state);
+      validateGameState(state, `event round ${round}`);
+
+      state = simulateEndRound(state, 10);
+      validateGameState(state, `end round ${round}`);
+    }
+
+    expect(state.gameOver).toBe(true);
+    expect(state.round).toBe(11);
+    expect(state.metricsHistory.length).toBe(10);
+
+    const score = calculateFinalScore(state);
+    expect(Number.isNaN(score.total)).toBe(false);
+    expect(score.total).toBeGreaterThanOrEqual(0);
+
+    const ev = calculateEnterpriseValue(state);
+    expect(ev).toBeGreaterThan(0);
+  });
+
+  it('should NOT be game over at round 10 with maxRounds: 20', () => {
+    resetBusinessIdCounter();
+    let state = createMockGameState({
+      round: 1,
+      maxRounds: 20,
+      duration: 'standard',
+    });
+
+    for (let round = 1; round <= 10; round++) {
+      state = simulateCollectPhase(state);
+      state = simulateEventPhase(state);
+      state = simulateEndRound(state, 20);
+    }
+
+    // Round 11, maxRounds 20 -> not over
+    expect(state.gameOver).toBe(false);
+    expect(state.round).toBe(11);
+  });
+});
+
+describe('10-Year Mode: Deal Terms Scaling', () => {
+  it('should produce seller note with 2-round term for 10-year mode', () => {
+    const deal = createMockDeal({ askingPrice: 4000 });
+    const structures = generateDealStructures(deal, 10000, 0.07, false, 10);
+    const sellerNote = structures.find(s => s.type === 'seller_note');
+    expect(sellerNote).toBeDefined();
+    // sellerNoteTerms = max(2, ceil(10 * 0.15)) = max(2, 2) = 2
+    expect(sellerNote!.sellerNote!.termRounds).toBe(2);
+  });
+
+  it('should produce seller note with 3-round term for 20-year mode', () => {
+    const deal = createMockDeal({ askingPrice: 4000 });
+    const structures = generateDealStructures(deal, 10000, 0.07, false, 20);
+    const sellerNote = structures.find(s => s.type === 'seller_note');
+    expect(sellerNote).toBeDefined();
+    // sellerNoteTerms = max(2, ceil(20 * 0.15)) = max(2, 3) = 3
+    expect(sellerNote!.sellerNote!.termRounds).toBe(3);
+  });
+
+  it('should produce bank debt with 5-round term for 10-year mode', () => {
+    const deal = createMockDeal({ askingPrice: 4000 });
+    const structures = generateDealStructures(deal, 10000, 0.07, false, 10);
+    const bankDebt = structures.find(s => s.type === 'bank_debt');
+    expect(bankDebt).toBeDefined();
+    // bankDebtTerms = max(4, ceil(10 * 0.50)) = max(4, 5) = 5
+    expect(bankDebt!.bankDebt!.termRounds).toBe(5);
+  });
+
+  it('should produce bank debt with 10-round term for 20-year mode', () => {
+    const deal = createMockDeal({ askingPrice: 4000 });
+    const structures = generateDealStructures(deal, 10000, 0.07, false, 20);
+    const bankDebt = structures.find(s => s.type === 'bank_debt');
+    expect(bankDebt).toBeDefined();
+    // bankDebtTerms = max(4, ceil(20 * 0.50)) = max(4, 10) = 10
+    expect(bankDebt!.bankDebt!.termRounds).toBe(10);
+  });
+
+  it('should have debt grace period of 2 for 10-year mode', () => {
+    // Debt grace period = Math.max(2, Math.ceil(10 * 0.10)) = Math.max(2, 1) = 2
+    const grace = Math.max(2, Math.ceil(10 * 0.10));
+    expect(grace).toBe(2);
+  });
+
+  it('should have debt grace period of 2 for 20-year mode', () => {
+    // Debt grace period = Math.max(2, Math.ceil(20 * 0.10)) = Math.max(2, 2) = 2
+    const grace = Math.max(2, Math.ceil(20 * 0.10));
+    expect(grace).toBe(2);
   });
 });

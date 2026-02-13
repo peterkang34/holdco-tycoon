@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
-import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatPercent, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration } from '../../engine/types';
+import { useState, useEffect, useMemo } from 'react';
+import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLeaderboardRankFromList } from '../../engine/scoring';
 import { calculateExitValuation } from '../../engine/simulation';
 import { AIAnalysisSection } from '../ui/AIAnalysisSection';
-import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../../hooks/useGame';
+import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
+import { getGradeColor, getRankColor } from '../../utils/gradeColors';
 
 interface GameOverScreenProps {
   holdcoName: string;
@@ -37,7 +38,7 @@ interface GameOverScreenProps {
 export function GameOverScreen({
   holdcoName,
   score,
-  insights,
+  insights: _insights,
   businesses,
   exitedBusinesses,
   metrics,
@@ -71,16 +72,39 @@ export function GameOverScreen({
 
   // Deduplicate: exitedBusinesses wins over businesses (a sold biz exists in both)
   // Filter out 'integrated' status (bolt-ons are folded into platform EBITDA)
-  const exitedIds = new Set(exitedBusinesses.map(b => b.id));
-  const allBusinesses = [
-    ...exitedBusinesses.filter(b => b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
-    ...businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
-  ];
-  const activeBusinesses = businesses.filter(b => b.status === 'active');
+  const allBusinesses = useMemo(() => {
+    const exitedIds = new Set(exitedBusinesses.map(b => b.id));
+    return [
+      ...exitedBusinesses.filter(b => b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
+      ...businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
+    ];
+  }, [businesses, exitedBusinesses]);
+  const activeBusinesses = useMemo(
+    () => businesses.filter(b => b.status === 'active'),
+    [businesses]
+  );
   const difficultyMultiplier = DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0;
   const adjustedFEV = Math.round(founderEquityValue * difficultyMultiplier);
   const canMakeLeaderboard = wouldMakeLeaderboardFromList(leaderboard, adjustedFEV);
   const potentialRank = getLeaderboardRankFromList(leaderboard, adjustedFEV);
+
+  // Memoize per-business exit valuations — each calls calculateExitValuation with premium/buyer-pool logic
+  const fevBreakdown = useMemo(() => {
+    const currentOwnership = sharesOutstanding > 0 ? founderShares / sharesOutstanding : 1;
+    const opcoDebt = activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+    const businessValues = activeBusinesses.map(business => {
+      const valuation = calculateExitValuation(business, maxRounds);
+      const value = Math.round(business.ebitda * valuation.totalMultiple);
+      const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
+      const moic = totalInvested > 0 ? value / totalInvested : 0;
+      return { business, valuation, value, totalInvested, moic };
+    }).sort((a, b) => b.value - a.value);
+    const portfolioValue = businessValues.reduce((sum, bv) => sum + bv.value, 0);
+    const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
+    const blendedMultiple = totalEbitda > 0 ? portfolioValue / totalEbitda : 0;
+    const hypotheticalFEV = Math.round(enterpriseValue * initialOwnershipPct);
+    return { currentOwnership, opcoDebt, businessValues, portfolioValue, blendedMultiple, hypotheticalFEV };
+  }, [activeBusinesses, sharesOutstanding, founderShares, maxRounds, enterpriseValue, initialOwnershipPct]);
 
   // Load global leaderboard on mount
   useEffect(() => {
@@ -154,17 +178,7 @@ export function GameOverScreen({
     }
   };
 
-  const getGradeColor = () => {
-    switch (score.grade) {
-      case 'S': return 'text-yellow-400';
-      case 'A': return 'text-accent';
-      case 'B': return 'text-blue-400';
-      case 'C': return 'text-warning';
-      case 'D': return 'text-orange-500';
-      case 'F': return 'text-danger';
-      default: return 'text-text-secondary';
-    }
-  };
+  const gradeColor = getGradeColor(score.grade);
 
   const getGradeEmoji = () => {
     switch (score.grade) {
@@ -246,7 +260,7 @@ export function GameOverScreen({
       <div className="text-center mb-8">
         <span className="text-6xl mb-4 block">{getGradeEmoji()}</span>
         <h1 className="text-3xl font-bold mb-2">{holdcoName}</h1>
-        <div className={`text-7xl font-bold mb-2 ${getGradeColor()}`}>
+        <div className={`text-7xl font-bold mb-2 ${gradeColor}`}>
           {score.grade}
         </div>
         <p className="text-xl text-text-secondary">{score.title}</p>
@@ -287,23 +301,7 @@ export function GameOverScreen({
 
       {/* FEV / EV Breakdown */}
       {!bankruptRound && (() => {
-        const currentOwnership = sharesOutstanding > 0 ? founderShares / sharesOutstanding : 1;
-        const opcoDebt = activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
-
-        // Per-business valuation
-        const businessValues = activeBusinesses.map(business => {
-          const valuation = calculateExitValuation(business, maxRounds);
-          const value = Math.round(business.ebitda * valuation.totalMultiple);
-          const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
-          const moic = totalInvested > 0 ? value / totalInvested : 0;
-          return { business, valuation, value, totalInvested, moic };
-        }).sort((a, b) => b.value - a.value);
-
-        const portfolioValue = businessValues.reduce((sum, bv) => sum + bv.value, 0);
-        const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
-        const blendedMultiple = totalEbitda > 0 ? portfolioValue / totalEbitda : 0;
-
-        const hypotheticalFEV = Math.round(enterpriseValue * initialOwnershipPct);
+        const { currentOwnership, opcoDebt, businessValues, portfolioValue, blendedMultiple, hypotheticalFEV } = fevBreakdown;
 
         return (
           <div className="card mb-6">
@@ -475,12 +473,7 @@ export function GameOverScreen({
                 }`}
               >
                 <div className="flex items-center gap-4 min-w-0 flex-1">
-                  <span className={`text-lg font-bold tabular-nums w-10 text-center inline-block ${
-                    index === 0 ? 'text-yellow-400' :
-                    index === 1 ? 'text-gray-300' :
-                    index === 2 ? 'text-orange-400' :
-                    'text-text-muted'
-                  }`}>
+                  <span className={`text-lg font-bold tabular-nums w-10 text-center inline-block ${getRankColor(index + 1)}`}>
                     #{index + 1}
                   </span>
                   <div className="min-w-0">
@@ -495,15 +488,7 @@ export function GameOverScreen({
                   </div>
                   <div className="min-w-[3.5rem]">
                     <p className="text-xs text-text-muted">Score</p>
-                    <p className={`font-mono tabular-nums ${
-                      entry.grade === 'S' ? 'text-yellow-400' :
-                      entry.grade === 'A' ? 'text-accent' :
-                      entry.grade === 'B' ? 'text-blue-400' :
-                      entry.grade === 'C' ? 'text-warning' :
-                      entry.grade === 'D' ? 'text-orange-500' :
-                      entry.grade === 'F' ? 'text-danger' :
-                      'text-text-secondary'
-                    }`}>{entry.score} ({entry.grade})</p>
+                    <p className={`font-mono tabular-nums ${getGradeColor(entry.grade)}`}>{entry.score} ({entry.grade})</p>
                   </div>
                   <div className="w-8 flex justify-center">
                     {entry.difficulty ? (

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Business, ExitValuation, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
+import { useState, useMemo } from 'react';
+import { Business, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { calculateExitValuation } from '../../engine/simulation';
 import { Tooltip } from '../ui/Tooltip';
@@ -41,8 +41,11 @@ export function BusinessCard({
   const sector = SECTORS[business.sectorId];
   const annualFcf = Math.round(business.ebitda * (1 - sector.capexRate));
 
-  // Calculate proper exit valuation
-  const exitValuation = calculateExitValuation(business, currentRound, lastEventType);
+  // Memoize exit valuation — involves multiple premium calculations, buyer pool logic, etc.
+  const exitValuation = useMemo(
+    () => calculateExitValuation(business, currentRound, lastEventType),
+    [business, currentRound, lastEventType]
+  );
   const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
   const gainLoss = exitValuation.netProceeds - totalInvested;
   const moic = exitValuation.netProceeds / totalInvested;

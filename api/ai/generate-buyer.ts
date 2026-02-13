@@ -1,24 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkAIRateLimit, isBodyTooLarge, sanitizeString } from '../_lib/rateLimit.js';
-
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+import { sanitizeString } from '../_lib/rateLimit.js';
+import { validateAIRequest, callAnthropic } from '../_lib/ai.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  if (!ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'API key not configured' });
-  }
-
-  if (await checkAIRateLimit(req)) {
-    return res.status(429).json({ error: 'Too many requests. Try again in a minute.' });
-  }
-
-  if (isBodyTooLarge(req.body)) {
-    return res.status(413).json({ error: 'Request too large' });
-  }
+  if (await validateAIRequest(req, res)) return;
 
   try {
     const body = req.body || {};
@@ -49,33 +34,13 @@ Base thesis: ${baseThesis}
 
 Write 2-3 sentences that sound like a real investment committee memo. Be specific about value creation levers including margin improvement opportunities. Respond with ONLY the thesis text, no JSON or formatting.`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 300,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+    const result = await callAnthropic(prompt, 300);
 
-    if (!response.ok) {
-      console.error('Anthropic API error:', response.status);
-      return res.status(502).json({ error: 'AI service temporarily unavailable' });
+    if (!result.content) {
+      return res.status(502).json({ error: result.error || 'AI service temporarily unavailable' });
     }
 
-    const data = await response.json();
-    const content = data.content?.[0]?.text;
-
-    if (!content) {
-      return res.status(500).json({ error: 'No content generated' });
-    }
-
-    return res.status(200).json({ thesis: content.trim() });
+    return res.status(200).json({ thesis: result.content.trim() });
   } catch (error) {
     console.error('Generate buyer error:', error);
     return res.status(500).json({ error: 'Internal server error' });

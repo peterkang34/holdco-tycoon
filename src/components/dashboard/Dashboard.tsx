@@ -58,9 +58,8 @@ export function Dashboard({
     return 'negative';
   };
 
-  // Calculate net cash amount when in net cash position
+  // Calculate net cash position
   const isNetCash = metrics.netDebtToEbitda < 0;
-  const netCashAmount = isNetCash ? Math.abs(metrics.netDebtToEbitda * metrics.totalEbitda) : 0;
 
   const getMoicStatus = () => {
     if (metrics.portfolioMoic > 2.0) return 'positive';

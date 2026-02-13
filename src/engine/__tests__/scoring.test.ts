@@ -8,13 +8,13 @@ import {
   wouldMakeLeaderboardFromList,
   getLeaderboardRankFromList,
 } from '../scoring';
-import { calculateMetrics } from '../simulation';
+// calculateMetrics available if needed for future tests
 import {
   createMockBusiness,
   createMockGameState,
   createMultiBusinessState,
 } from './helpers';
-import { QualityRating, Metrics, HistoricalMetrics, LeaderboardEntry } from '../types';
+import { HistoricalMetrics, LeaderboardEntry } from '../types';
 
 describe('calculateEnterpriseValue', () => {
   it('should return positive EV for healthy portfolio', () => {
@@ -44,18 +44,18 @@ describe('calculateEnterpriseValue', () => {
   });
 
   it('should include exit proceeds from sold businesses', () => {
-    const stateWithExits = createMockGameState({
-      exitedBusinesses: [
-        createMockBusiness({ status: 'sold', exitPrice: 8000 }),
-      ],
-    });
-    const stateWithoutExits = createMockGameState({
-      exitedBusinesses: [],
-    });
-
     // EV should include the exit proceeds value
     // Note: The calculation adds distributions + buybacks, not raw exit proceeds
     // The key is that exitedBusinesses with status 'sold' add exitPrice to the sum
+    const evWithExits = calculateEnterpriseValue(createMockGameState({
+      exitedBusinesses: [
+        createMockBusiness({ status: 'sold', exitPrice: 8000 }),
+      ],
+    }));
+    const evWithoutExits = calculateEnterpriseValue(createMockGameState({
+      exitedBusinesses: [],
+    }));
+    expect(evWithExits).toBeGreaterThanOrEqual(evWithoutExits);
   });
 
   it('should NOT add back distributions to EV (distributions reduce NAV)', () => {
@@ -434,6 +434,80 @@ describe('calculateFinalScore with 10-year mode', () => {
     const score = calculateFinalScore(state);
     expect(Number.isNaN(score.total)).toBe(false);
     expect(Number.isNaN(score.fcfShareGrowth)).toBe(false);
+  });
+});
+
+describe('Bankruptcy/Insolvency Scoring Edge Cases', () => {
+  it('should give F grade and score 0 for bankrupt game', () => {
+    const state = createMockGameState({
+      bankruptRound: 8,
+      businesses: [],
+      cash: 0,
+    });
+    const score = calculateFinalScore(state);
+    expect(score.total).toBe(0);
+    expect(score.grade).toBe('F');
+    expect(score.title).toContain('Bankrupt');
+    expect(score.title).toContain('Year 8');
+  });
+
+  it('should handle business with 0 EBITDA at game end', () => {
+    const state = createMockGameState({
+      businesses: [createMockBusiness({ ebitda: 0, revenue: 0 })],
+      round: 20,
+    });
+    const score = calculateFinalScore(state);
+    expect(Number.isNaN(score.total)).toBe(false);
+    expect(score.total).toBeGreaterThanOrEqual(0);
+  });
+
+  it('should handle empty portfolio (all businesses sold/wound down)', () => {
+    const state = createMockGameState({
+      businesses: [],
+      exitedBusinesses: [
+        createMockBusiness({ id: 'e1', status: 'sold', exitPrice: 8000 }),
+      ],
+      cash: 10000,
+      totalDebt: 0,
+      round: 20,
+    });
+    const score = calculateFinalScore(state);
+    expect(Number.isNaN(score.total)).toBe(false);
+    expect(score.total).toBeGreaterThanOrEqual(0);
+
+    const ev = calculateEnterpriseValue(state);
+    // No active businesses, EV = max(0, cash - debt) = 10000
+    expect(ev).toBe(10000);
+  });
+
+  it('should handle negative cash at game end', () => {
+    const state = createMockGameState({
+      businesses: [createMockBusiness({ ebitda: 500 })],
+      cash: -2000, // Negative cash
+      totalDebt: 5000,
+      round: 20,
+    });
+    const score = calculateFinalScore(state);
+    expect(Number.isNaN(score.total)).toBe(false);
+
+    const ev = calculateEnterpriseValue(state);
+    // Should not be NaN or undefined
+    expect(Number.isNaN(ev)).toBe(false);
+    expect(Number.isFinite(ev)).toBe(true);
+    // EV is floored at 0
+    expect(ev).toBeGreaterThanOrEqual(0);
+  });
+
+  it('should compute EV correctly with negative EBITDA business', () => {
+    const state = createMockGameState({
+      businesses: [createMockBusiness({ ebitda: -200, revenue: 1000, ebitdaMargin: -0.20 })],
+      cash: 5000,
+      totalDebt: 0,
+    });
+    const ev = calculateEnterpriseValue(state);
+    expect(Number.isNaN(ev)).toBe(false);
+    // Negative EBITDA * multiple would reduce portfolio value, but EV is floored at 0
+    expect(ev).toBeGreaterThanOrEqual(0);
   });
 });
 

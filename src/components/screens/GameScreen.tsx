@@ -17,9 +17,19 @@ import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { MetricDrilldownModal } from '../ui/MetricDrilldownModal';
 import { ToastContainer } from '../ui/ToastContainer';
 import { calculateFounderEquityValue } from '../../engine/scoring';
-import { DIFFICULTY_CONFIG } from '../../hooks/useGame';
+import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
 
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
+
+const IMPROVEMENT_LABELS: Record<string, string> = {
+  operating_playbook: 'Operating Playbook',
+  pricing_model: 'Pricing Model',
+  service_expansion: 'Service Expansion',
+  fix_underperformance: 'Fix Underperformance',
+  recurring_revenue_conversion: 'Recurring Revenue',
+  management_professionalization: 'Professionalize Mgmt',
+  digital_transformation: 'Digital Transformation',
+};
 
 interface GameScreenProps {
   onGameOver: () => void;
@@ -56,9 +66,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     totalDistributions,
     metrics,
     focusBonus,
-    requiresRestructuring,
+    requiresRestructuring: _requiresRestructuring,
     hasRestructured,
-    bankruptRound,
+    bankruptRound: _bankruptRound,
     holdcoAmortizationThisRound,
     roundHistory,
     advanceToEvent,
@@ -112,16 +122,6 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
   const founderOwnership = founderShares / sharesOutstanding;
 
   const addToast = useToastStore((s) => s.addToast);
-
-  const IMPROVEMENT_LABELS: Record<string, string> = {
-    operating_playbook: 'Operating Playbook',
-    pricing_model: 'Pricing Model',
-    service_expansion: 'Service Expansion',
-    fix_underperformance: 'Fix Underperformance',
-    recurring_revenue_conversion: 'Recurring Revenue',
-    management_professionalization: 'Professionalize Mgmt',
-    digital_transformation: 'Digital Transformation',
-  };
 
   const handleEventChoice = (action: string) => {
     switch (action) {

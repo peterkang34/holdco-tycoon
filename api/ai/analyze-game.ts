@@ -1,36 +1,9 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkAIRateLimit, isBodyTooLarge, sanitizeString } from '../_lib/rateLimit.js';
-
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
-
-function formatMoney(amountInThousands: number): string {
-  const amount = amountInThousands * 1000;
-  if (Math.abs(amount) >= 1000000000) {
-    return `$${(amount / 1000000000).toFixed(1)}B`;
-  }
-  if (Math.abs(amount) >= 1000000) {
-    return `$${(amount / 1000000).toFixed(1)}M`;
-  }
-  return `$${(amount / 1000).toFixed(0)}k`;
-}
+import { sanitizeString } from '../_lib/rateLimit.js';
+import { validateAIRequest, callAnthropic, formatMoneyForPrompt } from '../_lib/ai.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Only allow POST
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  if (!ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'API key not configured' });
-  }
-
-  if (await checkAIRateLimit(req)) {
-    return res.status(429).json({ error: 'Too many requests. Try again in a minute.' });
-  }
-
-  if (isBodyTooLarge(req.body)) {
-    return res.status(413).json({ error: 'Request too large' });
-  }
+  if (await validateAIRequest(req, res)) return;
 
   try {
     const {
@@ -80,8 +53,8 @@ GAME RESULTS:
 - Duration: ${totalRounds} years
 - Final Grade: ${score.grade} (${score.total}/100 points)
 - Title: ${score.title}
-- Founder Equity Value: ${formatMoney(founderEquityValue)} (founder's share of NAV)
-- Enterprise Value: ${formatMoney(enterpriseValue)} (total portfolio value)
+- Founder Equity Value: ${formatMoneyForPrompt(founderEquityValue)} (founder's share of NAV)
+- Enterprise Value: ${formatMoneyForPrompt(enterpriseValue)} (total portfolio value)
 - Founder Ownership: ${founderOwnership}
 
 SCORE BREAKDOWN:
@@ -102,17 +75,17 @@ PORTFOLIO ACTIVITY:
 - Sector Distribution: ${sectorSummarySafe}
 
 CAPITAL MANAGEMENT:
-- Total Invested Capital: ${formatMoney(totalInvestedCapital)}
-- Distributions to Owners: ${formatMoney(totalDistributions)}
-- Share Buybacks: ${formatMoney(totalBuybacks)}
+- Total Invested Capital: ${formatMoneyForPrompt(totalInvestedCapital)}
+- Distributions to Owners: ${formatMoneyForPrompt(totalDistributions)}
+- Share Buybacks: ${formatMoneyForPrompt(totalBuybacks)}
 - Equity Raises Used: ${equityRaisesUsed}/3
 - Shared Services Active: ${sharedServicesActive}
 
 TRAJECTORY:
 - EBITDA Growth: ${ebitdaGrowth}%
-- Revenue Growth: ${req.body.revenueGrowth || 'N/A'}%
-- Avg EBITDA Margin: ${req.body.avgMargin || 'N/A'}
-- Margin Change: ${req.body.marginChange || 'N/A'}
+- Revenue Growth: ${sanitizeString(String(req.body.revenueGrowth || 'N/A'), 50)}%
+- Avg EBITDA Margin: ${sanitizeString(String(req.body.avgMargin || 'N/A'), 50)}
+- Margin Change: ${sanitizeString(String(req.body.marginChange || 'N/A'), 50)}
 - Final Leverage: ${finalLeverage}x Net Debt/EBITDA
 
 Generate a JSON response with these fields:
@@ -127,43 +100,18 @@ Generate a JSON response with these fields:
 
 Be direct and specific. Reference their actual numbers. Don't be generic. Respond ONLY with valid JSON.`;
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 1000,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-      }),
-    });
+    const result = await callAnthropic(prompt, 1000);
 
-    if (!response.ok) {
-      console.error('Anthropic API error:', response.status);
-      return res.status(502).json({ error: 'AI service temporarily unavailable' });
-    }
-
-    const data = await response.json();
-    const content = data.content?.[0]?.text;
-
-    if (!content) {
-      return res.status(500).json({ error: 'No content generated' });
+    if (!result.content) {
+      return res.status(502).json({ error: result.error || 'AI service temporarily unavailable' });
     }
 
     // L-8: Parse and validate the JSON response with error handling
     let parsed;
     try {
-      parsed = JSON.parse(content);
+      parsed = JSON.parse(result.content);
     } catch {
-      console.error('Failed to parse AI response as JSON:', content.slice(0, 200));
+      console.error('Failed to parse AI response as JSON:', result.content.slice(0, 200));
       return res.status(500).json({ error: 'AI returned invalid JSON' });
     }
 

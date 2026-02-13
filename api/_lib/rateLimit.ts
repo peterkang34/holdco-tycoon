@@ -19,25 +19,6 @@ export function getClientIp(req: VercelRequest): string {
 }
 
 /**
- * Check and enforce rate limit using Vercel KV.
- * Returns true if the request should be rate-limited (blocked).
- */
-export async function isRateLimited(
-  key: string,
-  windowSeconds: number
-): Promise<boolean> {
-  try {
-    const existing = await kv.get(key);
-    if (existing) return true;
-    await kv.set(key, '1', { ex: windowSeconds });
-    return false;
-  } catch {
-    // If KV is unavailable, allow the request (fail-open for AI features)
-    return false;
-  }
-}
-
-/**
  * Rate limit check for AI endpoints.
  * 10 requests per minute per IP.
  * Returns true if rate-limited.

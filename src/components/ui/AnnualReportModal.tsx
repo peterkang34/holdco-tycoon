@@ -72,7 +72,7 @@ export function AnnualReportModal({ roundHistory, onClose }: AnnualReportModalPr
           </div>
         ) : (
           <div className="space-y-3">
-            {[...roundHistory].reverse().map((entry, idx) => {
+            {[...roundHistory].reverse().map((entry, _idx) => {
               const prevEntry = roundHistory.find(e => e.round === entry.round - 1);
               const isExpanded = expandedRound === entry.round;
 

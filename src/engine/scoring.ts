@@ -7,6 +7,7 @@ import {
 } from './types';
 import { calculateMetrics, calculateSectorFocusBonus, calculateExitValuation } from './simulation';
 import { POST_GAME_INSIGHTS } from '../data/tips';
+import { getAllDedupedBusinesses } from './helpers';
 
 const LEADERBOARD_KEY = 'holdco-tycoon-leaderboard';
 const MAX_LEADERBOARD_ENTRIES = 10;
@@ -100,11 +101,7 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
   // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons, merged, and child bolt-ons
   // Merged businesses' capital is already captured in the merged entity's totalAcquisitionCost
-  const exitedIds = new Set(state.exitedBusinesses.map(b => b.id));
-  const allBusinesses = [
-    ...state.exitedBusinesses.filter(b => b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
-    ...state.businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
-  ];
+  const allBusinesses = getAllDedupedBusinesses(state.businesses, state.exitedBusinesses);
 
   // 1. FCF/Share Growth (25 points max)
   let fcfShareGrowth = 0;
@@ -348,11 +345,7 @@ export function generatePostGameInsights(state: GameState): PostGameInsight[] {
   const metrics = calculateMetrics(state);
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
   // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons and child bolt-ons
-  const exitedIdsInsights = new Set(state.exitedBusinesses.map(b => b.id));
-  const allBusinesses = [
-    ...state.exitedBusinesses.filter(b => b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
-    ...state.businesses.filter(b => !exitedIdsInsights.has(b.id) && b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
-  ];
+  const allBusinesses = getAllDedupedBusinesses(state.businesses, state.exitedBusinesses);
 
   // Check for patterns
   const neverAcquired = allBusinesses.length <= 1;

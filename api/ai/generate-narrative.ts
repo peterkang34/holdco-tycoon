@@ -1,7 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkAIRateLimit, isBodyTooLarge, sanitizeString } from '../_lib/rateLimit.js';
-
-const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+import { sanitizeString } from '../_lib/rateLimit.js';
+import { validateAIRequest, callAnthropic } from '../_lib/ai.js';
 
 type NarrativeType = 'event' | 'business_update' | 'year_chronicle' | 'deal_story';
 
@@ -129,21 +128,7 @@ Be creative and specific. Keep it under 100 words. Respond with just the narrati
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
-  if (!ANTHROPIC_API_KEY) {
-    return res.status(500).json({ error: 'API key not configured' });
-  }
-
-  if (await checkAIRateLimit(req)) {
-    return res.status(429).json({ error: 'Too many requests. Try again in a minute.' });
-  }
-
-  if (isBodyTooLarge(req.body)) {
-    return res.status(413).json({ error: 'Request too large' });
-  }
+  if (await validateAIRequest(req, res)) return;
 
   try {
     const { type, context } = req.body as NarrativeRequest;
@@ -184,38 +169,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Invalid narrative type' });
     }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': ANTHROPIC_API_KEY,
-        'anthropic-version': '2023-06-01',
-      },
-      body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 200,
-        messages: [
-          {
-            role: 'user',
-            content: prompt,
-          },
-        ],
-      }),
-    });
+    const result = await callAnthropic(prompt, 200);
 
-    if (!response.ok) {
-      console.error('Anthropic API error:', response.status);
-      return res.status(502).json({ error: 'AI service temporarily unavailable' });
+    if (!result.content) {
+      return res.status(502).json({ error: result.error || 'AI service temporarily unavailable' });
     }
 
-    const data = await response.json();
-    const narrative = data.content?.[0]?.text?.trim();
-
-    if (!narrative) {
-      return res.status(500).json({ error: 'No narrative generated' });
-    }
-
-    return res.status(200).json({ narrative });
+    return res.status(200).json({ narrative: result.content.trim() });
   } catch (error) {
     console.error('Generate narrative error:', error);
     return res.status(500).json({ error: 'Internal server error' });

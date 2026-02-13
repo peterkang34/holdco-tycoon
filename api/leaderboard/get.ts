@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
+import { LEADERBOARD_KEY } from '../_lib/leaderboard.js';
 
-const LEADERBOARD_KEY = 'leaderboard:v2';
 const MAX_ENTRIES = 50;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

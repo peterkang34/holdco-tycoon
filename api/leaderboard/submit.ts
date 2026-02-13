@@ -2,8 +2,8 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import { randomUUID } from 'crypto';
 import { getClientIp, isBodyTooLarge } from '../_lib/rateLimit.js';
+import { LEADERBOARD_KEY, DIFFICULTY_MULTIPLIER } from '../_lib/leaderboard.js';
 
-const LEADERBOARD_KEY = 'leaderboard:v2';
 const MAX_ENTRIES = 100;
 const RATE_LIMIT_SECONDS = 60;
 
@@ -11,7 +11,6 @@ const VALID_GRADES = ['S', 'A', 'B', 'C', 'D', 'F'] as const;
 type Grade = typeof VALID_GRADES[number];
 const VALID_DIFFICULTIES = ['easy', 'normal'] as const;
 const VALID_DURATIONS = ['standard', 'quick'] as const;
-const DIFFICULTY_MULTIPLIER: Record<string, number> = { easy: 1.0, normal: 1.15 };
 
 // Allowlist: alphanumeric, spaces, and common business name chars
 const HOLDCO_NAME_REGEX = /^[A-Za-z0-9 &'.,\-]+$/;

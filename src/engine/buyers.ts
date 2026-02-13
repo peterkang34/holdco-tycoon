@@ -148,22 +148,22 @@ function getBuyerType(tier: BuyerPoolTier): { type: BuyerType; isStrategic: bool
     large_pe: ['large_pe', 'large_pe', 'institutional_pe'],
   };
 
-  const type = pickRandom(typeMap[tier]);
+  const type = pickRandom(typeMap[tier])!;
   return { type, isStrategic: false };
 }
 
 function pickBuyerName(buyerType: BuyerType, sectorId: SectorId): string {
   if (buyerType === 'strategic') {
     const strategics = STRATEGIC_TEMPLATES[sectorId] || STRATEGIC_TEMPLATES.b2bServices;
-    return pickRandom(strategics);
+    return pickRandom(strategics)!;
   }
   if (buyerType === 'individual') {
     return 'Independent Sponsor';
   }
   if (buyerType === 'family_office') {
-    return pickRandom(FAMILY_OFFICE_NAMES);
+    return pickRandom(FAMILY_OFFICE_NAMES)!;
   }
-  return pickRandom(PE_FUND_NAMES);
+  return pickRandom(PE_FUND_NAMES)!;
 }
 
 function getFundSize(buyerType: BuyerType): string | undefined {
