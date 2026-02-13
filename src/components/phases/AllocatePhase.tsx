@@ -153,6 +153,7 @@ export function AllocatePhase({
   const [sellConfirmBusiness, setSellConfirmBusiness] = useState<Business | null>(null);
   const [sellCelebration, setSellCelebration] = useState<{ name: string; moic: number } | null>(null);
   const [windDownConfirmBusiness, setWindDownConfirmBusiness] = useState<Business | null>(null);
+  const [dismissedWarnings, setDismissedWarnings] = useState<Set<string>>(new Set());
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const distressRestrictions = getDistressRestrictions(distressLevel);
@@ -820,12 +821,14 @@ export function AllocatePhase({
             {actionsThisRound
               .filter(a =>
                 (a.type === 'acquire_tuck_in' || a.type === 'merge_businesses') &&
-                a.details?.integrationOutcome === 'failure'
+                a.details?.integrationOutcome === 'failure' &&
+                !dismissedWarnings.has(`${a.type}-${a.details?.businessId ?? a.details?.newName}`)
               )
               .map((a, i) => {
                 const d = a.details;
                 const cost = d.restructuringCost as number;
                 const drag = Math.abs(d.growthDragPenalty as number) * 100;
+                const dismissKey = `${a.type}-${d.businessId ?? d.newName}`;
                 let description: string;
                 if (a.type === 'acquire_tuck_in') {
                   const platform = businesses.find(b => b.id === d.platformId);
@@ -838,10 +841,16 @@ export function AllocatePhase({
                   <div key={i} className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 mb-4">
                     <div className="flex items-start gap-3">
                       <span className="text-lg">⚠️</span>
-                      <div>
+                      <div className="flex-1 min-w-0">
                         <h4 className="font-bold text-red-400 text-sm">Integration Failed</h4>
                         <p className="text-xs text-text-secondary mt-1">{description}</p>
                       </div>
+                      <button
+                        onClick={() => setDismissedWarnings(prev => new Set(prev).add(dismissKey))}
+                        className="text-text-muted hover:text-text-primary text-lg leading-none"
+                      >
+                        ×
+                      </button>
                     </div>
                   </div>
                 );

@@ -69,7 +69,7 @@ function App() {
   const founderPersonalWealth = useMemo(() => screen === 'gameOver' ? getFounderPersonalWealth() : undefined, [screen]);
 
   return (
-    <div className="min-h-screen bg-bg-primary text-text-primary">
+    <div className="min-h-screen bg-bg-primary text-text-primary overflow-x-hidden">
       {screen === 'intro' && <IntroScreen onStart={handleStart} />}
       {screen === 'game' && <GameScreen onGameOver={handleGameOver} onResetGame={handlePlayAgain} showTutorial={isNewGame} />}
       {screen === 'gameOver' && (

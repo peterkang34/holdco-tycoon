@@ -46,12 +46,12 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
 
   const getArchetypeBadge = (archetype?: SellerArchetype) => {
     switch (archetype) {
-      case 'retiring_founder': return { label: 'Retiring', color: 'bg-blue-500/20 text-blue-400' };
-      case 'burnt_out_operator': return { label: 'Burnt Out', color: 'bg-orange-500/20 text-orange-400' };
-      case 'accidental_holdco': return { label: 'Divestiture', color: 'bg-purple-500/20 text-purple-400' };
-      case 'distressed_seller': return { label: 'Distressed', color: 'bg-red-500/20 text-red-400' };
-      case 'mbo_candidate': return { label: 'MBO', color: 'bg-green-500/20 text-green-400' };
-      case 'franchise_breakaway': return { label: 'Ex-Franchise', color: 'bg-teal-500/20 text-teal-400' };
+      case 'retiring_founder': return { label: 'Retiring', color: 'bg-blue-500/20 text-blue-400', tip: 'Founder ready to hand over the keys. Fair price, stable business, smooth transition.' };
+      case 'burnt_out_operator': return { label: 'Burnt Out', color: 'bg-orange-500/20 text-orange-400', tip: 'Owner is exhausted and wants out. Expect a discount, but the business may need operational attention.' };
+      case 'accidental_holdco': return { label: 'Divestiture', color: 'bg-purple-500/20 text-purple-400', tip: 'Parent company shedding a non-core division. Slight premium, but clean separation.' };
+      case 'distressed_seller': return { label: 'Distressed', color: 'bg-red-500/20 text-red-400', tip: 'Seller under financial pressure. Steep discount, but expect weak operations and higher risk.' };
+      case 'mbo_candidate': return { label: 'MBO', color: 'bg-green-500/20 text-green-400', tip: 'Management buyout — strong operator team already in place. Fair price with built-in leadership.' };
+      case 'franchise_breakaway': return { label: 'Ex-Franchise', color: 'bg-teal-500/20 text-teal-400', tip: 'Former franchisee going independent. Slight premium, but comes with entrepreneurial energy and higher growth.' };
       default: return null;
     }
   };
@@ -104,9 +104,13 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
             </span>
           </div>
           {archetypeBadge && (
-            <span className={`text-xs px-2 py-1 rounded ${archetypeBadge.color}`}>
-              {archetypeBadge.label}
-            </span>
+            <Tooltip
+              trigger={<span className={`text-xs px-2 py-1 rounded ${archetypeBadge.color}`}>{archetypeBadge.label}</span>}
+              align="right"
+              width="w-56"
+            >
+              {archetypeBadge.tip}
+            </Tooltip>
           )}
           <span className={`text-xs px-2 py-1 rounded ${
             deal.freshness === 1 ? 'bg-warning/20 text-warning' : 'bg-white/10 text-text-muted'
