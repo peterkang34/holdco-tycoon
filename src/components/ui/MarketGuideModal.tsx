@@ -104,10 +104,10 @@ export function MarketGuideModal({ onClose }: MarketGuideModalProps) {
             <div>
               <p className="font-medium text-text-primary">Multiple Expansion</p>
               <ul className="text-text-secondary mt-1 space-y-1">
-                <li>• Grow EBITDA</li>
-                <li>• Build platform scale</li>
-                <li>• Improve quality</li>
-                <li>• Hold longer</li>
+                <li>• Platform scale: +0.3x / +0.6x / +1.0x</li>
+                <li>• EBITDA &gt;$3M: +0.15x, &gt;$5M: +0.3x</li>
+                <li>• Higher quality rating</li>
+                <li>• Rule of 40, margin expansion</li>
               </ul>
             </div>
           </div>
@@ -207,14 +207,42 @@ export function MarketGuideModal({ onClose }: MarketGuideModalProps) {
           </table>
         </div>
 
+        {/* Bolt-On Sizing Guide */}
+        <div className="mt-6 bg-accent-secondary/10 border border-accent-secondary/30 rounded-lg p-4">
+          <h4 className="font-bold text-accent-secondary mb-2">Bolt-On Size Ratios</h4>
+          <p className="text-sm text-text-secondary mb-3">
+            When tucking a bolt-on into a platform, the size ratio (bolt-on EBITDA / platform EBITDA) affects integration success and synergy capture:
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+            <div className="bg-white/5 rounded p-2">
+              <p className="font-medium text-green-400">Ideal (&le;0.5x)</p>
+              <p className="text-text-muted text-xs mt-1">Full synergies, no penalty</p>
+            </div>
+            <div className="bg-white/5 rounded p-2">
+              <p className="font-medium text-yellow-400">Stretch (0.5-1.0x)</p>
+              <p className="text-text-muted text-xs mt-1">80% synergies, -8% integration</p>
+            </div>
+            <div className="bg-white/5 rounded p-2">
+              <p className="font-medium text-orange-400">Strained (1.0-2.0x)</p>
+              <p className="text-text-muted text-xs mt-1">50% synergies, -18% integration</p>
+            </div>
+            <div className="bg-white/5 rounded p-2">
+              <p className="font-medium text-red-400">Overreach (&gt;2.0x)</p>
+              <p className="text-text-muted text-xs mt-1">25% synergies, -28% integration</p>
+            </div>
+          </div>
+          <p className="text-xs text-text-muted mt-2">Scaled platforms (3+ bolt-ons), shared services, and high-quality matches can reduce integration penalties — but synergy dampening always applies.</p>
+        </div>
+
         {/* Footer Tips */}
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="p-4 bg-white/5 rounded-lg text-sm">
             <p className="font-medium text-text-secondary mb-2">Reading the Table</p>
             <ul className="text-text-muted space-y-1">
               <li><span className="text-accent">●</span> Green multiples = premium sectors (5x+)</li>
               <li><span className="text-accent-secondary">●</span> Orange multiples = value sectors (under 4x)</li>
               <li>Higher CapEx = lower FCF conversion from EBITDA</li>
+              <li>EBITDA = Revenue × Margin (margins drift down over time)</li>
             </ul>
           </div>
           <div className="p-4 bg-white/5 rounded-lg text-sm">
@@ -223,7 +251,8 @@ export function MarketGuideModal({ onClose }: MarketGuideModalProps) {
               <li>• Compare deal multiple to sector range</li>
               <li>• Quality businesses command top of range</li>
               <li>• Distressed sellers offer bottom of range</li>
-              <li>• Platform premiums add 0.5-1.0x on exit</li>
+              <li>• Hot/contested deals carry price premiums</li>
+              <li>• Sub-type match boosts bolt-on synergies</li>
             </ul>
           </div>
         </div>
