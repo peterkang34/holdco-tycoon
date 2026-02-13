@@ -422,13 +422,16 @@ function getSizeRatioProbabilityPenalty(
     strained: -0.18,
     overreach: -0.28,
   };
-  let penalty = basePenalty[tier];
-  if (penalty === 0) return 0;
+  const basePen = basePenalty[tier];
+  if (basePen === 0) return 0;
   // Mitigating factors (only reduce the penalty, never flip to bonus)
-  if (platformScale >= 3) penalty += 0.15; // Experienced platforms absorb better
-  if (hasSharedServices) penalty += 0.05;
-  if (bothHighQuality) penalty += 0.05;
-  return Math.min(0, penalty); // Never become positive
+  let mitigation = 0;
+  if (platformScale >= 3) mitigation += 0.15; // Experienced platforms absorb better
+  if (hasSharedServices) mitigation += 0.05;
+  if (bothHighQuality) mitigation += 0.05;
+  // Cap mitigation at 50% of base penalty — oversized bolt-ons are always risky
+  const maxMitigation = Math.abs(basePen) * 0.5;
+  return basePen + Math.min(mitigation, maxMitigation);
 }
 
 // Size ratio dampening on synergy capture

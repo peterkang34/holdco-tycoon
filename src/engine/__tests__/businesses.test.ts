@@ -861,6 +861,43 @@ describe('size ratio impact on integration', () => {
     expect(Math.abs(idealSuccesses - noTierSuccesses)).toBeLessThan(trials * 0.10);
   });
 
+  it('overreach with full mitigations should still have meaningful penalty (50% cap)', () => {
+    // Even with all mitigators, overreach should still reduce success vs ideal
+    let overreachMitigatedSuccesses = 0;
+    let idealSuccesses = 0;
+    const trials = 2000;
+    const mockBusiness = {
+      qualityRating: 5 as QualityRating,
+      sectorId: 'agency' as SectorId,
+      dueDiligence: {
+        operatorQuality: 'moderate' as const,
+        revenueConcentration: 'medium' as const,
+        operatorQualityText: '',
+        revenueConcentrationText: '',
+        trend: 'flat' as const,
+        trendText: '',
+        customerRetention: 85,
+        customerRetentionText: '',
+        competitivePosition: 'competitive' as const,
+        competitivePositionText: '',
+      },
+    } as any;
+    const mockPlatformScaled = {
+      qualityRating: 5 as QualityRating,
+      sectorId: 'agency' as SectorId,
+      platformScale: 3,
+    } as any;
+
+    for (let i = 0; i < trials; i++) {
+      // Overreach with full mitigations: scale 3+, shared services, both Q5
+      if (determineIntegrationOutcome(mockBusiness, mockPlatformScaled, true, 'match', 'overreach') === 'success') overreachMitigatedSuccesses++;
+      if (determineIntegrationOutcome(mockBusiness, mockPlatformScaled, true, 'match', 'ideal') === 'success') idealSuccesses++;
+    }
+    // With 50% cap, overreach (-28%) retains at least -14% penalty even with full mitigations
+    // So overreach should still have meaningfully fewer successes than ideal
+    expect(overreachMitigatedSuccesses).toBeLessThan(idealSuccesses * 0.90);
+  });
+
   it('overreach tier should significantly reduce success probability', () => {
     let overreachSuccesses = 0;
     let idealSuccesses = 0;
