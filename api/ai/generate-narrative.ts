@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkAIRateLimit, isBodyTooLarge, sanitizeString } from '../_lib/rateLimit';
+import { checkAIRateLimit, isBodyTooLarge, sanitizeString } from '../_lib/rateLimit.js';
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 

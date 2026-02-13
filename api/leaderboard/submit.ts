@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
-import crypto from 'crypto';
-import { getClientIp, isBodyTooLarge } from '../_lib/rateLimit';
+import { randomUUID } from 'crypto';
+import { getClientIp, isBodyTooLarge } from '../_lib/rateLimit.js';
 
 const LEADERBOARD_KEY = 'leaderboard:v2';
 const MAX_ENTRIES = 100;
@@ -126,7 +126,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     await kv.set(rateLimitKey, '1', { ex: RATE_LIMIT_SECONDS });
 
     // --- Store Entry ---
-    const id = crypto.randomUUID();
+    const id = randomUUID();
     const multiplier = DIFFICULTY_MULTIPLIER[validDifficulty] ?? 1.0;
     const adjustedFEV = Math.round(validFEV * multiplier);
 
