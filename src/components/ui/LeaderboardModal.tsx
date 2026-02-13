@@ -117,27 +117,27 @@ function RankBadge({ rank }: { rank: number }) {
     rank === 2 ? 'text-gray-300' :
     rank === 3 ? 'text-orange-400' :
     'text-text-muted';
-  return <span className={`text-lg font-bold ${color}`}>#{rank}</span>;
+  return <span className={`text-lg font-bold tabular-nums w-10 text-center inline-block ${color}`}>#{rank}</span>;
 }
 
 function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
   return (
     <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-4 min-w-0 flex-1">
         <RankBadge rank={rank} />
-        <div>
+        <div className="min-w-0">
           <p className="font-bold">{entry.initials}</p>
-          <p className="text-xs text-text-muted">{entry.holdcoName}</p>
+          <p className="text-xs text-text-muted truncate">{entry.holdcoName}</p>
         </div>
       </div>
-      <div className="flex items-center gap-3 sm:gap-6 text-right">
-        <div>
+      <div className="flex items-center gap-4 sm:gap-6 text-right shrink-0">
+        <div className="min-w-[4.5rem]">
           <p className="text-xs text-text-muted">{entry.founderEquityValue ? 'FEV' : 'EV'}</p>
-          <p className="font-mono font-bold text-accent">{formatMoney(entry.founderEquityValue ?? entry.enterpriseValue)}</p>
+          <p className="font-mono tabular-nums font-bold text-accent">{formatMoney(entry.founderEquityValue ?? entry.enterpriseValue)}</p>
         </div>
-        <div>
+        <div className="min-w-[3.5rem]">
           <p className="text-xs text-text-muted">Score</p>
-          <p className={`font-mono ${
+          <p className={`font-mono tabular-nums ${
             entry.grade === 'S' ? 'text-yellow-400' :
             entry.grade === 'A' ? 'text-accent' :
             entry.grade === 'B' ? 'text-blue-400' :
@@ -147,12 +147,14 @@ function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number
             'text-text-secondary'
           }`}>{entry.score} ({entry.grade})</p>
         </div>
-        {entry.difficulty && (
-          <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
-            {entry.difficulty === 'normal' ? 'H' : 'E'}{entry.duration === 'quick' ? '/10' : ''}
-          </span>
-        )}
-        <div className="text-xs text-text-muted hidden sm:block">
+        <div className="w-8 flex justify-center">
+          {entry.difficulty ? (
+            <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
+              {entry.difficulty === 'normal' ? 'H' : 'E'}{entry.duration === 'quick' ? '/10' : ''}
+            </span>
+          ) : null}
+        </div>
+        <div className="text-xs text-text-muted hidden sm:block w-20">
           {formatDate(entry.date)}
         </div>
       </div>
@@ -170,9 +172,14 @@ function GhostRow({ rank, ev }: { rank: number; ev: number }) {
           <p className="text-xs text-text-muted">Current run</p>
         </div>
       </div>
-      <div className="text-right">
-        <p className="text-xs text-text-muted">FEV</p>
-        <p className="font-mono font-bold text-accent">{formatMoney(ev)}</p>
+      <div className="flex items-center gap-4 sm:gap-6 text-right">
+        <div className="min-w-[4.5rem]">
+          <p className="text-xs text-text-muted">FEV</p>
+          <p className="font-mono tabular-nums font-bold text-accent">{formatMoney(ev)}</p>
+        </div>
+        <div className="min-w-[3.5rem]" />
+        <div className="w-8" />
+        <div className="w-20 hidden sm:block" />
       </div>
     </div>
   );
