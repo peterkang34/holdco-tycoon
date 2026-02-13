@@ -9,9 +9,10 @@ interface MetricCardProps {
   status?: 'positive' | 'negative' | 'warning' | 'neutral';
   tooltip?: string;
   icon?: ReactNode;
+  onClick?: () => void;
 }
 
-export function MetricCard({ label, value, subValue, status = 'neutral', tooltip, icon }: MetricCardProps) {
+export function MetricCard({ label, value, subValue, status = 'neutral', tooltip, icon, onClick }: MetricCardProps) {
   const statusColors = {
     positive: 'text-accent',
     negative: 'text-danger',
@@ -22,7 +23,7 @@ export function MetricCard({ label, value, subValue, status = 'neutral', tooltip
   const tooltipData = METRIC_TOOLTIPS[label.toLowerCase().replace(/[\/\s]/g, '')];
 
   return (
-    <div className="card min-w-0 relative p-2.5">
+    <div className={`card min-w-0 relative p-2.5${onClick ? ' cursor-pointer hover:border-accent/50 transition-colors' : ''}`} onClick={onClick}>
       <div className="flex items-center gap-1.5 mb-1">
         {icon && <span className="text-text-muted">{icon}</span>}
         <span className="text-[10px] sm:text-xs text-text-muted uppercase tracking-wider leading-tight">{label}</span>

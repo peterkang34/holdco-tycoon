@@ -15,6 +15,7 @@ interface DashboardProps {
   distressLevel: DistressLevel;
   concentrationCount?: number; // Max opcos sharing a focus group
   diversificationBonus?: boolean; // Has 4+ unique sectors
+  onMetricClick?: (key: string) => void;
 }
 
 export function Dashboard({
@@ -30,6 +31,7 @@ export function Dashboard({
   distressLevel,
   concentrationCount,
   diversificationBonus,
+  onMetricClick,
 }: DashboardProps) {
   const getCashStatus = () => {
     if (liveCash > 5000) return 'positive';  // $5M+ is healthy
@@ -94,36 +96,43 @@ export function Dashboard({
           label="Cash"
           value={formatMoney(liveCash)}
           status={getCashStatus()}
+          onClick={() => onMetricClick?.('cash')}
         />
         <MetricCard
           label="EBITDA"
           value={formatMoney(metrics.totalEbitda)}
+          onClick={() => onMetricClick?.('ebitda')}
         />
         <MetricCard
           label="Net FCF"
           value={formatMoney(metrics.totalFcf)}
           status={metrics.totalFcf > 0 ? 'positive' : metrics.totalFcf < 0 ? 'negative' : 'neutral'}
+          onClick={() => onMetricClick?.('netfcf')}
         />
         <MetricCard
           label="FCF/Share"
           value={`$${metrics.fcfPerShare.toFixed(0)}`}
           subValue={`${sharesOutstanding.toFixed(0)} shares`}
           status={metrics.fcfPerShare > 0 ? 'positive' : 'negative'}
+          onClick={() => onMetricClick?.('fcfshare')}
         />
         <MetricCard
           label="ROIC"
           value={formatPercent(metrics.portfolioRoic)}
           status={getRoicStatus()}
+          onClick={() => onMetricClick?.('roic')}
         />
         <MetricCard
           label="ROIIC"
           value={formatPercent(metrics.roiic)}
           status={getRoiicStatus()}
+          onClick={() => onMetricClick?.('roiic')}
         />
         <MetricCard
           label="MOIC"
           value={formatMultiple(metrics.portfolioMoic)}
           status={getMoicStatus()}
+          onClick={() => onMetricClick?.('moic')}
         />
         <MetricCard
           label="Leverage"
@@ -134,11 +143,13 @@ export function Dashboard({
               : isNetCash ? 'No debt' : 'Net Debt/EBITDA'
           }
           status={getLeverageStatus()}
+          onClick={() => onMetricClick?.('leverage')}
         />
         <MetricCard
           label="Cash Conv."
           value={formatPercent(metrics.cashConversion)}
           status={getCashConversionStatus()}
+          onClick={() => onMetricClick?.('cashconv')}
         />
       </div>
 

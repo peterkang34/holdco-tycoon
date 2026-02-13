@@ -62,8 +62,8 @@ export function GameOverScreen({
   // Filter out 'integrated' status (bolt-ons are folded into platform EBITDA)
   const exitedIds = new Set(exitedBusinesses.map(b => b.id));
   const allBusinesses = [
-    ...exitedBusinesses.filter(b => b.status !== 'integrated' && b.status !== 'merged'),
-    ...businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated' && b.status !== 'merged'),
+    ...exitedBusinesses.filter(b => b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
+    ...businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
   ];
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const difficultyMultiplier = DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0;

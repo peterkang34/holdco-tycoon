@@ -1,13 +1,16 @@
-import { GameEvent } from '../../engine/types';
+import { GameEvent, Business } from '../../engine/types';
 import { EventCard } from '../cards/EventCard';
 
 interface EventPhaseProps {
   event: GameEvent | null;
+  businesses?: Business[];
+  currentRound?: number;
+  lastEventType?: string;
   onChoice: (action: string) => void;
   onContinue: () => void;
 }
 
-export function EventPhase({ event, onChoice, onContinue }: EventPhaseProps) {
+export function EventPhase({ event, businesses, currentRound, lastEventType, onChoice, onContinue }: EventPhaseProps) {
   if (!event) {
     return (
       <div className="max-w-lg mx-auto px-4 sm:px-6 py-6 text-center">
@@ -30,6 +33,9 @@ export function EventPhase({ event, onChoice, onContinue }: EventPhaseProps) {
 
       <EventCard
         event={event}
+        businesses={businesses}
+        currentRound={currentRound}
+        lastEventType={lastEventType}
         onChoice={hasChoices ? onChoice : undefined}
         onContinue={!hasChoices ? onContinue : undefined}
       />

@@ -90,9 +90,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'grade does not match score range' });
     }
 
-    // businessCount: integer, 1 ≤ count ≤ 30
-    if (typeof businessCount !== 'number' || !Number.isInteger(businessCount) || businessCount < 1 || businessCount > 30) {
-      return res.status(400).json({ error: 'businessCount must be an integer between 1 and 30' });
+    // businessCount: integer, 0 ≤ count ≤ 30
+    if (typeof businessCount !== 'number' || !Number.isInteger(businessCount) || businessCount < 0 || businessCount > 30) {
+      return res.status(400).json({ error: 'businessCount must be an integer between 0 and 30' });
     }
 
     // totalRounds: 10 or 20

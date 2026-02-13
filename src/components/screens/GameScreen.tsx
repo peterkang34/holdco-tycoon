@@ -11,6 +11,7 @@ import { RestructurePhase } from '../phases/RestructurePhase';
 import { InstructionsModal } from '../ui/InstructionsModal';
 import { AnnualReportModal } from '../ui/AnnualReportModal';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
+import { MetricDrilldownModal } from '../ui/MetricDrilldownModal';
 import { calculateFounderEquityValue } from '../../engine/scoring';
 import { DIFFICULTY_CONFIG } from '../../hooks/useGame';
 
@@ -27,6 +28,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showAnnualReports, setShowAnnualReports] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [drilldownMetric, setDrilldownMetric] = useState<string | null>(null);
 
   const {
     holdcoName,
@@ -241,6 +243,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         return (
           <EventPhase
             event={currentEvent}
+            businesses={businesses}
+            currentRound={round}
+            lastEventType={lastEventType}
             onChoice={handleEventChoice}
             onContinue={advanceToAllocate}
           />
@@ -413,6 +418,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         distressLevel={metrics.distressLevel}
         concentrationCount={concentrationCount}
         diversificationBonus={diversificationBonus}
+        onMetricClick={setDrilldownMetric}
       />
 
       {/* Phase Content */}
@@ -433,6 +439,14 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         <LeaderboardModal
           hypotheticalEV={Math.round(calculateFounderEquityValue(useGameStore.getState()) * (DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0))}
           onClose={() => setShowLeaderboard(false)}
+        />
+      )}
+
+      {/* Metric Drilldown Modal */}
+      {drilldownMetric && (
+        <MetricDrilldownModal
+          metricKey={drilldownMetric}
+          onClose={() => setDrilldownMetric(null)}
         />
       )}
 

@@ -97,12 +97,12 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
 
   const metrics = calculateMetrics(state);
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
-  // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons and merged businesses
+  // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons, merged, and child bolt-ons
   // Merged businesses' capital is already captured in the merged entity's totalAcquisitionCost
   const exitedIds = new Set(state.exitedBusinesses.map(b => b.id));
   const allBusinesses = [
-    ...state.exitedBusinesses.filter(b => b.status !== 'integrated' && b.status !== 'merged'),
-    ...state.businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated' && b.status !== 'merged'),
+    ...state.exitedBusinesses.filter(b => b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
+    ...state.businesses.filter(b => !exitedIds.has(b.id) && b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
   ];
 
   // 1. FCF/Share Growth (25 points max)
@@ -346,11 +346,11 @@ export function generatePostGameInsights(state: GameState): PostGameInsight[] {
   const insights: PostGameInsight[] = [];
   const metrics = calculateMetrics(state);
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
-  // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons
+  // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons and child bolt-ons
   const exitedIdsInsights = new Set(state.exitedBusinesses.map(b => b.id));
   const allBusinesses = [
-    ...state.exitedBusinesses.filter(b => b.status !== 'integrated' && b.status !== 'merged'),
-    ...state.businesses.filter(b => !exitedIdsInsights.has(b.id) && b.status !== 'integrated' && b.status !== 'merged'),
+    ...state.exitedBusinesses.filter(b => b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
+    ...state.businesses.filter(b => !exitedIdsInsights.has(b.id) && b.status !== 'integrated' && b.status !== 'merged' && !b.parentPlatformId),
   ];
 
   // Check for patterns

@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { SectorId, GameDifficulty, GameDuration } from '../../engine/types';
 import { SECTOR_LIST, SECTORS } from '../../data/sectors';
-import { loadLeaderboard } from '../../engine/scoring';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../../hooks/useGame';
 
@@ -17,13 +16,6 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
   const [selectedDuration, setSelectedDuration] = useState<GameDuration>('standard');
   const [showNameError, setShowNameError] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [hasLeaderboardEntries, setHasLeaderboardEntries] = useState(false);
-
-  useEffect(() => {
-    loadLeaderboard().then(entries => {
-      setHasLeaderboardEntries(entries.length > 0);
-    });
-  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -201,14 +193,12 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
         )}
 
         {/* Global Leaderboard */}
-        {hasLeaderboardEntries && (
-          <button
-            onClick={() => setShowLeaderboard(true)}
-            className="mt-4 text-sm text-text-muted hover:text-accent transition-colors"
-          >
-            🌍 Global Leaderboard
-          </button>
-        )}
+        <button
+          onClick={() => setShowLeaderboard(true)}
+          className="mt-4 text-sm text-text-muted hover:text-accent transition-colors"
+        >
+          🌍 Global Leaderboard
+        </button>
 
         {/* Info */}
         <div className="mt-8 text-sm text-text-muted">

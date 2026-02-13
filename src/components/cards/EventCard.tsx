@@ -1,12 +1,17 @@
-import { GameEvent, EventImpact, BuyerProfile, EventChoice, formatMoney, formatPercent } from '../../engine/types';
+import { GameEvent, EventImpact, BuyerProfile, EventChoice, Business, formatMoney, formatPercent } from '../../engine/types';
+import { calculateExitValuation } from '../../engine/simulation';
+import { SECTORS } from '../../data/sectors';
 
 interface EventCardProps {
   event: GameEvent;
+  businesses?: Business[];
+  currentRound?: number;
+  lastEventType?: string;
   onChoice?: (action: string) => void;
   onContinue?: () => void;
 }
 
-export function EventCard({ event, onChoice, onContinue }: EventCardProps) {
+export function EventCard({ event, businesses, currentRound, lastEventType, onChoice, onContinue }: EventCardProps) {
   const getEventIcon = () => {
     switch (event.type) {
       case 'global_bull_market':
@@ -134,6 +139,81 @@ export function EventCard({ event, onChoice, onContinue }: EventCardProps) {
           </div>
         </div>
       )}
+
+      {/* Business Summary (unsolicited offers) */}
+      {event.type === 'unsolicited_offer' && businesses && currentRound && (() => {
+        const business = businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return null;
+        const sector = SECTORS[business.sectorId];
+        const valuation = calculateExitValuation(business, currentRound, lastEventType);
+        const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
+        const offerAmount = event.offerAmount ?? 0;
+        const premiumPct = valuation.exitPrice > 0
+          ? ((offerAmount - valuation.exitPrice) / valuation.exitPrice) * 100
+          : 0;
+        const gainVsInvested = totalInvested > 0
+          ? ((offerAmount - totalInvested) / totalInvested) * 100
+          : 0;
+        const fcf = business.ebitda * (1 - sector.capexRate);
+
+        return (
+          <div className="bg-white/5 rounded-lg p-4 mb-4 border border-white/10">
+            <p className="text-xs text-text-muted font-medium mb-3 uppercase tracking-wide">Business Being Solicited</p>
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xl">{sector.emoji}</span>
+              <div>
+                <span className="font-bold text-sm">{business.name}</span>
+                <span className="text-xs text-text-muted ml-2">{business.subType}</span>
+              </div>
+              <div className="ml-auto flex">
+                {Array(5).fill(0).map((_, i) => (
+                  <span key={i} className={`text-xs ${i < business.qualityRating ? 'text-yellow-400' : 'text-white/20'}`}>★</span>
+                ))}
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3 text-center mb-3">
+              <div>
+                <p className="text-xs text-text-muted">Revenue</p>
+                <p className="font-mono text-sm font-medium">{formatMoney(business.revenue)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-muted">EBITDA</p>
+                <p className="font-mono text-sm font-medium">{formatMoney(business.ebitda)}</p>
+                <p className="text-[10px] text-text-muted">{(business.ebitdaMargin * 100).toFixed(0)}% margin</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-muted">Annual FCF</p>
+                <p className="font-mono text-sm font-medium">{formatMoney(fcf)}</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-center mb-3">
+              <div>
+                <p className="text-xs text-text-muted">Est. Exit Value</p>
+                <p className="font-mono text-sm font-medium">{formatMoney(valuation.exitPrice)}</p>
+                <p className="text-[10px] text-text-muted">{valuation.totalMultiple.toFixed(1)}x multiple</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-muted">You Invested</p>
+                <p className="font-mono text-sm font-medium">{formatMoney(totalInvested)}</p>
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-2 border-t border-white/10">
+              <div className="text-xs">
+                <span className="text-text-muted">vs. Invested: </span>
+                <span className={`font-mono font-medium ${gainVsInvested >= 0 ? 'text-accent' : 'text-danger'}`}>
+                  {gainVsInvested >= 0 ? '+' : ''}{gainVsInvested.toFixed(0)}%
+                </span>
+              </div>
+              <div className="text-xs">
+                <span className="text-text-muted">vs. Est. Value: </span>
+                <span className={`font-mono font-bold px-1.5 py-0.5 rounded ${premiumPct >= 0 ? 'bg-accent/20 text-accent' : 'bg-danger/20 text-danger'}`}>
+                  {premiumPct >= 0 ? '+' : ''}{premiumPct.toFixed(0)}%
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Buyer Profile (unsolicited offers) */}
       {event.buyerProfile && (
