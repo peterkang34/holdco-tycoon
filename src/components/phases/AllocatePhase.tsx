@@ -296,18 +296,18 @@ export function AllocatePhase({
               })()}
             </div>
           )}
-          <div className="grid grid-cols-3 gap-4 mb-6">
-            <div className="card text-center">
-              <p className="text-text-muted text-sm">EBITDA</p>
-              <p className="text-2xl font-bold font-mono">{formatMoney(selectedDeal.business.ebitda)}</p>
+          <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-6">
+            <div className="card text-center px-2 sm:px-4">
+              <p className="text-text-muted text-xs sm:text-sm">EBITDA</p>
+              <p className="text-lg sm:text-2xl font-bold font-mono">{formatMoney(selectedDeal.business.ebitda)}</p>
             </div>
-            <div className="card text-center">
-              <p className="text-text-muted text-sm">Asking Price</p>
-              <p className="text-2xl font-bold font-mono">{formatMoney(selectedDeal.askingPrice)}</p>
+            <div className="card text-center px-2 sm:px-4">
+              <p className="text-text-muted text-xs sm:text-sm">Price</p>
+              <p className="text-lg sm:text-2xl font-bold font-mono">{formatMoney(selectedDeal.askingPrice)}</p>
             </div>
-            <div className="card text-center">
-              <p className="text-text-muted text-sm">Multiple</p>
-              <p className="text-2xl font-bold font-mono">{selectedDeal.business.acquisitionMultiple.toFixed(1)}x</p>
+            <div className="card text-center px-2 sm:px-4">
+              <p className="text-text-muted text-xs sm:text-sm">Multiple</p>
+              <p className="text-lg sm:text-2xl font-bold font-mono">{selectedDeal.business.acquisitionMultiple.toFixed(1)}x</p>
             </div>
           </div>
 
@@ -731,24 +731,24 @@ export function AllocatePhase({
       )}
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
         <div>
-          <h2 className="text-2xl font-bold">Capital Allocation</h2>
-          <p className="text-text-muted">Deploy your cash across portfolio companies, new acquisitions, or return it to owners</p>
+          <h2 className="text-xl sm:text-2xl font-bold">Capital Allocation</h2>
+          <p className="text-text-muted text-sm sm:text-base hidden sm:block">Deploy your cash across portfolio companies, new acquisitions, or return it to owners</p>
         </div>
-        <div className="text-right">
+        <div className="text-left sm:text-right">
           <p className="text-text-muted text-sm">Available Cash</p>
-          <p className="text-3xl font-bold font-mono text-accent">{formatMoney(cash)}</p>
+          <p className="text-2xl sm:text-3xl font-bold font-mono text-accent">{formatMoney(cash)}</p>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 mb-6 border-b border-white/10 pb-2">
+      <div className="flex gap-2 mb-6 border-b border-white/10 pb-2 overflow-x-auto">
         {tabs.map(tab => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-lg transition-colors ${
+            className={`px-3 sm:px-4 py-2 rounded-lg transition-colors whitespace-nowrap text-sm sm:text-base ${
               activeTab === tab.id
                 ? 'bg-accent text-bg-primary font-medium'
                 : 'text-text-muted hover:text-text-primary hover:bg-white/5'
@@ -756,7 +756,7 @@ export function AllocatePhase({
           >
             {tab.label}
             {tab.badge !== undefined && tab.badge > 0 && (
-              <span className="ml-2 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
+              <span className="ml-1.5 text-xs bg-white/20 px-1.5 py-0.5 rounded-full">
                 {tab.badge}
               </span>
             )}

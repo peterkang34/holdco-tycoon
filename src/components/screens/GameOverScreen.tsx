@@ -200,6 +200,16 @@ export function GameOverScreen({
           <p className="text-xl text-red-400">
             Filed for bankruptcy in Year {bankruptRound}
           </p>
+          {(difficulty || duration) && (
+            <div className="flex justify-center gap-2 mt-3">
+              <span className={`text-xs px-2 py-0.5 rounded ${difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
+                {difficulty === 'normal' ? 'Normal' : 'Easy'}
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-text-secondary">
+                {maxRounds}yr
+              </span>
+            </div>
+          )}
 
           <div className="card mt-6 bg-red-900/20 border-red-500/30">
             <p className="text-text-secondary">
@@ -449,6 +459,26 @@ export function GameOverScreen({
                     <p className="text-xs text-text-muted">{sector.name}</p>
                   </div>
                 </div>
+                {/* Mobile: compact data */}
+                <div className="flex sm:hidden items-center gap-3 text-right">
+                  <div>
+                    <p className="font-mono text-sm">{formatMoney(business.status === 'active' ? business.ebitda : business.exitPrice || 0)}</p>
+                    <p className={`text-xs font-mono ${moic >= 2 ? 'text-accent' : moic < 1 ? 'text-danger' : 'text-text-muted'}`}>
+                      {formatMultiple(moic)}
+                    </p>
+                  </div>
+                  <span className={`text-xs px-1.5 py-0.5 rounded ${
+                    business.status === 'active' ? 'bg-accent/20 text-accent' :
+                    business.status === 'sold' ? 'bg-blue-500/20 text-blue-400' :
+                    business.status === 'merged' ? 'bg-purple-500/20 text-purple-400' :
+                    'bg-danger/20 text-danger'
+                  }`}>
+                    {business.status === 'active' ? '●' :
+                    business.status === 'sold' ? '✓' :
+                    business.status === 'merged' ? '⇄' : '✕'}
+                  </span>
+                </div>
+                {/* Desktop: full data */}
                 <div className="hidden sm:flex items-center gap-2 sm:gap-4 text-right">
                   <div>
                     <p className="text-xs text-text-muted">Revenue</p>

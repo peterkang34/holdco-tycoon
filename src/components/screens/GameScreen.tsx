@@ -315,71 +315,86 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
       )}
 
       {/* Top Bar */}
-      <div className="bg-bg-card border-b border-white/10 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">🏛️</span>
-          <h1 className="text-xl font-bold">{holdcoName}</h1>
-          {difficulty && (
-            <span className={`text-xs px-2 py-0.5 rounded ${difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
-              {difficulty === 'normal' ? 'Normal' : 'Easy'}{maxRounds && maxRounds < 20 ? ` / ${maxRounds}yr` : ''}
-            </span>
-          )}
-          {roundHistory && roundHistory.length > 0 && (
+      <div className="bg-bg-card border-b border-white/10 px-3 sm:px-4 py-2 sm:py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <span className="text-xl sm:text-2xl">🏛️</span>
+            <h1 className="text-base sm:text-xl font-bold truncate max-w-[120px] sm:max-w-none">{holdcoName}</h1>
+            {difficulty && (
+              <span className={`text-xs px-1.5 sm:px-2 py-0.5 rounded whitespace-nowrap ${difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
+                {difficulty === 'normal' ? 'N' : 'E'}{maxRounds && maxRounds < 20 ? `/${maxRounds}` : ''}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1 sm:gap-2">
+            {roundHistory && roundHistory.length > 0 && (
+              <button
+                onClick={() => setShowAnnualReports(true)}
+                className="hidden sm:inline-flex text-text-muted hover:text-text-secondary transition-colors text-sm min-h-[44px] min-w-[44px] items-center justify-center rounded hover:bg-white/5"
+                title="Annual Reports"
+              >
+                Reports
+              </button>
+            )}
             <button
-              onClick={() => setShowAnnualReports(true)}
-              className="text-text-muted hover:text-text-secondary transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
-              title="Annual Reports"
+              onClick={() => setShowLeaderboard(true)}
+              className="text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5"
+              title="High Scores"
             >
-              Reports
+              🏆
             </button>
-          )}
-          <button
-            onClick={() => {
-              setShowLeaderboard(true);
-            }}
-            className="text-text-muted hover:text-text-secondary transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
-            title="High Scores"
-          >
-            🏆
-          </button>
-          <button
-            onClick={() => setShowInstructions(true)}
-            className="text-text-muted hover:text-text-secondary transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
-            title="View Tutorial"
-          >
-            ?
-          </button>
-          <button
-            onClick={() => setShowResetConfirm(true)}
-            className="text-text-muted hover:text-danger transition-colors text-sm px-2 py-1 rounded hover:bg-white/5"
-            title="Start Over"
-          >
-            Reset
-          </button>
+            <button
+              onClick={() => setShowInstructions(true)}
+              className="text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5"
+              title="View Tutorial"
+            >
+              ?
+            </button>
+            {roundHistory && roundHistory.length > 0 && (
+              <button
+                onClick={() => setShowAnnualReports(true)}
+                className="sm:hidden text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5"
+                title="Annual Reports"
+              >
+                📊
+              </button>
+            )}
+            <button
+              onClick={() => setShowResetConfirm(true)}
+              className="text-text-muted hover:text-danger transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5"
+              title="Start Over"
+            >
+              ↺
+            </button>
+          </div>
         </div>
-        <div className="hidden sm:flex items-center gap-2 sm:gap-4 text-sm">
-          <span className={`px-3 py-1 rounded-full ${
+        {/* Phase indicator — compact on mobile, full on desktop */}
+        <div className="flex items-center gap-1.5 sm:gap-3 mt-1.5 sm:mt-2 text-xs sm:text-sm">
+          <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ${
             phase === 'collect' ? 'bg-accent text-bg-primary' :
             'bg-white/10 text-text-muted'
           }`}>
-            1. Collect
+            <span className="sm:hidden">Collect</span>
+            <span className="hidden sm:inline">1. Collect</span>
           </span>
           {phase === 'restructure' && (
-            <span className="px-3 py-1 rounded-full bg-red-600 text-white animate-pulse">
+            <span className="px-2 sm:px-3 py-0.5 sm:py-1 rounded-full bg-red-600 text-white animate-pulse">
               Restructure
             </span>
           )}
-          <span className={`px-3 py-1 rounded-full ${
+          <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ${
             phase === 'event' ? 'bg-accent text-bg-primary' :
             'bg-white/10 text-text-muted'
           }`}>
-            2. Event
+            <span className="sm:hidden">Event</span>
+            <span className="hidden sm:inline">2. Event</span>
           </span>
-          <span className={`px-3 py-1 rounded-full ${
+          <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ${
             phase === 'allocate' ? 'bg-accent text-bg-primary' :
             'bg-white/10 text-text-muted'
           }`}>
-            3. Allocate
+            <span className="sm:hidden">Allocate</span>
+            <span className="hidden sm:inline">3. Allocate</span>
           </span>
         </div>
       </div>

@@ -129,7 +129,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
                 <button
                   type="button"
                   onClick={() => setStep('mode')}
-                  className="text-sm text-text-muted hover:text-text-secondary transition-colors"
+                  className="text-sm text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center"
                 >
                   ← Back
                 </button>
@@ -166,7 +166,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
               <label className="block text-left mb-2 text-sm text-text-muted">
                 Choose your first acquisition
               </label>
-              <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
                 {SECTOR_LIST.map(sector => (
                   <button
                     key={sector.id}

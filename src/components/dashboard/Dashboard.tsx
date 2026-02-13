@@ -89,7 +89,7 @@ export function Dashboard({
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2 sm:gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-1.5 sm:gap-3">
         <MetricCard
           label="Cash"
           value={formatMoney(liveCash)}
@@ -169,7 +169,7 @@ export function Dashboard({
         )}
         {diversificationBonus && (
           <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full"
-            title="4+ unique sectors: +3% growth bonus. 6+: +4.5%. Uncorrelated risk protects against sector shocks.">
+            title="4+ unique sectors: +4% growth bonus. 6+: +6%. Uncorrelated risk protects against sector shocks.">
             Diversified Portfolio
           </span>
         )}

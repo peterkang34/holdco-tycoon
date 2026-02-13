@@ -110,45 +110,45 @@ export function CollectPhase({
       {/* EBITDA to FCF Summary */}
       <div className="card mb-6 bg-white/5">
         <h3 className="font-bold mb-4">Portfolio Cash Flow Waterfall</h3>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2 sm:gap-3 lg:gap-4 text-center text-sm">
+        <div className="grid grid-cols-4 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-3 lg:gap-4 text-center text-xs sm:text-sm">
           <div>
             <p className="text-text-muted">Revenue</p>
-            <p className="font-mono font-bold text-lg">{formatMoney(activeBusinesses.reduce((s, b) => s + b.revenue, 0))}</p>
+            <p className="font-mono font-bold text-sm sm:text-lg">{formatMoney(activeBusinesses.reduce((s, b) => s + b.revenue, 0))}</p>
           </div>
           <div>
-            <p className="text-text-muted">EBITDA <span className="text-text-muted text-xs">({totalEbitda > 0 && activeBusinesses.reduce((s, b) => s + b.revenue, 0) > 0 ? ((totalEbitda / activeBusinesses.reduce((s, b) => s + b.revenue, 0)) * 100).toFixed(0) : 0}%)</span></p>
-            <p className="font-mono font-bold text-lg">{formatMoney(totalEbitda)}</p>
+            <p className="text-text-muted">EBITDA</p>
+            <p className="font-mono font-bold text-sm sm:text-lg">{formatMoney(totalEbitda)}</p>
           </div>
           <div>
             <p className="text-text-muted">CapEx</p>
-            <p className="font-mono font-bold text-lg text-warning">
+            <p className="font-mono font-bold text-sm sm:text-lg text-warning">
               -{formatMoney(businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.capex, 0))}
             </p>
           </div>
-          <div>
+          <div className="border-l border-white/20 pl-2 sm:pl-0 sm:border-0">
             <p className="text-text-muted">
-              {hasDeductions ? `Taxes (eff. ${effectiveRatePct}%)` : 'Taxes (30%)'}
+              {hasDeductions ? `Tax ${effectiveRatePct}%` : 'Tax'}
             </p>
-            <p className="font-mono font-bold text-lg text-warning">
+            <p className="font-mono font-bold text-sm sm:text-lg text-warning">
               -{formatMoney(taxBreakdown.taxAmount)}
             </p>
           </div>
           <div>
-            <p className="text-text-muted">OpCo Debt</p>
-            <p className="font-mono font-bold text-lg text-danger">
+            <p className="text-text-muted"><span className="hidden sm:inline">OpCo </span>Debt</p>
+            <p className="font-mono font-bold text-sm sm:text-lg text-danger">
               -{formatMoney(businessBreakdowns.reduce((s, { breakdown }) =>
                 s + breakdown.sellerNoteInterest + breakdown.sellerNotePrincipal + breakdown.bankDebtInterest, 0))}
             </p>
           </div>
           <div>
-            <p className="text-text-muted">HoldCo Costs</p>
-            <p className="font-mono font-bold text-lg text-danger">
+            <p className="text-text-muted">HoldCo</p>
+            <p className="font-mono font-bold text-sm sm:text-lg text-danger">
               -{formatMoney(holdcoInterest + sharedServicesCost + maSourcingCost)}
             </p>
           </div>
-          <div className="border-l border-white/20 pl-4">
+          <div className="border-l border-white/20 pl-2 sm:pl-4">
             <p className="text-text-muted">Net FCF</p>
-            <p className={`font-mono font-bold text-lg ${netFcf >= 0 ? 'text-accent' : 'text-danger'}`}>
+            <p className={`font-mono font-bold text-sm sm:text-lg ${netFcf >= 0 ? 'text-accent' : 'text-danger'}`}>
               {formatMoney(netFcf)}
             </p>
           </div>
@@ -240,16 +240,16 @@ export function CollectPhase({
                   }`}
                   onClick={() => setExpandedBusiness(isExpanded ? null : business.id)}
                 >
-                  <div className="flex items-center gap-2 w-32 sm:w-48">
-                    <span className="text-xl">{sector.emoji}</span>
+                  <div className="flex items-center gap-2 w-24 sm:w-48 min-w-0">
+                    <span className="text-lg sm:text-xl">{sector.emoji}</span>
                     <div className="truncate">
-                      <p className="font-medium truncate">{business.name}</p>
-                      <p className="text-xs text-text-muted">{sector.name}</p>
+                      <p className="font-medium truncate text-sm sm:text-base">{business.name}</p>
+                      <p className="text-xs text-text-muted hidden sm:block">{sector.name}</p>
                     </div>
                   </div>
 
-                  {/* Mini waterfall */}
-                  <div className="flex-1 flex items-center gap-2 text-xs font-mono">
+                  {/* Mini waterfall — hidden on mobile, visible on sm+ */}
+                  <div className="hidden sm:flex flex-1 items-center gap-2 text-xs font-mono">
                     <span className="text-text-secondary">{formatMoney(breakdown.ebitda)}</span>
                     <span className="text-text-muted">→</span>
                     <span className={breakdown.fcf >= 0 ? 'text-accent' : 'text-danger'}>
@@ -260,10 +260,11 @@ export function CollectPhase({
                     )}
                   </div>
 
-                  <div className="w-28 text-right">
-                    <span className={`font-mono font-bold ${breakdown.fcf >= 0 ? 'text-accent' : 'text-danger'}`}>
+                  <div className="flex-1 sm:w-28 sm:flex-none text-right">
+                    <span className={`font-mono font-bold text-sm sm:text-base ${breakdown.fcf >= 0 ? 'text-accent' : 'text-danger'}`}>
                       {breakdown.fcf >= 0 ? '+' : ''}{formatMoney(breakdown.fcf)}
                     </span>
+                    <p className="sm:hidden text-xs text-text-muted font-mono">{formatMoney(breakdown.ebitda)} EBITDA</p>
                   </div>
 
                   <span className="text-text-muted text-sm">{isExpanded ? '▼' : '▶'}</span>
