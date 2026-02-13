@@ -238,20 +238,29 @@ export function buildChronicleContext(state: GameState): ChronicleContext {
     }
     return sum + (b.ebitda - capex - snInterest - snPrincipal - bankInterest - earnout);
   }, 0);
-  // Earn-out from integrated (tuck-in) businesses using platform growth as proxy
-  const integratedEarnouts = state.businesses
-    .filter(b => b.status === 'integrated' && b.earnoutRemaining > 0 && b.earnoutTarget > 0 && b.parentPlatformId)
+  // Debt service from integrated (tuck-in) businesses: seller notes + earnouts
+  const integratedDebtService = state.businesses
+    .filter(b => b.status === 'integrated')
     .reduce((sum, b) => {
-      const platform = state.businesses.find(p => p.id === b.parentPlatformId && p.status === 'active');
-      if (platform && platform.acquisitionEbitda > 0) {
-        const growth = (platform.ebitda - platform.acquisitionEbitda) / platform.acquisitionEbitda;
-        if (growth >= b.earnoutTarget) return sum + b.earnoutRemaining;
+      let debt = 0;
+      // Seller note interest + principal
+      if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
+        debt += Math.round(b.sellerNoteBalance * b.sellerNoteRate);
+        debt += Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
       }
-      return sum;
+      // Earn-out using platform growth as proxy
+      if (b.earnoutRemaining > 0 && b.earnoutTarget > 0 && b.parentPlatformId) {
+        const platform = state.businesses.find(p => p.id === b.parentPlatformId && p.status === 'active');
+        if (platform && platform.acquisitionEbitda > 0) {
+          const growth = (platform.ebitda - platform.acquisitionEbitda) / platform.acquisitionEbitda;
+          if (growth >= b.earnoutTarget) debt += b.earnoutRemaining;
+        }
+      }
+      return sum + debt;
     }, 0);
   const taxBreakdown = calculatePortfolioTax(activeBusinesses, state.totalDebt, state.interestRate, totalDeductibleCosts);
   const holdcoInterest = Math.round(state.totalDebt * state.interestRate);
-  const fcf = totalBusinessFcf - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - integratedEarnouts;
+  const fcf = totalBusinessFcf - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - integratedDebtService;
 
   // EBITDA growth
   const prevMetrics = state.metricsHistory.length > 0

@@ -58,18 +58,27 @@ function calculateFcfBreakdown(business: Business, interestRate: number) {
   };
 }
 
-// Calculate earn-out payments for integrated (tuck-in) businesses using platform growth
-function calculateIntegratedEarnouts(businesses: Business[]): number {
-  return businesses
-    .filter(b => b.status === 'integrated' && b.earnoutRemaining > 0 && b.earnoutTarget > 0 && b.parentPlatformId)
-    .reduce((sum, b) => {
+// Calculate all debt service for integrated (tuck-in) businesses: seller notes + earnouts
+function calculateIntegratedDebtService(businesses: Business[]): { sellerNotes: number; earnouts: number; total: number } {
+  const integrated = businesses.filter(b => b.status === 'integrated');
+  let sellerNotes = 0;
+  let earnouts = 0;
+  for (const b of integrated) {
+    // Seller note interest + principal
+    if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
+      sellerNotes += Math.round(b.sellerNoteBalance * b.sellerNoteRate);
+      sellerNotes += Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
+    }
+    // Earn-out using platform growth as proxy
+    if (b.earnoutRemaining > 0 && b.earnoutTarget > 0 && b.parentPlatformId) {
       const platform = businesses.find(p => p.id === b.parentPlatformId && p.status === 'active');
       if (platform && platform.acquisitionEbitda > 0) {
         const growth = (platform.ebitda - platform.acquisitionEbitda) / platform.acquisitionEbitda;
-        if (growth >= b.earnoutTarget) return sum + b.earnoutRemaining;
+        if (growth >= b.earnoutTarget) earnouts += b.earnoutRemaining;
       }
-      return sum;
-    }, 0);
+    }
+  }
+  return { sellerNotes, earnouts, total: sellerNotes + earnouts };
 }
 
 export function CollectPhase({
@@ -101,8 +110,8 @@ export function CollectPhase({
   const totalBusinessFcf = businessBreakdowns.reduce((sum, { breakdown }) => sum + breakdown.fcf, 0);
   const totalEbitda = businessBreakdowns.reduce((sum, { breakdown }) => sum + breakdown.ebitda, 0);
 
-  // Earn-out payments from integrated (tuck-in) businesses (platform growth as proxy)
-  const integratedEarnouts = calculateIntegratedEarnouts(businesses);
+  // Debt service from integrated (tuck-in) businesses: seller notes + earnouts
+  const integratedDebt = calculateIntegratedDebtService(businesses);
 
   // Portfolio-level tax with all deductions
   const taxBreakdown = calculatePortfolioTax(activeBusinesses, totalDebt, interestRate, sharedServicesCost);
@@ -113,13 +122,13 @@ export function CollectPhase({
   const holdcoInterest = Math.round(totalDebt * interestRate);
 
   // Net FCF after tax, holdco interest, shared services, MA sourcing, and tuck-in earnouts
-  const netFcf = totalBusinessFcf - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - integratedEarnouts;
+  const netFcf = totalBusinessFcf - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - integratedDebt.total;
 
   // What cash will be after collection
   const projectedCash = cash + netFcf;
 
   // Coverage ratios
-  const totalEarnouts = businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.earnoutPayment, 0) + integratedEarnouts;
+  const totalEarnouts = businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.earnoutPayment, 0) + integratedDebt.total;
   const totalInterestExpense = holdcoInterest +
     businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNoteInterest + breakdown.bankDebtInterest, 0);
   const totalDebtService = totalInterestExpense +
@@ -174,7 +183,7 @@ export function CollectPhase({
             <p className="text-text-muted"><span className="hidden sm:inline">OpCo </span>Debt</p>
             <p className="font-mono font-bold text-sm sm:text-lg text-danger">
               -{formatMoney(businessBreakdowns.reduce((s, { breakdown }) =>
-                s + breakdown.sellerNoteInterest + breakdown.sellerNotePrincipal + breakdown.bankDebtInterest + breakdown.earnoutPayment, 0) + integratedEarnouts)}
+                s + breakdown.sellerNoteInterest + breakdown.sellerNotePrincipal + breakdown.bankDebtInterest + breakdown.earnoutPayment, 0) + integratedDebt.total)}
             </p>
           </div>
           <div>
