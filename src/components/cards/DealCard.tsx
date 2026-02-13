@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Deal, DealHeat, SellerArchetype, formatMoney, Business } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
+import { getSizeRatioTier } from '../../engine/businesses';
 import { Tooltip } from '../ui/Tooltip';
 
 interface DealCardProps {
@@ -121,13 +122,22 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
       </div>
 
       {/* Tuck-in indicator */}
-      {canTuckIn && (
-        <div className="bg-accent-secondary/10 border border-accent-secondary/30 rounded-lg p-2 mb-3">
-          <p className="text-xs text-accent-secondary">
-            Can be tucked into: {availablePlatforms.map(p => p.name).join(', ')}
-          </p>
-        </div>
-      )}
+      {canTuckIn && (() => {
+        const bestTier = availablePlatforms.reduce((best, p) => {
+          const { tier } = getSizeRatioTier(deal.business.ebitda, p.ebitda);
+          const rank = { ideal: 0, stretch: 1, strained: 2, overreach: 3 };
+          return rank[tier] < rank[best] ? tier : best;
+        }, 'overreach' as 'ideal' | 'stretch' | 'strained' | 'overreach');
+        const sizeWarning = bestTier === 'strained' || bestTier === 'overreach';
+        return (
+          <div className={`${sizeWarning ? 'bg-warning/10 border-warning/30' : 'bg-accent-secondary/10 border-accent-secondary/30'} border rounded-lg p-2 mb-3`}>
+            <p className={`text-xs ${sizeWarning ? 'text-warning' : 'text-accent-secondary'}`}>
+              Can be tucked into: {availablePlatforms.map(p => p.name).join(', ')}
+              {sizeWarning && ' (!) oversized for available platforms'}
+            </p>
+          </div>
+        );
+      })()}
 
       {/* Tuck-in discount indicator */}
       {deal.tuckInDiscount && deal.tuckInDiscount > 0 && (

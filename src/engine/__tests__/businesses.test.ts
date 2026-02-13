@@ -12,6 +12,7 @@ import {
   determineIntegrationOutcome,
   calculateSynergies,
   getSubTypeAffinity,
+  getSizeRatioTier,
   calculateMultipleExpansion,
   createStartingBusiness,
   calculateDealHeat,
@@ -784,5 +785,137 @@ describe('Seller Archetypes: assignSellerArchetype', () => {
         ]).toContain(deal.sellerArchetype);
       }
     }
+  });
+});
+
+describe('getSizeRatioTier', () => {
+  it('should return ideal when bolt-on is <= 50% of platform', () => {
+    expect(getSizeRatioTier(400, 1000).tier).toBe('ideal');
+    expect(getSizeRatioTier(500, 1000).tier).toBe('ideal');
+    expect(getSizeRatioTier(100, 1000).tier).toBe('ideal');
+  });
+
+  it('should return stretch when bolt-on is 51-100% of platform', () => {
+    expect(getSizeRatioTier(600, 1000).tier).toBe('stretch');
+    expect(getSizeRatioTier(1000, 1000).tier).toBe('stretch');
+  });
+
+  it('should return strained when bolt-on is 101-200% of platform', () => {
+    expect(getSizeRatioTier(1500, 1000).tier).toBe('strained');
+    expect(getSizeRatioTier(2000, 1000).tier).toBe('strained');
+  });
+
+  it('should return overreach when bolt-on is >200% of platform', () => {
+    expect(getSizeRatioTier(2500, 1000).tier).toBe('overreach');
+    expect(getSizeRatioTier(5000, 1000).tier).toBe('overreach');
+  });
+
+  it('should return overreach when platform EBITDA is 0 or negative', () => {
+    expect(getSizeRatioTier(1000, 0).tier).toBe('overreach');
+    expect(getSizeRatioTier(1000, -500).tier).toBe('overreach');
+  });
+
+  it('should calculate ratio correctly', () => {
+    const result = getSizeRatioTier(750, 1000);
+    expect(result.ratio).toBeCloseTo(0.75, 2);
+    expect(result.tier).toBe('stretch');
+  });
+
+  it('should use absolute value of bolt-on EBITDA', () => {
+    // Negative EBITDA bolt-on should use absolute value
+    expect(getSizeRatioTier(-500, 1000).tier).toBe('ideal');
+  });
+});
+
+describe('size ratio impact on integration', () => {
+  it('ideal tier should not reduce integration success probability', () => {
+    // With deterministic testing, run many iterations to compare average outcomes
+    let idealSuccesses = 0;
+    const trials = 1000;
+    const mockBusiness = {
+      qualityRating: 3 as QualityRating,
+      sectorId: 'agency' as SectorId,
+      dueDiligence: {
+        operatorQuality: 'moderate' as const,
+        revenueConcentration: 'medium' as const,
+        operatorQualityText: '',
+        revenueConcentrationText: '',
+        trend: 'flat' as const,
+        trendText: '',
+        customerRetention: 85,
+        customerRetentionText: '',
+        competitivePosition: 'competitive' as const,
+        competitivePositionText: '',
+      },
+    } as any;
+
+    for (let i = 0; i < trials; i++) {
+      if (determineIntegrationOutcome(mockBusiness, undefined, false, 'match', 'ideal') === 'success') idealSuccesses++;
+    }
+    // Ideal tier should have roughly the same success rate as no tier
+    let noTierSuccesses = 0;
+    for (let i = 0; i < trials; i++) {
+      if (determineIntegrationOutcome(mockBusiness, undefined, false, 'match') === 'success') noTierSuccesses++;
+    }
+    // Allow 5% variance due to randomness
+    expect(Math.abs(idealSuccesses - noTierSuccesses)).toBeLessThan(trials * 0.10);
+  });
+
+  it('overreach tier should significantly reduce success probability', () => {
+    let overreachSuccesses = 0;
+    let idealSuccesses = 0;
+    const trials = 1000;
+    const mockBusiness = {
+      qualityRating: 3 as QualityRating,
+      sectorId: 'agency' as SectorId,
+      dueDiligence: {
+        operatorQuality: 'moderate' as const,
+        revenueConcentration: 'medium' as const,
+        operatorQualityText: '',
+        revenueConcentrationText: '',
+        trend: 'flat' as const,
+        trendText: '',
+        customerRetention: 85,
+        customerRetentionText: '',
+        competitivePosition: 'competitive' as const,
+        competitivePositionText: '',
+      },
+    } as any;
+    const mockPlatform = {
+      qualityRating: 3 as QualityRating,
+      sectorId: 'agency' as SectorId,
+      platformScale: 1,
+    } as any;
+
+    for (let i = 0; i < trials; i++) {
+      if (determineIntegrationOutcome(mockBusiness, mockPlatform, false, 'match', 'overreach') === 'success') overreachSuccesses++;
+      if (determineIntegrationOutcome(mockBusiness, mockPlatform, false, 'match', 'ideal') === 'success') idealSuccesses++;
+    }
+    // Overreach should have meaningfully fewer successes
+    expect(overreachSuccesses).toBeLessThan(idealSuccesses);
+  });
+
+  it('ideal tier synergies should equal base synergies', () => {
+    const baseSynergies = calculateSynergies('success', 1000, true, 'match');
+    const idealSynergies = calculateSynergies('success', 1000, true, 'match', 'ideal');
+    expect(idealSynergies).toBe(baseSynergies);
+  });
+
+  it('overreach tier should heavily dampen synergies', () => {
+    const idealSynergies = calculateSynergies('success', 1000, true, 'match', 'ideal');
+    const overreachSynergies = calculateSynergies('success', 1000, true, 'match', 'overreach');
+    expect(overreachSynergies).toBeLessThan(idealSynergies * 0.30); // 25% multiplier
+  });
+
+  it('stretch tier should moderately dampen synergies', () => {
+    const idealSynergies = calculateSynergies('success', 1000, true, 'match', 'ideal');
+    const stretchSynergies = calculateSynergies('success', 1000, true, 'match', 'stretch');
+    expect(stretchSynergies).toBe(Math.round(idealSynergies * 0.80));
+  });
+
+  it('strained tier should halve synergies', () => {
+    const idealSynergies = calculateSynergies('success', 1000, true, 'match', 'ideal');
+    const strainedSynergies = calculateSynergies('success', 1000, true, 'match', 'strained');
+    expect(strainedSynergies).toBe(Math.round(idealSynergies * 0.50));
   });
 });

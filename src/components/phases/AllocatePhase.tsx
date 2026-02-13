@@ -21,7 +21,7 @@ import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
 import { generateDealStructures, getStructureLabel, getStructureDescription } from '../../engine/deals';
 import { calculateExitValuation } from '../../engine/simulation';
-import { getSubTypeAffinity } from '../../engine/businesses';
+import { getSubTypeAffinity, getSizeRatioTier } from '../../engine/businesses';
 import { SECTORS } from '../../data/sectors';
 import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES, MA_SOURCING_CONFIG, getMASourcingUpgradeCost, getMASourcingAnnualCost } from '../../data/sharedServices';
 import { MarketGuideModal } from '../ui/MarketGuideModal';
@@ -267,15 +267,20 @@ export function AllocatePhase({
                 className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
               >
                 <option value="">Acquire as Standalone</option>
-                {availablePlatformsForDeal.map(platform => (
-                  <option key={platform.id} value={platform.id}>
-                    {platform.name} (Scale {platform.platformScale}, EBITDA: {formatMoney(platform.ebitda)})
-                  </option>
-                ))}
+                {availablePlatformsForDeal.map(platform => {
+                  const { tier } = getSizeRatioTier(selectedDeal.business.ebitda, platform.ebitda);
+                  const tierSuffix = tier === 'stretch' ? ' ⚠' : tier === 'strained' ? ' ⚠⚠' : tier === 'overreach' ? ' ⛔' : '';
+                  return (
+                    <option key={platform.id} value={platform.id}>
+                      {platform.name} (Scale {platform.platformScale}, EBITDA: {formatMoney(platform.ebitda)}){tierSuffix}
+                    </option>
+                  );
+                })}
               </select>
               {selectedTuckInPlatform && (() => {
                 const platform = availablePlatformsForDeal.find(p => p.id === selectedTuckInPlatform);
                 const affinity = platform ? getSubTypeAffinity(platform.sectorId, platform.subType, selectedDeal.business.subType) : 'distant';
+                const sizeInfo = platform ? getSizeRatioTier(selectedDeal.business.ebitda, platform.ebitda) : null;
                 return (
                   <div className="mt-2 space-y-1">
                     {affinity === 'match' ? (
@@ -289,6 +294,21 @@ export function AllocatePhase({
                     ) : (
                       <p className="text-xs text-yellow-400 flex items-center gap-1">
                         <span>&#9888;</span> Distant sub-types ({platform?.subType} + {selectedDeal.business.subType}) — 45% synergies
+                      </p>
+                    )}
+                    {sizeInfo && sizeInfo.tier === 'stretch' && (
+                      <p className="text-xs text-yellow-400 flex items-center gap-1">
+                        <span>&#9888;</span> Stretch fit ({(sizeInfo.ratio).toFixed(1)}x platform size) — reduced synergies, slightly harder integration
+                      </p>
+                    )}
+                    {sizeInfo && sizeInfo.tier === 'strained' && (
+                      <p className="text-xs text-orange-400 flex items-center gap-1">
+                        <span>&#9888;</span> Strained fit ({(sizeInfo.ratio).toFixed(1)}x platform size) — 50% synergies, significantly harder integration
+                      </p>
+                    )}
+                    {sizeInfo && sizeInfo.tier === 'overreach' && (
+                      <p className="text-xs text-red-400 flex items-center gap-1">
+                        <span>&#9888;</span> Overreach ({(sizeInfo.ratio).toFixed(1)}x platform size) — 25% synergies, very high integration failure risk
                       </p>
                     )}
                     <p className="text-xs text-accent">

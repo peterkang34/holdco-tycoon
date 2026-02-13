@@ -161,6 +161,9 @@ export type AcquisitionType = 'standalone' | 'tuck_in' | 'platform';
 // Integration outcomes for post-acquisition performance
 export type IntegrationOutcome = 'success' | 'partial' | 'failure';
 
+// Size ratio tier for bolt-on acquisitions (bolt-on EBITDA / platform EBITDA)
+export type SizeRatioTier = 'ideal' | 'stretch' | 'strained' | 'overreach';
+
 // AI-generated rich content for deals
 export interface AIGeneratedContent {
   backstory: string; // Company history and founding story

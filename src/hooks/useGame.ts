@@ -23,6 +23,7 @@ import {
   determineIntegrationOutcome,
   calculateSynergies,
   getSubTypeAffinity,
+  getSizeRatioTier,
   calculateMultipleExpansion,
   enhanceDealsWithAI,
   generateSourcedDeals,
@@ -717,9 +718,12 @@ export const useGameStore = create<GameStore>()(
         // Check sub-type compatibility (graduated affinity)
         const subTypeAffinity = getSubTypeAffinity(platform.sectorId, platform.subType, deal.business.subType);
 
+        // Calculate size ratio tier (bolt-on EBITDA vs platform EBITDA)
+        const { tier: sizeRatioTier, ratio: sizeRatio } = getSizeRatioTier(deal.business.ebitda, platform.ebitda);
+
         // Determine integration outcome
-        const outcome = determineIntegrationOutcome(deal.business, platform, hasSharedServices, subTypeAffinity);
-        const synergies = calculateSynergies(outcome, deal.business.ebitda, true, subTypeAffinity);
+        const outcome = determineIntegrationOutcome(deal.business, platform, hasSharedServices, subTypeAffinity, sizeRatioTier);
+        const synergies = calculateSynergies(outcome, deal.business.ebitda, true, subTypeAffinity, sizeRatioTier);
 
         // Create the bolt-on business record
         const boltOnId = generateBusinessId();
@@ -834,6 +838,8 @@ export const useGameStore = create<GameStore>()(
                 restructuringCost,
                 growthDragPenalty,
                 heat: deal.heat,
+                sizeRatio,
+                sizeRatioTier,
               },
             },
           ],

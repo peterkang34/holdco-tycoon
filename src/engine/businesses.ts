@@ -13,6 +13,7 @@ import {
   MASourcingTier,
   SubTypeAffinity,
   SellerArchetype,
+  SizeRatioTier,
   randomInRange,
   randomInt,
   pickRandom,
@@ -397,12 +398,57 @@ export function getSubTypeAffinity(sectorId: string, subType1: string, subType2:
   return group1 === group2 ? 'related' : 'distant';
 }
 
+// Calculate size ratio tier for bolt-on acquisitions
+// sizeRatio = bolt-on EBITDA / platform EBITDA
+export function getSizeRatioTier(boltOnEbitda: number, platformEbitda: number): { tier: SizeRatioTier; ratio: number } {
+  if (platformEbitda <= 0) return { tier: 'overreach', ratio: 99 };
+  const ratio = Math.abs(boltOnEbitda) / platformEbitda;
+  if (ratio <= 0.5) return { tier: 'ideal', ratio };
+  if (ratio <= 1.0) return { tier: 'stretch', ratio };
+  if (ratio <= 2.0) return { tier: 'strained', ratio };
+  return { tier: 'overreach', ratio };
+}
+
+// Size ratio penalty on integration success probability
+function getSizeRatioProbabilityPenalty(
+  tier: SizeRatioTier,
+  platformScale: number,
+  hasSharedServices: boolean,
+  bothHighQuality: boolean,
+): number {
+  const basePenalty: Record<SizeRatioTier, number> = {
+    ideal: 0,
+    stretch: -0.08,
+    strained: -0.18,
+    overreach: -0.28,
+  };
+  let penalty = basePenalty[tier];
+  if (penalty === 0) return 0;
+  // Mitigating factors (only reduce the penalty, never flip to bonus)
+  if (platformScale >= 3) penalty += 0.15; // Experienced platforms absorb better
+  if (hasSharedServices) penalty += 0.05;
+  if (bothHighQuality) penalty += 0.05;
+  return Math.min(0, penalty); // Never become positive
+}
+
+// Size ratio dampening on synergy capture
+function getSizeRatioSynergyMultiplier(tier: SizeRatioTier): number {
+  const multipliers: Record<SizeRatioTier, number> = {
+    ideal: 1.0,
+    stretch: 0.80,
+    strained: 0.50,
+    overreach: 0.25,
+  };
+  return multipliers[tier];
+}
+
 // Determine integration outcome based on various factors
 export function determineIntegrationOutcome(
   acquiredBusiness: Omit<Business, 'id' | 'acquisitionRound' | 'improvements' | 'status'>,
   targetPlatform?: Business,
   hasSharedServices?: boolean,
-  subTypeAffinity?: SubTypeAffinity
+  subTypeAffinity?: SubTypeAffinity,
+  sizeRatioTier?: SizeRatioTier,
 ): IntegrationOutcome {
   let successProbability = 0.6; // Base 60% chance
 
@@ -438,6 +484,17 @@ export function determineIntegrationOutcome(
     successProbability -= 0.1;
   }
 
+  // Size ratio penalty — oversized bolt-ons are harder to integrate
+  if (sizeRatioTier && targetPlatform) {
+    const bothHighQuality = acquiredBusiness.qualityRating >= 4 && targetPlatform.qualityRating >= 4;
+    successProbability += getSizeRatioProbabilityPenalty(
+      sizeRatioTier,
+      targetPlatform.platformScale,
+      !!hasSharedServices,
+      bothHighQuality,
+    );
+  }
+
   // Roll the dice
   const roll = Math.random();
   if (roll < successProbability * 0.6) {
@@ -454,7 +511,8 @@ export function calculateSynergies(
   outcome: IntegrationOutcome,
   acquiredEbitda: number,
   isTuckIn: boolean,
-  subTypeAffinity?: SubTypeAffinity
+  subTypeAffinity?: SubTypeAffinity,
+  sizeRatioTier?: SizeRatioTier,
 ): number {
   // Synergies are a % of the acquired business EBITDA
   let synergyRate: number;
@@ -476,6 +534,11 @@ export function calculateSynergies(
     synergyRate *= 0.75; // Related sub-types: 75% synergies (e.g., HVAC + plumbing share suppliers)
   } else if (subTypeAffinity === 'distant') {
     synergyRate *= 0.45; // Distant sub-types: 45% synergies (e.g., dental + behavioral health)
+  }
+
+  // Size ratio dampens synergy capture for oversized bolt-ons
+  if (sizeRatioTier) {
+    synergyRate *= getSizeRatioSynergyMultiplier(sizeRatioTier);
   }
 
   return Math.round(acquiredEbitda * synergyRate);
