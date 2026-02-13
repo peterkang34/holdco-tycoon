@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatPercent, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLeaderboardRankFromList } from '../../engine/scoring';
+import { calculateExitValuation } from '../../engine/simulation';
 import { AIAnalysisSection } from '../ui/AIAnalysisSection';
 import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../../hooks/useGame';
 
@@ -25,6 +26,11 @@ interface GameOverScreenProps {
   equityRaisesUsed: number;
   sharedServicesActive: number;
   bankruptRound?: number;
+  cash: number;
+  founderShares: number;
+  sharesOutstanding: number;
+  initialOwnershipPct: number;
+  totalDebt: number;
   onPlayAgain: () => void;
 }
 
@@ -48,6 +54,11 @@ export function GameOverScreen({
   equityRaisesUsed,
   sharedServicesActive,
   bankruptRound,
+  cash,
+  founderShares,
+  sharesOutstanding,
+  initialOwnershipPct,
+  totalDebt,
   onPlayAgain,
 }: GameOverScreenProps) {
   const [initials, setInitials] = useState('');
@@ -273,6 +284,118 @@ export function GameOverScreen({
           </div>
         </div>
       </div>
+
+      {/* FEV / EV Breakdown */}
+      {!bankruptRound && (() => {
+        const currentOwnership = sharesOutstanding > 0 ? founderShares / sharesOutstanding : 1;
+        const opcoDebt = activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+
+        // Per-business valuation
+        const businessValues = activeBusinesses.map(business => {
+          const valuation = calculateExitValuation(business, maxRounds);
+          const value = Math.round(business.ebitda * valuation.totalMultiple);
+          const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
+          const moic = totalInvested > 0 ? value / totalInvested : 0;
+          return { business, valuation, value, totalInvested, moic };
+        }).sort((a, b) => b.value - a.value);
+
+        const portfolioValue = businessValues.reduce((sum, bv) => sum + bv.value, 0);
+        const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
+        const blendedMultiple = totalEbitda > 0 ? portfolioValue / totalEbitda : 0;
+
+        const hypotheticalFEV = Math.round(enterpriseValue * initialOwnershipPct);
+
+        return (
+          <div className="card mb-6">
+            <h2 className="text-lg font-bold mb-4">FEV / EV Breakdown</h2>
+
+            {/* EV Waterfall */}
+            <div className="space-y-2 mb-5">
+              <div className="flex justify-between text-sm">
+                <span className="text-text-muted">Portfolio Value <span className="text-xs">({formatMultiple(blendedMultiple)} blended)</span></span>
+                <span className="font-mono">{formatMoney(portfolioValue)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-text-muted">+ Cash</span>
+                <span className="font-mono">{formatMoney(cash)}</span>
+              </div>
+              {totalDebt > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-muted">- Holdco Bank Debt</span>
+                  <span className="font-mono text-danger">({formatMoney(totalDebt)})</span>
+                </div>
+              )}
+              {opcoDebt > 0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-muted">- Opco Seller Notes</span>
+                  <span className="font-mono text-danger">({formatMoney(opcoDebt)})</span>
+                </div>
+              )}
+              <div className="border-t border-white/10 pt-2 flex justify-between text-sm font-bold">
+                <span>= Enterprise Value</span>
+                <span className="font-mono">{formatMoney(enterpriseValue)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-text-muted">x Your Ownership ({(currentOwnership * 100).toFixed(1)}%)</span>
+                <span className="font-mono"></span>
+              </div>
+              <div className="flex justify-between text-sm font-bold text-accent">
+                <span>= Founder Equity Value</span>
+                <span className="font-mono">{formatMoney(founderEquityValue)}</span>
+              </div>
+            </div>
+
+            {/* Value by Business */}
+            {businessValues.length > 0 && (
+              <div className="mb-5">
+                <h3 className="text-sm font-bold text-text-secondary mb-2">Value by Business</h3>
+                <div className="space-y-1.5">
+                  {businessValues.map(({ business, valuation, value, moic }) => {
+                    const pctOfPortfolio = portfolioValue > 0 ? (value / portfolioValue) * 100 : 0;
+                    const sector = SECTORS[business.sectorId];
+                    return (
+                      <div key={business.id} className="flex items-center justify-between p-2 bg-white/5 rounded text-xs">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span>{sector.emoji}</span>
+                          <span className="truncate">{business.name}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-right shrink-0">
+                          <div className="hidden sm:block">
+                            <span className="text-text-muted">{formatMoney(business.ebitda)} x </span>
+                            <span className="font-mono">{formatMultiple(valuation.totalMultiple)}</span>
+                          </div>
+                          <span className="font-mono font-bold w-16 text-right">{formatMoney(value)}</span>
+                          <span className="text-text-muted w-10 text-right">{pctOfPortfolio.toFixed(0)}%</span>
+                          <span className={`font-mono w-12 text-right ${moic >= 2 ? 'text-accent' : moic < 1 ? 'text-danger' : ''}`}>
+                            {formatMultiple(moic)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Ownership Impact */}
+            {currentOwnership < initialOwnershipPct - 0.001 && (
+              <div className="p-3 bg-white/5 rounded text-sm">
+                <div className="flex justify-between mb-1">
+                  <span className="text-text-muted">Initial Ownership</span>
+                  <span className="font-mono">{(initialOwnershipPct * 100).toFixed(1)}%</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-text-muted">Final Ownership</span>
+                  <span className="font-mono">{(currentOwnership * 100).toFixed(1)}%</span>
+                </div>
+                <p className="text-xs text-text-muted">
+                  At {(initialOwnershipPct * 100).toFixed(0)}% ownership, FEV would be {formatMoney(hypotheticalFEV)} ({hypotheticalFEV > founderEquityValue ? '+' : ''}{formatMoney(hypotheticalFEV - founderEquityValue)})
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Save to Leaderboard */}
       {!hasSaved && !leaderboardLoading && canMakeLeaderboard && (

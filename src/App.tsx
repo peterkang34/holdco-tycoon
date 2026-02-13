@@ -28,6 +28,11 @@ function App() {
     difficulty,
     duration,
     maxRounds,
+    cash,
+    founderShares,
+    sharesOutstanding,
+    initialOwnershipPct,
+    totalDebt,
     startGame,
     resetGame,
   } = useGameStore();
@@ -88,6 +93,11 @@ function App() {
           equityRaisesUsed={equityRaisesUsed}
           sharedServicesActive={sharedServices.filter(s => s.active).length}
           bankruptRound={bankruptRound}
+          cash={cash}
+          founderShares={founderShares}
+          sharesOutstanding={sharesOutstanding}
+          initialOwnershipPct={initialOwnershipPct}
+          totalDebt={totalDebt}
           onPlayAgain={handlePlayAgain}
         />
       )}

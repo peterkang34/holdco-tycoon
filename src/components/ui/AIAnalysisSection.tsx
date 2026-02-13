@@ -3,7 +3,7 @@ import {
   AIGameAnalysis,
   generateGameAnalysis,
   generateFallbackAnalysis,
-  isAIEnabled,
+  checkAIStatus,
 } from '../../services/aiGeneration';
 import { GameState, ScoreBreakdown, Business } from '../../engine/types';
 
@@ -78,21 +78,28 @@ export function AIAnalysisSection({
         sharedServicesActive,
       };
 
-      if (isAIEnabled()) {
-        const aiAnalysis = await generateGameAnalysis(input);
-        if (aiAnalysis) {
-          setAnalysis(aiAnalysis);
-          setIsAI(true);
+      try {
+        const aiEnabled = await checkAIStatus();
+        if (aiEnabled) {
+          const aiAnalysis = await generateGameAnalysis(input);
+          if (aiAnalysis) {
+            setAnalysis(aiAnalysis);
+            setIsAI(true);
+          } else {
+            setAnalysis(generateFallbackAnalysis(input));
+            setIsAI(false);
+          }
         } else {
           setAnalysis(generateFallbackAnalysis(input));
           setIsAI(false);
         }
-      } else {
+      } catch (e) {
+        console.error('AI analysis error:', e);
         setAnalysis(generateFallbackAnalysis(input));
         setIsAI(false);
+      } finally {
+        setLoading(false);
       }
-
-      setLoading(false);
     }
 
     fetchAnalysis();

@@ -10,8 +10,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    // Fetch top entries from sorted set (descending by EV score)
-    const entries = await kv.zrange(LEADERBOARD_KEY, 0, MAX_ENTRIES - 1, { rev: true });
+    // Fetch top entries from sorted set (ascending by score, then reverse in-memory)
+    // Note: { rev: true } has a known bug in @vercel/kv v3 that returns empty arrays
+    const entries = await kv.zrange(LEADERBOARD_KEY, 0, MAX_ENTRIES - 1);
 
     // entries are stored as JSON strings in the sorted set
     // Wrap each parse in try/catch so one bad entry doesn't break the whole endpoint
@@ -21,7 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch {
         return null;
       }
-    }).filter(Boolean);
+    }).filter(Boolean).reverse();
 
     res.setHeader('Cache-Control', 'public, s-maxage=30, stale-while-revalidate=60');
     return res.status(200).json(parsed);

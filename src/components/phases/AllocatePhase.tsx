@@ -133,6 +133,7 @@ export function AllocatePhase({
   const [payDebtAmount, setPayDebtAmount] = useState('');
   const [equityAmount, setEquityAmount] = useState('');
   const [buybackAmount, setBuybackAmount] = useState('');
+  const [buybackMode, setBuybackMode] = useState<'dollars' | 'shares'>('dollars');
   const [distributeAmount, setDistributeAmount] = useState('');
   const [showEndTurnConfirm, setShowEndTurnConfirm] = useState(false);
   // Deal pass state
@@ -1495,9 +1496,29 @@ export function AllocatePhase({
               <p className="text-xs text-text-muted mb-4">
                 Outstanding: {sharesOutstanding.toFixed(0)} total | {(sharesOutstanding - founderShares).toFixed(0)} outside shares
               </p>
+              {/* Mode toggle */}
+              <div className="flex gap-1 mb-3 bg-white/5 rounded p-0.5 w-fit">
+                <button
+                  onClick={() => { setBuybackMode('dollars'); setBuybackAmount(''); }}
+                  className={`text-xs px-3 py-1 rounded transition-colors ${buybackMode === 'dollars' ? 'bg-accent text-white' : 'text-text-muted hover:text-text-secondary'}`}
+                >
+                  $ Amount
+                </button>
+                <button
+                  onClick={() => { setBuybackMode('shares'); setBuybackAmount(''); }}
+                  className={`text-xs px-3 py-1 rounded transition-colors ${buybackMode === 'shares' ? 'bg-accent text-white' : 'text-text-muted hover:text-text-secondary'}`}
+                >
+                  # Shares
+                </button>
+              </div>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                  {buybackMode === 'dollars' && (
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                  )}
+                  {buybackMode === 'shares' && (
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">#</span>
+                  )}
                   <input
                     type="text"
                     inputMode="numeric"
@@ -1506,31 +1527,72 @@ export function AllocatePhase({
                       const raw = e.target.value.replace(/[^0-9]/g, '');
                       setBuybackAmount(raw);
                     }}
-                    placeholder="2,000,000"
+                    placeholder={buybackMode === 'dollars' ? '2,000,000' : `e.g. ${Math.max(1, Math.floor(sharesOutstanding - founderShares))}`}
                     className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2 text-sm"
                   />
                 </div>
                 <button
                   onClick={() => {
-                    const dollars = parseInt(buybackAmount) || 0;
-                    const internalAmount = Math.round(dollars / 1000);
-                    if (internalAmount > 0) {
-                      onBuyback(internalAmount);
-                      setBuybackAmount('');
+                    if (buybackMode === 'dollars') {
+                      const dollars = parseInt(buybackAmount) || 0;
+                      const internalAmount = Math.round(dollars / 1000);
+                      if (internalAmount > 0) {
+                        onBuyback(internalAmount);
+                        setBuybackAmount('');
+                      }
+                    } else {
+                      const shareCount = parseInt(buybackAmount) || 0;
+                      if (shareCount > 0 && intrinsicValuePerShare > 0) {
+                        const internalAmount = Math.round(shareCount * intrinsicValuePerShare);
+                        if (internalAmount > 0) {
+                          onBuyback(internalAmount);
+                          setBuybackAmount('');
+                        }
+                      }
                     }
                   }}
-                  disabled={!buybackAmount || (parseInt(buybackAmount) || 0) < 1000 || Math.round((parseInt(buybackAmount) || 0) / 1000) > cash || !distressRestrictions.canBuyback}
+                  disabled={(() => {
+                    if (!buybackAmount || !distressRestrictions.canBuyback) return true;
+                    if (buybackMode === 'dollars') {
+                      const dollars = parseInt(buybackAmount) || 0;
+                      return dollars < 1000 || Math.round(dollars / 1000) > cash;
+                    } else {
+                      const shareCount = parseInt(buybackAmount) || 0;
+                      const outsideShares = sharesOutstanding - founderShares;
+                      const cost = Math.round(shareCount * intrinsicValuePerShare);
+                      return shareCount < 1 || shareCount > outsideShares || cost > cash || intrinsicValuePerShare <= 0;
+                    }
+                  })()}
                   className="btn-primary text-sm"
                 >
                   {!distressRestrictions.canBuyback ? 'Blocked' : 'Buyback'}
                 </button>
               </div>
-              {buybackAmount && parseInt(buybackAmount) >= 1000 && (
+              {/* Preview for dollar mode */}
+              {buybackMode === 'dollars' && buybackAmount && parseInt(buybackAmount) >= 1000 && (
                 <p className="text-xs text-text-muted mt-1">= {formatMoney(Math.round(parseInt(buybackAmount) / 1000))}</p>
               )}
-              {buybackAmount && parseInt(buybackAmount) >= 1000 && intrinsicValuePerShare > 0 && (() => {
-                const amt = Math.round(parseInt(buybackAmount) / 1000);
-                const sharesRepurchased = Math.round((amt / intrinsicValuePerShare) * 1000) / 1000;
+              {/* Preview for shares mode */}
+              {buybackMode === 'shares' && buybackAmount && parseInt(buybackAmount) >= 1 && intrinsicValuePerShare > 0 && (() => {
+                const shareCount = parseInt(buybackAmount) || 0;
+                const cost = Math.round(shareCount * intrinsicValuePerShare);
+                return (
+                  <p className="text-xs text-text-muted mt-1">= {formatMoney(cost)} ({shareCount} shares @ {formatMoney(intrinsicValuePerShare)}/share)</p>
+                );
+              })()}
+              {/* Detail preview */}
+              {buybackAmount && intrinsicValuePerShare > 0 && (() => {
+                let internalAmt: number;
+                if (buybackMode === 'dollars') {
+                  const dollars = parseInt(buybackAmount) || 0;
+                  if (dollars < 1000) return null;
+                  internalAmt = Math.round(dollars / 1000);
+                } else {
+                  const shareCount = parseInt(buybackAmount) || 0;
+                  if (shareCount < 1) return null;
+                  internalAmt = Math.round(shareCount * intrinsicValuePerShare);
+                }
+                const sharesRepurchased = Math.round((internalAmt / intrinsicValuePerShare) * 1000) / 1000;
                 const outsideShares = sharesOutstanding - founderShares;
                 const newTotal = sharesOutstanding - Math.min(sharesRepurchased, outsideShares);
                 const newOwnership = founderShares / newTotal * 100;

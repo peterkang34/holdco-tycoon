@@ -1466,6 +1466,7 @@ export const useGameStore = create<GameStore>()(
 
         // Can only buy back non-founder shares (outside investors' shares)
         const outsideShares = state.sharesOutstanding - state.founderShares;
+        if (outsideShares <= 0) return; // No outside shares to buy back
         if (sharesRepurchased > outsideShares) return; // Can't buy more than outside investors own
 
         const newTotalShares = state.sharesOutstanding - sharesRepurchased;
@@ -2455,6 +2456,10 @@ export const useGameStore = create<GameStore>()(
                 (state.totalDistributions || 0) * (state.founderShares / (state.sharesOutstanding || 1))
               );
             }
+            // Cap table invariant enforcement
+            if (!state.sharesOutstanding || state.sharesOutstanding <= 0) (state as any).sharesOutstanding = 1000;
+            if (!state.founderShares || state.founderShares <= 0) (state as any).founderShares = state.sharesOutstanding;
+            if (state.founderShares > state.sharesOutstanding) (state as any).founderShares = state.sharesOutstanding;
             // Backwards compat: initialize maSourcing if missing
             if (!state.maSourcing) {
               (state as any).maSourcing = { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 };

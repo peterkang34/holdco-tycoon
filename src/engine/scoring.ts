@@ -67,6 +67,7 @@ export function calculateEnterpriseValue(state: GameState): number {
  * This is the PRIMARY leaderboard ranking metric.
  */
 export function calculateFounderEquityValue(state: GameState): number {
+  if (state.sharesOutstanding <= 0) return 0;
   const ev = calculateEnterpriseValue(state);
   const ownership = state.founderShares / state.sharesOutstanding;
   return Math.round(ev * ownership);
