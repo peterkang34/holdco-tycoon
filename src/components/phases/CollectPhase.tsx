@@ -91,6 +91,15 @@ export function CollectPhase({
   // What cash will be after collection
   const projectedCash = cash + netFcf;
 
+  // Coverage ratios
+  const totalInterestExpense = holdcoInterest +
+    businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNoteInterest + breakdown.bankDebtInterest, 0);
+  const totalDebtService = totalInterestExpense +
+    businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNotePrincipal, 0);
+  const interestCoverage = totalInterestExpense > 0 ? totalEbitda / totalInterestExpense : Infinity;
+  const debtServiceCoverage = totalDebtService > 0 ? netFcf / totalDebtService : Infinity;
+  const hasDebtObligations = totalDebtService > 0;
+
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 pb-8">
       <div className="text-center mb-8">
@@ -153,7 +162,62 @@ export function CollectPhase({
             </p>
           </div>
         </div>
+
+        {/* Coverage Ratios */}
+        {hasDebtObligations && (
+          <div className="mt-4 pt-3 border-t border-white/10 flex flex-col sm:flex-row gap-2 sm:gap-6 text-sm">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${
+                interestCoverage >= 4 ? 'bg-accent' : interestCoverage >= 2 ? 'bg-yellow-400' : 'bg-red-400'
+              }`} />
+              <span className="text-text-muted">Interest Coverage</span>
+              <span className={`font-mono font-bold ${
+                interestCoverage >= 4 ? 'text-accent' : interestCoverage >= 2 ? 'text-yellow-400' : 'text-red-400'
+              }`}>
+                {interestCoverage === Infinity ? '∞' : `${interestCoverage.toFixed(1)}x`}
+              </span>
+              <span className="text-xs text-text-muted hidden sm:inline">(EBITDA / Interest)</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${
+                debtServiceCoverage >= 1.5 ? 'bg-accent' : debtServiceCoverage >= 1 ? 'bg-yellow-400' : 'bg-red-400'
+              }`} />
+              <span className="text-text-muted">Debt Service Coverage</span>
+              <span className={`font-mono font-bold ${
+                debtServiceCoverage >= 1.5 ? 'text-accent' : debtServiceCoverage >= 1 ? 'text-yellow-400' : 'text-red-400'
+              }`}>
+                {debtServiceCoverage === Infinity ? '∞' : `${debtServiceCoverage.toFixed(1)}x`}
+              </span>
+              <span className="text-xs text-text-muted hidden sm:inline">(Net FCF / Debt Service)</span>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Negative FCF Warning Banner */}
+      {netFcf < 0 && (
+        <div className={`rounded-xl p-4 mb-6 ${
+          projectedCash <= 0
+            ? 'bg-red-900/30 border-2 border-red-500/50'
+            : 'bg-red-900/20 border border-red-500/30'
+        }`}>
+          <div className="flex items-start gap-3">
+            <span className="text-2xl">{projectedCash <= 0 ? '🚨' : '⚠️'}</span>
+            <div>
+              <h3 className={`font-bold ${projectedCash <= 0 ? 'text-red-400' : 'text-red-300'}`}>
+                {projectedCash <= 0
+                  ? 'Cash Reserves Exhausted'
+                  : 'Negative Cash Flow'}
+              </h3>
+              <p className="text-sm text-text-secondary mt-1">
+                {projectedCash <= 0
+                  ? `Your portfolio generated ${formatMoney(netFcf)} in negative cash flow, exceeding your ${formatMoney(cash)} reserves. Restructuring will be triggered.`
+                  : `Your portfolio generated ${formatMoney(netFcf)} in negative cash flow this year. Debt service and overhead exceeded operating earnings.`}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tax Details (collapsible) — only shown when there are deductions */}
       {hasDeductions && (
@@ -423,7 +487,7 @@ export function CollectPhase({
           <span className="text-2xl text-text-muted">→</span>
           <div>
             <p className="text-text-muted text-sm">After Collection</p>
-            <p className="text-2xl font-bold font-mono text-accent">{formatMoney(projectedCash)}</p>
+            <p className={`text-2xl font-bold font-mono ${projectedCash >= cash ? 'text-accent' : 'text-danger'}`}>{formatMoney(projectedCash)}</p>
           </div>
         </div>
       </div>

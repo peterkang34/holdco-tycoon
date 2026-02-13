@@ -4,7 +4,7 @@ export interface Toast {
   id: string;
   message: string;
   detail?: string;
-  type: 'success' | 'info' | 'warning';
+  type: 'success' | 'info' | 'warning' | 'danger';
 }
 
 interface ToastState {

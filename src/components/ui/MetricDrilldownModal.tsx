@@ -589,6 +589,30 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
             <p className="text-text-muted">Breach</p>
           </div>
         </div>
+
+        {/* Headroom & Breach Counter */}
+        {leverage > 0 && (
+          <div className="mt-3 space-y-1.5 text-sm">
+            {leverage < 4.5 && (
+              <p className="text-text-secondary">
+                Headroom: <span className="font-mono font-bold">{(
+                  leverage < 2.5 ? (2.5 - leverage).toFixed(1) :
+                  leverage < 3.5 ? (3.5 - leverage).toFixed(1) :
+                  (4.5 - leverage).toFixed(1)
+                )}x</span> to {
+                  leverage < 2.5 ? 'Elevated' :
+                  leverage < 3.5 ? 'Stressed' :
+                  'Breach'
+                }
+              </p>
+            )}
+            {leverage >= 4.5 && state.covenantBreachRounds > 0 && (
+              <p className="text-red-400 font-bold">
+                Consecutive breach years: {state.covenantBreachRounds} of 2
+              </p>
+            )}
+          </div>
+        )}
       </>
     );
   }

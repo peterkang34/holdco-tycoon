@@ -76,6 +76,7 @@ interface AllocatePhaseProps {
   onUpgradeMASourcing: () => void;
   onToggleMASourcing: () => void;
   onProactiveOutreach: () => void;
+  covenantBreachRounds?: number;
   acquisitionsThisRound: number;
   maxAcquisitionsPerRound: number;
   lastAcquisitionResult: 'success' | 'snatched' | null;
@@ -124,6 +125,7 @@ export function AllocatePhase({
   onUpgradeMASourcing,
   onToggleMASourcing,
   onProactiveOutreach,
+  covenantBreachRounds,
   acquisitionsThisRound,
   maxAcquisitionsPerRound,
   lastAcquisitionResult,
@@ -462,6 +464,12 @@ export function AllocatePhase({
             <div>
               <h3 className="font-bold text-red-400">{getDistressLabel(distressLevel)}</h3>
               <p className="text-sm text-red-300">{getDistressDescription(distressLevel)}</p>
+              {covenantBreachRounds !== undefined && covenantBreachRounds > 0 && (
+                <p className="text-sm text-red-300 mt-1 font-bold">
+                  This is year {covenantBreachRounds} of 2 consecutive breach years.
+                  {covenantBreachRounds >= 1 && ' If leverage stays above 4.5x, restructuring will be forced next year.'}
+                </p>
+              )}
             </div>
           </div>
         </div>

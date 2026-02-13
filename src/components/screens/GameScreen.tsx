@@ -67,6 +67,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     metrics,
     focusBonus,
     requiresRestructuring: _requiresRestructuring,
+    covenantBreachRounds,
     hasRestructured,
     bankruptRound: _bankruptRound,
     holdcoAmortizationThisRound,
@@ -474,6 +475,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             onUpgradeMASourcing={handleUpgradeMASourcing}
             onToggleMASourcing={handleToggleMASourcing}
             onProactiveOutreach={handleProactiveOutreach}
+            covenantBreachRounds={covenantBreachRounds}
             acquisitionsThisRound={acquisitionsThisRound}
             maxAcquisitionsPerRound={maxAcquisitionsPerRound}
             lastAcquisitionResult={lastAcquisitionResult}
@@ -601,6 +603,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         distressLevel={metrics.distressLevel}
         concentrationCount={concentrationCount}
         diversificationBonus={diversificationBonus}
+        covenantBreachRounds={covenantBreachRounds}
         onMetricClick={setDrilldownMetric}
       />
 

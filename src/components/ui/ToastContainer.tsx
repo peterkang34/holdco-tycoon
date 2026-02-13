@@ -4,18 +4,21 @@ const TYPE_STYLES: Record<Toast['type'], string> = {
   success: 'border-accent/60 bg-accent/10',
   info: 'border-blue-400/60 bg-blue-400/10',
   warning: 'border-warning/60 bg-warning/10',
+  danger: 'border-red-500/60 bg-red-500/10',
 };
 
 const TYPE_ICONS: Record<Toast['type'], string> = {
   success: '✓',
   info: 'ℹ',
   warning: '⚠',
+  danger: '🚨',
 };
 
 const ICON_COLORS: Record<Toast['type'], string> = {
   success: 'text-accent',
   info: 'text-blue-400',
   warning: 'text-warning',
+  danger: 'text-red-400',
 };
 
 export function ToastContainer() {

@@ -14,6 +14,7 @@ import {
   RoundHistoryEntry,
   MASourcingTier,
   MASourcingState,
+  formatMoney,
 } from '../engine/types';
 import {
   createStartingBusiness,
@@ -73,6 +74,7 @@ import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../data/gameConfig';
 import { clampMargin } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
 import { buildChronicleContext } from '../services/chronicleContext';
+import { useToastStore } from './useToast';
 
 interface GameStore extends GameState {
   // Computed
@@ -291,6 +293,7 @@ export const useGameStore = create<GameStore>()(
         // Pay opco-level debt (seller notes, earnouts, bank debt interest)
         // This aligns with the waterfall display — all deductions happen at collection time
         let opcoDebtAdjustment = 0;
+        let hadSkippedPayments = false;
         const updatedBusinesses = state.businesses.map(b => {
           if (b.status !== 'active') return b;
           let updated = { ...b };
@@ -303,6 +306,7 @@ export const useGameStore = create<GameStore>()(
             const availableForPayment = Math.max(0, newCash + opcoDebtAdjustment);
             const actualPayment = Math.min(totalPayment, availableForPayment);
             opcoDebtAdjustment -= actualPayment;
+            if (actualPayment < totalPayment) hadSkippedPayments = true;
             const principalPaid = Math.max(0, actualPayment - interest);
             updated.sellerNoteBalance = Math.max(0, b.sellerNoteBalance - principalPaid);
             if (actualPayment >= totalPayment) {
@@ -338,6 +342,7 @@ export const useGameStore = create<GameStore>()(
             const bankInterest = Math.round(b.bankDebtBalance * state.interestRate);
             const availableForBank = Math.max(0, newCash + opcoDebtAdjustment);
             const actualBankPayment = Math.min(bankInterest, availableForBank);
+            if (actualBankPayment < bankInterest) hadSkippedPayments = true;
             opcoDebtAdjustment -= actualBankPayment;
           }
 
@@ -346,11 +351,30 @@ export const useGameStore = create<GameStore>()(
 
         newCash = newCash + opcoDebtAdjustment;
 
+        // Fire financial stress toasts
+        const addToast = useToastStore.getState().addToast;
+        const cashChange = newCash - state.cash;
+
         // Negative cash triggers restructuring
         let requiresRestructuring = state.requiresRestructuring;
         if (newCash < 0) {
           requiresRestructuring = true;
+          addToast({ message: 'Cash depleted — forced restructuring triggered', type: 'danger' });
           newCash = 0; // Floor at 0
+        } else if (cashChange < 0) {
+          addToast({
+            message: `Negative cash flow: ${formatMoney(cashChange)}`,
+            detail: 'Cash reserves absorbed the shortfall.',
+            type: 'warning',
+          });
+        }
+
+        if (hadSkippedPayments) {
+          addToast({
+            message: 'Debt payments partially skipped',
+            detail: 'Insufficient cash to cover all obligations.',
+            type: 'warning',
+          });
         }
 
         // Generate event

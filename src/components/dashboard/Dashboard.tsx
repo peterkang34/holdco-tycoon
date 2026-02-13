@@ -15,6 +15,7 @@ interface DashboardProps {
   distressLevel: DistressLevel;
   concentrationCount?: number; // Max opcos sharing a focus group
   diversificationBonus?: boolean; // Has 4+ unique sectors
+  covenantBreachRounds?: number; // Consecutive rounds in breach
   onMetricClick?: (key: string) => void;
 }
 
@@ -31,6 +32,7 @@ export function Dashboard({
   distressLevel,
   concentrationCount,
   diversificationBonus,
+  covenantBreachRounds,
   onMetricClick,
 }: DashboardProps) {
   const getCashStatus = () => {
@@ -183,6 +185,16 @@ export function Dashboard({
             Diversified Portfolio
           </span>
         )}
+        {metrics.totalFcf < 0 && (
+          <span className="text-xs bg-red-600/30 text-red-400 px-2 py-1 rounded-full font-bold">
+            Cash Flow Negative
+          </span>
+        )}
+        {metrics.totalFcf >= 0 && metrics.totalDebt > 0 && metrics.totalFcf < Math.round(metrics.totalDebt * metrics.interestRate) && (
+          <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">
+            Tight Debt Coverage
+          </span>
+        )}
         {metrics.interestRate > 0.08 && (
           <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded-full">
             High Interest: {formatPercent(metrics.interestRate)}
@@ -200,7 +212,7 @@ export function Dashboard({
         )}
         {distressLevel === 'breach' && (
           <span className="text-xs bg-red-600/30 text-red-400 px-2 py-1 rounded-full animate-pulse font-bold">
-            {getDistressLabel(distressLevel)}
+            {getDistressLabel(distressLevel)}{covenantBreachRounds ? ` (${covenantBreachRounds} of 2)` : ''}
           </span>
         )}
       </div>
