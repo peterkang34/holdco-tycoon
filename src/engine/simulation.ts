@@ -1030,7 +1030,8 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
             before: beforeEbitda, after: afterEbitda, delta: afterEbitda - beforeEbitda,
             deltaPercent: beforeEbitda > 0 ? (afterEbitda - beforeEbitda) / beforeEbitda : 0,
           });
-          let updated = { ...b, revenue: newRevenue, ebitda: afterEbitda, peakRevenue: Math.max(b.peakRevenue, newRevenue) };
+          const floored = applyEbitdaFloor(afterEbitda, newRevenue, b.ebitdaMargin, b.acquisitionEbitda);
+          let updated = { ...b, revenue: newRevenue, ebitda: floored.ebitda, ebitdaMargin: floored.margin, peakRevenue: Math.max(b.peakRevenue, newRevenue) };
           if (sectorEvent.growthEffect) {
             updated.organicGrowthRate = capGrowthRate(updated.organicGrowthRate + sectorEvent.growthEffect);
             updated.revenueGrowthRate = capGrowthRate(updated.revenueGrowthRate + sectorEvent.growthEffect);

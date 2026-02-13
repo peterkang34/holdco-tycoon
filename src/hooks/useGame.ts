@@ -1899,24 +1899,19 @@ export const useGameStore = create<GameStore>()(
             activeBusinesses.map(b => b.name),
           );
 
-          if (narrative) {
-            set({
-              currentEvent: { ...event, narrative },
-            });
-          } else {
-            // Use fallback
-            const fallbackNarrative = getFallbackEventNarrative(event.type);
-            set({
-              currentEvent: { ...event, narrative: fallbackNarrative },
-            });
+          const finalNarrative = narrative || getFallbackEventNarrative(event.type);
+          // Guard: only update if the event is still current (prevents resurrecting dismissed events)
+          const current = get().currentEvent;
+          if (current && current.type === event.type && current.affectedBusinessId === event.affectedBusinessId) {
+            set({ currentEvent: { ...current, narrative: finalNarrative } });
           }
         } catch (error) {
           console.error('Failed to fetch event narrative:', error);
-          // Use fallback on error
           const fallbackNarrative = getFallbackEventNarrative(event.type);
-          set({
-            currentEvent: { ...event, narrative: fallbackNarrative },
-          });
+          const current = get().currentEvent;
+          if (current && current.type === event.type && current.affectedBusinessId === event.affectedBusinessId) {
+            set({ currentEvent: { ...current, narrative: fallbackNarrative } });
+          }
         }
       },
 
@@ -1978,7 +1973,15 @@ export const useGameStore = create<GameStore>()(
           })
         );
 
-        set({ businesses: updatedBusinesses });
+        // Merge storyBeats into current state (avoids overwriting concurrent mutations)
+        const freshState = get();
+        const storyMap = new Map(updatedBusinesses.map(b => [b.id, b.storyBeats]));
+        set({
+          businesses: freshState.businesses.map(b => {
+            const newBeats = storyMap.get(b.id);
+            return newBeats ? { ...b, storyBeats: newBeats } : b;
+          }),
+        });
       },
 
       generateYearChronicle: async () => {
