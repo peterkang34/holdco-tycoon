@@ -87,7 +87,7 @@ import {
   resolveTurnaround,
   getQualityImprovementChance,
 } from '../engine/turnarounds';
-import { getProgramById, getTurnaroundTierAnnualCost, getTurnaroundTierUnlockCost, TURNAROUND_TIER_CONFIG, getQualityCeiling } from '../data/turnaroundPrograms';
+import { getProgramById, getTurnaroundTierAnnualCost, TURNAROUND_TIER_CONFIG, getQualityCeiling } from '../data/turnaroundPrograms';
 import type { QualityRating } from '../engine/types';
 
 interface GameStore extends GameState {

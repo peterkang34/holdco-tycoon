@@ -126,10 +126,6 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     difficulty,
     duration,
     lastAcquisitionResult,
-    turnaroundTier,
-    activeTurnarounds,
-    unlockTurnaroundTier,
-    startTurnaroundProgram,
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;

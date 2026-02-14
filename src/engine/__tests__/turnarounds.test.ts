@@ -13,7 +13,6 @@ import {
   getAvailablePrograms,
   getProgramById,
   getQualityCeiling,
-  SECTOR_QUALITY_CEILINGS,
   DEFAULT_QUALITY_CEILING,
   TURNAROUND_TIER_CONFIG,
   getTurnaroundTierAnnualCost,
@@ -27,7 +26,7 @@ import {
   QUALITY_IMPROVEMENT_TIER_BONUS,
 } from '../../data/gameConfig';
 import { createMockBusiness, createMockGameState } from './helpers';
-import type { ActiveTurnaround, QualityRating, TurnaroundTier } from '../types';
+import type { ActiveTurnaround } from '../types';
 
 // ── Program Data Integrity ──
 

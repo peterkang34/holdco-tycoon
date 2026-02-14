@@ -17,7 +17,6 @@ import {
   GameDuration,
   TurnaroundTier,
   ActiveTurnaround,
-  TurnaroundProgram,
   formatMoney,
   formatPercent,
 } from '../../engine/types';
