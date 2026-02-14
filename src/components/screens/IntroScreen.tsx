@@ -11,7 +11,7 @@ interface IntroScreenProps {
 export function IntroScreen({ onStart }: IntroScreenProps) {
   const [step, setStep] = useState<'mode' | 'setup'>('mode');
   const [holdcoName, setHoldcoName] = useState('');
-  const [selectedSector, setSelectedSector] = useState<SectorId>('agency');
+  const [selectedSector, setSelectedSector] = useState<SectorId | 'random'>('agency');
   const [selectedDifficulty, setSelectedDifficulty] = useState<GameDifficulty>('easy');
   const [selectedDuration, setSelectedDuration] = useState<GameDuration>('standard');
   const [showNameError, setShowNameError] = useState(false);
@@ -23,7 +23,10 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
       setShowNameError(true);
       return;
     }
-    onStart(holdcoName.trim(), selectedSector, selectedDifficulty, selectedDuration);
+    const sector = selectedSector === 'random'
+      ? SECTOR_LIST[Math.floor(Math.random() * SECTOR_LIST.length)].id
+      : selectedSector;
+    onStart(holdcoName.trim(), sector, selectedDifficulty, selectedDuration);
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -161,18 +164,19 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
                 <button
                   type="button"
-                  onClick={() => {
-                    const random = SECTOR_LIST[Math.floor(Math.random() * SECTOR_LIST.length)];
-                    setSelectedSector(random.id);
-                  }}
-                  className="p-3 rounded-lg border text-left transition-all border-dashed border-accent/40 bg-accent/5 hover:border-accent hover:bg-accent/10"
+                  onClick={() => setSelectedSector('random')}
+                  className={`p-3 rounded-lg border text-left transition-all border-dashed ${
+                    selectedSector === 'random'
+                      ? 'border-accent bg-accent/10'
+                      : 'border-accent/40 bg-accent/5 hover:border-accent hover:bg-accent/10'
+                  }`}
                 >
                   <div className="flex items-center gap-2">
                     <span className="text-xl">🎲</span>
                     <span className="text-sm font-medium text-accent">Surprise Me</span>
                   </div>
                   <p className="text-[11px] sm:text-[10px] text-text-muted mt-1">
-                    Pick a random sector
+                    Reveal on launch
                   </p>
                 </button>
                 {SECTOR_LIST.map(sector => (
