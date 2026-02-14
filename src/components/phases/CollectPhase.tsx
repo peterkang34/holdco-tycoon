@@ -121,15 +121,25 @@ export function CollectPhase({
   // Calculate annual interest expense (holdco level)
   const holdcoInterest = Math.round(totalDebt * interestRate);
 
+  // Total earn-out payments (active businesses + tuck-ins) — uncapped
+  const uncappedActiveEarnouts = businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.earnoutPayment, 0);
+  const uncappedTotalEarnouts = uncappedActiveEarnouts + integratedDebt.earnouts;
+
+  // Net FCF WITHOUT earn-outs (to determine how much cash is available for earn-outs)
+  const netFcfBeforeEarnouts = totalBusinessFcf + uncappedActiveEarnouts - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - integratedDebt.sellerNotes;
+  const availableForEarnouts = Math.max(0, cash + netFcfBeforeEarnouts);
+
+  // Cap earn-outs at available cash (matches store's Math.min logic)
+  const totalEarnouts = Math.min(uncappedTotalEarnouts, availableForEarnouts);
+  const activeEarnouts = uncappedTotalEarnouts > 0
+    ? Math.round(uncappedActiveEarnouts * (totalEarnouts / uncappedTotalEarnouts))
+    : 0;
+
   // Net FCF after tax, holdco interest, shared services, MA sourcing, and tuck-in earnouts
-  const netFcf = totalBusinessFcf - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - integratedDebt.total;
+  const netFcf = netFcfBeforeEarnouts - totalEarnouts;
 
   // What cash will be after collection
   const projectedCash = cash + netFcf;
-
-  // Total earn-out payments (active businesses + tuck-ins)
-  const activeEarnouts = businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.earnoutPayment, 0);
-  const totalEarnouts = activeEarnouts + integratedDebt.earnouts;
 
   // OpCo debt service (seller notes + bank debt, excluding earn-outs)
   const opcoDebtService = businessBreakdowns.reduce((s, { breakdown }) =>

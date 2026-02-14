@@ -393,7 +393,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
       case 'collect':
         return (
           <CollectPhase
-            businesses={activeBusinesses}
+            businesses={businesses}
             cash={cash}
             totalDebt={totalDebt}
             interestRate={interestRate}
