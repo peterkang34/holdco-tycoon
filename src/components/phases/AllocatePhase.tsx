@@ -1622,6 +1622,8 @@ export function AllocatePhase({
             {(() => {
               const founderOwnership = founderShares / sharesOutstanding;
               const outsideShares = sharesOutstanding - founderShares;
+              const isEasyMode = difficulty === 'easy';
+              const initialOutsideShares = isEasyMode ? STARTING_SHARES * 0.2 : 0;
               return (
                 <div className="card bg-white/5">
                   <h4 className="font-bold mb-3">Cap Table & Equity</h4>
@@ -1653,11 +1655,11 @@ export function AllocatePhase({
                       <p className="text-text-muted">Outside Shares</p>
                       <p className="font-mono font-bold text-lg">{outsideShares.toFixed(0)}</p>
                       <p className="text-xs text-text-muted">
-                        {outsideShares > STARTING_SHARES * 0.2
-                          ? `+${(outsideShares - STARTING_SHARES * 0.2).toFixed(0)} since start`
-                          : outsideShares < STARTING_SHARES * 0.2
-                          ? `${(STARTING_SHARES * 0.2 - outsideShares).toFixed(0)} bought back`
-                          : 'Initial 200 from raise'}
+                        {outsideShares > initialOutsideShares
+                          ? `+${(outsideShares - initialOutsideShares).toFixed(0)} since start`
+                          : outsideShares < initialOutsideShares
+                          ? `${(initialOutsideShares - outsideShares).toFixed(0)} bought back`
+                          : isEasyMode ? 'Initial 200 from raise' : 'No outside shareholders'}
                       </p>
                     </div>
                     <div>
@@ -1679,7 +1681,11 @@ export function AllocatePhase({
                   </div>
 
                   <div className="mt-4 p-3 bg-white/5 rounded text-xs text-text-muted">
-                    <strong>How equity works:</strong> You started with 1,000 total shares — 800 yours (80%), 200 sold to investors for {formatMoney(20000)}.
+                    <strong>How equity works:</strong>{' '}
+                    {isEasyMode
+                      ? <>You started with 1,000 total shares — 800 yours (80%), 200 sold to investors for {formatMoney(20000)}.</>
+                      : <>You started with 1,000 shares and 100% ownership.</>
+                    }{' '}
                     Issuing new shares raises cash but dilutes your ownership %. Buybacks retire outside shares, increasing your % back.
                     You must always hold &gt;51% to keep control.
                   </div>
