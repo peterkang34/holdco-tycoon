@@ -16,7 +16,7 @@ import { AnnualReportModal } from '../ui/AnnualReportModal';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { MetricDrilldownModal } from '../ui/MetricDrilldownModal';
 import { ToastContainer } from '../ui/ToastContainer';
-import { calculateFounderEquityValue } from '../../engine/scoring';
+import { calculateFounderEquityValue, calculateFounderPersonalWealth } from '../../engine/scoring';
 import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
 import { updateSessionRound } from '../../services/telemetry';
 
@@ -118,6 +118,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     maxAcquisitionsPerRound,
     maxRounds,
     difficulty,
+    duration,
     lastAcquisitionResult,
   } = useGameStore();
 
@@ -635,12 +636,22 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
       )}
 
       {/* Leaderboard Modal */}
-      {showLeaderboard && (
-        <LeaderboardModal
-          hypotheticalEV={Math.round(calculateFounderEquityValue(useGameStore.getState()) * (DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0))}
-          onClose={() => setShowLeaderboard(false)}
-        />
-      )}
+      {showLeaderboard && (() => {
+        const state = useGameStore.getState();
+        const rawFEV = calculateFounderEquityValue(state);
+        const adjustedFEV = Math.round(rawFEV * (DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0));
+        const wealth = calculateFounderPersonalWealth(state);
+        return (
+          <LeaderboardModal
+            hypotheticalEV={adjustedFEV}
+            hypotheticalRawFEV={rawFEV}
+            hypotheticalWealth={wealth}
+            currentDifficulty={difficulty}
+            currentDuration={duration}
+            onClose={() => setShowLeaderboard(false)}
+          />
+        );
+      })()}
 
       {/* Metric Drilldown Modal */}
       {drilldownMetric && (

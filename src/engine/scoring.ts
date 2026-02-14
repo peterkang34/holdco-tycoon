@@ -526,7 +526,7 @@ export function getLeaderboardRank(enterpriseValue: number): number {
 
 // --- Sync helpers for pre-fetched arrays (used by UI with global data) ---
 
-const GLOBAL_LEADERBOARD_SIZE = 50;
+const GLOBAL_LEADERBOARD_SIZE = 500;
 
 /**
  * Check if a score would make a pre-fetched leaderboard.

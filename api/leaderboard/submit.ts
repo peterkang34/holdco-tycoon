@@ -4,7 +4,7 @@ import { randomUUID } from 'crypto';
 import { getClientIp, isBodyTooLarge } from '../_lib/rateLimit.js';
 import { LEADERBOARD_KEY, DIFFICULTY_MULTIPLIER } from '../_lib/leaderboard.js';
 
-const MAX_ENTRIES = 100;
+const MAX_ENTRIES = 500;
 const RATE_LIMIT_SECONDS = 60;
 
 const VALID_GRADES = ['S', 'A', 'B', 'C', 'D', 'F'] as const;

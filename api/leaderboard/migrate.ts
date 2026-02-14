@@ -83,6 +83,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ migrated, skipped, v1Total: v1Entries.length });
     }
 
+    // Audit mode — flag potentially invalid entries
+    if (action === 'audit') {
+      const allEntries = await kv.zrange(NEW_KEY, 0, -1);
+      const flagged: { id: string; holdcoName: string; flags: string[]; fev?: number; ev?: number; difficulty?: string; duration?: string }[] = [];
+
+      for (const raw of allEntries) {
+        try {
+          const entry: any = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (!entry?.id) continue;
+          const flags: string[] = [];
+
+          if (!entry.difficulty) flags.push('missing_difficulty');
+          if (!entry.duration) flags.push('missing_duration');
+          if (!entry.founderEquityValue && entry.founderEquityValue !== 0) flags.push('missing_fev');
+          // $200M = 200000 in thousands
+          if ((entry.enterpriseValue ?? 0) > 200000) flags.push('high_ev');
+
+          if (flags.length > 0) {
+            flagged.push({
+              id: entry.id,
+              holdcoName: entry.holdcoName,
+              flags,
+              fev: entry.founderEquityValue,
+              ev: entry.enterpriseValue,
+              difficulty: entry.difficulty,
+              duration: entry.duration,
+            });
+          }
+        } catch { /* skip malformed */ }
+      }
+
+      return res.status(200).json({ totalEntries: allEntries.length, flaggedCount: flagged.length, flagged });
+    }
+
     // Diagnostic mode — show both v1 and v2
     const v1Count = await kv.zcard(OLD_KEY);
     const v2Count = await kv.zcard(NEW_KEY);
