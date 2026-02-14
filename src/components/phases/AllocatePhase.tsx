@@ -401,7 +401,7 @@ export function AllocatePhase({
               {/* In-modal equity raise for Scenario A */}
               {(() => {
                 const raisesRemaining = MAX_EQUITY_RAISES[duration] - equityRaisesUsed;
-                const shortfall = Math.max(0, selectedDeal.effectivePrice * 0.25 - cash);
+                const shortfall = Math.max(0, Math.round(selectedDeal.effectivePrice * 0.25) - cash);
                 const suggestedRaise = Math.ceil(shortfall / 100) * 100; // round up to nearest $100K (internal units)
                 const canRaise = raisesRemaining > 0 && intrinsicValuePerShare > 0;
                 const parsedAmount = parseInt(modalEquityAmount) || 0;
@@ -429,7 +429,7 @@ export function AllocatePhase({
                               inputMode="numeric"
                               value={modalEquityAmount}
                               onChange={(e) => setModalEquityAmount(e.target.value.replace(/[^0-9]/g, ''))}
-                              placeholder={String(suggestedRaise * 1000)}
+                              placeholder={(suggestedRaise * 1000).toLocaleString()}
                               className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-base sm:text-sm"
                             />
                           </div>
@@ -1309,7 +1309,7 @@ export function AllocatePhase({
                 </span>
                 <span className="hidden sm:inline text-white/20">|</span>
                 <span className="text-text-muted text-xs sm:text-sm">
-                  {dealPipeline.filter(d => cash >= d.effectivePrice * 0.25).length} of {dealPipeline.length} deals affordable
+                  {dealPipeline.filter(d => cash >= Math.round(d.effectivePrice * 0.25)).length} of {dealPipeline.length} deals affordable
                 </span>
                 <span className="hidden sm:inline text-white/20">|</span>
                 <span className="text-text-muted text-xs sm:text-sm">
@@ -1328,7 +1328,7 @@ export function AllocatePhase({
                   deal={deal}
                   onSelect={() => setSelectedDeal(deal)}
                   disabled={!distressRestrictions.canAcquire || acquisitionsThisRound >= maxAcquisitionsPerRound}
-                  unaffordable={cash < deal.effectivePrice * 0.25}
+                  unaffordable={cash < Math.round(deal.effectivePrice * 0.25)}
                   availablePlatforms={getPlatformsForSector(deal.business.sectorId)}
                   isPassed={passedDealIds.has(deal.id)}
                   onPass={() => {
