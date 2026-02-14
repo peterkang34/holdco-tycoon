@@ -238,7 +238,7 @@ export function AllocatePhase({
     const canTuckIn = availablePlatformsForDeal.length > 0;
 
     return (
-      <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+      <div className="fixed inset-0 bg-black/80 flex items-start sm:items-center justify-center p-4 pt-8 sm:pt-4 z-50 overflow-y-auto">
         <div className="bg-bg-primary border border-white/10 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
           <div className="flex items-start justify-between mb-6">
             <div>
@@ -430,7 +430,7 @@ export function AllocatePhase({
                               value={modalEquityAmount}
                               onChange={(e) => setModalEquityAmount(e.target.value.replace(/[^0-9]/g, ''))}
                               placeholder={String(suggestedRaise * 1000)}
-                              className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-sm"
+                              className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-base sm:text-sm"
                             />
                           </div>
                           <button
@@ -565,7 +565,7 @@ export function AllocatePhase({
                 <div className="mt-4">
                   <button
                     onClick={() => setShowModalEquityRaise(!showModalEquityRaise)}
-                    className="text-sm text-accent hover:text-accent/80 transition-colors flex items-center gap-1"
+                    className="text-sm text-accent hover:text-accent/80 transition-colors flex items-center gap-1 py-2"
                   >
                     {showModalEquityRaise ? '▼' : '▶'} Need more cash?
                   </button>
@@ -581,7 +581,7 @@ export function AllocatePhase({
                             value={modalEquityAmount}
                             onChange={(e) => setModalEquityAmount(e.target.value.replace(/[^0-9]/g, ''))}
                             placeholder="e.g. 5000000"
-                            className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-sm"
+                            className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-base sm:text-sm"
                           />
                         </div>
                         <button
