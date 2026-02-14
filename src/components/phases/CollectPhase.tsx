@@ -127,8 +127,15 @@ export function CollectPhase({
   // What cash will be after collection
   const projectedCash = cash + netFcf;
 
+  // Total earn-out payments (active businesses + tuck-ins)
+  const activeEarnouts = businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.earnoutPayment, 0);
+  const totalEarnouts = activeEarnouts + integratedDebt.earnouts;
+
+  // OpCo debt service (seller notes + bank debt, excluding earn-outs)
+  const opcoDebtService = businessBreakdowns.reduce((s, { breakdown }) =>
+    s + breakdown.sellerNoteInterest + breakdown.sellerNotePrincipal + breakdown.bankDebtInterest, 0) + integratedDebt.sellerNotes;
+
   // Coverage ratios
-  const totalEarnouts = businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.earnoutPayment, 0) + integratedDebt.total;
   const totalInterestExpense = holdcoInterest +
     businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNoteInterest + breakdown.bankDebtInterest, 0);
   const totalDebtService = totalInterestExpense +
@@ -156,7 +163,7 @@ export function CollectPhase({
       {/* EBITDA to FCF Summary */}
       <div className="card mb-6 bg-white/5">
         <h3 className="font-bold mb-4">Portfolio Cash Flow Waterfall</h3>
-        <div className="overflow-x-auto -mx-2 sm:mx-0"><div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 sm:gap-3 min-w-[320px] sm:min-w-0 text-center text-xs sm:text-sm">
+        <div className="overflow-x-auto -mx-2 sm:mx-0"><div className={`grid gap-1.5 sm:gap-3 min-w-[320px] sm:min-w-0 text-center text-xs sm:text-sm ${totalEarnouts > 0 ? 'grid-cols-4 sm:grid-cols-8' : 'grid-cols-4 sm:grid-cols-7'}`}>
           <div>
             <p className="text-text-muted">Revenue</p>
             <p className="font-mono font-bold text-sm sm:text-lg">{formatMoney(activeBusinesses.reduce((s, b) => s + b.revenue, 0))}</p>
@@ -182,10 +189,17 @@ export function CollectPhase({
           <div>
             <p className="text-text-muted"><span className="hidden sm:inline">OpCo </span>Debt</p>
             <p className="font-mono font-bold text-sm sm:text-lg text-danger">
-              -{formatMoney(businessBreakdowns.reduce((s, { breakdown }) =>
-                s + breakdown.sellerNoteInterest + breakdown.sellerNotePrincipal + breakdown.bankDebtInterest + breakdown.earnoutPayment, 0) + integratedDebt.total)}
+              -{formatMoney(opcoDebtService)}
             </p>
           </div>
+          {totalEarnouts > 0 && (
+            <div>
+              <p className="text-text-muted">Earn-outs</p>
+              <p className="font-mono font-bold text-sm sm:text-lg text-danger">
+                -{formatMoney(totalEarnouts)}
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-text-muted">HoldCo</p>
             <p className="font-mono font-bold text-sm sm:text-lg text-danger">
@@ -484,6 +498,21 @@ export function CollectPhase({
                 <span className="text-text-secondary">M&A Sourcing Team</span>
               </div>
               <span className="font-mono text-warning">-{formatMoney(maSourcingCost)}</span>
+            </div>
+          )}
+
+          {totalEarnouts > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">📝</span>
+                <span className="text-text-secondary">
+                  Earn-out Payments
+                  {activeEarnouts > 0 && integratedDebt.earnouts > 0
+                    ? ` (${formatMoney(activeEarnouts)} standalone + ${formatMoney(integratedDebt.earnouts)} bolt-on)`
+                    : ''}
+                </span>
+              </div>
+              <span className="font-mono text-danger">-{formatMoney(totalEarnouts)}</span>
             </div>
           )}
         </div>
