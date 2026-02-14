@@ -41,16 +41,28 @@ export function RestructurePhase({
   const [actionsTaken, setActionsTaken] = useState(0);
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
+  const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
 
   // Calculate fire-sale prices for each business
   const businessValues = activeBusinesses.map(b => {
     const valuation = calculateExitValuation(b, round, lastEventType);
     const fireSalePrice = Math.round(valuation.exitPrice * 0.70);
     const netProceeds = Math.max(0, fireSalePrice - b.sellerNoteBalance);
-    return { business: b, valuation, fireSalePrice, netProceeds };
+    // Project post-sale ND/E
+    const postSaleDebt = totalDebt - b.sellerNoteBalance;
+    const postSaleCash = cash + netProceeds;
+    const postSaleEbitda = totalEbitda - b.ebitda;
+    const postSaleNDE = postSaleEbitda > 0 ? (postSaleDebt - postSaleCash) / postSaleEbitda : 99;
+    return { business: b, valuation, fireSalePrice, netProceeds, postSaleNDE };
   });
 
   const canContinue = actionsTaken > 0;
+  const breachResolved = netDebtToEbitda < 4.5 && cash >= 0;
+
+  // Calculate how much cash needed to reach comfortable (2.5x) and breach exit (4.5x)
+  const netDebt = totalDebt - cash;
+  const cashToExitBreach = totalEbitda > 0 ? Math.max(0, netDebt - totalEbitda * 4.5) : netDebt;
+  const cashToComfortable = totalEbitda > 0 ? Math.max(0, netDebt - totalEbitda * 2.5) : netDebt;
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 pb-8">
@@ -71,7 +83,9 @@ export function RestructurePhase({
           </div>
           <div>
             <p className="text-text-muted text-sm">Net Debt/EBITDA</p>
-            <p className="text-2xl font-bold font-mono text-red-400">{formatMultiple(netDebtToEbitda)}</p>
+            <p className={`text-2xl font-bold font-mono ${breachResolved ? 'text-green-400' : 'text-red-400'}`}>
+              {formatMultiple(netDebtToEbitda)}
+            </p>
           </div>
         </div>
         {hasRestructured && (
@@ -81,14 +95,57 @@ export function RestructurePhase({
         )}
       </div>
 
-      {/* What triggered this */}
+      {/* Breach Resolved Banner */}
+      {actionsTaken > 0 && breachResolved && (
+        <div className="bg-green-900/30 border-2 border-green-500/50 rounded-xl p-4 mb-6 text-center">
+          <p className="text-green-300 font-bold text-lg mb-1">Breach Resolved</p>
+          <p className="text-green-400 text-sm">
+            ND/E is now {formatMultiple(netDebtToEbitda)} (below 4.5x). You can continue.
+          </p>
+        </div>
+      )}
+
+      {/* What triggered this + Prescriptive guidance */}
       <div className="card mb-6 bg-white/5">
         <h3 className="font-bold mb-2">What happened?</h3>
-        <p className="text-sm text-text-secondary">
+        <p className="text-sm text-text-secondary mb-4">
           {cash <= 0
-            ? 'Your holding company ran out of cash. Interest payments and operating costs exceeded your free cash flow, leaving you unable to meet obligations.'
-            : 'You have been in covenant breach for 2 consecutive years. Your net debt/EBITDA ratio has exceeded 4.5x, triggering mandatory lender intervention.'}
+            ? 'Your holding company ran out of cash. Interest payments and operating costs exceeded your free cash flow.'
+            : 'You have been in covenant breach for 2 consecutive years. Your net debt/EBITDA ratio has exceeded 4.5x.'}
         </p>
+
+        {/* Prescriptive guidance */}
+        <div className="bg-white/5 rounded-lg p-4 space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-text-muted">Current ND/E</span>
+            <span className={`font-mono font-bold ${netDebtToEbitda >= 4.5 ? 'text-red-400' : netDebtToEbitda >= 2.5 ? 'text-orange-400' : 'text-green-400'}`}>
+              {formatMultiple(netDebtToEbitda)}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-text-muted">Target to exit breach (&lt; 4.5x)</span>
+            <span className="font-mono text-orange-300">
+              {cashToExitBreach > 0 ? `Raise or free up ${formatMoney(cashToExitBreach)}` : 'Met'}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-text-muted">Target for comfortable (&lt; 2.5x)</span>
+            <span className="font-mono text-text-muted">
+              {cashToComfortable > 0 ? `Raise or free up ${formatMoney(cashToComfortable)}` : 'Met'}
+            </span>
+          </div>
+          {businessValues.length > 0 && (
+            <div className="border-t border-white/10 pt-2 mt-2">
+              <p className="text-text-muted text-xs mb-1.5">Projected ND/E after each sale:</p>
+              {businessValues.slice(0, 3).map(v => (
+                <p key={v.business.id} className="text-xs text-text-secondary">
+                  {SECTORS[v.business.sectorId].emoji} {v.business.name}: +{formatMoney(v.netProceeds)} → ND/E {v.postSaleNDE < 0 ? '0.0x' : formatMultiple(v.postSaleNDE)}
+                  {v.postSaleNDE < 4.5 && <span className="text-green-400 ml-1">(resolves breach)</span>}
+                </p>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Action Cards */}
@@ -104,7 +161,7 @@ export function RestructurePhase({
             <p className="text-text-muted text-sm italic">No businesses to sell.</p>
           ) : (
             <div className="space-y-3">
-              {businessValues.map(({ business, fireSalePrice, netProceeds }) => {
+              {businessValues.map(({ business, fireSalePrice, netProceeds, postSaleNDE }) => {
                 const sector = SECTORS[business.sectorId];
                 return (
                   <div
@@ -118,6 +175,12 @@ export function RestructurePhase({
                         <p className="text-xs text-text-muted">
                           EBITDA: {formatMoney(business.ebitda)} | Fire-sale: {formatMoney(fireSalePrice)}
                           <span className="text-red-400"> (70% of fair value)</span>
+                        </p>
+                        <p className="text-xs text-text-muted">
+                          → ND/E after: <span className={postSaleNDE < 4.5 ? 'text-green-400' : 'text-orange-400'}>
+                            {postSaleNDE < 0 ? '0.0x' : formatMultiple(postSaleNDE)}
+                          </span>
+                          {postSaleNDE < 4.5 && <span className="text-green-400"> (resolves breach)</span>}
                         </p>
                       </div>
                     </div>
@@ -175,6 +238,8 @@ export function RestructurePhase({
             const newShares = Math.round((amt / emergencyPrice) * 1000) / 1000;
             const newTotal = sharesOutstanding + newShares;
             const newOwnership = founderShares / newTotal * 100;
+            const postRaiseNetDebt = totalDebt - (cash + amt);
+            const postRaiseNDE = totalEbitda > 0 ? postRaiseNetDebt / totalEbitda : 99;
             return (
               <div className="p-3 bg-white/5 rounded text-xs space-y-1">
                 <div className="flex justify-between">
@@ -189,6 +254,13 @@ export function RestructurePhase({
                   <span className="text-text-muted">Your ownership after</span>
                   <span className={`font-mono font-bold ${newOwnership < 51 ? 'text-red-400' : 'text-warning'}`}>
                     {newOwnership.toFixed(1)}%
+                  </span>
+                </div>
+                <div className="flex justify-between border-t border-white/10 pt-1 mt-1">
+                  <span className="text-text-muted">ND/E after raise</span>
+                  <span className={`font-mono ${postRaiseNDE < 4.5 ? 'text-green-400' : 'text-orange-400'}`}>
+                    {postRaiseNDE < 0 ? '0.0x' : formatMultiple(postRaiseNDE)}
+                    {postRaiseNDE < 4.5 && ' (resolves breach)'}
                   </span>
                 </div>
               </div>
@@ -256,7 +328,7 @@ export function RestructurePhase({
         }`}
       >
         {canContinue
-          ? 'Continue to Events →'
+          ? (breachResolved ? 'Continue (Breach Resolved) →' : 'Continue to Events →')
           : 'Take at least one action to continue'}
       </button>
     </div>

@@ -37,8 +37,24 @@ describe('generateDealStructures', () => {
       expect(sellerNote.sellerNote!.amount).toBeGreaterThan(0);
       expect(sellerNote.sellerNote!.rate).toBeGreaterThanOrEqual(0.05);
       expect(sellerNote.sellerNote!.rate).toBeLessThanOrEqual(0.06);
-      expect(sellerNote.sellerNote!.termRounds).toBe(3);
+      expect(sellerNote.sellerNote!.termRounds).toBe(5);
     }
+  });
+
+  it('should set seller note term to 4 for 10yr mode', () => {
+    const deal = createMockDeal({ askingPrice: 4000 });
+    const structures = generateDealStructures(deal, 3000, 0.07, false, 10);
+    const sellerNote = structures.find(s => s.type === 'seller_note');
+    expect(sellerNote).toBeDefined();
+    expect(sellerNote!.sellerNote!.termRounds).toBe(4);
+  });
+
+  it('should set seller note term to 5 for 20yr mode', () => {
+    const deal = createMockDeal({ askingPrice: 4000 });
+    const structures = generateDealStructures(deal, 3000, 0.07, false, 20);
+    const sellerNote = structures.find(s => s.type === 'seller_note');
+    expect(sellerNote).toBeDefined();
+    expect(sellerNote!.sellerNote!.termRounds).toBe(5);
   });
 
   it('should not include bank debt during credit tightening', () => {

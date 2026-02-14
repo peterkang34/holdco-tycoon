@@ -110,7 +110,7 @@ export function GameOverScreen({
     const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
     const blendedMultiple = totalEbitda > 0 ? portfolioValue / totalEbitda : 0;
     const hypotheticalFEV = Math.round(enterpriseValue * initialOwnershipPct);
-    return { currentOwnership, opcoDebt, businessValues, portfolioValue, blendedMultiple, hypotheticalFEV };
+    return { currentOwnership, opcoDebt, portfolioValue, blendedMultiple, hypotheticalFEV };
   }, [activeBusinesses, sharesOutstanding, founderShares, maxRounds, enterpriseValue, initialOwnershipPct]);
 
   // Load global leaderboard on mount
@@ -308,7 +308,7 @@ export function GameOverScreen({
 
       {/* FEV / EV Breakdown */}
       {!bankruptRound && (() => {
-        const { currentOwnership, opcoDebt, businessValues, portfolioValue, blendedMultiple, hypotheticalFEV } = fevBreakdown;
+        const { currentOwnership, opcoDebt, portfolioValue, blendedMultiple, hypotheticalFEV } = fevBreakdown;
 
         return (
           <div className="card mb-6">
@@ -349,38 +349,6 @@ export function GameOverScreen({
                 <span className="font-mono">{formatMoney(founderEquityValue)}</span>
               </div>
             </div>
-
-            {/* Value by Business */}
-            {businessValues.length > 0 && (
-              <div className="mb-5">
-                <h3 className="text-sm font-bold text-text-secondary mb-2">Value by Business</h3>
-                <div className="space-y-1.5">
-                  {businessValues.map(({ business, valuation, value, moic }) => {
-                    const pctOfPortfolio = portfolioValue > 0 ? (value / portfolioValue) * 100 : 0;
-                    const sector = SECTORS[business.sectorId];
-                    return (
-                      <div key={business.id} className="flex items-center justify-between p-2 bg-white/5 rounded text-xs">
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          <span>{sector.emoji}</span>
-                          <span className="truncate">{business.name}</span>
-                        </div>
-                        <div className="flex items-center gap-3 text-right shrink-0">
-                          <div className="hidden sm:block">
-                            <span className="text-text-muted">{formatMoney(business.ebitda)} x </span>
-                            <span className="font-mono">{formatMultiple(valuation.totalMultiple)}</span>
-                          </div>
-                          <span className="font-mono font-bold w-16 text-right">{formatMoney(value)}</span>
-                          <span className="text-text-muted w-10 text-right">{pctOfPortfolio.toFixed(0)}%</span>
-                          <span className={`font-mono w-12 text-right ${moic >= 2 ? 'text-accent' : moic < 1 ? 'text-danger' : ''}`}>
-                            {formatMultiple(moic)}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
             {/* Ownership Impact */}
             {currentOwnership < initialOwnershipPct - 0.001 && (
@@ -556,34 +524,42 @@ export function GameOverScreen({
 
       {/* Portfolio */}
       <div className="card mb-6">
-        <h2 className="text-lg font-bold mb-4">Portfolio Companies</h2>
+        <h2 className="text-lg font-bold mb-1">Portfolio Companies</h2>
+        <p className="text-xs text-text-muted mb-4">Platforms and standalone companies. Bolt-ons are consolidated into their parent platform.</p>
         <div className="space-y-2">
           {allBusinesses.map(business => {
             const sector = SECTORS[business.sectorId];
             const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
-            const moic = totalInvested > 0
-              ? (business.exitPrice
-                  ? business.exitPrice / totalInvested
-                  : (business.ebitda * business.acquisitionMultiple) / totalInvested)
-              : 0;
+            let exitValue: number;
+            let exitMultiple: number | null = null;
+            if (business.status === 'sold') {
+              exitValue = business.exitPrice || 0;
+            } else if (business.status === 'wound_down') {
+              exitValue = 0;
+            } else {
+              const valuation = calculateExitValuation(business, maxRounds);
+              exitMultiple = valuation.totalMultiple;
+              exitValue = Math.round(business.ebitda * valuation.totalMultiple);
+            }
+            const moic = totalInvested > 0 ? exitValue / totalInvested : 0;
 
             return (
               <div
                 key={business.id}
                 className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <span className="text-xl">{sector.emoji}</span>
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <span className="text-xl shrink-0">{sector.emoji}</span>
                   <div className="min-w-0">
                     <p className="font-medium truncate">{business.name}</p>
                     <p className="text-xs text-text-muted">{sector.name}</p>
                   </div>
                 </div>
                 {/* Mobile: compact data */}
-                <div className="flex sm:hidden items-center gap-3 text-right">
+                <div className="flex sm:hidden items-center gap-3 text-right shrink-0">
                   <div>
-                    <p className="font-mono text-sm">{formatMoney(business.status === 'active' ? business.ebitda : business.exitPrice || 0)}</p>
-                    <p className={`text-xs font-mono ${moic >= 2 ? 'text-accent' : moic < 1 ? 'text-danger' : 'text-text-muted'}`}>
+                    <p className="font-mono tabular-nums text-sm">{formatMoney(exitValue)}</p>
+                    <p className={`text-xs font-mono tabular-nums ${moic >= 2 ? 'text-accent' : moic < 1 ? 'text-danger' : 'text-text-muted'}`}>
                       {formatMultiple(moic)}
                     </p>
                   </div>
@@ -599,69 +575,25 @@ export function GameOverScreen({
                   </span>
                 </div>
                 {/* Desktop: full data */}
-                <div className="hidden sm:flex items-center gap-2 sm:gap-4 text-right">
-                  <div>
-                    <p className="text-xs text-text-muted">Revenue</p>
-                    <p className="font-mono">{formatMoney(business.revenue)}</p>
-                  </div>
-                  <div>
+                <div className="hidden sm:flex items-center gap-6 text-right shrink-0">
+                  <div className="w-20">
                     <p className="text-xs text-text-muted">EBITDA</p>
-                    <p className="font-mono">{formatMoney(business.status === 'active' ? business.ebitda : business.exitPrice || 0)}</p>
-                    <p className={`text-xs font-mono ${business.ebitdaMargin > business.acquisitionMargin ? 'text-accent' : business.ebitdaMargin < business.acquisitionMargin ? 'text-danger' : 'text-text-muted'}`}>
-                      {(business.ebitdaMargin * 100).toFixed(0)}%
-                      {business.status === 'active' && ` (${((business.ebitdaMargin - business.acquisitionMargin) * 100) >= 0 ? '+' : ''}${((business.ebitdaMargin - business.acquisitionMargin) * 100).toFixed(1)}ppt)`}
-                    </p>
+                    <p className="font-mono tabular-nums">{formatMoney(business.status === 'active' ? business.ebitda : business.exitPrice || 0)}</p>
                   </div>
-                  <div>
+                  <div className="w-24">
+                    <p className="text-xs text-text-muted">Est. Exit Value</p>
+                    <p className="font-mono tabular-nums font-bold">{formatMoney(exitValue)}</p>
+                    {exitMultiple !== null && (
+                      <p className="text-xs text-text-muted font-mono tabular-nums">({formatMultiple(exitMultiple)})</p>
+                    )}
+                  </div>
+                  <div className="w-14">
                     <p className="text-xs text-text-muted">MOIC</p>
-                    <p className={`font-mono ${moic >= 2 ? 'text-accent' : moic < 1 ? 'text-danger' : ''}`}>
+                    <p className={`font-mono tabular-nums ${moic >= 2 ? 'text-accent' : moic < 1 ? 'text-danger' : ''}`}>
                       {formatMultiple(moic)}
                     </p>
                   </div>
-                  <div className="relative group">
-                    <div className="flex flex-col items-center cursor-help">
-                      <p className="text-xs text-text-muted">Quality</p>
-                      <div className="flex items-center gap-0.5">
-                        {Array(5).fill(0).map((_, i) => (
-                          <span key={i} className={`text-xs ${i < business.qualityRating ? 'text-yellow-400' : 'text-white/20'}`}>
-                            ★
-                          </span>
-                        ))}
-                      </div>
-                      <p className={`text-xs ${business.qualityRating >= 4 ? 'text-accent' : business.qualityRating <= 2 ? 'text-danger' : 'text-text-muted'}`}>
-                        {business.qualityRating === 1 ? 'Struggling' :
-                         business.qualityRating === 2 ? 'Below Avg' :
-                         business.qualityRating === 3 ? 'Solid' :
-                         business.qualityRating === 4 ? 'Well-Run' : 'Best-in-Class'}
-                      </p>
-                    </div>
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-56 p-3 bg-card border border-white/10 rounded-lg shadow-xl opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity z-50 text-left">
-                      <p className="text-xs font-medium text-text-primary mb-1.5">
-                        Quality Rating: {business.qualityRating}/5
-                      </p>
-                      <div className="space-y-1 text-xs text-text-muted">
-                        <p>
-                          Exit multiple: <span className={`font-mono ${(business.qualityRating - 3) * 0.4 >= 0 ? 'text-accent' : 'text-danger'}`}>
-                            {(business.qualityRating - 3) * 0.4 >= 0 ? '+' : ''}{((business.qualityRating - 3) * 0.4).toFixed(1)}x
-                          </span>
-                        </p>
-                        <p>
-                          Integration: <span className="text-text-secondary">
-                            {business.qualityRating >= 4 ? 'easier' : business.qualityRating <= 2 ? 'harder' : 'normal'}
-                          </span>
-                        </p>
-                        <p>
-                          Operator: <span className="text-text-secondary">
-                            {business.dueDiligence.operatorQuality}
-                          </span>
-                        </p>
-                      </div>
-                      <p className="text-[10px] text-text-muted mt-1.5 pt-1.5 border-t border-white/10">
-                        Set at acquisition, affects exit valuation and bolt-on integration success.
-                      </p>
-                    </div>
-                  </div>
-                  <span className={`text-xs px-2 py-1 rounded ${
+                  <span className={`text-xs px-2 py-1 rounded w-20 text-center ${
                     business.status === 'active' ? 'bg-accent/20 text-accent' :
                     business.status === 'sold' ? 'bg-blue-500/20 text-blue-400' :
                     business.status === 'merged' ? 'bg-purple-500/20 text-purple-400' :

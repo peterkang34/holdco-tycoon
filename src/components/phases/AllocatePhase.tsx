@@ -135,6 +135,7 @@ export function AllocatePhase({
   const [selectedBusinessForImprovement, setSelectedBusinessForImprovement] = useState<Business | null>(null);
   const [payDebtAmount, setPayDebtAmount] = useState('');
   const [equityAmount, setEquityAmount] = useState('');
+  const [equityMode, setEquityMode] = useState<'dollars' | 'shares'>('dollars');
   const [buybackAmount, setBuybackAmount] = useState('');
   const [buybackMode, setBuybackMode] = useState<'dollars' | 'shares'>('dollars');
   const [distributeAmount, setDistributeAmount] = useState('');
@@ -1177,9 +1178,29 @@ export function AllocatePhase({
               <p className="text-xs text-text-muted mb-4">
                 Your ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% | {equityRaisesUsed} raise{equityRaisesUsed !== 1 ? 's' : ''} so far
               </p>
+              {/* Mode toggle */}
+              <div className="flex gap-1 mb-3 bg-white/5 rounded p-0.5 w-fit">
+                <button
+                  onClick={() => { setEquityMode('dollars'); setEquityAmount(''); }}
+                  className={`text-xs px-3 py-1 rounded transition-colors ${equityMode === 'dollars' ? 'bg-accent text-white' : 'text-text-muted hover:text-text-secondary'}`}
+                >
+                  $ Amount
+                </button>
+                <button
+                  onClick={() => { setEquityMode('shares'); setEquityAmount(''); }}
+                  className={`text-xs px-3 py-1 rounded transition-colors ${equityMode === 'shares' ? 'bg-accent text-white' : 'text-text-muted hover:text-text-secondary'}`}
+                >
+                  # Shares
+                </button>
+              </div>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                  {equityMode === 'dollars' && (
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                  )}
+                  {equityMode === 'shares' && (
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">#</span>
+                  )}
                   <input
                     type="text"
                     inputMode="numeric"
@@ -1188,31 +1209,70 @@ export function AllocatePhase({
                       const raw = e.target.value.replace(/[^0-9]/g, '');
                       setEquityAmount(raw);
                     }}
-                    placeholder="5,000,000"
+                    placeholder={equityMode === 'dollars' ? '5,000,000' : `e.g. ${Math.max(1, Math.floor(sharesOutstanding))}`}
                     className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-sm"
                   />
                 </div>
                 <button
                   onClick={() => {
-                    const dollars = parseInt(equityAmount) || 0;
-                    const internalAmount = Math.round(dollars / 1000);
-                    if (internalAmount > 0) {
-                      onIssueEquity(internalAmount);
-                      setEquityAmount('');
+                    if (equityMode === 'dollars') {
+                      const dollars = parseInt(equityAmount) || 0;
+                      const internalAmount = Math.round(dollars / 1000);
+                      if (internalAmount > 0) {
+                        onIssueEquity(internalAmount);
+                        setEquityAmount('');
+                      }
+                    } else {
+                      const shareCount = parseInt(equityAmount) || 0;
+                      if (shareCount > 0 && intrinsicValuePerShare > 0) {
+                        const internalAmount = Math.ceil(shareCount * intrinsicValuePerShare);
+                        if (internalAmount > 0) {
+                          onIssueEquity(internalAmount);
+                          setEquityAmount('');
+                        }
+                      }
                     }
                   }}
-                  disabled={!equityAmount || (parseInt(equityAmount) || 0) < 1000}
+                  disabled={(() => {
+                    if (!equityAmount || intrinsicValuePerShare <= 0) return true;
+                    if (equityMode === 'dollars') {
+                      const dollars = parseInt(equityAmount) || 0;
+                      return dollars < 1000;
+                    } else {
+                      const shareCount = parseInt(equityAmount) || 0;
+                      return shareCount < 1;
+                    }
+                  })()}
                   className="btn-primary text-sm min-h-[44px]"
                 >
                   Issue
                 </button>
               </div>
-              {equityAmount && parseInt(equityAmount) >= 1000 && (
+              {/* Preview for dollar mode */}
+              {equityMode === 'dollars' && equityAmount && parseInt(equityAmount) >= 1000 && (
                 <p className="text-xs text-text-muted mt-1">= {formatMoney(Math.round(parseInt(equityAmount) / 1000))}</p>
               )}
-              {equityAmount && parseInt(equityAmount) >= 1000 && intrinsicValuePerShare > 0 && (() => {
-                const amt = Math.round(parseInt(equityAmount) / 1000);
-                const newShares = Math.round((amt / intrinsicValuePerShare) * 1000) / 1000;
+              {/* Preview for shares mode */}
+              {equityMode === 'shares' && equityAmount && parseInt(equityAmount) >= 1 && intrinsicValuePerShare > 0 && (() => {
+                const shareCount = parseInt(equityAmount) || 0;
+                const cost = Math.ceil(shareCount * intrinsicValuePerShare);
+                return (
+                  <p className="text-xs text-text-muted mt-1">= {formatMoney(cost)} ({shareCount} shares @ {formatMoney(intrinsicValuePerShare)}/share)</p>
+                );
+              })()}
+              {/* Detail preview */}
+              {equityAmount && intrinsicValuePerShare > 0 && (() => {
+                let internalAmt: number;
+                if (equityMode === 'dollars') {
+                  const dollars = parseInt(equityAmount) || 0;
+                  if (dollars < 1000) return null;
+                  internalAmt = Math.round(dollars / 1000);
+                } else {
+                  const shareCount = parseInt(equityAmount) || 0;
+                  if (shareCount < 1) return null;
+                  internalAmt = Math.ceil(shareCount * intrinsicValuePerShare);
+                }
+                const newShares = Math.round((internalAmt / intrinsicValuePerShare) * 1000) / 1000;
                 const newTotal = sharesOutstanding + newShares;
                 const newOwnership = founderShares / newTotal * 100;
                 return (

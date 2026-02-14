@@ -179,7 +179,10 @@ export function generateBusiness(
 
   // Calculate acquisition multiple
   let multiple = randomInRange(sector.acquisitionMultiple);
-  multiple += (quality - 3) * 0.2;
+  multiple += (quality - 3) * 0.35;
+  // Competitive position affects pricing
+  if (dueDiligence.competitivePosition === 'leader') multiple += 0.3;
+  else if (dueDiligence.competitivePosition === 'commoditized') multiple -= 0.3;
   multiple = Math.round(multiple * 10) / 10;
 
   const subType = forceSubType && sector.subTypes.includes(forceSubType)
@@ -272,7 +275,7 @@ export function assignSellerArchetype(quality: QualityRating): SellerArchetype {
     { archetype: 'retiring_founder', baseWeight: 0.30, qualityAdj: quality >= 4 ? 0.10 : quality <= 2 ? -0.10 : 0 },
     { archetype: 'burnt_out_operator', baseWeight: 0.20, qualityAdj: quality <= 2 ? 0.05 : quality >= 4 ? -0.05 : 0 },
     { archetype: 'accidental_holdco', baseWeight: 0.10, qualityAdj: 0 },
-    { archetype: 'distressed_seller', baseWeight: 0.10, qualityAdj: quality <= 2 ? 0.10 : quality >= 4 ? -0.08 : 0 },
+    { archetype: 'distressed_seller', baseWeight: 0.08, qualityAdj: quality <= 2 ? 0.12 : quality >= 4 ? -0.05 : 0 },
     { archetype: 'mbo_candidate', baseWeight: 0.15, qualityAdj: quality >= 4 ? 0.05 : quality <= 2 ? -0.05 : 0 },
     { archetype: 'franchise_breakaway', baseWeight: 0.15, qualityAdj: quality <= 2 ? -0.05 : 0 },
   ];
@@ -851,6 +854,19 @@ export function generateDealWithSize(
   // Apply premium (positive price modifiers stack on top)
   if (archetypePremium > 0) {
     finalAskingPrice = Math.round(finalAskingPrice * (1 + archetypePremium));
+  }
+
+  // Distressed seller: cap asking multiple at sector midpoint (never top-of-range)
+  if (sellerArchetype === 'distressed_seller') {
+    const sector = SECTORS[sectorId];
+    const sectorMidMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
+    const maxDistressedMultiple = quality <= 2
+      ? sector.acquisitionMultiple[0] + 0.5  // Q1-Q2: near floor
+      : sectorMidMultiple;                    // Q3+: midpoint
+    const impliedMultiple = adjustedEbitda > 0 ? finalAskingPrice / adjustedEbitda : 0;
+    if (impliedMultiple > maxDistressedMultiple) {
+      finalAskingPrice = Math.round(adjustedEbitda * maxDistressedMultiple);
+    }
   }
 
   // Franchise breakaway: +2% growth perk

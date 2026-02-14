@@ -1037,3 +1037,39 @@ describe('naming — wealthManagement and environmental', () => {
     expect(weights.environmental).toBeGreaterThan(0);
   });
 });
+
+describe('multiple-to-quality cohesion', () => {
+  it('Q5 businesses should have higher avg multiples than Q1', () => {
+    let q5Total = 0;
+    let q1Total = 0;
+    const runs = 200;
+
+    for (let i = 0; i < runs; i++) {
+      const q5biz = generateBusiness('saas', 5, 5 as QualityRating);
+      const q1biz = generateBusiness('saas', 5, 1 as QualityRating);
+      q5Total += q5biz.acquisitionMultiple;
+      q1Total += q1biz.acquisitionMultiple;
+    }
+
+    const q5Avg = q5Total / runs;
+    const q1Avg = q1Total / runs;
+    // With (quality-3)*0.35 + competitive position, Q5 should be at least 1.0x higher than Q1
+    expect(q5Avg - q1Avg).toBeGreaterThanOrEqual(1.0);
+  });
+
+  it('distressed sellers should be more common for low-quality businesses', () => {
+    let q1Distressed = 0;
+    let q5Distressed = 0;
+    const runs = 500;
+
+    for (let i = 0; i < runs; i++) {
+      if (assignSellerArchetype(1 as QualityRating) === 'distressed_seller') q1Distressed++;
+      if (assignSellerArchetype(5 as QualityRating) === 'distressed_seller') q5Distressed++;
+    }
+
+    // Q1 distressed rate should be significantly higher than Q5
+    expect(q1Distressed / runs).toBeGreaterThan(q5Distressed / runs);
+    expect(q1Distressed / runs).toBeGreaterThan(0.10); // At least 10%
+    expect(q5Distressed / runs).toBeLessThan(0.10);     // Under 10%
+  });
+});

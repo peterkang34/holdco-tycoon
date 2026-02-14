@@ -458,22 +458,22 @@ describe('Full Game Simulation - 10-Year Quick Play', () => {
 });
 
 describe('10-Year Mode: Deal Terms Scaling', () => {
-  it('should produce seller note with 2-round term for 10-year mode', () => {
+  it('should produce seller note with 4-round term for 10-year mode', () => {
     const deal = createMockDeal({ askingPrice: 4000 });
     const structures = generateDealStructures(deal, 10000, 0.07, false, 10);
     const sellerNote = structures.find(s => s.type === 'seller_note');
     expect(sellerNote).toBeDefined();
-    // sellerNoteTerms = max(2, ceil(10 * 0.15)) = max(2, 2) = 2
-    expect(sellerNote!.sellerNote!.termRounds).toBe(2);
+    // sellerNoteTerms = max(4, ceil(10 * 0.25)) = max(4, 3) = 4
+    expect(sellerNote!.sellerNote!.termRounds).toBe(4);
   });
 
-  it('should produce seller note with 3-round term for 20-year mode', () => {
+  it('should produce seller note with 5-round term for 20-year mode', () => {
     const deal = createMockDeal({ askingPrice: 4000 });
     const structures = generateDealStructures(deal, 10000, 0.07, false, 20);
     const sellerNote = structures.find(s => s.type === 'seller_note');
     expect(sellerNote).toBeDefined();
-    // sellerNoteTerms = max(2, ceil(20 * 0.15)) = max(2, 3) = 3
-    expect(sellerNote!.sellerNote!.termRounds).toBe(3);
+    // sellerNoteTerms = max(4, ceil(20 * 0.25)) = max(4, 5) = 5
+    expect(sellerNote!.sellerNote!.termRounds).toBe(5);
   });
 
   it('should produce bank debt with 5-round term for 10-year mode', () => {
