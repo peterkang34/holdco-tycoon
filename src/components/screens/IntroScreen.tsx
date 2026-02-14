@@ -161,24 +161,19 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
               <label className="block text-left mb-2 text-sm text-text-muted">
                 Choose your first acquisition
               </label>
+              <button
+                type="button"
+                onClick={() => setSelectedSector('random')}
+                className={`w-full mb-2 p-3 rounded-lg border text-center transition-all border-dashed ${
+                  selectedSector === 'random'
+                    ? 'border-accent bg-accent/10'
+                    : 'border-accent/40 bg-accent/5 hover:border-accent hover:bg-accent/10'
+                }`}
+              >
+                <span className="text-sm font-medium text-accent">🎲 Surprise Me</span>
+                <span className="text-[11px] text-text-muted ml-2">— sector revealed on launch</span>
+              </button>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-                <button
-                  type="button"
-                  onClick={() => setSelectedSector('random')}
-                  className={`p-3 rounded-lg border text-left transition-all border-dashed ${
-                    selectedSector === 'random'
-                      ? 'border-accent bg-accent/10'
-                      : 'border-accent/40 bg-accent/5 hover:border-accent hover:bg-accent/10'
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">🎲</span>
-                    <span className="text-sm font-medium text-accent">Surprise Me</span>
-                  </div>
-                  <p className="text-[11px] sm:text-[10px] text-text-muted mt-1">
-                    Reveal on launch
-                  </p>
-                </button>
                 {SECTOR_LIST.map(sector => (
                   <button
                     key={sector.id}
