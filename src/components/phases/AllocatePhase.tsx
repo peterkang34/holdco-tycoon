@@ -167,6 +167,9 @@ export function AllocatePhase({
   const [buybackMode, setBuybackMode] = useState<'dollars' | 'shares'>('dollars');
   const [distributeAmount, setDistributeAmount] = useState('');
   const [showEndTurnConfirm, setShowEndTurnConfirm] = useState(false);
+  // In-modal equity raise state
+  const [modalEquityAmount, setModalEquityAmount] = useState('');
+  const [showModalEquityRaise, setShowModalEquityRaise] = useState(false);
   // Deal pass state
   const [passedDealIds, setPassedDealIds] = useState<Set<string>>(new Set());
   const [showPassedDeals, setShowPassedDeals] = useState(false);
@@ -280,6 +283,8 @@ export function AllocatePhase({
               onClick={() => {
                 setSelectedDeal(null);
                 setSelectedTuckInPlatform(null);
+                setModalEquityAmount('');
+                setShowModalEquityRaise(false);
               }}
               className="text-text-muted hover:text-text-primary text-2xl"
             >
@@ -372,14 +377,99 @@ export function AllocatePhase({
             </div>
           </div>
 
+          {/* Cash Position Bar */}
+          <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-text-muted">Your Cash:</span>
+              <span className="font-mono font-bold text-sm">{formatMoney(cash)}</span>
+            </div>
+            <span className="text-xs text-text-muted">Min. down payment (25%): {formatMoney(selectedDeal.effectivePrice * 0.25)}</span>
+          </div>
+
           <h4 className="font-bold mb-4">Choose Deal Structure</h4>
 
           {structures.length === 0 ? (
-            <div className="card text-center text-text-muted py-8">
-              <p>You don't have enough cash to structure this deal.</p>
-              <p className="text-sm mt-2">Need at least {formatMoney(selectedDeal.effectivePrice * 0.25)} for minimum down payment (25% equity).</p>
+            <div className="card text-text-muted py-6">
+              <div className="text-center mb-6">
+                <p className="text-warning font-medium text-base mb-2">Not enough cash for this deal</p>
+                <p className="text-sm">
+                  Need at least {formatMoney(selectedDeal.effectivePrice * 0.25)} (25% of {formatMoney(selectedDeal.effectivePrice)})
+                </p>
+                <p className="text-sm">
+                  You have {formatMoney(cash)} — shortfall: <span className="text-warning font-mono">{formatMoney(Math.max(0, selectedDeal.effectivePrice * 0.25 - cash))}</span>
+                </p>
+              </div>
+              {/* In-modal equity raise for Scenario A */}
+              {(() => {
+                const raisesRemaining = MAX_EQUITY_RAISES[duration] - equityRaisesUsed;
+                const shortfall = Math.max(0, selectedDeal.effectivePrice * 0.25 - cash);
+                const suggestedRaise = Math.ceil(shortfall / 100) * 100; // round up to nearest $100K (internal units)
+                const canRaise = raisesRemaining > 0 && intrinsicValuePerShare > 0;
+                const parsedAmount = parseInt(modalEquityAmount) || 0;
+                const internalAmount = Math.round(parsedAmount / 1000);
+                const newShares = intrinsicValuePerShare > 0 ? Math.round((internalAmount / intrinsicValuePerShare) * 1000) / 1000 : 0;
+                const newTotal = sharesOutstanding + newShares;
+                const newOwnership = newTotal > 0 ? founderShares / newTotal * 100 : 100;
+                const wouldBreachFloor = newOwnership < 51;
+                return (
+                  <div className="border border-accent/30 bg-accent/5 rounded-lg p-4">
+                    <h5 className="font-bold text-text-primary mb-3">Raise Capital</h5>
+                    {canRaise ? (
+                      <>
+                        <p className="text-sm text-text-secondary mb-3">
+                          Raise equity to unlock deal structures.
+                        </p>
+                        <p className="text-xs text-text-muted mb-3">
+                          Suggested: {formatMoney(suggestedRaise)} (covers shortfall)
+                        </p>
+                        <div className="flex gap-2 mb-2">
+                          <div className="flex-1 relative">
+                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={modalEquityAmount}
+                              onChange={(e) => setModalEquityAmount(e.target.value.replace(/[^0-9]/g, ''))}
+                              placeholder={String(suggestedRaise * 1000)}
+                              className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-sm"
+                            />
+                          </div>
+                          <button
+                            onClick={() => {
+                              if (internalAmount > 0 && !wouldBreachFloor) {
+                                onIssueEquity(internalAmount);
+                                setModalEquityAmount('');
+                              }
+                            }}
+                            disabled={parsedAmount < 1000 || wouldBreachFloor || !canRaise}
+                            className="btn-primary text-sm min-h-[44px] whitespace-nowrap"
+                          >
+                            <span className="hidden sm:inline">Raise Capital</span>
+                            <span className="sm:hidden">Raise</span>
+                          </button>
+                        </div>
+                        {parsedAmount >= 1000 && intrinsicValuePerShare > 0 && (
+                          <div className="text-xs space-y-1 mt-2">
+                            <p className="text-text-muted">= {newShares.toFixed(1)} shares @ {formatMoney(intrinsicValuePerShare)}/share</p>
+                            <p className={`font-medium ${wouldBreachFloor ? 'text-danger' : newOwnership < 55 ? 'text-warning' : 'text-text-secondary'}`}>
+                              Ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% → {newOwnership.toFixed(1)}%
+                            </p>
+                            {wouldBreachFloor && <p className="text-danger">Below 51% — raise would be blocked</p>}
+                          </div>
+                        )}
+                        <p className="text-xs text-text-muted mt-2">Raises remaining: {raisesRemaining}/{MAX_EQUITY_RAISES[duration]}</p>
+                      </>
+                    ) : (
+                      <p className="text-sm text-warning">
+                        {raisesRemaining <= 0 ? 'No equity raises remaining this game.' : 'Cannot raise equity at this time.'}
+                      </p>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
           ) : (
+            <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {structures.map((structure, index) => (
                 <div
@@ -409,6 +499,16 @@ export function AllocatePhase({
                     <div className="flex justify-between">
                       <span className="text-text-muted">Cash Required</span>
                       <span className="font-mono">{formatMoney(structure.cashRequired)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-text-muted">Cash After</span>
+                      <span className={`font-mono font-bold ${
+                        (cash - structure.cashRequired) >= 5000 ? 'text-green-400' :
+                        (cash - structure.cashRequired) >= 2000 ? 'text-yellow-400' :
+                        'text-red-400'
+                      }`}>
+                        {formatMoney(cash - structure.cashRequired)}
+                      </span>
                     </div>
                     {structure.sellerNote && (
                       <div className="flex justify-between">
@@ -450,6 +550,70 @@ export function AllocatePhase({
                 </div>
               ))}
             </div>
+
+            {/* Scenario B: Collapsible equity raise for when you can afford some structures but want more options */}
+            {(() => {
+              const raisesRemaining = MAX_EQUITY_RAISES[duration] - equityRaisesUsed;
+              const canRaise = raisesRemaining > 0 && intrinsicValuePerShare > 0;
+              if (!canRaise) return null;
+              const parsedAmount = parseInt(modalEquityAmount) || 0;
+              const internalAmount = Math.round(parsedAmount / 1000);
+              const newShares = intrinsicValuePerShare > 0 ? Math.round((internalAmount / intrinsicValuePerShare) * 1000) / 1000 : 0;
+              const newTotal = sharesOutstanding + newShares;
+              const newOwnership = newTotal > 0 ? founderShares / newTotal * 100 : 100;
+              const wouldBreachFloor = newOwnership < 51;
+              return (
+                <div className="mt-4">
+                  <button
+                    onClick={() => setShowModalEquityRaise(!showModalEquityRaise)}
+                    className="text-sm text-accent hover:text-accent/80 transition-colors flex items-center gap-1"
+                  >
+                    {showModalEquityRaise ? '▼' : '▶'} Need more cash?
+                  </button>
+                  {showModalEquityRaise && (
+                    <div className="border border-accent/30 bg-accent/5 rounded-lg p-4 mt-2">
+                      <p className="text-sm text-text-secondary mb-3">Raise capital to unlock more deal structures.</p>
+                      <div className="flex gap-2 mb-2">
+                        <div className="flex-1 relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={modalEquityAmount}
+                            onChange={(e) => setModalEquityAmount(e.target.value.replace(/[^0-9]/g, ''))}
+                            placeholder="e.g. 5000000"
+                            className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-sm"
+                          />
+                        </div>
+                        <button
+                          onClick={() => {
+                            if (internalAmount > 0 && !wouldBreachFloor) {
+                              onIssueEquity(internalAmount);
+                              setModalEquityAmount('');
+                              setShowModalEquityRaise(false);
+                            }
+                          }}
+                          disabled={parsedAmount < 1000 || wouldBreachFloor}
+                          className="btn-primary text-sm min-h-[44px]"
+                        >
+                          Raise
+                        </button>
+                      </div>
+                      {parsedAmount >= 1000 && intrinsicValuePerShare > 0 && (
+                        <div className="text-xs space-y-1">
+                          <p className={`font-medium ${wouldBreachFloor ? 'text-danger' : newOwnership < 55 ? 'text-warning' : 'text-text-secondary'}`}>
+                            Ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% → {newOwnership.toFixed(1)}%
+                          </p>
+                          {wouldBreachFloor && <p className="text-danger">Below 51% — raise would be blocked</p>}
+                        </div>
+                      )}
+                      <p className="text-xs text-text-muted mt-2">{raisesRemaining}/{MAX_EQUITY_RAISES[duration]} raises remaining</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+            </>
           )}
 
           <div className="mt-6 p-4 bg-white/5 rounded-lg text-sm text-text-muted">
@@ -1137,6 +1301,24 @@ export function AllocatePhase({
               )}
             </div>
 
+            {/* Cash Context Bar */}
+            {dealPipeline.length > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-lg px-3 sm:px-4 py-2 mb-4 flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4 text-sm">
+                <span className="flex items-center gap-1.5">
+                  <span className="text-text-muted">Available:</span>
+                  <span className="font-mono font-bold">{formatMoney(cash)}</span>
+                </span>
+                <span className="hidden sm:inline text-white/20">|</span>
+                <span className="text-text-muted text-xs sm:text-sm">
+                  {dealPipeline.filter(d => cash >= d.effectivePrice * 0.25).length} of {dealPipeline.length} deals affordable
+                </span>
+                <span className="hidden sm:inline text-white/20">|</span>
+                <span className="text-text-muted text-xs sm:text-sm">
+                  Raises: {MAX_EQUITY_RAISES[duration] - equityRaisesUsed}/{MAX_EQUITY_RAISES[duration]} remaining
+                </span>
+              </div>
+            )}
+
             {/* Deals Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {dealPipeline
@@ -1146,7 +1328,8 @@ export function AllocatePhase({
                   key={deal.id}
                   deal={deal}
                   onSelect={() => setSelectedDeal(deal)}
-                  disabled={cash < deal.effectivePrice * 0.25 || !distressRestrictions.canAcquire || acquisitionsThisRound >= maxAcquisitionsPerRound}
+                  disabled={!distressRestrictions.canAcquire || acquisitionsThisRound >= maxAcquisitionsPerRound}
+                  unaffordable={cash < deal.effectivePrice * 0.25}
                   availablePlatforms={getPlatformsForSector(deal.business.sectorId)}
                   isPassed={passedDealIds.has(deal.id)}
                   onPass={() => {

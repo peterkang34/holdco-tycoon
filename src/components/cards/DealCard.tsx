@@ -8,12 +8,13 @@ interface DealCardProps {
   deal: Deal;
   onSelect?: () => void;
   disabled?: boolean;
+  unaffordable?: boolean;
   availablePlatforms?: Business[]; // Platforms in the same sector that can receive this as a tuck-in
   isPassed?: boolean;
   onPass?: () => void;
 }
 
-export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], isPassed, onPass }: DealCardProps) {
+export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlatforms = [], isPassed, onPass }: DealCardProps) {
   const [showStory, setShowStory] = useState(false);
   const sector = SECTORS[deal.business.sectorId];
   const { dueDiligence, qualityRating } = deal.business;
@@ -79,7 +80,7 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
 
   return (
     <div
-      className={`card cursor-pointer transition-all ${disabled ? 'opacity-50' : 'hover:border-accent'}`}
+      className={`card transition-all ${disabled ? 'opacity-50' : unaffordable ? 'opacity-65 cursor-pointer hover:border-accent/50' : 'cursor-pointer hover:border-accent'}`}
       style={{ borderTopColor: sector.color, borderTopWidth: '3px' }}
       onClick={!disabled ? onSelect : undefined}
     >
@@ -286,7 +287,7 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
         </p>
       </div>
 
-      <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/10">
+      <div className="flex flex-wrap items-center justify-between gap-2 mt-4 pt-3 border-t border-white/10">
         <div className="flex items-center gap-2">
           {deal.source === 'proprietary' && (
             <span className="text-xs bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded">Off-Market</span>
@@ -318,9 +319,20 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
             </button>
           )}
           {onSelect && !disabled && !isPassed && (
-            <button className="btn-primary text-sm py-1.5 px-4">
-              Review Deal
-            </button>
+            unaffordable ? (
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded whitespace-nowrap">
+                  Need {formatMoney(deal.effectivePrice * 0.25)}
+                </span>
+                <button className="btn-primary text-sm py-1.5 px-3 sm:px-4 opacity-80">
+                  Review
+                </button>
+              </div>
+            ) : (
+              <button className="btn-primary text-sm py-1.5 px-4">
+                Review Deal
+              </button>
+            )
           )}
         </div>
       </div>

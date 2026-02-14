@@ -244,20 +244,20 @@ export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, 
 
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-bg-card border border-white/10 rounded-2xl max-w-lg w-full max-h-[90vh] overflow-hidden shadow-2xl">
+      <div className="bg-bg-card border border-white/10 rounded-2xl max-w-lg w-full max-h-[90vh] flex flex-col shadow-2xl">
         {/* Header */}
-        <div className="p-4 sm:p-6 border-b border-white/10 text-center">
+        <div className="p-4 sm:p-6 border-b border-white/10 text-center flex-shrink-0">
           <span className="text-5xl mb-3 block">{currentPage.icon}</span>
           <h2 className="text-2xl font-bold">{currentPage.title}</h2>
         </div>
 
         {/* Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto max-h-[65vh] sm:max-h-[50vh]">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0">
           {currentPage.content}
         </div>
 
         {/* Footer */}
-        <div className="p-4 sm:p-6 border-t border-white/10">
+        <div className="p-4 sm:p-6 border-t border-white/10 flex-shrink-0">
           {/* Page indicators */}
           <div className="flex justify-center gap-2 mb-4">
             {pages.map((_, i) => (
