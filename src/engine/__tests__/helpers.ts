@@ -161,6 +161,7 @@ export function createMockGameState(overrides: Partial<GameState> = {}): GameSta
     difficulty: 'easy',
     duration: 'standard',
     maxRounds: 20,
+    integratedPlatforms: [],
     founderDistributionsReceived: 0,
     ...overrides,
   };

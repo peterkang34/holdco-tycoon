@@ -223,6 +223,29 @@ export function migrateV14ToV15(): void {
   }
 }
 
+// --- v15 → v16: adds integratedPlatforms ---
+
+export function migrateV15ToV16(): void {
+  try {
+    const v16Key = 'holdco-tycoon-save-v16';
+    const v15Key = 'holdco-tycoon-save-v15';
+    if (localStorage.getItem(v16Key)) return;
+    const v15Raw = localStorage.getItem(v15Key);
+    if (!v15Raw) return;
+    const v15Data = JSON.parse(v15Raw);
+    if (!v15Data?.state) return;
+
+    if (!v15Data.state.integratedPlatforms) {
+      v15Data.state.integratedPlatforms = [];
+    }
+
+    localStorage.setItem(v16Key, JSON.stringify(v15Data));
+    localStorage.removeItem(v15Key);
+  } catch (e) {
+    console.error('v15→v16 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -234,4 +257,5 @@ export function runAllMigrations(): void {
   migrateV12ToV13();
   migrateV13ToV14();
   migrateV14ToV15();
+  migrateV15ToV16();
 }

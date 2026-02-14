@@ -320,7 +320,7 @@ describe('migrateV14ToV15', () => {
 });
 
 describe('runAllMigrations', () => {
-  it('should chain all migrations from v9 to v15', () => {
+  it('should chain all migrations from v9 to v16', () => {
     const v9Data = {
       state: {
         businesses: [{
@@ -345,14 +345,16 @@ describe('runAllMigrations', () => {
 
     // v9 should be consumed
     expect(localStorageMock.getItem('holdco-tycoon-save-v9')).toBeNull();
-    // Final v15 should exist
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v15')!);
+    // Final v16 should exist
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v16')!);
     expect(result.state.difficulty).toBe('easy');
     expect(result.state.maxRounds).toBe(20);
     expect(result.state.founderDistributionsReceived).toBeDefined();
     // v14→v15 fields
     expect(result.state.businesses[0].wasMerged).toBe(false);
     expect(result.state.businesses[0].acquisitionSizeTierPremium).toBeDefined();
+    // v15→v16 fields
+    expect(result.state.integratedPlatforms).toEqual([]);
   });
 
   it('should be safe to call multiple times (idempotent)', () => {
@@ -366,10 +368,10 @@ describe('runAllMigrations', () => {
     localStorageMock.setItem('holdco-tycoon-save-v14', JSON.stringify(v14Data));
 
     runAllMigrations();
-    const first = localStorageMock.getItem('holdco-tycoon-save-v15');
+    const first = localStorageMock.getItem('holdco-tycoon-save-v16');
 
     runAllMigrations();
-    const second = localStorageMock.getItem('holdco-tycoon-save-v15');
+    const second = localStorageMock.getItem('holdco-tycoon-save-v16');
 
     expect(first).toBe(second);
   });
@@ -382,5 +384,6 @@ describe('runAllMigrations', () => {
     expect(localStorageMock.getItem('holdco-tycoon-save-v13')).toBeNull();
     expect(localStorageMock.getItem('holdco-tycoon-save-v14')).toBeNull();
     expect(localStorageMock.getItem('holdco-tycoon-save-v15')).toBeNull();
+    expect(localStorageMock.getItem('holdco-tycoon-save-v16')).toBeNull();
   });
 });

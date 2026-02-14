@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import {
   Business,
   Deal,
@@ -12,6 +12,9 @@ import {
   DealSizePreference,
   DistressLevel,
   MASourcingState,
+  IntegratedPlatform,
+  GameDifficulty,
+  GameDuration,
   formatMoney,
   formatPercent,
 } from '../../engine/types';
@@ -28,6 +31,7 @@ import { MarketGuideModal } from '../ui/MarketGuideModal';
 import { RollUpGuideModal } from '../ui/RollUpGuideModal';
 import { ImprovementModal } from '../modals/ImprovementModal';
 import { isAIEnabled } from '../../services/aiGeneration';
+import { checkPlatformEligibility, calculateIntegrationCost } from '../../engine/platforms';
 
 const STARTING_SHARES = 1000;
 
@@ -76,6 +80,10 @@ interface AllocatePhaseProps {
   onUpgradeMASourcing: () => void;
   onToggleMASourcing: () => void;
   onProactiveOutreach: () => void;
+  onForgePlatform: (recipeId: string, businessIds: string[], platformName: string, cost: number) => void;
+  integratedPlatforms: IntegratedPlatform[];
+  difficulty: GameDifficulty;
+  duration: GameDuration;
   covenantBreachRounds?: number;
   acquisitionsThisRound: number;
   maxAcquisitionsPerRound: number;
@@ -125,6 +133,10 @@ export function AllocatePhase({
   onUpgradeMASourcing,
   onToggleMASourcing,
   onProactiveOutreach,
+  onForgePlatform,
+  integratedPlatforms,
+  difficulty,
+  duration,
   covenantBreachRounds,
   acquisitionsThisRound,
   maxAcquisitionsPerRound,
@@ -158,6 +170,7 @@ export function AllocatePhase({
   const [sellCelebration, setSellCelebration] = useState<{ name: string; moic: number } | null>(null);
   const [windDownConfirmBusiness, setWindDownConfirmBusiness] = useState<Business | null>(null);
   const [dismissedWarnings, setDismissedWarnings] = useState<Set<string>>(new Set());
+  const [forgeConfirm, setForgeConfirm] = useState<{ recipeId: string; businessIds: string[] } | null>(null);
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const distressRestrictions = getDistressRestrictions(distressLevel);
@@ -185,6 +198,12 @@ export function AllocatePhase({
     return Object.entries(sectorCounts).filter(([_, businesses]) => businesses.length >= 2);
   };
   const mergeableSectors = getMergeableSectors();
+
+  // Integrated Platform eligibility
+  const eligiblePlatformRecipes = useMemo(
+    () => checkPlatformEligibility(businesses, integratedPlatforms, difficulty, duration),
+    [businesses, integratedPlatforms, difficulty, duration]
+  );
 
   const tabs: { id: AllocateTab; label: string; badge?: number }[] = [
     { id: 'portfolio', label: 'Portfolio', badge: activeBusinesses.length },
@@ -599,6 +618,124 @@ export function AllocatePhase({
                   </div>
                 );
               })}
+
+            {/* Active Integrated Platforms */}
+            {integratedPlatforms.length > 0 && (
+              <div className="card bg-purple-500/5 border-purple-500/30 mb-6">
+                <h3 className="font-bold text-purple-400 mb-3">Integrated Platforms</h3>
+                <div className="space-y-3">
+                  {integratedPlatforms.map(ip => {
+                    const constituentNames = ip.constituentBusinessIds
+                      .map(id => businesses.find(b => b.id === id)?.name)
+                      .filter(Boolean);
+                    const sectorEmojis = ip.sectorIds
+                      .map(sid => SECTORS[sid]?.emoji)
+                      .filter(Boolean)
+                      .join(' ');
+                    return (
+                      <div key={ip.id} className="bg-white/5 rounded-lg p-3">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="font-medium text-sm truncate min-w-0">{sectorEmojis} {ip.name}</span>
+                          <span className="text-xs text-text-muted whitespace-nowrap flex-shrink-0">Forged Year {ip.forgedInRound}</span>
+                        </div>
+                        <p className="text-xs text-text-muted mb-2 break-words">
+                          {constituentNames.join(', ')}
+                        </p>
+                        <div className="flex flex-wrap gap-2 text-xs">
+                          <span className="bg-green-500/15 text-green-400 px-2 py-0.5 rounded">
+                            +{formatPercent(ip.bonuses.marginBoost)} margin
+                          </span>
+                          <span className="bg-blue-500/15 text-blue-400 px-2 py-0.5 rounded">
+                            +{formatPercent(ip.bonuses.growthBoost)} growth
+                          </span>
+                          <span className="bg-purple-500/15 text-purple-400 px-2 py-0.5 rounded">
+                            +{ip.bonuses.multipleExpansion.toFixed(1)}x exit multiple
+                          </span>
+                          {ip.bonuses.recessionResistanceReduction < 1.0 && (
+                            <span className="bg-yellow-500/15 text-yellow-400 px-2 py-0.5 rounded">
+                              {Math.round((1 - ip.bonuses.recessionResistanceReduction) * 100)}% recession shield
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Eligible Platform Integrations */}
+            {eligiblePlatformRecipes.length > 0 && (
+              <div className="card bg-purple-500/5 border-purple-500/30 mb-6">
+                <h3 className="font-bold text-purple-400 mb-1">Available Integrations</h3>
+                <p className="text-sm text-text-muted mb-4">
+                  Combine complementary businesses into an integrated platform for permanent bonuses.
+                </p>
+                <div className="space-y-4">
+                  {eligiblePlatformRecipes.map(({ recipe, eligibleBusinesses: eligible }) => {
+                    const cost = calculateIntegrationCost(recipe, eligible);
+                    const canAfford = cash >= cost;
+                    const sectorEmojis = recipe.sectorId
+                      ? SECTORS[recipe.sectorId]?.emoji ?? ''
+                      : (recipe.crossSectorIds ?? []).map(sid => SECTORS[sid]?.emoji).filter(Boolean).join(' ');
+                    return (
+                      <div key={recipe.id} className="bg-white/5 rounded-lg p-4">
+                        <div className="mb-2">
+                          <h4 className="font-bold text-sm break-words">{sectorEmojis} {recipe.name}</h4>
+                          <p className="text-xs text-text-secondary mt-1 break-words">{recipe.description}</p>
+                          {recipe.realWorldExample && (
+                            <p className="text-xs text-text-muted mt-1 italic break-words">e.g. {recipe.realWorldExample}</p>
+                          )}
+                        </div>
+                        <div className="mt-3 mb-3">
+                          <p className="text-xs text-text-muted mb-1">Qualifying businesses:</p>
+                          <div className="flex flex-wrap gap-1">
+                            {eligible.map(b => (
+                              <span key={b.id} className="text-xs bg-white/10 px-2 py-1 rounded truncate max-w-full inline-block">
+                                {SECTORS[b.sectorId].emoji} {b.name} ({b.subType})
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-3">
+                          <div className="bg-green-500/10 rounded p-2 text-center">
+                            <p className="text-text-muted">Margin</p>
+                            <p className="font-bold text-green-400">+{formatPercent(recipe.bonuses.marginBoost)}</p>
+                          </div>
+                          <div className="bg-blue-500/10 rounded p-2 text-center">
+                            <p className="text-text-muted">Growth</p>
+                            <p className="font-bold text-blue-400">+{formatPercent(recipe.bonuses.growthBoost)}</p>
+                          </div>
+                          <div className="bg-purple-500/10 rounded p-2 text-center">
+                            <p className="text-text-muted">Exit Multiple</p>
+                            <p className="font-bold text-purple-400">+{recipe.bonuses.multipleExpansion.toFixed(1)}x</p>
+                          </div>
+                          <div className="bg-yellow-500/10 rounded p-2 text-center">
+                            <p className="text-text-muted">Recession</p>
+                            <p className="font-bold text-yellow-400">-{Math.round((1 - recipe.bonuses.recessionResistanceReduction) * 100)}%</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                          <span className="text-sm font-mono">
+                            Cost: <span className={canAfford ? 'text-text-primary' : 'text-danger'}>{formatMoney(cost)}</span>
+                          </span>
+                          <button
+                            onClick={() => setForgeConfirm({
+                              recipeId: recipe.id,
+                              businessIds: eligible.map(b => b.id),
+                            })}
+                            disabled={!canAfford}
+                            className={`btn-primary text-sm px-4 py-3 min-h-[44px] w-full sm:w-auto ${!canAfford ? 'opacity-50 cursor-not-allowed' : ''}`}
+                          >
+                            Forge Platform
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {activeBusinesses.filter(b => !b.parentPlatformId).map(business => (
@@ -1807,6 +1944,79 @@ export function AllocatePhase({
           </div>
         </div>
       )}
+
+      {/* Forge Platform Confirmation Modal */}
+      {forgeConfirm && (() => {
+        const entry = eligiblePlatformRecipes.find(e => e.recipe.id === forgeConfirm.recipeId);
+        if (!entry) return null;
+        const { recipe, eligibleBusinesses: eligible } = entry;
+        const cost = calculateIntegrationCost(recipe, eligible);
+        const sectorEmojis = recipe.sectorId
+          ? SECTORS[recipe.sectorId]?.emoji ?? ''
+          : (recipe.crossSectorIds ?? []).map(sid => SECTORS[sid]?.emoji).filter(Boolean).join(' ');
+        return (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+            <div className="bg-bg-primary border border-purple-500/30 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-bold text-purple-400 mb-2 break-words">{sectorEmojis} Forge {recipe.name}?</h3>
+              <p className="text-sm text-text-secondary mb-4 break-words">{recipe.description}</p>
+
+              <div className="mb-4">
+                <p className="text-xs text-text-muted mb-2">Businesses to integrate:</p>
+                <div className="space-y-1">
+                  {eligible.map(b => (
+                    <div key={b.id} className="flex justify-between gap-2 text-sm bg-white/5 rounded px-3 py-2">
+                      <span className="truncate min-w-0">{SECTORS[b.sectorId].emoji} {b.name}</span>
+                      <span className="text-text-muted font-mono whitespace-nowrap flex-shrink-0">{b.subType}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2 mb-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Integration Cost</span>
+                  <span className="font-mono text-danger">-{formatMoney(cost)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Margin Boost (permanent)</span>
+                  <span className="font-mono text-green-400">+{formatPercent(recipe.bonuses.marginBoost)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Growth Boost (permanent)</span>
+                  <span className="font-mono text-blue-400">+{formatPercent(recipe.bonuses.growthBoost)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Exit Multiple Premium</span>
+                  <span className="font-mono text-purple-400">+{recipe.bonuses.multipleExpansion.toFixed(1)}x</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Recession Resistance</span>
+                  <span className="font-mono text-yellow-400">-{Math.round((1 - recipe.bonuses.recessionResistanceReduction) * 100)}% sensitivity</span>
+                </div>
+              </div>
+
+              <p className="text-xs text-warning mb-4">
+                This action is irreversible. Once forged, these businesses are permanently linked.
+              </p>
+
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setForgeConfirm(null)} className="btn-secondary px-6 min-h-[44px]">
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    onForgePlatform(recipe.id, forgeConfirm.businessIds, recipe.name, cost);
+                    setForgeConfirm(null);
+                  }}
+                  className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors"
+                >
+                  Forge Platform
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* End Turn Confirmation Modal */}
       {showEndTurnConfirm && (

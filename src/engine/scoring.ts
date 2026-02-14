@@ -41,7 +41,7 @@ export function calculateEnterpriseValue(state: GameState): number {
   let weightedMultiple = 0;
 
   for (const business of activeBusinesses) {
-    const valuation = calculateExitValuation(business, maxRounds);
+    const valuation = calculateExitValuation(business, maxRounds, undefined, undefined, state.integratedPlatforms);
     totalEbitda += business.ebitda;
     weightedMultiple += business.ebitda * valuation.totalMultiple;
   }
@@ -145,7 +145,7 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
       returns = business.exitPrice;
     } else if (business.status === 'active') {
       // Use full valuation engine for current value
-      const valuation = calculateExitValuation(business, maxRounds);
+      const valuation = calculateExitValuation(business, maxRounds, undefined, undefined, state.integratedPlatforms);
       returns = business.ebitda * valuation.totalMultiple;
     }
 

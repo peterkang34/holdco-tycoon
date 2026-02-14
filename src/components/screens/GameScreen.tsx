@@ -101,6 +101,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     upgradeMASourcing,
     toggleMASourcing,
     proactiveOutreach,
+    forgeIntegratedPlatform,
+    integratedPlatforms,
     triggerAIEnhancement,
     sourceDealFlow,
     distressedSale,
@@ -303,6 +305,15 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     });
   }, [proactiveOutreach, addToast]);
 
+  const handleForgePlatform = useCallback((recipeId: string, businessIds: string[], platformName: string, cost: number) => {
+    forgeIntegratedPlatform(recipeId, businessIds);
+    addToast({
+      message: `Forged ${platformName}`,
+      detail: `${formatMoney(cost)} integration cost — margin and growth boosted`,
+      type: 'success',
+    });
+  }, [forgeIntegratedPlatform, addToast]);
+
   // Show tutorial on new game start or first visit
   useEffect(() => {
     if (showTutorial) {
@@ -490,6 +501,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             onUpgradeMASourcing={handleUpgradeMASourcing}
             onToggleMASourcing={handleToggleMASourcing}
             onProactiveOutreach={handleProactiveOutreach}
+            onForgePlatform={handleForgePlatform}
+            integratedPlatforms={integratedPlatforms}
+            difficulty={difficulty}
+            duration={duration}
             covenantBreachRounds={covenantBreachRounds}
             acquisitionsThisRound={acquisitionsThisRound}
             maxAcquisitionsPerRound={maxAcquisitionsPerRound}

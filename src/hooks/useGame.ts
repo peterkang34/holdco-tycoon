@@ -76,6 +76,8 @@ import { clampMargin } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
 import { buildChronicleContext } from '../services/chronicleContext';
 import { useToastStore } from './useToast';
+import { calculateIntegrationCost, forgePlatform } from '../engine/platforms';
+import { getRecipeById } from '../data/platformRecipes';
 
 interface GameStore extends GameState {
   // Computed
@@ -117,6 +119,9 @@ interface GameStore extends GameState {
   upgradeMASourcing: () => void;
   toggleMASourcing: () => void;
   proactiveOutreach: () => void;
+
+  // Integrated Platforms
+  forgeIntegratedPlatform: (recipeId: string, businessIds: string[]) => void;
 
   // Restructuring actions
   distressedSale: (businessId: string) => void;
@@ -178,6 +183,7 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   dealPipeline: [],
   maFocus: { sectorId: null, sizePreference: 'any' as DealSizePreference, subType: null },
   maSourcing: { tier: 0 as MASourcingTier, active: false, unlockedRound: 0, lastUpgradeRound: 0 },
+  integratedPlatforms: [],
   currentEvent: null,
   eventHistory: [],
   creditTighteningRoundsRemaining: 0,
@@ -1408,7 +1414,7 @@ export const useGameStore = create<GameStore>()(
 
         // L-1: Use shared calculateExitValuation instead of duplicated logic
         const lastEvent = state.eventHistory[state.eventHistory.length - 1];
-        const valuation = calculateExitValuation(business, state.round, lastEvent?.type);
+        const valuation = calculateExitValuation(business, state.round, lastEvent?.type, undefined, state.integratedPlatforms);
 
         // Generate buyer profile for the sale
         const buyerProfile = generateBuyerProfile(business, valuation.buyerPoolTier, business.sectorId);
@@ -1701,7 +1707,7 @@ export const useGameStore = create<GameStore>()(
 
         // Fire sale at 70% of normal exit valuation
         const lastEvent = state.eventHistory[state.eventHistory.length - 1];
-        const valuation = calculateExitValuation(business, state.round, lastEvent?.type);
+        const valuation = calculateExitValuation(business, state.round, lastEvent?.type, undefined, state.integratedPlatforms);
         const exitPrice = Math.round(valuation.exitPrice * 0.70);
 
         // Cascade to bolt-on businesses
@@ -1940,6 +1946,55 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
+      forgeIntegratedPlatform: (recipeId: string, businessIds: string[]) => {
+        const state = get();
+        if (state.phase !== 'allocate') return;
+
+        const recipe = getRecipeById(recipeId);
+        if (!recipe) return;
+
+        const selectedBusinesses = state.businesses.filter(b => businessIds.includes(b.id));
+        if (selectedBusinesses.length === 0) return;
+
+        const integrationCost = calculateIntegrationCost(recipe, selectedBusinesses);
+        if (state.cash < integrationCost) return;
+
+        const platform = forgePlatform(recipe, businessIds, state.round);
+
+        const updatedBusinesses = state.businesses.map(b => {
+          if (!businessIds.includes(b.id)) return b;
+          return {
+            ...b,
+            integratedPlatformId: platform.id,
+            ebitdaMargin: b.ebitdaMargin + recipe.bonuses.marginBoost,
+            revenueGrowthRate: b.revenueGrowthRate + recipe.bonuses.growthBoost,
+            ebitda: Math.round(b.revenue * (b.ebitdaMargin + recipe.bonuses.marginBoost)),
+          };
+        });
+
+        set({
+          businesses: updatedBusinesses,
+          integratedPlatforms: [...state.integratedPlatforms, platform],
+          cash: state.cash - integrationCost,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            {
+              type: 'forge_integrated_platform' as const,
+              round: state.round,
+              details: {
+                recipeId,
+                platformName: recipe.name,
+                businessIds,
+                integrationCost,
+                marginBoost: recipe.bonuses.marginBoost,
+                growthBoost: recipe.bonuses.growthBoost,
+                multipleExpansion: recipe.bonuses.multipleExpansion,
+              },
+            },
+          ],
+        });
+      },
+
       triggerAIEnhancement: async () => {
         const state = get();
         try {
@@ -2109,7 +2164,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v15', // v15: day-1 multiple fix, merger rebalance
+      name: 'holdco-tycoon-save-v16', // v16: integrated platforms
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -2136,6 +2191,7 @@ export const useGameStore = create<GameStore>()(
         dealPipeline: state.dealPipeline,
         maFocus: state.maFocus,
         maSourcing: state.maSourcing,
+        integratedPlatforms: state.integratedPlatforms,
         currentEvent: state.currentEvent,
         eventHistory: state.eventHistory,
         creditTighteningRoundsRemaining: state.creditTighteningRoundsRemaining,
@@ -2168,6 +2224,8 @@ export const useGameStore = create<GameStore>()(
                 (state.totalDistributions || 0) * (state.founderShares / (state.sharesOutstanding || 1))
               );
             }
+            // Backfill integratedPlatforms
+            if (!(state as any).integratedPlatforms) (state as any).integratedPlatforms = [];
             // Cap table invariant enforcement
             if (!state.sharesOutstanding || state.sharesOutstanding <= 0) (state as any).sharesOutstanding = 1000;
             if (!state.founderShares || state.founderShares <= 0) (state as any).founderShares = state.sharesOutstanding;

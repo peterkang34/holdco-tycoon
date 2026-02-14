@@ -5,6 +5,7 @@ import {
   EventImpact,
   EventChoice,
   ExitValuation,
+  IntegratedPlatform,
   SectorFocusBonus,
   SectorFocusGroup,
   SectorFocusTier,
@@ -31,6 +32,7 @@ import {
   capGrowthRate,
   applyEbitdaFloor,
 } from './helpers';
+import { getPlatformMultipleExpansion, getPlatformRecessionModifier } from './platforms';
 
 export const TAX_RATE = 0.30;
 
@@ -50,7 +52,8 @@ export function calculateExitValuation(
   business: Business,
   currentRound: number,
   lastEventType?: string,
-  portfolioContext?: { totalPlatformEbitda?: number }
+  portfolioContext?: { totalPlatformEbitda?: number },
+  integratedPlatforms: IntegratedPlatform[] = []
 ): ExitValuation {
   // Start with acquisition multiple as baseline
   const baseMultiple = business.acquisitionMultiple;
@@ -122,12 +125,15 @@ export function calculateExitValuation(
       : business.mergerBalanceRatio <= 3.0 ? 0.4 : 0.3;
   }
 
+  // Integrated platform premium — businesses in forged platforms command higher multiples
+  const integratedPlatformPremium = getPlatformMultipleExpansion(business, integratedPlatforms);
+
   // Calculate exit multiple
   const totalMultiple = Math.max(
     2.0, // Absolute floor - distressed sale
     baseMultiple + growthPremium + qualityPremium + platformPremium + holdPremium +
     improvementsPremium + marketModifier + sizeTierPremium + deRiskingPremium +
-    ruleOf40Premium + marginExpansionPremium + mergerPremium
+    ruleOf40Premium + marginExpansionPremium + mergerPremium + integratedPlatformPremium
   );
 
   const exitPrice = Math.max(0, Math.round(business.ebitda * totalMultiple));
@@ -152,6 +158,7 @@ export function calculateExitValuation(
     sizeTierPremium,
     acquisitionSizeTierPremium: business.acquisitionSizeTierPremium ?? 0,
     mergerPremium,
+    integratedPlatformPremium,
     deRiskingPremium,
     ruleOf40Premium,
     marginExpansionPremium,
@@ -678,7 +685,7 @@ export function generateEvent(state: GameState): GameEvent | null {
       const business = pickRandom(activeBusinesses);
       if (business) {
         // Use calculateExitValuation for realistic pricing
-        const valuation = calculateExitValuation(business, state.round);
+        const valuation = calculateExitValuation(business, state.round, undefined, undefined, state.integratedPlatforms);
         const buyerProfile = generateBuyerProfile(business, valuation.buyerPoolTier, business.sectorId);
 
         // If strategic, add their premium
@@ -759,11 +766,14 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
 
     case 'global_recession': {
       // Revenue -(sensitivity × 10%), Margin -(sensitivity × 2 ppt)
+      // Integrated platform businesses get reduced recession sensitivity
       newState.businesses = newState.businesses.map(b => {
         if (b.status !== 'active') return b;
         const sector = SECTORS[b.sectorId];
-        const revImpact = sector.recessionSensitivity * 0.10;
-        const marginImpact = sector.recessionSensitivity * 0.02;
+        const recessionModifier = getPlatformRecessionModifier(b, state.integratedPlatforms);
+        const adjustedSensitivity = sector.recessionSensitivity * recessionModifier;
+        const revImpact = adjustedSensitivity * 0.10;
+        const marginImpact = adjustedSensitivity * 0.02;
         const beforeEbitda = b.ebitda;
         const newRevenue = Math.round(b.revenue * (1 - revImpact));
         const rawMargin = clampMargin(b.ebitdaMargin - marginImpact);

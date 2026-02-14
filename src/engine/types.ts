@@ -137,6 +137,8 @@ export interface Business {
   wasMerged?: boolean; // Was this entity created from a merger?
   mergerBalanceRatio?: number; // larger/smaller EBITDA at merge time
 
+  integratedPlatformId?: string; // ID of the integrated platform this business belongs to
+
   // Dynamic narratives
   storyBeats?: StoryBeat[]; // Narrative events that happened to this business
 }
@@ -405,6 +407,9 @@ export interface GameState {
   maFocus: MAFocus; // M&A sector and size focus
   maSourcing: MASourcingState; // M&A Sourcing capability tier
 
+  // Integrated Platforms
+  integratedPlatforms: IntegratedPlatform[];
+
   // Events
   currentEvent: GameEvent | null;
   eventHistory: GameEvent[];
@@ -461,7 +466,8 @@ export type GameActionType =
   | 'source_deals' // Hire investment banker for additional deal flow
   | 'upgrade_ma_sourcing'
   | 'toggle_ma_sourcing'
-  | 'proactive_outreach';
+  | 'proactive_outreach'
+  | 'forge_integrated_platform';
 
 export interface GameAction {
   type: GameActionType;
@@ -527,6 +533,7 @@ export interface ExitValuation {
   sizeTierPremium: number;
   acquisitionSizeTierPremium: number; // baseline premium at acquisition (netted out)
   mergerPremium: number; // exit premium for well-balanced mergers
+  integratedPlatformPremium: number; // exit premium for being part of an integrated platform
   deRiskingPremium: number;
   ruleOf40Premium: number;
   marginExpansionPremium: number;
@@ -538,4 +545,37 @@ export interface ExitValuation {
   yearsHeld: number;
   buyerProfile?: BuyerProfile;
   commentary?: ValuationCommentary;
+}
+
+// ── Integrated Platform Mechanic ──
+
+export interface PlatformBonuses {
+  marginBoost: number;       // ppt added to EBITDA margin (e.g., 0.04 = +4ppt)
+  growthBoost: number;       // added to revenue growth rate (e.g., 0.03 = +3%)
+  multipleExpansion: number; // absolute multiple premium on exit (e.g., 1.5 = +1.5x)
+  recessionResistanceReduction: number; // multiplied against recessionSensitivity (e.g., 0.8 = 20% less sensitive)
+}
+
+export interface PlatformRecipe {
+  id: string;
+  name: string;
+  sectorId: SectorId | null;          // null = cross-sector
+  crossSectorIds?: SectorId[];        // for cross-sector recipes
+  requiredSubTypes: string[];         // sub-types that qualify
+  minSubTypes: number;                // minimum distinct sub-types player must own
+  baseEbitdaThreshold: number;        // in $k — scaled by difficulty/duration
+  bonuses: PlatformBonuses;
+  integrationCostFraction: number;    // fraction of combined EBITDA (e.g., 0.20 = 20%)
+  description: string;
+  realWorldExample?: string;
+}
+
+export interface IntegratedPlatform {
+  id: string;
+  recipeId: string;
+  name: string;
+  sectorIds: SectorId[];
+  constituentBusinessIds: string[];
+  forgedInRound: number;
+  bonuses: PlatformBonuses;
 }

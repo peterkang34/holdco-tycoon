@@ -34,6 +34,11 @@ export const DURATION_CONFIG = {
   quick: { rounds: 10, label: 'Quick Play (10 Years)' },
 } as const;
 
+export const INTEGRATION_THRESHOLD_MULTIPLIER = {
+  easy: { standard: 1.0, quick: 0.7 },
+  normal: { standard: 0.7, quick: 0.5 },
+} as const;
+
 // Type helpers for consumers
 export type DifficultyConfig = typeof DIFFICULTY_CONFIG;
 export type DurationConfig = typeof DURATION_CONFIG;
