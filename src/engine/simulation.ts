@@ -1177,11 +1177,13 @@ export function calculateMetrics(state: GameState): Metrics {
   // Net FCF after interest and shared services costs
   const netFcf = totalFcf - annualInterest - opcoInterest - sharedServicesCost;
 
-  // Portfolio value (using sector average multiples)
+  // Portfolio value (using sector average multiples, adjusted for quality)
   const portfolioValue = activeBusinesses.reduce((sum, b) => {
     const sector = SECTORS[b.sectorId];
     const avgMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
-    return sum + b.ebitda * avgMultiple;
+    const qualityAdj = (b.qualityRating - 3) * 0.35;
+    const multiple = Math.max(sector.acquisitionMultiple[0], avgMultiple + qualityAdj);
+    return sum + b.ebitda * multiple;
   }, 0);
 
   // Intrinsic value per share

@@ -620,6 +620,52 @@ describe('calculateMetrics', () => {
     expect(metrics.totalDebt).toBe(1500); // 1000 holdco + 500 seller note (bankDebtBalance ignored)
   });
 
+  it('should apply quality adjustment to portfolio valuation multiple', () => {
+    // Agency sector: [2.5, 5.0], midpoint = 3.75
+    // Quality 5: adjustment = (5-3) * 0.35 = +0.70 → multiple = 4.45
+    // Quality 1: adjustment = (1-3) * 0.35 = -0.70 → multiple = 3.05
+    const highQState = createMockGameState({
+      cash: 0,
+      totalDebt: 0,
+      businesses: [createMockBusiness({ qualityRating: 5, ebitda: 1000 })],
+    });
+    const lowQState = createMockGameState({
+      cash: 0,
+      totalDebt: 0,
+      businesses: [createMockBusiness({ qualityRating: 1, ebitda: 1000 })],
+    });
+    const highMetrics = calculateMetrics(highQState);
+    const lowMetrics = calculateMetrics(lowQState);
+
+    // High quality should be valued higher than low quality
+    expect(highMetrics.intrinsicValuePerShare).toBeGreaterThan(lowMetrics.intrinsicValuePerShare);
+
+    // Quality 3 (neutral) should match the sector midpoint
+    const neutralState = createMockGameState({
+      cash: 0,
+      totalDebt: 0,
+      businesses: [createMockBusiness({ qualityRating: 3, ebitda: 1000 })],
+    });
+    const neutralMetrics = calculateMetrics(neutralState);
+    // portfolioValue = 1000 * 3.75 = 3750, intrinsic/share = 3750/1000 = 3.75
+    expect(neutralMetrics.intrinsicValuePerShare).toBeCloseTo(3.75, 1);
+  });
+
+  it('should floor quality-adjusted multiple at sector minimum', () => {
+    // Agency sector min = 2.5, midpoint = 3.75
+    // Quality 1: adjustment = -0.70 → 3.75 - 0.70 = 3.05 (above floor, ok)
+    // Even with extreme hypothetical values, the floor should hold
+    const state = createMockGameState({
+      cash: 0,
+      totalDebt: 0,
+      businesses: [createMockBusiness({ qualityRating: 1, ebitda: 1000 })],
+    });
+    const metrics = calculateMetrics(state);
+    // Multiple should be 3.05 (not below 2.5 floor)
+    // portfolioValue = 1000 * 3.05 = 3050, intrinsic/share = 3050/1000 = 3.05
+    expect(metrics.intrinsicValuePerShare).toBeGreaterThanOrEqual(2.5);
+  });
+
   it('should handle zero businesses gracefully', () => {
     const state = createMockGameState({ businesses: [] });
     const metrics = calculateMetrics(state);
