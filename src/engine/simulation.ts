@@ -92,7 +92,8 @@ export function calculateExitValuation(
   // Use platform consolidated EBITDA if available, otherwise business standalone
   const effectiveEbitda = portfolioContext?.totalPlatformEbitda ?? business.ebitda;
   const sizeTierResult = calculateSizeTierPremium(effectiveEbitda);
-  const sizeTierPremium = sizeTierResult.premium;
+  // Net out the premium that was already "paid for" at acquisition (prevents day-1 paper gains)
+  const sizeTierPremium = sizeTierResult.premium - (business.acquisitionSizeTierPremium ?? 0);
   const buyerPoolTier = sizeTierResult.tier;
 
   // De-risking premium — composite de-risking factor
@@ -114,12 +115,19 @@ export function calculateExitValuation(
   else if (marginDelta >= 0.05) marginExpansionPremium = 0.1 + (marginDelta - 0.05) * 4;
   else if (marginDelta <= -0.05) marginExpansionPremium = -0.2;
 
+  // Merger premium — well-balanced mergers command a premium from buyers
+  let mergerPremium = 0;
+  if (business.wasMerged && business.mergerBalanceRatio) {
+    mergerPremium = business.mergerBalanceRatio <= 2.0 ? 0.5
+      : business.mergerBalanceRatio <= 3.0 ? 0.4 : 0.3;
+  }
+
   // Calculate exit multiple
   const totalMultiple = Math.max(
     2.0, // Absolute floor - distressed sale
     baseMultiple + growthPremium + qualityPremium + platformPremium + holdPremium +
     improvementsPremium + marketModifier + sizeTierPremium + deRiskingPremium +
-    ruleOf40Premium + marginExpansionPremium
+    ruleOf40Premium + marginExpansionPremium + mergerPremium
   );
 
   const exitPrice = Math.max(0, Math.round(business.ebitda * totalMultiple));
@@ -142,6 +150,8 @@ export function calculateExitValuation(
     improvementsPremium,
     marketModifier,
     sizeTierPremium,
+    acquisitionSizeTierPremium: business.acquisitionSizeTierPremium ?? 0,
+    mergerPremium,
     deRiskingPremium,
     ruleOf40Premium,
     marginExpansionPremium,

@@ -703,6 +703,7 @@ export const useGameStore = create<GameStore>()(
           boltOnIds: [],
           synergiesRealized: 0,
           totalAcquisitionCost: deal.effectivePrice,
+          acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0,
         };
 
         // Add bank debt to holdco if applicable
@@ -820,6 +821,7 @@ export const useGameStore = create<GameStore>()(
           integrationOutcome: outcome,
           synergiesRealized: synergies,
           totalAcquisitionCost: deal.effectivePrice,
+          acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0,
         };
 
         // Failed integration: restructuring cost + growth drag on platform
@@ -933,12 +935,19 @@ export const useGameStore = create<GameStore>()(
         // Check sub-type compatibility (graduated affinity)
         const subTypeAffinity = getSubTypeAffinity(biz1.sectorId, biz1.subType, biz2.subType);
 
-        // Integration outcome for merger
-        const outcome = determineIntegrationOutcome(biz2, biz1, hasSharedServices, subTypeAffinity);
-        const synergies = calculateSynergies(outcome, biz1.ebitda + biz2.ebitda, false, subTypeAffinity);
+        // Compute size ratio between merging businesses (use larger/smaller)
+        const largerEbitda = Math.max(Math.abs(biz1.ebitda), Math.abs(biz2.ebitda));
+        const smallerEbitda = Math.min(Math.abs(biz1.ebitda), Math.abs(biz2.ebitda));
+        const { tier: mergerSizeRatioTier, ratio: mergerSizeRatio } = getSizeRatioTier(smallerEbitda, largerEbitda);
+        const mergerBalanceRatio = smallerEbitda > 0 ? largerEbitda / smallerEbitda : 99;
+
+        // Integration outcome for merger (with isMerger flag for softer penalties)
+        const outcome = determineIntegrationOutcome(biz2, biz1, hasSharedServices, subTypeAffinity, mergerSizeRatioTier, true);
+        // Synergy base: smaller EBITDA (prevents combined-EBITDA exploit)
+        const synergies = calculateSynergies(outcome, smallerEbitda, false, subTypeAffinity, mergerSizeRatioTier, true);
 
         // Failed integration: restructuring cost + growth drag
-        const mergeRestructuringCost = outcome === 'failure' ? Math.round(Math.min(Math.abs(biz1.ebitda), Math.abs(biz2.ebitda)) * 0.07) : 0;
+        const mergeRestructuringCost = outcome === 'failure' ? Math.round(smallerEbitda * 0.07) : 0;
         const mergeGrowthDrag = outcome === 'failure' ? -0.010 : 0;
 
         // Combined entity
@@ -972,7 +981,7 @@ export const useGameStore = create<GameStore>()(
           acquisitionPrice: combinedTotalCost,
           acquisitionRound: Math.min(biz1.acquisitionRound, biz2.acquisitionRound),
           acquisitionMultiple: ((biz1.acquisitionMultiple + biz2.acquisitionMultiple) / 2) + multipleExpansion,
-          organicGrowthRate: (biz1.organicGrowthRate + biz2.organicGrowthRate) / 2 + 0.01 + mergeGrowthDrag,
+          organicGrowthRate: (biz1.organicGrowthRate + biz2.organicGrowthRate) / 2 + (subTypeAffinity === 'match' ? 0.015 : subTypeAffinity === 'related' ? 0.010 : 0.005) + mergeGrowthDrag,
           revenue: combinedRevenue,
           ebitdaMargin: clampMargin(mergedMargin),
           acquisitionRevenue: biz1.acquisitionRevenue + biz2.acquisitionRevenue,
@@ -980,7 +989,7 @@ export const useGameStore = create<GameStore>()(
             ? (biz1.acquisitionEbitda + biz2.acquisitionEbitda) / (biz1.acquisitionRevenue + biz2.acquisitionRevenue)
             : mergedMargin,
           peakRevenue: combinedRevenue,
-          revenueGrowthRate: (biz1.revenueGrowthRate + biz2.revenueGrowthRate) / 2 + 0.01 + mergeGrowthDrag,
+          revenueGrowthRate: (biz1.revenueGrowthRate + biz2.revenueGrowthRate) / 2 + (subTypeAffinity === 'match' ? 0.015 : subTypeAffinity === 'related' ? 0.010 : 0.005) + mergeGrowthDrag,
           marginDriftRate: (biz1.marginDriftRate + biz2.marginDriftRate) / 2,
           qualityRating: bestQuality,
           dueDiligence: biz1.dueDiligence, // Keep first business's DD
@@ -1015,6 +1024,10 @@ export const useGameStore = create<GameStore>()(
           integrationOutcome: outcome,
           synergiesRealized: (biz1.synergiesRealized || 0) + (biz2.synergiesRealized || 0) + synergies,
           totalAcquisitionCost: combinedTotalCost,
+          // Use higher baseline to prevent gaming (buy standalone, merge to bypass tuck-in penalties)
+          acquisitionSizeTierPremium: Math.max(biz1.acquisitionSizeTierPremium ?? 0, biz2.acquisitionSizeTierPremium ?? 0),
+          wasMerged: true,
+          mergerBalanceRatio: mergerBalanceRatio,
         };
 
         // Remove old businesses, add merged one, and update bolt-on parent references
@@ -1048,6 +1061,9 @@ export const useGameStore = create<GameStore>()(
                 combinedEbitda,
                 restructuringCost: mergeRestructuringCost,
                 growthDragPenalty: mergeGrowthDrag,
+                mergerSizeRatio,
+                mergerSizeRatioTier,
+                mergerBalanceRatio,
               },
             },
           ],
@@ -2093,7 +2109,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v14', // v14: game modes (difficulty + duration), FEV scoring
+      name: 'holdco-tycoon-save-v15', // v15: day-1 multiple fix, merger rebalance
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

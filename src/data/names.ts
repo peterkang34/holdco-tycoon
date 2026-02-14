@@ -73,6 +73,16 @@ const SECTOR_NAME_PARTS: Record<string, NameParts> = {
     cores: ['Supply', 'Ship', 'Move', 'Link', 'Flow', 'Route', 'Line', 'Haul', 'Pack', 'Port', 'Dock', 'Freight', 'Source', 'Stock', 'Depot', 'Hub', 'Track', 'Cargo', 'Load', 'Bulk'],
     suffixes: ['Distribution', 'Supply Co', 'Logistics', 'Wholesale', 'Supply Chain', 'Distributors', 'Trading', 'Holdings', 'Inc', ''],
   },
+  wealthManagement: {
+    prefixes: ['Harrington', 'Summit', 'Meridian', 'Cornerstone', 'Legacy', 'Sterling', 'Pinnacle', 'Beacon', 'Vanguard', 'Keystone', 'Heritage', 'Prestige', 'Whitfield', 'Ashford', 'Clearview', 'Granite', 'Pacific', 'Compass', 'Bridgeport', 'Ironwood'],
+    cores: ['Wealth', 'Capital', 'Asset', 'Trust', 'Advisory', 'Fiduciary', 'Portfolio', 'Estate', 'Fund', 'Equity', 'Reserve', 'Treasury', 'Steward', 'Arbor', 'Haven', 'Ridge', 'Shore', 'Point', 'Creek', 'Stone'],
+    suffixes: ['Advisors', 'Partners', 'Group', 'Wealth Management', 'Capital', 'Financial', 'Advisory', 'Wealth', 'Associates', ''],
+  },
+  environmental: {
+    prefixes: ['Republic', 'Clearwater', 'Patriot', 'National', 'Metro', 'Summit', 'Eagle', 'Frontier', 'Liberty', 'Evergreen', 'Pacific', 'Atlantic', 'Pioneer', 'Allied', 'Premier', 'Central', 'Heartland', 'Valley', 'Golden', 'Heritage'],
+    cores: ['Waste', 'Environmental', 'Disposal', 'Recycling', 'Sanitation', 'Haul', 'Green', 'Clean', 'Recovery', 'Resource', 'Eco', 'Site', 'Land', 'Water', 'Remediation', 'Container', 'Roll', 'Bin', 'Transfer', 'Collection'],
+    suffixes: ['Services', 'Environmental', 'Waste Services', 'Disposal', 'Solutions', 'Industries', 'Management', 'Group', 'Inc', ''],
+  },
 };
 
 // Sub-type → suffixes map: ensures the name suffix matches the business sub-type
@@ -175,6 +185,20 @@ const SUBTYPE_SUFFIXES: Record<string, string[]> = {
   'Janitorial / Facilities Supply': ['Jan-San', 'Facility Supply', 'Janitorial', 'Supply Co', 'Clean Supply'],
   'Specialty / Niche': ['Specialty', 'Niche Supply', 'Specialty Distribution', 'Select', 'Specialty Co'],
   'Last-Mile Delivery': ['Delivery', 'Express', 'Last Mile', 'Courier', 'Logistics'],
+  // Wealth Management sub-types
+  'Independent RIA': ['Advisors', 'Wealth', 'Financial', 'Advisory', 'Wealth Management'],
+  'Retirement Plan Advisory': ['Retirement', 'Benefits', '401k Group', 'Pension', 'Retirement Advisory'],
+  'Family Office Services': ['Family Office', 'Private Wealth', 'Family Capital', 'Private Client', 'Legacy'],
+  'Tax & Estate Planning': ['Tax', 'Estate Planning', 'Tax Advisory', 'Estate', 'Planning'],
+  'Insurance-Based Advisory': ['Financial', 'Insurance Advisory', 'Benefits', 'Risk Advisory', 'Financial Group'],
+  'Institutional Consulting': ['Consulting', 'Institutional', 'Advisory', 'Capital Advisory', 'Investment Consulting'],
+  // Environmental sub-types
+  'Commercial Waste Collection': ['Waste', 'Collection', 'Hauling', 'Disposal', 'Waste Services'],
+  'Residential Hauling': ['Disposal', 'Hauling', 'Sanitation', 'Trash', 'Waste Collection'],
+  'Recycling & Materials Recovery': ['Recycling', 'Recovery', 'Materials', 'Resource Recovery', 'Reclamation'],
+  'Environmental Remediation': ['Remediation', 'Environmental', 'Restoration', 'Cleanup', 'Environmental Services'],
+  'Portable Sanitation': ['Sanitation', 'Portable Services', 'Site Services', 'Restrooms', 'Sanitation Co'],
+  'Industrial Waste Management': ['Industrial', 'Waste Management', 'Environmental Services', 'Hazmat', 'Industrial Waste'],
 };
 
 // Track used names to avoid duplicates within a game
@@ -186,7 +210,14 @@ export function resetUsedNames(): void {
 
 function buildName(parts: NameParts): string {
   const prefix = parts.prefixes[Math.floor(Math.random() * parts.prefixes.length)];
-  const core = parts.cores[Math.floor(Math.random() * parts.cores.length)];
+  let core = parts.cores[Math.floor(Math.random() * parts.cores.length)];
+  // Avoid prefix-equals-core collisions (e.g. "Summit Summit")
+  if (prefix.toLowerCase() === core.toLowerCase()) {
+    const filtered = parts.cores.filter(c => c.toLowerCase() !== prefix.toLowerCase());
+    if (filtered.length > 0) {
+      core = filtered[Math.floor(Math.random() * filtered.length)];
+    }
+  }
   const suffix = parts.suffixes[Math.floor(Math.random() * parts.suffixes.length)];
 
   // Vary the structure for diversity

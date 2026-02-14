@@ -5,6 +5,7 @@ import {
   migrateV11ToV12,
   migrateV12ToV13,
   migrateV13ToV14,
+  migrateV14ToV15,
   runAllMigrations,
 } from '../../hooks/migrations';
 
@@ -253,8 +254,73 @@ describe('migrateV13ToV14', () => {
   });
 });
 
+describe('migrateV14ToV15', () => {
+  it('should back-fill acquisitionSizeTierPremium and wasMerged on businesses', () => {
+    const v14Data = {
+      state: {
+        businesses: [
+          { id: 'biz_1', sectorId: 'agency', ebitda: 3000, acquisitionEbitda: 3000 },
+          { id: 'biz_2', sectorId: 'saas', ebitda: 8000, acquisitionEbitda: 5000 },
+        ],
+        exitedBusinesses: [
+          { id: 'biz_3', sectorId: 'agency', ebitda: 1000, acquisitionEbitda: 1000 },
+        ],
+        dealPipeline: [
+          { id: 'deal_1', business: { ebitda: 2500, acquisitionEbitda: 2500 } },
+        ],
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v14', JSON.stringify(v14Data));
+
+    migrateV14ToV15();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v15')!);
+
+    // biz_1: EBITDA 3000 → premium lerp(3000, 2000, 5000, 0.5, 1.0) = 0.667
+    const biz1 = result.state.businesses[0];
+    expect(biz1.acquisitionSizeTierPremium).toBeCloseTo(0.667, 1);
+    expect(biz1.wasMerged).toBe(false);
+
+    // biz_2: acquisitionEbitda 5000 → premium = 1.0
+    const biz2 = result.state.businesses[1];
+    expect(biz2.acquisitionSizeTierPremium).toBeCloseTo(1.0, 1);
+    expect(biz2.wasMerged).toBe(false);
+
+    // Exited biz_3: EBITDA 1000 → premium = 0.0 (below 2000)
+    const biz3 = result.state.exitedBusinesses[0];
+    expect(biz3.acquisitionSizeTierPremium).toBe(0);
+    expect(biz3.wasMerged).toBe(false);
+
+    // Pipeline deal: EBITDA 2500 → lerp(2500, 2000, 5000, 0.5, 1.0) ≈ 0.583
+    const deal1 = result.state.dealPipeline[0];
+    expect(deal1.business.acquisitionSizeTierPremium).toBeCloseTo(0.583, 1);
+
+    // v14 consumed
+    expect(localStorageMock.getItem('holdco-tycoon-save-v14')).toBeNull();
+  });
+
+  it('should not overwrite existing acquisitionSizeTierPremium', () => {
+    const v14Data = {
+      state: {
+        businesses: [
+          { id: 'biz_1', acquisitionEbitda: 3000, acquisitionSizeTierPremium: 0.5 },
+        ],
+        exitedBusinesses: [],
+        dealPipeline: [],
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v14', JSON.stringify(v14Data));
+
+    migrateV14ToV15();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v15')!);
+    // Should keep existing value since ?? only triggers on null/undefined
+    expect(result.state.businesses[0].acquisitionSizeTierPremium).toBe(0.5);
+  });
+});
+
 describe('runAllMigrations', () => {
-  it('should chain all migrations from v9 to v14', () => {
+  it('should chain all migrations from v9 to v15', () => {
     const v9Data = {
       state: {
         businesses: [{
@@ -279,28 +345,31 @@ describe('runAllMigrations', () => {
 
     // v9 should be consumed
     expect(localStorageMock.getItem('holdco-tycoon-save-v9')).toBeNull();
-    // Final v14 should exist
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v14')!);
+    // Final v15 should exist
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v15')!);
     expect(result.state.difficulty).toBe('easy');
     expect(result.state.maxRounds).toBe(20);
     expect(result.state.founderDistributionsReceived).toBeDefined();
+    // v14→v15 fields
+    expect(result.state.businesses[0].wasMerged).toBe(false);
+    expect(result.state.businesses[0].acquisitionSizeTierPremium).toBeDefined();
   });
 
   it('should be safe to call multiple times (idempotent)', () => {
-    const v13Data = {
+    const v14Data = {
       state: {
-        totalDistributions: 0,
-        founderShares: 1000,
-        sharesOutstanding: 1000,
+        businesses: [{ id: 'biz_1', acquisitionEbitda: 1000 }],
+        exitedBusinesses: [],
+        dealPipeline: [],
       },
     };
-    localStorageMock.setItem('holdco-tycoon-save-v13', JSON.stringify(v13Data));
+    localStorageMock.setItem('holdco-tycoon-save-v14', JSON.stringify(v14Data));
 
     runAllMigrations();
-    const first = localStorageMock.getItem('holdco-tycoon-save-v14');
+    const first = localStorageMock.getItem('holdco-tycoon-save-v15');
 
     runAllMigrations();
-    const second = localStorageMock.getItem('holdco-tycoon-save-v14');
+    const second = localStorageMock.getItem('holdco-tycoon-save-v15');
 
     expect(first).toBe(second);
   });
@@ -312,5 +381,6 @@ describe('runAllMigrations', () => {
     expect(localStorageMock.getItem('holdco-tycoon-save-v12')).toBeNull();
     expect(localStorageMock.getItem('holdco-tycoon-save-v13')).toBeNull();
     expect(localStorageMock.getItem('holdco-tycoon-save-v14')).toBeNull();
+    expect(localStorageMock.getItem('holdco-tycoon-save-v15')).toBeNull();
   });
 });

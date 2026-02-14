@@ -956,3 +956,84 @@ describe('size ratio impact on integration', () => {
     expect(strainedSynergies).toBe(Math.round(idealSynergies * 0.50));
   });
 });
+
+describe('acquisitionSizeTierPremium', () => {
+  it('should be set correctly on generated businesses', () => {
+    const biz = generateBusiness('agency', 1);
+    expect(biz.acquisitionSizeTierPremium).toBeDefined();
+    expect(typeof biz.acquisitionSizeTierPremium).toBe('number');
+    expect(biz.acquisitionSizeTierPremium).toBeGreaterThanOrEqual(0);
+  });
+
+  it('should be set on createStartingBusiness', () => {
+    const biz = createStartingBusiness('agency', 1000);
+    expect(biz.acquisitionSizeTierPremium).toBeDefined();
+    // $1M EBITDA is below $2M threshold → 0 premium
+    expect(biz.acquisitionSizeTierPremium).toBe(0);
+  });
+
+  it('should be positive for large EBITDA businesses', () => {
+    const biz = createStartingBusiness('agency', 5000);
+    expect(biz.acquisitionSizeTierPremium).toBeGreaterThan(0);
+  });
+});
+
+describe('merger-specific synergies (isMerger)', () => {
+  it('merger success synergy rate should be 15%', () => {
+    const synergies = calculateSynergies('success', 1000, false, 'match', 'ideal', true);
+    expect(synergies).toBe(150); // 15% of 1000
+  });
+
+  it('merger partial synergy rate should be 5%', () => {
+    const synergies = calculateSynergies('partial', 1000, false, 'match', 'ideal', true);
+    expect(synergies).toBe(50); // 5% of 1000
+  });
+
+  it('merger failure synergy rate should be -7%', () => {
+    const synergies = calculateSynergies('failure', 1000, false, 'match', 'ideal', true);
+    expect(synergies).toBe(-70); // -7% of 1000
+  });
+
+  it('merger size-ratio penalties should be softer than tuck-in', () => {
+    // Compare strained tier: tuck-in uses 0.50x, merger uses 0.70x
+    const tuckInSynergies = calculateSynergies('success', 1000, true, 'match', 'strained');
+    const mergerSynergies = calculateSynergies('success', 1000, false, 'match', 'strained', true);
+    // Merger base = 15% × 0.70 = 10.5%, tuck-in = 20% × 0.50 = 10%
+    // Merger should be close to or higher per unit than tuck-in at strained tier
+    expect(mergerSynergies).toBeGreaterThanOrEqual(tuckInSynergies * 0.5);
+  });
+
+  it('merger ideal tier should have no dampening', () => {
+    const noDampen = calculateSynergies('success', 1000, false, 'match', 'ideal', true);
+    const noDampenNoTier = calculateSynergies('success', 1000, false, 'match', undefined, true);
+    expect(noDampen).toBe(noDampenNoTier);
+  });
+});
+
+describe('naming — wealthManagement and environmental', () => {
+  it('wealthManagement names should not contain agency words', () => {
+    const agencyWords = ['Pixel', 'Spark', 'Digital', 'Metric', 'Neon', 'Creative', 'Media', 'Agency'];
+    for (let i = 0; i < 20; i++) {
+      const biz = generateBusiness('wealthManagement', 1);
+      for (const word of agencyWords) {
+        expect(biz.name).not.toContain(word);
+      }
+    }
+  });
+
+  it('environmental names should not contain agency words', () => {
+    const agencyWords = ['Pixel', 'Spark', 'Digital', 'Metric', 'Neon', 'Creative', 'Media', 'Agency'];
+    for (let i = 0; i < 20; i++) {
+      const biz = generateBusiness('environmental', 1);
+      for (const word of agencyWords) {
+        expect(biz.name).not.toContain(word);
+      }
+    }
+  });
+
+  it('wealthManagement and environmental should appear in sector weights', () => {
+    const weights = getSectorWeightsForRound(5);
+    expect(weights.wealthManagement).toBeGreaterThan(0);
+    expect(weights.environmental).toBeGreaterThan(0);
+  });
+});

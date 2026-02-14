@@ -21,6 +21,7 @@ import {
 import { clampMargin } from './helpers';
 import { SECTORS, SECTOR_LIST } from '../data/sectors';
 import { getRandomBusinessName } from '../data/names';
+import { calculateSizeTierPremium } from './buyers';
 import {
   isAIEnabled,
   generateBusinessContent,
@@ -213,6 +214,7 @@ export function generateBusiness(
     acquisitionEbitda: ebitda,
     acquisitionPrice,
     acquisitionMultiple: multiple,
+    acquisitionSizeTierPremium: calculateSizeTierPremium(ebitda).premium,
     organicGrowthRate,
     revenue,
     ebitdaMargin,
@@ -445,6 +447,39 @@ function getSizeRatioSynergyMultiplier(tier: SizeRatioTier): number {
   return multipliers[tier];
 }
 
+// Merger-specific penalties (half of tuck-in — mergers are more balanced by nature)
+function getMergerSizeRatioProbabilityPenalty(
+  tier: SizeRatioTier,
+  platformScale: number,
+  hasSharedServices: boolean,
+  bothHighQuality: boolean,
+): number {
+  const basePenalty: Record<SizeRatioTier, number> = {
+    ideal: 0,
+    stretch: -0.04,
+    strained: -0.09,
+    overreach: -0.14,
+  };
+  const basePen = basePenalty[tier];
+  if (basePen === 0) return 0;
+  let mitigation = 0;
+  if (platformScale >= 3) mitigation += 0.15;
+  if (hasSharedServices) mitigation += 0.05;
+  if (bothHighQuality) mitigation += 0.05;
+  const maxMitigation = Math.abs(basePen) * 0.5;
+  return basePen + Math.min(mitigation, maxMitigation);
+}
+
+function getMergerSizeRatioSynergyMultiplier(tier: SizeRatioTier): number {
+  const multipliers: Record<SizeRatioTier, number> = {
+    ideal: 1.0,
+    stretch: 0.90,
+    strained: 0.70,
+    overreach: 0.50,
+  };
+  return multipliers[tier];
+}
+
 // Determine integration outcome based on various factors
 export function determineIntegrationOutcome(
   acquiredBusiness: Omit<Business, 'id' | 'acquisitionRound' | 'improvements' | 'status'>,
@@ -452,6 +487,7 @@ export function determineIntegrationOutcome(
   hasSharedServices?: boolean,
   subTypeAffinity?: SubTypeAffinity,
   sizeRatioTier?: SizeRatioTier,
+  isMerger?: boolean,
 ): IntegrationOutcome {
   let successProbability = 0.6; // Base 60% chance
 
@@ -487,10 +523,11 @@ export function determineIntegrationOutcome(
     successProbability -= 0.1;
   }
 
-  // Size ratio penalty — oversized bolt-ons are harder to integrate
+  // Size ratio penalty — oversized bolt-ons/mergers are harder to integrate
   if (sizeRatioTier && targetPlatform) {
     const bothHighQuality = acquiredBusiness.qualityRating >= 4 && targetPlatform.qualityRating >= 4;
-    successProbability += getSizeRatioProbabilityPenalty(
+    const penaltyFn = isMerger ? getMergerSizeRatioProbabilityPenalty : getSizeRatioProbabilityPenalty;
+    successProbability += penaltyFn(
       sizeRatioTier,
       targetPlatform.platformScale,
       !!hasSharedServices,
@@ -516,20 +553,30 @@ export function calculateSynergies(
   isTuckIn: boolean,
   subTypeAffinity?: SubTypeAffinity,
   sizeRatioTier?: SizeRatioTier,
+  isMerger?: boolean,
 ): number {
-  // Synergies are a % of the acquired business EBITDA
+  // Synergies are a % of the acquired/smaller business EBITDA
   let synergyRate: number;
 
-  switch (outcome) {
-    case 'success':
-      synergyRate = isTuckIn ? 0.20 : 0.10; // Tuck-ins get more synergies
-      break;
-    case 'partial':
-      synergyRate = isTuckIn ? 0.08 : 0.03;
-      break;
-    case 'failure':
-      synergyRate = isTuckIn ? -0.05 : -0.10; // Failed integrations hurt
-      break;
+  if (isMerger) {
+    // Merger-specific rates (rebalanced: higher success, gentler failure)
+    switch (outcome) {
+      case 'success': synergyRate = 0.15; break;
+      case 'partial': synergyRate = 0.05; break;
+      case 'failure': synergyRate = -0.07; break;
+    }
+  } else {
+    switch (outcome) {
+      case 'success':
+        synergyRate = isTuckIn ? 0.20 : 0.10;
+        break;
+      case 'partial':
+        synergyRate = isTuckIn ? 0.08 : 0.03;
+        break;
+      case 'failure':
+        synergyRate = isTuckIn ? -0.05 : -0.10;
+        break;
+    }
   }
 
   // Sub-type affinity affects synergy capture
@@ -539,9 +586,11 @@ export function calculateSynergies(
     synergyRate *= 0.45; // Distant sub-types: 45% synergies (e.g., dental + behavioral health)
   }
 
-  // Size ratio dampens synergy capture for oversized bolt-ons
+  // Size ratio dampens synergy capture for oversized bolt-ons/mergers
   if (sizeRatioTier) {
-    synergyRate *= getSizeRatioSynergyMultiplier(sizeRatioTier);
+    synergyRate *= isMerger
+      ? getMergerSizeRatioSynergyMultiplier(sizeRatioTier)
+      : getSizeRatioSynergyMultiplier(sizeRatioTier);
   }
 
   return Math.round(acquiredEbitda * synergyRate);
@@ -650,7 +699,7 @@ export function getSectorWeightsForRound(round: number, maxRounds: number = 20):
   // Late game: premium sectors
 
   const cheap: SectorId[] = ['agency', 'homeServices', 'b2bServices', 'education', 'autoServices'];
-  const mid: SectorId[] = ['consumer', 'restaurant', 'healthcare', 'insurance', 'distribution'];
+  const mid: SectorId[] = ['consumer', 'restaurant', 'healthcare', 'insurance', 'distribution', 'wealthManagement', 'environmental'];
   const premium: SectorId[] = ['saas', 'industrial', 'realEstate'];
 
   let cheapWeight: number, midWeight: number, premiumWeight: number;
@@ -1094,6 +1143,7 @@ export function createStartingBusiness(sectorId: SectorId = 'agency', targetEbit
     acquisitionEbitda: targetEbitda,
     acquisitionPrice,
     acquisitionMultiple: targetMultiple,
+    acquisitionSizeTierPremium: calculateSizeTierPremium(targetEbitda).premium,
     revenue: startingRevenue,
     acquisitionRevenue: startingRevenue,
     peakRevenue: startingRevenue,

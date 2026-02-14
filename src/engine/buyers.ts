@@ -122,6 +122,8 @@ const STRATEGIC_TEMPLATES: Record<string, string[]> = {
   insurance: ['Acrisure', 'Hub International', 'Gallagher', 'AssuredPartners', 'NFP'],
   autoServices: ['Driven Brands', 'Mavis Discount Tire', 'Caliber Collision', 'Sun Auto Tire', 'Crash Champions'],
   distribution: ['Watsco', 'Pool Corp', 'Fastenal', 'Grainger', 'HD Supply'],
+  wealthManagement: ['Focus Financial', 'Hightower', 'CI Financial', 'Mercer Advisors', 'Carson Group', 'Cetera Financial'],
+  environmental: ['Waste Management', 'Republic Services', 'GFL Environmental', 'Casella Waste', 'Clean Harbors', 'US Ecology'],
 };
 
 // ── Buyer Profile Generation ───────────────────────────────────────

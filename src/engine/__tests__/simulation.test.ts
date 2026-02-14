@@ -1027,3 +1027,78 @@ describe('Rule of 40 + Margin Expansion Exit Premiums', () => {
     );
   });
 });
+
+describe('day-1 multiple expansion fix', () => {
+  it('net sizeTierPremium = 0 for a no-growth business at same EBITDA', () => {
+    // Business with EBITDA 3000 at acquisition, still 3000 now
+    const biz = createMockBusiness({
+      ebitda: 3000,
+      acquisitionEbitda: 3000,
+      acquisitionSizeTierPremium: 0.667, // lerp(3000, 2000, 5000, 0.5, 1.0)
+    });
+    const valuation = calculateExitValuation(biz, 3);
+    // Current premium from 3000 EBITDA ≈ 0.667 minus acquisition 0.667 = 0
+    expect(valuation.sizeTierPremium).toBeCloseTo(0, 1);
+  });
+
+  it('net sizeTierPremium > 0 for EBITDA growth', () => {
+    // Business grew from 3000 to 8000 EBITDA
+    const biz = createMockBusiness({
+      ebitda: 8000,
+      acquisitionEbitda: 3000,
+      acquisitionSizeTierPremium: 0.667,
+    });
+    const valuation = calculateExitValuation(biz, 5);
+    // Current premium from 8000 ≈ lerp(8000, 5000, 10000, 1.0, 2.0) = 1.6
+    // Net = 1.6 - 0.667 = 0.933
+    expect(valuation.sizeTierPremium).toBeGreaterThan(0.5);
+  });
+
+  it('backward compat: ?? 0 fallback for legacy businesses', () => {
+    // Business without acquisitionSizeTierPremium field
+    const biz = createMockBusiness({
+      ebitda: 5000,
+      acquisitionEbitda: 5000,
+    });
+    // Remove the field to simulate legacy data
+    delete (biz as any).acquisitionSizeTierPremium;
+    const valuation = calculateExitValuation(biz, 3);
+    // Should not throw, sizeTierPremium = full premium (not netted)
+    expect(valuation.sizeTierPremium).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('merger exit premium', () => {
+  it('balanced merger (ratio ≤ 2.0) should get +0.5x premium', () => {
+    const biz = createMockBusiness({
+      wasMerged: true,
+      mergerBalanceRatio: 1.5,
+    });
+    const valuation = calculateExitValuation(biz, 5);
+    expect(valuation.mergerPremium).toBe(0.5);
+  });
+
+  it('moderately imbalanced merger (ratio 2-3) should get +0.4x', () => {
+    const biz = createMockBusiness({
+      wasMerged: true,
+      mergerBalanceRatio: 2.5,
+    });
+    const valuation = calculateExitValuation(biz, 5);
+    expect(valuation.mergerPremium).toBe(0.4);
+  });
+
+  it('highly imbalanced merger (ratio > 3) should get +0.3x', () => {
+    const biz = createMockBusiness({
+      wasMerged: true,
+      mergerBalanceRatio: 4.0,
+    });
+    const valuation = calculateExitValuation(biz, 5);
+    expect(valuation.mergerPremium).toBe(0.3);
+  });
+
+  it('non-merged business should get 0 merger premium', () => {
+    const biz = createMockBusiness({ wasMerged: false });
+    const valuation = calculateExitValuation(biz, 5);
+    expect(valuation.mergerPremium).toBe(0);
+  });
+});

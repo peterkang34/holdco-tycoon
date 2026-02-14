@@ -174,6 +174,55 @@ export function migrateV13ToV14(): void {
   }
 }
 
+// --- v14 → v15: adds acquisitionSizeTierPremium + wasMerged ---
+
+// Inline lerp matching buyers.ts calculateSizeTierPremium
+function computeSizeTierPremium(ebitda: number): number {
+  if (ebitda < 2000) return 0.0;
+  if (ebitda < 5000) return 0.5 + ((ebitda - 2000) / (5000 - 2000)) * (1.0 - 0.5);
+  if (ebitda < 10000) return 1.0 + ((ebitda - 5000) / (10000 - 5000)) * (2.0 - 1.0);
+  if (ebitda < 20000) return 2.0 + ((ebitda - 10000) / (20000 - 10000)) * (3.5 - 2.0);
+  const capped = Math.min(ebitda, 30000);
+  return 3.5 + ((capped - 20000) / (30000 - 20000)) * (5.0 - 3.5);
+}
+
+export function migrateV14ToV15(): void {
+  try {
+    const v15Key = 'holdco-tycoon-save-v15';
+    const v14Key = 'holdco-tycoon-save-v14';
+    if (localStorage.getItem(v15Key)) return;
+    const v14Raw = localStorage.getItem(v14Key);
+    if (!v14Raw) return;
+    const v14Data = JSON.parse(v14Raw);
+    if (!v14Data?.state) return;
+
+    const backfill = (b: any) => ({
+      ...b,
+      acquisitionSizeTierPremium: b.acquisitionSizeTierPremium ?? computeSizeTierPremium(b.acquisitionEbitda || b.ebitda || 0),
+      wasMerged: b.wasMerged ?? false,
+    });
+
+    if (Array.isArray(v14Data.state.businesses)) {
+      v14Data.state.businesses = v14Data.state.businesses.map(backfill);
+    }
+    if (Array.isArray(v14Data.state.exitedBusinesses)) {
+      v14Data.state.exitedBusinesses = v14Data.state.exitedBusinesses.map(backfill);
+    }
+    // Pipeline deal businesses
+    if (Array.isArray(v14Data.state.dealPipeline)) {
+      v14Data.state.dealPipeline = v14Data.state.dealPipeline.map((d: any) => ({
+        ...d,
+        business: d.business ? backfill(d.business) : d.business,
+      }));
+    }
+
+    localStorage.setItem(v15Key, JSON.stringify(v14Data));
+    localStorage.removeItem(v14Key);
+  } catch (e) {
+    console.error('v14→v15 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -184,4 +233,5 @@ export function runAllMigrations(): void {
   migrateV11ToV12();
   migrateV12ToV13();
   migrateV13ToV14();
+  migrateV14ToV15();
 }

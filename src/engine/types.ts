@@ -101,6 +101,7 @@ export interface Business {
   acquisitionPrice: number;
   acquisitionRound: number;
   acquisitionMultiple: number;
+  acquisitionSizeTierPremium: number; // size-tier premium at time of acquisition (nets out day-1 paper gains)
   organicGrowthRate: number;
   revenue: number;              // annual revenue in $k
   ebitdaMargin: number;         // 0-1 (e.g. 0.22 = 22%)
@@ -131,6 +132,10 @@ export interface Business {
   integrationOutcome?: IntegrationOutcome; // How well the integration went
   synergiesRealized: number; // EBITDA boost from successful integration (in $k)
   totalAcquisitionCost: number; // Sum of this business + all bolt-ons acquired
+
+  // Merger tracking
+  wasMerged?: boolean; // Was this entity created from a merger?
+  mergerBalanceRatio?: number; // larger/smaller EBITDA at merge time
 
   // Dynamic narratives
   storyBeats?: StoryBeat[]; // Narrative events that happened to this business
@@ -520,6 +525,8 @@ export interface ExitValuation {
   improvementsPremium: number;
   marketModifier: number;
   sizeTierPremium: number;
+  acquisitionSizeTierPremium: number; // baseline premium at acquisition (netted out)
+  mergerPremium: number; // exit premium for well-balanced mergers
   deRiskingPremium: number;
   ruleOf40Premium: number;
   marginExpansionPremium: number;
