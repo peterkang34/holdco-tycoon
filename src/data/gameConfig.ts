@@ -39,6 +39,20 @@ export const INTEGRATION_THRESHOLD_MULTIPLIER = {
   normal: { standard: 0.7, quick: 0.5 },
 } as const;
 
+// ── Turnaround Constants ──
+
+export const TURNAROUND_FATIGUE_THRESHOLD = 4;   // 4+ simultaneous turnarounds = penalty
+export const TURNAROUND_FATIGUE_PENALTY = 0.10;  // -10ppt to all success rates
+export const TURNAROUND_EXIT_PREMIUM = 0.25;     // +0.25x exit multiple
+export const TURNAROUND_EXIT_PREMIUM_MIN_TIERS = 2; // need 2+ quality tiers improved
+
+export const BASE_QUALITY_IMPROVEMENT_CHANCE = 0.30; // 30% base chance on op improvement
+export const QUALITY_IMPROVEMENT_TIER_BONUS: Record<1 | 2 | 3, number> = {
+  1: 0.15, // total 45%
+  2: 0.20, // total 50%
+  3: 0.25, // total 55%
+};
+
 // Type helpers for consumers
 export type DifficultyConfig = typeof DIFFICULTY_CONFIG;
 export type DurationConfig = typeof DURATION_CONFIG;

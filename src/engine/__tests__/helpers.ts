@@ -50,6 +50,7 @@ export function createMockBusiness(overrides: Partial<Business> = {}): Business 
     boltOnIds: [],
     synergiesRealized: 0,
     totalAcquisitionCost: 4000,
+    qualityImprovedTiers: 0,
     ...overrides,
   };
 }
@@ -162,6 +163,8 @@ export function createMockGameState(overrides: Partial<GameState> = {}): GameSta
     duration: 'standard',
     maxRounds: 20,
     integratedPlatforms: [],
+    turnaroundTier: 0,
+    activeTurnarounds: [],
     founderDistributionsReceived: 0,
     ...overrides,
   };

@@ -103,6 +103,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     proactiveOutreach,
     forgeIntegratedPlatform,
     integratedPlatforms,
+    turnaroundTier,
+    activeTurnarounds,
+    unlockTurnaroundTier,
+    startTurnaroundProgram,
     triggerAIEnhancement,
     sourceDealFlow,
     distressedSale,
@@ -122,6 +126,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     difficulty,
     duration,
     lastAcquisitionResult,
+    turnaroundTier,
+    activeTurnarounds,
+    unlockTurnaroundTier,
+    startTurnaroundProgram,
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;
@@ -313,6 +321,25 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
       type: 'success',
     });
   }, [forgeIntegratedPlatform, addToast]);
+
+  const handleUnlockTurnaroundTier = useCallback(() => {
+    const nextTier = Math.min(turnaroundTier + 1, 3);
+    unlockTurnaroundTier();
+    addToast({
+      message: `Turnaround capability unlocked: Tier ${nextTier}`,
+      type: 'success',
+    });
+  }, [unlockTurnaroundTier, turnaroundTier, addToast]);
+
+  const handleStartTurnaround = useCallback((businessId: string, programId: string) => {
+    const biz = businesses.find(b => b.id === businessId);
+    startTurnaroundProgram(businessId, programId);
+    addToast({
+      message: `Turnaround started for ${biz?.name ?? 'business'}`,
+      detail: 'Program in progress — results at completion',
+      type: 'info',
+    });
+  }, [startTurnaroundProgram, businesses, addToast]);
 
   // Show tutorial on new game start or first visit
   useEffect(() => {
@@ -509,6 +536,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             acquisitionsThisRound={acquisitionsThisRound}
             maxAcquisitionsPerRound={maxAcquisitionsPerRound}
             lastAcquisitionResult={lastAcquisitionResult}
+            turnaroundTier={turnaroundTier}
+            activeTurnarounds={activeTurnarounds}
+            onUnlockTurnaroundTier={handleUnlockTurnaroundTier}
+            onStartTurnaround={handleStartTurnaround}
           />
         );
       default:

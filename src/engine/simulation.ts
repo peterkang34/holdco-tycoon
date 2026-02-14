@@ -33,6 +33,7 @@ import {
   applyEbitdaFloor,
 } from './helpers';
 import { getPlatformMultipleExpansion, getPlatformRecessionModifier } from './platforms';
+import { getTurnaroundExitPremium } from './turnarounds';
 
 export const TAX_RATE = 0.30;
 
@@ -128,12 +129,16 @@ export function calculateExitValuation(
   // Integrated platform premium — businesses in forged platforms command higher multiples
   const integratedPlatformPremium = getPlatformMultipleExpansion(business, integratedPlatforms);
 
+  // Turnaround premium — businesses that improved 2+ quality tiers command higher multiples
+  const turnaroundPremium = getTurnaroundExitPremium(business);
+
   // Calculate exit multiple
   const totalMultiple = Math.max(
     2.0, // Absolute floor - distressed sale
     baseMultiple + growthPremium + qualityPremium + platformPremium + holdPremium +
     improvementsPremium + marketModifier + sizeTierPremium + deRiskingPremium +
-    ruleOf40Premium + marginExpansionPremium + mergerPremium + integratedPlatformPremium
+    ruleOf40Premium + marginExpansionPremium + mergerPremium + integratedPlatformPremium +
+    turnaroundPremium
   );
 
   const exitPrice = Math.max(0, Math.round(business.ebitda * totalMultiple));
@@ -159,6 +164,7 @@ export function calculateExitValuation(
     acquisitionSizeTierPremium: business.acquisitionSizeTierPremium ?? 0,
     mergerPremium,
     integratedPlatformPremium,
+    turnaroundPremium,
     deRiskingPremium,
     ruleOf40Premium,
     marginExpansionPremium,

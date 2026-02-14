@@ -14,6 +14,8 @@ import {
   RoundHistoryEntry,
   MASourcingTier,
   MASourcingState,
+  TurnaroundTier,
+  ActiveTurnaround,
   formatMoney,
 } from '../engine/types';
 import {
@@ -78,6 +80,15 @@ import { buildChronicleContext } from '../services/chronicleContext';
 import { useToastStore } from './useToast';
 import { calculateIntegrationCost, forgePlatform } from '../engine/platforms';
 import { getRecipeById } from '../data/platformRecipes';
+import {
+  canUnlockTier,
+  calculateTurnaroundCost,
+  getTurnaroundDuration,
+  resolveTurnaround,
+  getQualityImprovementChance,
+} from '../engine/turnarounds';
+import { getProgramById, getTurnaroundTierAnnualCost, getTurnaroundTierUnlockCost, TURNAROUND_TIER_CONFIG, getQualityCeiling } from '../data/turnaroundPrograms';
+import type { QualityRating } from '../engine/types';
 
 interface GameStore extends GameState {
   // Computed
@@ -122,6 +133,10 @@ interface GameStore extends GameState {
 
   // Integrated Platforms
   forgeIntegratedPlatform: (recipeId: string, businessIds: string[]) => void;
+
+  // Turnaround capability
+  unlockTurnaroundTier: () => void;
+  startTurnaroundProgram: (businessId: string, programId: string) => void;
 
   // Restructuring actions
   distressedSale: (businessId: string) => void;
@@ -184,6 +199,8 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   maFocus: { sectorId: null, sizePreference: 'any' as DealSizePreference, subType: null },
   maSourcing: { tier: 0 as MASourcingTier, active: false, unlockedRound: 0, lastUpgradeRound: 0 },
   integratedPlatforms: [],
+  turnaroundTier: 0 as TurnaroundTier,
+  activeTurnarounds: [],
   currentEvent: null,
   eventHistory: [],
   creditTighteningRoundsRemaining: 0,
@@ -241,6 +258,8 @@ export const useGameStore = create<GameStore>()(
           sharedServices: initializeSharedServices(),
           dealPipeline: initialDealPipeline,
           maSourcing: { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 },
+          turnaroundTier: 0 as any,
+          activeTurnarounds: [],
           founderDistributionsReceived: 0,
         };
 
@@ -284,6 +303,17 @@ export const useGameStore = create<GameStore>()(
           ? getMASourcingAnnualCost(state.maSourcing.tier)
           : 0;
 
+        // Turnaround tier annual cost
+        const turnaroundTierCost = getTurnaroundTierAnnualCost(state.turnaroundTier);
+
+        // Turnaround per-program annual costs for active turnarounds
+        const turnaroundProgramCosts = state.activeTurnarounds
+          .filter(t => t.status === 'active')
+          .reduce((sum, t) => {
+            const prog = getProgramById(t.programId);
+            return sum + (prog ? prog.annualCost : 0);
+          }, 0);
+
         // Apply distress interest penalty
         const currentMetrics = calculateMetrics(state as GameState);
         const distressRestrictions = getDistressRestrictions(currentMetrics.distressLevel);
@@ -304,7 +334,7 @@ export const useGameStore = create<GameStore>()(
         // Interest and shared services are still cash costs (separate from tax)
         const annualInterest = Math.round(state.totalDebt * effectiveRate);
 
-        let newCash = state.cash + annualFcf - annualInterest - sharedServicesCost - maSourcingCost;
+        let newCash = state.cash + annualFcf - annualInterest - sharedServicesCost - maSourcingCost - turnaroundTierCost - turnaroundProgramCosts;
 
         // Pay opco-level debt (seller notes, earnouts, bank debt interest)
         // This aligns with the waterfall display — all deductions happen at collection time
@@ -451,9 +481,72 @@ export const useGameStore = create<GameStore>()(
           gameState.inflationRoundsRemaining--;
         }
 
+        // Resolve turnarounds that have reached their end round
+        let resolvedTurnarounds = [...(gameState.activeTurnarounds || state.activeTurnarounds)];
+        let businessesAfterTurnarounds = [...gameState.businesses];
+        const turnaroundActions: typeof state.actionsThisRound = [];
+
+        const activeCount = resolvedTurnarounds.filter(t => t.status === 'active').length;
+
+        for (let i = 0; i < resolvedTurnarounds.length; i++) {
+          const ta = resolvedTurnarounds[i];
+          if (ta.status !== 'active') continue;
+          if (state.round < ta.endRound) continue;
+
+          const prog = getProgramById(ta.programId);
+          const biz = businessesAfterTurnarounds.find(b => b.id === ta.businessId);
+          if (!prog || !biz) continue;
+
+          const result = resolveTurnaround(prog, activeCount);
+
+          // Map engine result to turnaround status
+          const newStatus = result.result === 'success' ? 'completed' as const
+            : result.result === 'partial' ? 'partial' as const
+            : 'failed' as const;
+
+          resolvedTurnarounds[i] = { ...ta, status: newStatus };
+
+          // Update business quality and EBITDA
+          const qualityTiersImproved = result.qualityChange;
+          businessesAfterTurnarounds = businessesAfterTurnarounds.map(b => {
+            if (b.id !== ta.businessId) return b;
+            const newEbitda = Math.round(b.ebitda * result.ebitdaMultiplier);
+            const ceiling = getQualityCeiling(b.sectorId);
+            const newQuality = Math.min(result.targetQuality, ceiling) as QualityRating;
+            return {
+              ...b,
+              qualityRating: newQuality,
+              ebitda: newEbitda,
+              peakEbitda: Math.max(b.peakEbitda, newEbitda),
+              qualityImprovedTiers: (b.qualityImprovedTiers ?? 0) + Math.max(0, qualityTiersImproved),
+            };
+          });
+
+          // Toast for turnaround result
+          const bizName = biz.name;
+          const displayQuality = Math.min(result.targetQuality, getQualityCeiling(biz.sectorId));
+          if (result.result === 'success') {
+            addToast({ message: `Turnaround succeeded: ${bizName} is now Q${displayQuality}`, type: 'success' });
+          } else if (result.result === 'partial') {
+            addToast({ message: `Turnaround partial success: ${bizName} improved to Q${displayQuality}`, type: 'info' });
+          } else {
+            addToast({ message: `Turnaround failed: ${bizName} — EBITDA took a hit`, type: 'danger' });
+          }
+
+          turnaroundActions.push({
+            type: 'turnaround_resolved' as const,
+            round: state.round,
+            details: { businessId: ta.businessId, businessName: bizName, programId: ta.programId, outcome: result.result, newQuality: displayQuality, qualityTiersImproved },
+          });
+        }
+
+        gameState.businesses = businessesAfterTurnarounds;
+        gameState.activeTurnarounds = resolvedTurnarounds;
+
         set({
           ...gameState,
           eventHistory: event ? [...state.eventHistory, event] : state.eventHistory,
+          actionsThisRound: [...state.actionsThisRound, ...turnaroundActions],
           metrics: calculateMetrics(gameState),
         });
       },
@@ -1221,6 +1314,26 @@ export const useGameStore = create<GameStore>()(
             ],
           };
         });
+
+        // Roll for quality improvement from operational improvement
+        const improvedBusiness = updatedBusinesses.find(b => b.id === businessId);
+        if (improvedBusiness) {
+          const ceiling = getQualityCeiling(improvedBusiness.sectorId);
+          if (improvedBusiness.qualityRating < ceiling) {
+            const chance = getQualityImprovementChance(state.turnaroundTier);
+            if (Math.random() < chance) {
+              const newQuality = Math.min(improvedBusiness.qualityRating + 1, ceiling) as QualityRating;
+              const idx = updatedBusinesses.findIndex(b => b.id === businessId);
+              updatedBusinesses[idx] = {
+                ...improvedBusiness,
+                qualityRating: newQuality,
+                qualityImprovedTiers: (improvedBusiness.qualityImprovedTiers ?? 0) + 1,
+              };
+              const addToast = useToastStore.getState().addToast;
+              addToast({ message: `Quality improved! ${improvedBusiness.name} is now Q${newQuality}`, type: 'success' });
+            }
+          }
+        }
 
         const improveState = {
           ...state,
@@ -1995,6 +2108,77 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
+      unlockTurnaroundTier: () => {
+        const state = get();
+        if (state.phase !== 'allocate') return;
+
+        const activeCount = state.businesses.filter(b => b.status === 'active').length;
+        const check = canUnlockTier(state.turnaroundTier, state.cash, activeCount);
+        if (!check.canUnlock) return;
+
+        const nextTier = (state.turnaroundTier + 1) as 1 | 2 | 3;
+        const unlockCost = TURNAROUND_TIER_CONFIG[nextTier].unlockCost;
+
+        const newState = {
+          ...state,
+          turnaroundTier: nextTier as TurnaroundTier,
+          cash: state.cash - unlockCost,
+        };
+        set({
+          ...newState,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'unlock_turnaround_tier' as const, round: state.round, details: { tier: nextTier, cost: unlockCost } },
+          ],
+          metrics: calculateMetrics(newState as GameState),
+        });
+      },
+
+      startTurnaroundProgram: (businessId: string, programId: string) => {
+        const state = get();
+        if (state.phase !== 'allocate') return;
+
+        const business = state.businesses.find(b => b.id === businessId && b.status === 'active');
+        if (!business) return;
+
+        const program = getProgramById(programId);
+        if (!program) return;
+
+        // Validate: quality must match program source, tier must be sufficient
+        if (business.qualityRating !== program.sourceQuality) return;
+        if (program.tierId > state.turnaroundTier) return;
+
+        // Can't start if business already has an active turnaround
+        if (state.activeTurnarounds.some(t => t.businessId === businessId && t.status === 'active')) return;
+
+        const upfrontCost = calculateTurnaroundCost(program, business);
+        if (state.cash < upfrontCost) return;
+
+        const duration = getTurnaroundDuration(program, state.duration);
+        const turnaround: ActiveTurnaround = {
+          id: `ta_${businessId}_${state.round}`,
+          businessId,
+          programId,
+          startRound: state.round,
+          endRound: state.round + duration,
+          status: 'active',
+        };
+
+        const newState = {
+          ...state,
+          cash: state.cash - upfrontCost,
+          activeTurnarounds: [...state.activeTurnarounds, turnaround],
+        };
+        set({
+          ...newState,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'start_turnaround' as const, round: state.round, details: { businessId, businessName: business.name, programId, upfrontCost, targetQuality: program.targetQuality } },
+          ],
+          metrics: calculateMetrics(newState as GameState),
+        });
+      },
+
       triggerAIEnhancement: async () => {
         const state = get();
         try {
@@ -2164,7 +2348,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v16', // v16: integrated platforms
+      name: 'holdco-tycoon-save-v17', // v17: turnaround capability
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -2192,6 +2376,8 @@ export const useGameStore = create<GameStore>()(
         maFocus: state.maFocus,
         maSourcing: state.maSourcing,
         integratedPlatforms: state.integratedPlatforms,
+        turnaroundTier: state.turnaroundTier,
+        activeTurnarounds: state.activeTurnarounds,
         currentEvent: state.currentEvent,
         eventHistory: state.eventHistory,
         creditTighteningRoundsRemaining: state.creditTighteningRoundsRemaining,
@@ -2226,6 +2412,9 @@ export const useGameStore = create<GameStore>()(
             }
             // Backfill integratedPlatforms
             if (!(state as any).integratedPlatforms) (state as any).integratedPlatforms = [];
+            // Backfill turnaround fields
+            if ((state as any).turnaroundTier === undefined) (state as any).turnaroundTier = 0;
+            if (!(state as any).activeTurnarounds) (state as any).activeTurnarounds = [];
             // Cap table invariant enforcement
             if (!state.sharesOutstanding || state.sharesOutstanding <= 0) (state as any).sharesOutstanding = 1000;
             if (!state.founderShares || state.founderShares <= 0) (state as any).founderShares = state.sharesOutstanding;

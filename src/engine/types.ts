@@ -139,6 +139,8 @@ export interface Business {
 
   integratedPlatformId?: string; // ID of the integrated platform this business belongs to
 
+  qualityImprovedTiers?: number; // tracks total quality improvement for exit premium
+
   // Dynamic narratives
   storyBeats?: StoryBeat[]; // Narrative events that happened to this business
 }
@@ -242,6 +244,36 @@ export interface SharedService {
 }
 
 export type SectorFocusTier = 0 | 1 | 2 | 3;
+
+export type TurnaroundTier = 0 | 1 | 2 | 3;
+
+export interface TurnaroundProgram {
+  id: string;
+  tierId: 1 | 2 | 3;
+  sourceQuality: QualityRating;
+  targetQuality: QualityRating;
+  durationStandard: number; // rounds in standard (20yr) mode
+  durationQuick: number;    // rounds in quick (10yr) mode
+  successRate: number;      // 0-1
+  partialRate: number;      // 0-1
+  failureRate: number;      // 0-1
+  ebitdaBoostOnSuccess: number;   // fraction, e.g. 0.07 = +7%
+  ebitdaBoostOnPartial: number;
+  ebitdaDamageOnFailure: number;  // positive number, applied as negative
+  upfrontCostFraction: number;    // fraction of EBITDA, e.g. 0.10 = 10%
+  annualCost: number;             // in $k
+}
+
+export type TurnaroundStatus = 'active' | 'completed' | 'partial' | 'failed';
+
+export interface ActiveTurnaround {
+  id: string;
+  businessId: string;
+  programId: string;
+  startRound: number;
+  endRound: number;
+  status: TurnaroundStatus;
+}
 
 export interface SectorFocusBonus {
   focusGroup: SectorFocusGroup;
@@ -410,6 +442,10 @@ export interface GameState {
   // Integrated Platforms
   integratedPlatforms: IntegratedPlatform[];
 
+  // Turnarounds
+  turnaroundTier: TurnaroundTier;
+  activeTurnarounds: ActiveTurnaround[];
+
   // Events
   currentEvent: GameEvent | null;
   eventHistory: GameEvent[];
@@ -467,7 +503,10 @@ export type GameActionType =
   | 'upgrade_ma_sourcing'
   | 'toggle_ma_sourcing'
   | 'proactive_outreach'
-  | 'forge_integrated_platform';
+  | 'forge_integrated_platform'
+  | 'unlock_turnaround_tier'
+  | 'start_turnaround'
+  | 'turnaround_resolved';
 
 export interface GameAction {
   type: GameActionType;
@@ -534,6 +573,7 @@ export interface ExitValuation {
   acquisitionSizeTierPremium: number; // baseline premium at acquisition (netted out)
   mergerPremium: number; // exit premium for well-balanced mergers
   integratedPlatformPremium: number; // exit premium for being part of an integrated platform
+  turnaroundPremium: number; // exit premium for businesses that improved 2+ quality tiers
   deRiskingPremium: number;
   ruleOf40Premium: number;
   marginExpansionPremium: number;

@@ -246,6 +246,46 @@ export function migrateV15ToV16(): void {
   }
 }
 
+// --- v16 → v17: adds turnaround capability ---
+
+export function migrateV16ToV17(): void {
+  try {
+    const v17Key = 'holdco-tycoon-save-v17';
+    const v16Key = 'holdco-tycoon-save-v16';
+    if (localStorage.getItem(v17Key)) return;
+    const v16Raw = localStorage.getItem(v16Key);
+    if (!v16Raw) return;
+    const v16Data = JSON.parse(v16Raw);
+    if (!v16Data?.state) return;
+
+    // Add turnaround state
+    if (v16Data.state.turnaroundTier === undefined) {
+      v16Data.state.turnaroundTier = 0;
+    }
+    if (!v16Data.state.activeTurnarounds) {
+      v16Data.state.activeTurnarounds = [];
+    }
+
+    // Backfill qualityImprovedTiers on all businesses
+    const backfillBusiness = (b: any) => ({
+      ...b,
+      qualityImprovedTiers: b.qualityImprovedTiers ?? 0,
+    });
+
+    if (Array.isArray(v16Data.state.businesses)) {
+      v16Data.state.businesses = v16Data.state.businesses.map(backfillBusiness);
+    }
+    if (Array.isArray(v16Data.state.exitedBusinesses)) {
+      v16Data.state.exitedBusinesses = v16Data.state.exitedBusinesses.map(backfillBusiness);
+    }
+
+    localStorage.setItem(v17Key, JSON.stringify(v16Data));
+    localStorage.removeItem(v16Key);
+  } catch (e) {
+    console.error('v16→v17 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -258,4 +298,5 @@ export function runAllMigrations(): void {
   migrateV13ToV14();
   migrateV14ToV15();
   migrateV15ToV16();
+  migrateV16ToV17();
 }

@@ -6,6 +6,7 @@ import {
   migrateV12ToV13,
   migrateV13ToV14,
   migrateV14ToV15,
+  migrateV16ToV17,
   runAllMigrations,
 } from '../../hooks/migrations';
 
@@ -319,8 +320,83 @@ describe('migrateV14ToV15', () => {
   });
 });
 
+describe('migrateV16ToV17', () => {
+  it('should add turnaround state fields', () => {
+    const v16Data = {
+      state: {
+        businesses: [
+          { id: 'biz_1', sectorId: 'agency', ebitda: 1000 },
+        ],
+        exitedBusinesses: [],
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v16', JSON.stringify(v16Data));
+
+    migrateV16ToV17();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v17')!);
+    expect(result.state.turnaroundTier).toBe(0);
+    expect(result.state.activeTurnarounds).toEqual([]);
+    expect(result.state.businesses[0].qualityImprovedTiers).toBe(0);
+    expect(localStorageMock.getItem('holdco-tycoon-save-v16')).toBeNull();
+  });
+
+  it('should not overwrite existing turnaround fields', () => {
+    const v16Data = {
+      state: {
+        turnaroundTier: 2,
+        activeTurnarounds: [{ id: 'ta_1' }],
+        businesses: [
+          { id: 'biz_1', qualityImprovedTiers: 3 },
+        ],
+        exitedBusinesses: [],
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v16', JSON.stringify(v16Data));
+
+    migrateV16ToV17();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v17')!);
+    expect(result.state.turnaroundTier).toBe(2);
+    expect(result.state.activeTurnarounds).toHaveLength(1);
+    expect(result.state.businesses[0].qualityImprovedTiers).toBe(3);
+  });
+
+  it('should backfill qualityImprovedTiers on exited businesses', () => {
+    const v16Data = {
+      state: {
+        businesses: [],
+        exitedBusinesses: [
+          { id: 'biz_1', sectorId: 'saas' },
+        ],
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v16', JSON.stringify(v16Data));
+
+    migrateV16ToV17();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v17')!);
+    expect(result.state.exitedBusinesses[0].qualityImprovedTiers).toBe(0);
+  });
+
+  it('should be a no-op if v17 already exists', () => {
+    localStorageMock.setItem('holdco-tycoon-save-v17', JSON.stringify({ state: { existing: true } }));
+    localStorageMock.setItem('holdco-tycoon-save-v16', JSON.stringify({ state: {} }));
+
+    migrateV16ToV17();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v17')!);
+    expect(result.state.existing).toBe(true);
+  });
+
+  it('should be a no-op if no v16 key', () => {
+    migrateV16ToV17();
+    expect(localStorageMock.getItem('holdco-tycoon-save-v17')).toBeNull();
+  });
+});
+
 describe('runAllMigrations', () => {
-  it('should chain all migrations from v9 to v16', () => {
+  it('should chain all migrations from v9 to v17', () => {
     const v9Data = {
       state: {
         businesses: [{
@@ -345,8 +421,8 @@ describe('runAllMigrations', () => {
 
     // v9 should be consumed
     expect(localStorageMock.getItem('holdco-tycoon-save-v9')).toBeNull();
-    // Final v16 should exist
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v16')!);
+    // Final v17 should exist
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v17')!);
     expect(result.state.difficulty).toBe('easy');
     expect(result.state.maxRounds).toBe(20);
     expect(result.state.founderDistributionsReceived).toBeDefined();
@@ -355,6 +431,10 @@ describe('runAllMigrations', () => {
     expect(result.state.businesses[0].acquisitionSizeTierPremium).toBeDefined();
     // v15→v16 fields
     expect(result.state.integratedPlatforms).toEqual([]);
+    // v16→v17 fields
+    expect(result.state.turnaroundTier).toBe(0);
+    expect(result.state.activeTurnarounds).toEqual([]);
+    expect(result.state.businesses[0].qualityImprovedTiers).toBe(0);
   });
 
   it('should be safe to call multiple times (idempotent)', () => {
@@ -368,10 +448,10 @@ describe('runAllMigrations', () => {
     localStorageMock.setItem('holdco-tycoon-save-v14', JSON.stringify(v14Data));
 
     runAllMigrations();
-    const first = localStorageMock.getItem('holdco-tycoon-save-v16');
+    const first = localStorageMock.getItem('holdco-tycoon-save-v17');
 
     runAllMigrations();
-    const second = localStorageMock.getItem('holdco-tycoon-save-v16');
+    const second = localStorageMock.getItem('holdco-tycoon-save-v17');
 
     expect(first).toBe(second);
   });
@@ -384,6 +464,6 @@ describe('runAllMigrations', () => {
     expect(localStorageMock.getItem('holdco-tycoon-save-v13')).toBeNull();
     expect(localStorageMock.getItem('holdco-tycoon-save-v14')).toBeNull();
     expect(localStorageMock.getItem('holdco-tycoon-save-v15')).toBeNull();
-    expect(localStorageMock.getItem('holdco-tycoon-save-v16')).toBeNull();
+    expect(localStorageMock.getItem('holdco-tycoon-save-v17')).toBeNull();
   });
 });
