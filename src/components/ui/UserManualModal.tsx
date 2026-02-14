@@ -1042,7 +1042,7 @@ function GlossaryContent() {
 
 // --- Section renderer map ---
 
-const SECTION_CONTENT: Record<ManualSection, () => JSX.Element> = {
+const SECTION_CONTENT: Record<ManualSection, () => React.ReactElement> = {
   'getting-started': GettingStartedContent,
   'game-loop': GameLoopContent,
   'acquiring': AcquiringContent,
