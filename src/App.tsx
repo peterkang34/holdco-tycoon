@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
+import { Suspense, lazy, useState, useEffect, useMemo } from 'react';
+const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 import { useGameStore, getFinalScore, getPostGameInsights, getEnterpriseValue, getFounderEquityValue, getFounderPersonalWealth } from './hooks/useGame';
 import { IntroScreen } from './components/screens/IntroScreen';
 import { GameScreen } from './components/screens/GameScreen';
@@ -8,6 +9,14 @@ import { SectorId, GameDifficulty, GameDuration } from './engine/types';
 type Screen = 'intro' | 'game' | 'gameOver';
 
 function App() {
+  const [isAdmin, setIsAdmin] = useState(window.location.hash === '#/admin');
+
+  useEffect(() => {
+    const onHash = () => setIsAdmin(window.location.hash === '#/admin');
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+
   const [screen, setScreen] = useState<Screen>('intro');
   const [isNewGame, setIsNewGame] = useState(false);
 
@@ -67,6 +76,14 @@ function App() {
   const enterpriseValue = useMemo(() => screen === 'gameOver' ? getEnterpriseValue() : undefined, [screen]);
   const founderEquityValue = useMemo(() => screen === 'gameOver' ? getFounderEquityValue() : undefined, [screen]);
   const founderPersonalWealth = useMemo(() => screen === 'gameOver' ? getFounderPersonalWealth() : undefined, [screen]);
+
+  if (isAdmin) {
+    return (
+      <Suspense fallback={<div className="min-h-screen bg-bg-primary flex items-center justify-center"><p className="text-text-muted animate-pulse">Loading admin...</p></div>}>
+        <AdminDashboard />
+      </Suspense>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary overflow-x-hidden">

@@ -18,6 +18,7 @@ import { MetricDrilldownModal } from '../ui/MetricDrilldownModal';
 import { ToastContainer } from '../ui/ToastContainer';
 import { calculateFounderEquityValue } from '../../engine/scoring';
 import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
+import { updateSessionRound } from '../../services/telemetry';
 
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
 
@@ -353,6 +354,11 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
       generateYearChronicleAction();
     }
   }, [phase, round, generateYearChronicleAction]);
+
+  // Update telemetry session meta with current round
+  useEffect(() => {
+    updateSessionRound(round);
+  }, [round]);
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const lastEventType = eventHistory.length > 0 ? eventHistory[eventHistory.length - 1].type : undefined;

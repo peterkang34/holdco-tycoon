@@ -42,6 +42,7 @@ import {
   generateYearChronicle,
 } from '../services/aiGeneration';
 import { resetUsedNames } from '../data/names';
+import { trackGameStart, trackGameAbandon } from '../services/telemetry';
 import { initializeSharedServices, MIN_OPCOS_FOR_SHARED_SERVICES, getMASourcingAnnualCost, MA_SOURCING_CONFIG } from '../data/sharedServices';
 import {
   calculatePortfolioFcf,
@@ -242,9 +243,18 @@ export const useGameStore = create<GameStore>()(
           metrics: calculateMetrics(newState),
           focusBonus: calculateSectorFocusBonus(newState.businesses),
         });
+
+        // Fire telemetry (fire-and-forget)
+        trackGameStart(difficulty, duration, startingSector, maxRounds);
       },
 
       resetGame: () => {
+        // Send abandon telemetry if mid-game
+        const state = get();
+        if (state.round > 0 && !state.gameOver) {
+          trackGameAbandon(state.round, state.maxRounds, state.difficulty, state.duration, state.businesses[0]?.sectorId || 'agency');
+        }
+
         resetBusinessIdCounter();
         resetUsedNames();
         set({

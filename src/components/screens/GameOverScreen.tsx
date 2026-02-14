@@ -6,6 +6,7 @@ import { calculateExitValuation } from '../../engine/simulation';
 import { AIAnalysisSection } from '../ui/AIAnalysisSection';
 import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
 import { getGradeColor, getRankColor } from '../../utils/gradeColors';
+import { trackGameComplete } from '../../services/telemetry';
 
 interface GameOverScreenProps {
   holdcoName: string;
@@ -69,6 +70,12 @@ export function GameOverScreen({
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
   const [leaderboardError, setLeaderboardError] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Fire telemetry on game completion
+  useEffect(() => {
+    const sector = businesses[0]?.sectorId || exitedBusinesses[0]?.sectorId || 'agency';
+    trackGameComplete(maxRounds, maxRounds, difficulty, duration, sector, score.grade, founderEquityValue);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Deduplicate: exitedBusinesses wins over businesses (a sold biz exists in both)
   // Filter out 'integrated' status (bolt-ons are folded into platform EBITDA)
