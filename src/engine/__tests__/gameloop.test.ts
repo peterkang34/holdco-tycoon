@@ -19,6 +19,7 @@ import { generateDealStructures, executeDealStructure } from '../deals';
 import { calculateFinalScore, calculateEnterpriseValue } from '../scoring';
 import { createMockBusiness, createMockGameState, createMockDeal } from './helpers';
 import { GameState, SectorId, GamePhase } from '../types';
+import { MAX_EQUITY_RAISES } from '../../data/gameConfig';
 
 /**
  * Full game loop simulation tests
@@ -504,5 +505,61 @@ describe('10-Year Mode: Deal Terms Scaling', () => {
     // Debt grace period = Math.max(2, Math.ceil(20 * 0.10)) = Math.max(2, 2) = 2
     const grace = Math.max(2, Math.ceil(20 * 0.10));
     expect(grace).toBe(2);
+  });
+});
+
+describe('Equity Raise Cap', () => {
+  it('should allow 3 raises for standard (20yr) games', () => {
+    expect(MAX_EQUITY_RAISES.standard).toBe(3);
+  });
+
+  it('should allow 2 raises for quick (10yr) games', () => {
+    expect(MAX_EQUITY_RAISES.quick).toBe(2);
+  });
+
+  it('should block equity raise when cap is reached in standard mode', () => {
+    const state = createMockGameState({ duration: 'standard', equityRaisesUsed: 3 });
+    const blocked = state.equityRaisesUsed >= MAX_EQUITY_RAISES[state.duration];
+    expect(blocked).toBe(true);
+  });
+
+  it('should block equity raise when cap is reached in quick mode', () => {
+    const state = createMockGameState({ duration: 'quick', equityRaisesUsed: 2 });
+    const blocked = state.equityRaisesUsed >= MAX_EQUITY_RAISES[state.duration];
+    expect(blocked).toBe(true);
+  });
+
+  it('should allow equity raise when under cap', () => {
+    const state = createMockGameState({ duration: 'standard', equityRaisesUsed: 2 });
+    const blocked = state.equityRaisesUsed >= MAX_EQUITY_RAISES[state.duration];
+    expect(blocked).toBe(false);
+  });
+
+  it('should allow first equity raise with zero raises used', () => {
+    const state = createMockGameState({ duration: 'quick', equityRaisesUsed: 0 });
+    const blocked = state.equityRaisesUsed >= MAX_EQUITY_RAISES[state.duration];
+    expect(blocked).toBe(false);
+  });
+
+  it('should block the 8-raise exploit in a 10yr hard game', () => {
+    // The exploit: raise equity 8 times in a 10-year game
+    const state = createMockGameState({
+      difficulty: 'normal',
+      duration: 'quick',
+      equityRaisesUsed: 2,
+    });
+    // After 2 raises, further raises should be blocked
+    const blocked = state.equityRaisesUsed >= MAX_EQUITY_RAISES[state.duration];
+    expect(blocked).toBe(true);
+
+    // Verify the exploit (8 raises) is impossible
+    for (let raise = 3; raise <= 8; raise++) {
+      const exploitState = createMockGameState({
+        difficulty: 'normal',
+        duration: 'quick',
+        equityRaisesUsed: raise,
+      });
+      expect(exploitState.equityRaisesUsed >= MAX_EQUITY_RAISES[exploitState.duration]).toBe(true);
+    }
   });
 });

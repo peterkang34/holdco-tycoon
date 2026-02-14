@@ -22,6 +22,7 @@ import {
   formatPercent,
 } from '../../engine/types';
 import { getDistressRestrictions, getDistressLabel, getDistressDescription } from '../../engine/distress';
+import { MAX_EQUITY_RAISES } from '../../data/gameConfig';
 import { SECTOR_LIST } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
@@ -1510,14 +1511,17 @@ export function AllocatePhase({
             </div>
 
             {/* Issue Equity */}
-            <div className="card">
+            <div className={`card ${equityRaisesUsed >= MAX_EQUITY_RAISES[duration] ? 'opacity-50' : ''}`}>
               <h4 className="font-bold mb-3">Issue Equity</h4>
               <p className="text-sm text-text-muted mb-2">
                 Raise capital by selling new shares at {formatMoney(intrinsicValuePerShare)}/share.
               </p>
               <p className="text-xs text-text-muted mb-4">
-                Your ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% | {equityRaisesUsed} raise{equityRaisesUsed !== 1 ? 's' : ''} so far
+                Your ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% | {equityRaisesUsed}/{MAX_EQUITY_RAISES[duration]} raises used
               </p>
+              {equityRaisesUsed >= MAX_EQUITY_RAISES[duration] && (
+                <p className="text-xs text-warning mb-4">No equity raises remaining this game.</p>
+              )}
               {/* Mode toggle */}
               <div className="flex gap-1 mb-3 bg-white/5 rounded p-0.5 w-fit">
                 <button
@@ -1574,6 +1578,7 @@ export function AllocatePhase({
                     }
                   }}
                   disabled={(() => {
+                    if (equityRaisesUsed >= MAX_EQUITY_RAISES[duration]) return true;
                     if (!equityAmount || intrinsicValuePerShare <= 0) return true;
                     if (equityMode === 'dollars') {
                       const dollars = parseInt(equityAmount) || 0;

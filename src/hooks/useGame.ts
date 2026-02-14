@@ -73,7 +73,7 @@ const FOUNDER_SHARES = 800;
 const STARTING_INTEREST_RATE = 0.07;
 const MIN_FOUNDER_OWNERSHIP = 0.51;
 
-import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../data/gameConfig';
+import { DIFFICULTY_CONFIG, DURATION_CONFIG, MAX_EQUITY_RAISES } from '../data/gameConfig';
 import { clampMargin } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
 import { buildChronicleContext } from '../services/chronicleContext';
@@ -1426,7 +1426,9 @@ export const useGameStore = create<GameStore>()(
         const state = get();
         if (amount <= 0) return;
 
-        // Dilution is the natural consequence — no artificial caps on raises
+        // Enforce per-game equity raise cap
+        const maxRaises = MAX_EQUITY_RAISES[state.duration];
+        if (state.equityRaisesUsed >= maxRaises) return;
 
         const metrics = calculateMetrics(state);
         // M-5: Guard against division by zero or negative intrinsic value

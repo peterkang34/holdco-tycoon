@@ -39,6 +39,13 @@ export const INTEGRATION_THRESHOLD_MULTIPLIER = {
   normal: { standard: 0.7, quick: 0.5 },
 } as const;
 
+// ── Equity Constants ──
+
+export const MAX_EQUITY_RAISES = {
+  standard: 3,  // 20-year game
+  quick: 2,     // 10-year game
+} as const;
+
 // ── Turnaround Constants ──
 
 export const TURNAROUND_FATIGUE_THRESHOLD = 4;   // 4+ simultaneous turnarounds = penalty
