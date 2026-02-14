@@ -16,14 +16,16 @@ interface CollectPhaseProps {
   cashBeforeDebtPayments?: number;
   holdcoAmortization?: number;
   interestPenalty?: number;
+  capexReduction?: number;
   onContinue: () => void;
 }
 
 // Calculate detailed FCF breakdown for a business (pre-tax — tax is at portfolio level)
-function calculateFcfBreakdown(business: Business, interestRate: number) {
+function calculateFcfBreakdown(business: Business, interestRate: number, capexReduction: number = 0) {
   const sector = SECTORS[business.sectorId];
   const ebitda = business.ebitda;
-  const capex = Math.round(ebitda * sector.capexRate);
+  const effectiveCapexRate = sector.capexRate * (1 - capexReduction);
+  const capex = Math.round(ebitda * effectiveCapexRate);
 
   // OpCo-level debt service
   const sellerNoteInterest = Math.round(business.sellerNoteBalance * business.sellerNoteRate);
@@ -94,6 +96,7 @@ export function CollectPhase({
   cashBeforeDebtPayments,
   holdcoAmortization,
   interestPenalty,
+  capexReduction = 0,
   onContinue
 }: CollectPhaseProps) {
   const [expandedBusiness, setExpandedBusiness] = useState<string | null>(null);
@@ -103,7 +106,7 @@ export function CollectPhase({
   // Calculate breakdowns for all businesses (pre-tax)
   const businessBreakdowns = activeBusinesses.map(b => ({
     business: b,
-    breakdown: calculateFcfBreakdown(b, interestRate),
+    breakdown: calculateFcfBreakdown(b, interestRate, capexReduction),
   }));
 
   // Calculate total pre-tax FCF from all businesses (annual)
@@ -114,12 +117,12 @@ export function CollectPhase({
   const integratedDebt = calculateIntegratedDebtService(businesses);
 
   // Portfolio-level tax with all deductions
-  const taxBreakdown = calculatePortfolioTax(activeBusinesses, totalDebt, interestRate, sharedServicesCost);
+  const taxBreakdown = calculatePortfolioTax(activeBusinesses, totalDebt, interestRate, sharedServicesCost + (maSourcingCost ?? 0));
   const hasDeductions = taxBreakdown.totalTaxSavings > 0;
   const effectiveRatePct = Math.round(taxBreakdown.effectiveTaxRate * 100);
 
   // Calculate annual interest expense (holdco level)
-  const holdcoInterest = Math.round(totalDebt * interestRate);
+  const holdcoInterest = Math.round(totalDebt * (interestRate + (interestPenalty ?? 0)));
 
   // Total earn-out payments (active businesses + tuck-ins) — uncapped
   const uncappedActiveEarnouts = businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.earnoutPayment, 0);
@@ -149,7 +152,7 @@ export function CollectPhase({
   const totalInterestExpense = holdcoInterest +
     businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNoteInterest + breakdown.bankDebtInterest, 0);
   const totalDebtService = totalInterestExpense +
-    businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNotePrincipal, 0) + totalEarnouts;
+    businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNotePrincipal, 0);
   const interestCoverage = totalInterestExpense > 0 ? totalEbitda / totalInterestExpense : Infinity;
   const debtServiceCoverage = totalDebtService > 0 ? netFcf / totalDebtService : Infinity;
   const hasDebtObligations = totalDebtService > 0;

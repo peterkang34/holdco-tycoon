@@ -888,7 +888,17 @@ export function generateDealWithSize(
   // Calculate deal heat and effective price (pass archetype for heat modifier)
   const heat = calculateDealHeat(quality, dealSource, round, options.lastEventType, sellerArchetype, options.maxRounds ?? 20);
   const heatPremium = calculateHeatPremium(heat);
-  const effectivePrice = Math.round(finalAskingPrice * heatPremium);
+  let effectivePrice = Math.round(finalAskingPrice * heatPremium);
+
+  // Re-cap distressed deals after heat premium (prevents heat from exceeding distressed ceiling)
+  if (sellerArchetype === 'distressed_seller' && adjustedEbitda > 0) {
+    const sector = SECTORS[sectorId];
+    const sectorMidMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
+    const maxDistressedMultiple = quality <= 2
+      ? sector.acquisitionMultiple[0] + 0.5
+      : sectorMidMultiple;
+    effectivePrice = Math.min(effectivePrice, Math.round(adjustedEbitda * maxDistressedMultiple));
+  }
 
   return {
     id: `deal_${generateBusinessId()}`,

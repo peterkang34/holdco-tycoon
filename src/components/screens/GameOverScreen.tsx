@@ -578,7 +578,7 @@ export function GameOverScreen({
                 <div className="hidden sm:flex items-center gap-6 text-right shrink-0">
                   <div className="w-20">
                     <p className="text-xs text-text-muted">EBITDA</p>
-                    <p className="font-mono tabular-nums">{formatMoney(business.status === 'active' ? business.ebitda : business.exitPrice || 0)}</p>
+                    <p className="font-mono tabular-nums">{formatMoney(business.ebitda)}</p>
                   </div>
                   <div className="w-24">
                     <p className="text-xs text-text-muted">Est. Exit Value</p>

@@ -1225,7 +1225,7 @@ export function AllocatePhase({
                     } else {
                       const shareCount = parseInt(equityAmount) || 0;
                       if (shareCount > 0 && intrinsicValuePerShare > 0) {
-                        const internalAmount = Math.ceil(shareCount * intrinsicValuePerShare);
+                        const internalAmount = Math.floor(shareCount * intrinsicValuePerShare);
                         if (internalAmount > 0) {
                           onIssueEquity(internalAmount);
                           setEquityAmount('');
@@ -1255,7 +1255,7 @@ export function AllocatePhase({
               {/* Preview for shares mode */}
               {equityMode === 'shares' && equityAmount && parseInt(equityAmount) >= 1 && intrinsicValuePerShare > 0 && (() => {
                 const shareCount = parseInt(equityAmount) || 0;
-                const cost = Math.ceil(shareCount * intrinsicValuePerShare);
+                const cost = Math.floor(shareCount * intrinsicValuePerShare);
                 return (
                   <p className="text-xs text-text-muted mt-1">= {formatMoney(cost)} ({shareCount} shares @ {formatMoney(intrinsicValuePerShare)}/share)</p>
                 );
@@ -1270,7 +1270,7 @@ export function AllocatePhase({
                 } else {
                   const shareCount = parseInt(equityAmount) || 0;
                   if (shareCount < 1) return null;
-                  internalAmt = Math.ceil(shareCount * intrinsicValuePerShare);
+                  internalAmt = Math.floor(shareCount * intrinsicValuePerShare);
                 }
                 const newShares = Math.round((internalAmt / intrinsicValuePerShare) * 1000) / 1000;
                 const newTotal = sharesOutstanding + newShares;

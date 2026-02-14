@@ -387,6 +387,13 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     .filter(s => s.active)
     .reduce((sum, s) => sum + s.annualCost, 0);
   const maSourcingCost = maSourcing.active ? getMASourcingAnnualCost(maSourcing.tier) : 0;
+  const capexReduction = useMemo(() => {
+    const hasProcurement = sharedServices.some(s => s.type === 'procurement' && s.active);
+    if (!hasProcurement) return 0;
+    const opcoCount = activeBusinesses.length;
+    const scaleMultiplier = opcoCount >= 6 ? 1.2 : opcoCount >= 3 ? 1.0 + (opcoCount - 2) * 0.05 : 1.0;
+    return 0.15 * scaleMultiplier;
+  }, [sharedServices, activeBusinesses]);
 
   const renderPhase = () => {
     switch (phase) {
@@ -405,6 +412,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             cashBeforeDebtPayments={cashBeforeDebtPayments}
             holdcoAmortization={holdcoAmortizationThisRound}
             interestPenalty={getDistressRestrictions(metrics.distressLevel).interestPenalty}
+            capexReduction={capexReduction}
             onContinue={advanceToEvent}
           />
         );
