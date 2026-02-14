@@ -79,7 +79,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
                   >
                     <div className="font-medium text-sm mb-1">{config.label.split(' — ')[0]}</div>
                     <div className="text-xs text-accent mb-2">{config.label.split(' — ')[1]}</div>
-                    <p className="text-[10px] text-text-muted leading-relaxed">{config.description}</p>
+                    <p className="text-xs sm:text-[10px] text-text-muted leading-relaxed">{config.description}</p>
                   </button>
                 ))}
               </div>
@@ -174,7 +174,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
                       <span className="text-xl">{sector.emoji}</span>
                       <span className="text-sm font-medium">{sector.name}</span>
                     </div>
-                    <p className="text-[10px] text-text-muted mt-1">
+                    <p className="text-[11px] sm:text-[10px] text-text-muted mt-1">
                       {sector.acquisitionMultiple[0]}–{sector.acquisitionMultiple[1]}x &middot; {Math.round(sector.organicGrowthRange[0] * 100)}–{Math.round(sector.organicGrowthRange[1] * 100)}% growth &middot; {Math.round(sector.capexRate * 100)}% capex
                     </p>
                   </button>

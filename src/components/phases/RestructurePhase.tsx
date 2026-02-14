@@ -109,12 +109,12 @@ export function RestructurePhase({
                 return (
                   <div
                     key={business.id}
-                    className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
+                    className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-2 sm:p-3 bg-white/5 rounded-lg"
                   >
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <span className="text-xl">{sector.emoji}</span>
-                      <div>
-                        <p className="font-medium">{business.name}</p>
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{business.name}</p>
                         <p className="text-xs text-text-muted">
                           EBITDA: {formatMoney(business.ebitda)} | Fire-sale: {formatMoney(fireSalePrice)}
                           <span className="text-red-400"> (70% of fair value)</span>
@@ -126,7 +126,7 @@ export function RestructurePhase({
                         onDistressedSale(business.id);
                         setActionsTaken(prev => prev + 1);
                       }}
-                      className="btn-primary text-sm bg-orange-600 hover:bg-orange-500"
+                      className="btn-primary text-sm bg-orange-600 hover:bg-orange-500 w-full sm:w-auto"
                     >
                       Sell (+{formatMoney(netProceeds)})
                     </button>

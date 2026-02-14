@@ -522,7 +522,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-2">
             {roundHistory && roundHistory.length > 0 && (
               <button
                 onClick={() => setShowAnnualReports(true)}

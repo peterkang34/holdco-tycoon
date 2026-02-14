@@ -23,10 +23,10 @@ export function MetricCard({ label, value, subValue, status = 'neutral', tooltip
   const tooltipData = METRIC_TOOLTIPS[label.toLowerCase().replace(/[\/\s]/g, '')];
 
   return (
-    <div className={`card min-w-0 relative p-2.5${onClick ? ' cursor-pointer hover:border-accent/50 transition-colors' : ''}`} onClick={onClick}>
+    <div className={`card min-w-0 relative p-1.5 sm:p-2.5${onClick ? ' cursor-pointer hover:border-accent/50 transition-colors' : ''}`} onClick={onClick}>
       <div className="flex items-center gap-1.5 mb-1">
         {icon && <span className="text-text-muted">{icon}</span>}
-        <span className="text-[10px] sm:text-xs text-text-muted uppercase tracking-wider leading-tight">{label}</span>
+        <span className="text-[8px] sm:text-[10px] md:text-xs text-text-muted uppercase tracking-wider leading-tight">{label}</span>
         {(tooltip || tooltipData) && (
           <Tooltip
             trigger={<span className="text-text-muted text-[10px]">?</span>}
@@ -54,11 +54,11 @@ export function MetricCard({ label, value, subValue, status = 'neutral', tooltip
           </Tooltip>
         )}
       </div>
-      <div className={`text-lg font-bold font-mono ${statusColors[status]}`}>
+      <div className={`text-base sm:text-lg font-bold font-mono ${statusColors[status]}`}>
         {value}
       </div>
       {subValue && (
-        <div className="text-xs text-text-muted mt-1">{subValue}</div>
+        <div className="text-[10px] sm:text-xs text-text-muted mt-0.5 sm:mt-1 truncate">{subValue}</div>
       )}
     </div>
   );

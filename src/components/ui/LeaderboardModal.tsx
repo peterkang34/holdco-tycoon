@@ -111,7 +111,7 @@ export function LeaderboardModal({ onClose, hypotheticalEV }: LeaderboardModalPr
 }
 
 function RankBadge({ rank }: { rank: number }) {
-  return <span className={`text-lg font-bold tabular-nums w-10 text-center inline-block ${getRankColor(rank)}`}>#{rank}</span>;
+  return <span className={`text-base sm:text-lg font-bold tabular-nums w-10 text-center inline-block ${getRankColor(rank)}`}>#{rank}</span>;
 }
 
 function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number }) {
@@ -124,7 +124,7 @@ function LeaderboardRow({ entry, rank }: { entry: LeaderboardEntry; rank: number
           <p className="text-xs text-text-muted truncate">{entry.holdcoName}</p>
         </div>
       </div>
-      <div className="flex items-center gap-4 sm:gap-6 text-right shrink-0">
+      <div className="flex items-center gap-2 sm:gap-4 md:gap-6 text-right shrink-0">
         <div className="min-w-[4.5rem]">
           <p className="text-xs text-text-muted">{entry.founderEquityValue ? 'FEV' : 'EV'}</p>
           <p className="font-mono tabular-nums font-bold text-accent">{formatMoney(entry.founderEquityValue ?? entry.enterpriseValue)}</p>

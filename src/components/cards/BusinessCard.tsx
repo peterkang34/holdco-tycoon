@@ -133,14 +133,14 @@ export function BusinessCard({
         </div>
       )}
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2 md:gap-3 mb-3">
         <div>
           <p className="text-xs text-text-muted">Revenue</p>
-          <p className="font-mono font-bold text-lg">{formatMoney(business.revenue)}</p>
+          <p className="font-mono font-bold text-base sm:text-lg">{formatMoney(business.revenue)}</p>
         </div>
         <div>
           <p className="text-xs text-text-muted">EBITDA</p>
-          <p className={`font-mono font-bold text-lg ${isDeclining ? 'text-danger' : ''}`}>
+          <p className={`font-mono font-bold text-base sm:text-lg ${isDeclining ? 'text-danger' : ''}`}>
             {formatMoney(business.ebitda)}
           </p>
           <p className={`text-xs ${business.ebitdaMargin > business.acquisitionMargin ? 'text-accent' : business.ebitdaMargin < business.acquisitionMargin ? 'text-danger' : 'text-text-muted'}`}>
@@ -149,7 +149,7 @@ export function BusinessCard({
         </div>
         <div>
           <p className="text-xs text-text-muted">Annual FCF</p>
-          <p className="font-mono font-bold text-lg text-accent">
+          <p className="font-mono font-bold text-base sm:text-lg text-accent">
             {formatMoney(annualFcf)}
           </p>
         </div>
@@ -157,7 +157,7 @@ export function BusinessCard({
 
       {showDetails && (
         <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs mb-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 text-[11px] sm:text-xs mb-3">
             <div>
               <p className="text-text-muted">Invested</p>
               <p className="font-mono">{formatMoney(totalInvested)}</p>
@@ -216,7 +216,7 @@ export function BusinessCard({
               </button>
             </div>
             <div className="flex items-center justify-between">
-              <span className="font-mono font-bold text-lg">{formatMoney(exitValuation.exitPrice)}</span>
+              <span className="font-mono font-bold text-base sm:text-lg">{formatMoney(exitValuation.exitPrice)}</span>
               <span className={`font-mono ${gainLoss >= 0 ? 'text-accent' : 'text-danger'}`}>
                 {gainLoss >= 0 ? '+' : ''}{formatMoney(gainLoss)} ({formatMultiple(moic)} MOIC)
               </span>

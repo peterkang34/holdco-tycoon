@@ -146,16 +146,16 @@ export function ImprovementModal({
       onClose={onClose}
       header={
         <div className="flex items-center gap-3">
-          <span className="text-3xl">{sector.emoji}</span>
+          <span className="text-2xl sm:text-3xl">{sector.emoji}</span>
           <div>
-            <h3 className="text-xl font-bold">{business.name}</h3>
+            <h3 className="text-lg sm:text-xl font-bold truncate">{business.name}</h3>
             <p className="text-text-muted">{business.subType}</p>
           </div>
         </div>
       }
       size="xl"
     >
-        <div className="grid grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
           <div className="card text-center">
             <p className="text-text-muted text-sm">Current EBITDA</p>
             <p className="text-2xl font-bold font-mono">{formatMoney(business.ebitda)}</p>

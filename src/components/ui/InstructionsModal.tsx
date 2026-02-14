@@ -252,7 +252,7 @@ export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, 
         </div>
 
         {/* Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto max-h-[50vh]">
+        <div className="p-4 sm:p-6 overflow-y-auto max-h-[65vh] sm:max-h-[50vh]">
           {currentPage.content}
         </div>
 

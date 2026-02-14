@@ -91,29 +91,29 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
             <p className="text-xs text-text-muted truncate">{deal.business.subType}</p>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-col items-end gap-0.5 sm:gap-1">
           <div className="flex items-center gap-1">
             <Tooltip
-              trigger={<span className={`text-xs px-2 py-1 rounded ${heatBadge.color} ${heatBadge.pulse ? 'animate-pulse' : ''}`}>{heatBadge.label}</span>}
+              trigger={<span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ${heatBadge.color} ${heatBadge.pulse ? 'animate-pulse' : ''}`}>{heatBadge.label}</span>}
               align="right"
               width="w-48"
             >
               {heatBadge.tip}
             </Tooltip>
-            <span className={`text-xs px-2 py-1 rounded ${acquisitionBadge.color}`}>
+            <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ${acquisitionBadge.color}`}>
               {acquisitionBadge.label}
             </span>
           </div>
           {archetypeBadge && (
             <Tooltip
-              trigger={<span className={`text-xs px-2 py-1 rounded ${archetypeBadge.color}`}>{archetypeBadge.label}</span>}
+              trigger={<span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ${archetypeBadge.color}`}>{archetypeBadge.label}</span>}
               align="right"
               width="w-56"
             >
               {archetypeBadge.tip}
             </Tooltip>
           )}
-          <span className={`text-xs px-2 py-1 rounded ${
+          <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded ${
             deal.freshness === 1 ? 'bg-warning/20 text-warning' : 'bg-white/10 text-text-muted'
           }`}>
             {freshnessLabel}
@@ -130,8 +130,8 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
         }, 'overreach' as 'ideal' | 'stretch' | 'strained' | 'overreach');
         const sizeWarning = bestTier === 'strained' || bestTier === 'overreach';
         return (
-          <div className={`${sizeWarning ? 'bg-warning/10 border-warning/30' : 'bg-accent-secondary/10 border-accent-secondary/30'} border rounded-lg p-2 mb-3`}>
-            <p className={`text-xs ${sizeWarning ? 'text-warning' : 'text-accent-secondary'}`}>
+          <div className={`${sizeWarning ? 'bg-warning/10 border-warning/30' : 'bg-accent-secondary/10 border-accent-secondary/30'} border rounded-lg p-1.5 sm:p-2 mb-3`}>
+            <p className={`text-[10px] sm:text-xs ${sizeWarning ? 'text-warning' : 'text-accent-secondary'}`}>
               Can be tucked into: {availablePlatforms.map(p => p.name).join(', ')}
               {sizeWarning && ' (!) oversized for available platforms'}
             </p>
@@ -204,17 +204,17 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 mb-4">
         <div>
           <p className="text-xs text-text-muted">Revenue</p>
-          <p className="font-mono font-bold text-lg">{formatMoney(deal.business.revenue)}</p>
+          <p className="font-mono font-bold text-base sm:text-lg">{formatMoney(deal.business.revenue)}</p>
           <p className="text-xs text-text-muted">+{(deal.business.revenueGrowthRate * 100).toFixed(0)}%/yr</p>
         </div>
         <div>
           <p className="text-xs text-text-muted">EBITDA</p>
-          <p className="font-mono font-bold text-lg">{formatMoney(deal.business.ebitda)}</p>
+          <p className="font-mono font-bold text-base sm:text-lg">{formatMoney(deal.business.ebitda)}</p>
           <p className="text-xs text-text-muted">{(deal.business.ebitdaMargin * 100).toFixed(0)}% margin</p>
         </div>
         <div>
           <p className="text-xs text-text-muted">Asking Price</p>
-          <p className="font-mono font-bold text-lg">{formatMoney(deal.effectivePrice)}</p>
+          <p className="font-mono font-bold text-base sm:text-lg">{formatMoney(deal.effectivePrice)}</p>
           {hasHeatPremium ? (
             <Tooltip
               trigger={
@@ -236,7 +236,7 @@ export function DealCard({ deal, onSelect, disabled, availablePlatforms = [], is
           <p className="text-xs text-text-muted">Quality</p>
           <Tooltip
             trigger={
-              <span className="font-mono font-bold text-lg">
+              <span className="font-mono font-bold text-base sm:text-lg">
                 {'★'.repeat(qualityRating)}{'☆'.repeat(5 - qualityRating)}
               </span>
             }

@@ -24,7 +24,7 @@ export function Modal({ isOpen, onClose, title, subtitle, header, children, size
   const closeButton = (
     <button
       onClick={onClose}
-      className="text-text-muted hover:text-text-primary transition-colors text-2xl min-h-[44px] min-w-[44px] flex items-center justify-center"
+      className="text-text-muted hover:text-text-primary transition-colors text-2xl min-h-[44px] min-w-[44px] flex items-center justify-center active:scale-95"
     >
       ×
     </button>
@@ -33,7 +33,7 @@ export function Modal({ isOpen, onClose, title, subtitle, header, children, size
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50" onClick={onClose}>
       <div
-        className={`bg-bg-primary border border-white/10 rounded-xl ${SIZE_CLASSES[size]} w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6`}
+        className={`bg-bg-primary border border-white/10 rounded-xl ${SIZE_CLASSES[size]} w-full max-h-[85vh] sm:max-h-[90vh] overflow-y-auto p-4 sm:p-6`}
         onClick={e => e.stopPropagation()}
       >
         {header ? (

@@ -108,7 +108,7 @@ export function AnnualReportModal({ roundHistory, onClose }: AnnualReportModalPr
                   )}
 
                   {/* Key metrics row */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 text-sm">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 lg:gap-4 text-sm">
                     <div>
                       <p className="text-text-muted text-xs">Revenue</p>
                       <p className="font-mono font-bold">

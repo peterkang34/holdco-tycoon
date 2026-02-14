@@ -493,7 +493,7 @@ export function AllocatePhase({
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-3 sm:px-4 py-2 rounded-lg transition-colors whitespace-nowrap text-sm sm:text-base ${
+            className={`px-3 sm:px-4 py-2.5 sm:py-2 rounded-lg transition-colors whitespace-nowrap text-sm sm:text-base min-h-[44px] flex items-center ${
               activeTab === tab.id
                 ? 'bg-accent text-bg-primary font-medium'
                 : 'text-text-muted hover:text-text-primary hover:bg-white/5'
@@ -631,7 +631,7 @@ export function AllocatePhase({
           <div>
             {/* M&A Focus Settings */}
             <div className="card mb-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2 sm:gap-0">
                 <div>
                   <h3 className="font-bold">M&A Focus</h3>
                   <p className="text-sm text-text-muted">Set your acquisition preferences to see more relevant deals</p>
@@ -1144,7 +1144,7 @@ export function AllocatePhase({
                       setPayDebtAmount(raw);
                     }}
                     placeholder="1,000,000"
-                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2 text-sm"
+                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-sm"
                   />
                 </div>
                 <button
@@ -1157,7 +1157,7 @@ export function AllocatePhase({
                     }
                   }}
                   disabled={!payDebtAmount || (parseInt(payDebtAmount) || 0) < 1000 || totalDebt === 0}
-                  className="btn-primary text-sm"
+                  className="btn-primary text-sm min-h-[44px]"
                 >
                   Pay
                 </button>
@@ -1189,7 +1189,7 @@ export function AllocatePhase({
                       setEquityAmount(raw);
                     }}
                     placeholder="5,000,000"
-                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2 text-sm"
+                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-sm"
                   />
                 </div>
                 <button
@@ -1202,7 +1202,7 @@ export function AllocatePhase({
                     }
                   }}
                   disabled={!equityAmount || (parseInt(equityAmount) || 0) < 1000}
-                  className="btn-primary text-sm"
+                  className="btn-primary text-sm min-h-[44px]"
                 >
                   Issue
                 </button>
@@ -1280,7 +1280,7 @@ export function AllocatePhase({
                       setBuybackAmount(raw);
                     }}
                     placeholder={buybackMode === 'dollars' ? '2,000,000' : `e.g. ${Math.max(1, Math.floor(sharesOutstanding - founderShares))}`}
-                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2 text-sm"
+                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-sm"
                   />
                 </div>
                 <button
@@ -1315,7 +1315,7 @@ export function AllocatePhase({
                       return shareCount < 1 || shareCount > outsideShares || cost > cash || intrinsicValuePerShare <= 0;
                     }
                   })()}
-                  className="btn-primary text-sm"
+                  className="btn-primary text-sm min-h-[44px]"
                 >
                   {!distressRestrictions.canBuyback ? 'Blocked' : 'Buyback'}
                 </button>
@@ -1384,7 +1384,7 @@ export function AllocatePhase({
                       setDistributeAmount(raw);
                     }}
                     placeholder="1,000,000"
-                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2 text-sm"
+                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-sm"
                   />
                 </div>
                 <button
@@ -1397,7 +1397,7 @@ export function AllocatePhase({
                     }
                   }}
                   disabled={!distributeAmount || (parseInt(distributeAmount) || 0) < 1000 || Math.round((parseInt(distributeAmount) || 0) / 1000) > cash || !distressRestrictions.canDistribute}
-                  className="btn-primary text-sm"
+                  className="btn-primary text-sm min-h-[44px]"
                 >
                   {!distressRestrictions.canDistribute ? 'Blocked' : 'Distribute'}
                 </button>
@@ -1537,7 +1537,7 @@ export function AllocatePhase({
                         );
                       })()}
 
-                      <div className="grid grid-cols-3 gap-4 text-sm">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm">
                         <div>
                           <p className="text-text-muted">Combined EBITDA</p>
                           <p className="font-mono font-bold text-lg text-accent">

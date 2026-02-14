@@ -288,10 +288,10 @@ export function GameOverScreen({
       <div className="card mb-6 bg-gradient-to-r from-accent/20 to-accent-secondary/20 border-accent/30">
         <div className="text-center">
           <p className="text-text-muted text-sm mb-1">Founder Equity Value</p>
-          <p className="text-5xl font-bold font-mono text-accent mb-2">
+          <p className="text-3xl sm:text-5xl font-bold font-mono text-accent mb-2">
             {formatMoney(founderEquityValue)}
           </p>
-          <div className="flex justify-center gap-6 mt-3">
+          <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-6 mt-3">
             <div>
               <p className="text-text-muted text-xs">Enterprise Value</p>
               <p className="font-mono text-text-secondary">{formatMoney(enterpriseValue)}</p>
@@ -419,12 +419,12 @@ export function GameOverScreen({
                 onChange={(e) => setInitials(e.target.value.replace(/[^A-Za-z0-9]/g, '').slice(0, 4).toUpperCase())}
                 placeholder="AAA"
                 maxLength={4}
-                className="w-28 text-center text-2xl font-bold bg-white/10 border border-white/20 rounded-lg py-2 px-4 focus:outline-none focus:border-accent"
+                className="w-20 sm:w-28 text-center text-2xl font-bold bg-white/10 border border-white/20 rounded-lg py-2 px-4 focus:outline-none focus:border-accent"
               />
               <button
                 onClick={handleSaveScore}
                 disabled={initials.length < 2 || saving}
-                className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                className="btn-primary text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Saving...' : 'Save Score'}
               </button>
@@ -530,26 +530,26 @@ export function GameOverScreen({
       {/* Final Metrics */}
       <div className="card mb-6">
         <h2 className="text-lg font-bold mb-4">Final Portfolio Summary</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 sm:gap-4 text-center">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4 text-center">
           <div>
             <p className="text-text-muted text-sm">Total Revenue</p>
-            <p className="text-2xl font-bold font-mono">{formatMoney(metrics.totalRevenue)}</p>
+            <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(metrics.totalRevenue)}</p>
           </div>
           <div>
             <p className="text-text-muted text-sm">Final EBITDA <span className="text-xs">({(metrics.avgEbitdaMargin * 100).toFixed(0)}%)</span></p>
-            <p className="text-2xl font-bold font-mono">{formatMoney(metrics.totalEbitda)}</p>
+            <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(metrics.totalEbitda)}</p>
           </div>
           <div>
             <p className="text-text-muted text-sm">Portfolio MOIC</p>
-            <p className="text-2xl font-bold font-mono text-accent">{formatMultiple(metrics.portfolioMoic)}</p>
+            <p className="text-xl sm:text-2xl font-bold font-mono text-accent">{formatMultiple(metrics.portfolioMoic)}</p>
           </div>
           <div>
             <p className="text-text-muted text-sm">Total Distributed</p>
-            <p className="text-2xl font-bold font-mono">{formatMoney(metrics.totalDistributions)}</p>
+            <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(metrics.totalDistributions)}</p>
           </div>
           <div>
             <p className="text-text-muted text-sm">Exit Proceeds</p>
-            <p className="text-2xl font-bold font-mono">{formatMoney(metrics.totalExitProceeds)}</p>
+            <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(metrics.totalExitProceeds)}</p>
           </div>
         </div>
       </div>
@@ -572,10 +572,10 @@ export function GameOverScreen({
                 key={business.id}
                 className="flex items-center justify-between p-3 bg-white/5 rounded-lg"
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <span className="text-xl">{sector.emoji}</span>
-                  <div>
-                    <p className="font-medium">{business.name}</p>
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">{business.name}</p>
                     <p className="text-xs text-text-muted">{sector.name}</p>
                   </div>
                 </div>

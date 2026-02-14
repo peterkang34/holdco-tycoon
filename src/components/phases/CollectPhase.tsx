@@ -156,7 +156,7 @@ export function CollectPhase({
       {/* EBITDA to FCF Summary */}
       <div className="card mb-6 bg-white/5">
         <h3 className="font-bold mb-4">Portfolio Cash Flow Waterfall</h3>
-        <div className="grid grid-cols-4 sm:grid-cols-4 lg:grid-cols-7 gap-1.5 sm:gap-3 lg:gap-4 text-center text-xs sm:text-sm">
+        <div className="overflow-x-auto -mx-2 sm:mx-0"><div className="grid grid-cols-4 sm:grid-cols-7 gap-1.5 sm:gap-3 min-w-[320px] sm:min-w-0 text-center text-xs sm:text-sm">
           <div>
             <p className="text-text-muted">Revenue</p>
             <p className="font-mono font-bold text-sm sm:text-lg">{formatMoney(activeBusinesses.reduce((s, b) => s + b.revenue, 0))}</p>
@@ -198,11 +198,11 @@ export function CollectPhase({
               {formatMoney(netFcf)}
             </p>
           </div>
-        </div>
+        </div></div>
 
         {/* Coverage Ratios */}
         {hasDebtObligations && (
-          <div className="mt-4 pt-3 border-t border-white/10 flex flex-col sm:flex-row gap-2 sm:gap-6 text-sm">
+          <div className="mt-3 sm:mt-4 pt-2 sm:pt-3 border-t border-white/10 flex flex-col sm:flex-row gap-1.5 sm:gap-6 text-xs sm:text-sm">
             <div className="flex items-center gap-2">
               <span className={`w-2 h-2 rounded-full ${
                 interestCoverage >= 4 ? 'bg-accent' : interestCoverage >= 2 ? 'bg-yellow-400' : 'bg-red-400'
@@ -373,7 +373,7 @@ export function CollectPhase({
 
                 {/* Expanded Detail */}
                 {isExpanded && (
-                  <div className="ml-8 mr-4 mt-2 p-4 bg-white/5 rounded-lg text-sm">
+                  <div className="ml-4 sm:ml-8 mr-2 sm:mr-4 mt-2 p-2 sm:p-4 bg-white/5 rounded-lg text-xs sm:text-sm">
                     <table className="w-full">
                       <tbody>
                         <tr>

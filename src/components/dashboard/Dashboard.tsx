@@ -92,7 +92,7 @@ export function Dashboard({
       </div>
 
       {/* Metrics Grid */}
-      <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-1.5 sm:gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-1 sm:gap-1.5 md:gap-3">
         <MetricCard
           label="Cash"
           value={formatMoney(liveCash)}
@@ -155,8 +155,8 @@ export function Dashboard({
       </div>
 
       {/* Status Badges */}
-      <div className="flex flex-wrap gap-2 mt-4">
-        <span className={`text-xs px-2 py-1 rounded-full ${
+      <div className="flex flex-wrap gap-1 sm:gap-2 mt-3 sm:mt-4">
+        <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
           founderOwnership >= 0.70 ? 'bg-accent/20 text-accent' :
           founderOwnership >= 0.51 ? 'bg-warning/20 text-warning' :
           'bg-danger/20 text-danger'
@@ -164,54 +164,54 @@ export function Dashboard({
           Your Ownership: {formatPercent(founderOwnership)}
         </span>
         {sharedServicesCount > 0 && (
-          <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded-full">
+          <span className="text-[10px] sm:text-xs bg-accent/20 text-accent px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
             {sharedServicesCount} Shared Service{sharedServicesCount > 1 ? 's' : ''} Active
           </span>
         )}
         {focusTier && focusTier > 0 && (
-          <span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded-full">
+          <span className="text-[10px] sm:text-xs bg-accent/20 text-accent px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
             Tier {focusTier} {focusSector} Focus
           </span>
         )}
         {concentrationCount && concentrationCount >= 4 && (
-          <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded-full"
+          <span className="text-[10px] sm:text-xs bg-warning/20 text-warning px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full"
             title={`${concentrationCount} businesses in same sector group — volatility amplified ${((1 + (concentrationCount - 3) * 0.25) * 100).toFixed(0)}%`}>
             Concentration Risk ({concentrationCount} correlated)
           </span>
         )}
         {diversificationBonus && (
-          <span className="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded-full"
+          <span className="text-[10px] sm:text-xs bg-blue-500/20 text-blue-400 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full"
             title="4+ unique sectors: +4% growth bonus. 6+: +6%. Uncorrelated risk protects against sector shocks.">
             Diversified Portfolio
           </span>
         )}
         {metrics.totalFcf < 0 && (
-          <span className="text-xs bg-red-600/30 text-red-400 px-2 py-1 rounded-full font-bold">
+          <span className="text-[10px] sm:text-xs bg-red-600/30 text-red-400 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full font-bold">
             Cash Flow Negative
           </span>
         )}
         {metrics.totalFcf >= 0 && metrics.totalDebt > 0 && metrics.totalFcf < Math.round(metrics.totalDebt * metrics.interestRate) && (
-          <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">
+          <span className="text-[10px] sm:text-xs bg-yellow-500/20 text-yellow-400 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
             Tight Debt Coverage
           </span>
         )}
         {metrics.interestRate > 0.08 && (
-          <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded-full">
+          <span className="text-[10px] sm:text-xs bg-warning/20 text-warning px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
             High Interest: {formatPercent(metrics.interestRate)}
           </span>
         )}
         {distressLevel === 'elevated' && (
-          <span className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-full">
+          <span className="text-[10px] sm:text-xs bg-yellow-500/20 text-yellow-400 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
             {getDistressLabel(distressLevel)}
           </span>
         )}
         {distressLevel === 'stressed' && (
-          <span className="text-xs bg-orange-500/20 text-orange-400 px-2 py-1 rounded-full">
+          <span className="text-[10px] sm:text-xs bg-orange-500/20 text-orange-400 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
             {getDistressLabel(distressLevel)}
           </span>
         )}
         {distressLevel === 'breach' && (
-          <span className="text-xs bg-red-600/30 text-red-400 px-2 py-1 rounded-full animate-pulse font-bold">
+          <span className="text-[10px] sm:text-xs bg-red-600/30 text-red-400 px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full animate-pulse font-bold">
             {getDistressLabel(distressLevel)}{covenantBreachRounds ? ` (${covenantBreachRounds} of 2)` : ''}
           </span>
         )}
