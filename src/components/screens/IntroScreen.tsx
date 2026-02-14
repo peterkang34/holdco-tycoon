@@ -159,6 +159,22 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
                 Choose your first acquisition
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const random = SECTOR_LIST[Math.floor(Math.random() * SECTOR_LIST.length)];
+                    setSelectedSector(random.id);
+                  }}
+                  className="p-3 rounded-lg border text-left transition-all border-dashed border-accent/40 bg-accent/5 hover:border-accent hover:bg-accent/10"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-xl">🎲</span>
+                    <span className="text-sm font-medium text-accent">Surprise Me</span>
+                  </div>
+                  <p className="text-[11px] sm:text-[10px] text-text-muted mt-1">
+                    Pick a random sector
+                  </p>
+                </button>
                 {SECTOR_LIST.map(sector => (
                   <button
                     key={sector.id}

@@ -921,6 +921,8 @@ export const useGameStore = create<GameStore>()(
           synergiesRealized: synergies,
           totalAcquisitionCost: deal.effectivePrice,
           acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0,
+          // Propagate integratedPlatformId if the target platform belongs to a forged integrated platform
+          integratedPlatformId: platform.integratedPlatformId,
         };
 
         // Failed integration: restructuring cost + growth drag on platform
@@ -971,6 +973,15 @@ export const useGameStore = create<GameStore>()(
 
         const tuckInCash = Math.max(0, state.cash - structure.cashRequired - restructuringCost);
 
+        // If the target platform belongs to a forged integrated platform, update its constituent list
+        const updatedIntegratedPlatforms = platform.integratedPlatformId
+          ? state.integratedPlatforms.map(ip =>
+              ip.id === platform.integratedPlatformId
+                ? { ...ip, constituentBusinessIds: [...ip.constituentBusinessIds, boltOnId] }
+                : ip
+            )
+          : state.integratedPlatforms;
+
         set({
           cash: tuckInCash,
           totalDebt: newTotalDebt,
@@ -980,6 +991,7 @@ export const useGameStore = create<GameStore>()(
           dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
           acquisitionsThisRound: state.acquisitionsThisRound + 1,
           lastAcquisitionResult: 'success',
+          integratedPlatforms: updatedIntegratedPlatforms,
           actionsThisRound: [
             ...state.actionsThisRound,
             {

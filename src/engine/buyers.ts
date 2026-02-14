@@ -273,7 +273,14 @@ export function generateValuationCommentary(
   }
 
   const marginPct = business.ebitdaMargin ? (business.ebitdaMargin * 100).toFixed(0) : null;
-  const summary = `At $${ebitdaM}M EBITDA${marginPct ? ` (${marginPct}% margins)` : ''}, this attracts ${tier.replace(/_/g, ' ')} attention at ${totalMultiple.toFixed(1)}x`;
+  const tierLabels: Record<BuyerPoolTier, string> = {
+    individual: 'individual buyer',
+    small_pe: 'small PE',
+    lower_middle_pe: 'lower middle PE',
+    institutional_pe: 'institutional PE',
+    large_pe: 'large PE',
+  };
+  const summary = `At $${ebitdaM}M EBITDA${marginPct ? ` (${marginPct}% margins)` : ''}, this attracts ${tierLabels[tier]} attention at ${totalMultiple.toFixed(1)}x`;
 
   return {
     summary,

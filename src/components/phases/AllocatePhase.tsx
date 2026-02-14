@@ -201,8 +201,39 @@ export function AllocatePhase({
 
   // Platform and tuck-in helpers
   const platforms = activeBusinesses.filter(b => b.isPlatform);
-  const getPlatformsForSector = (sectorId: string) =>
-    platforms.filter(p => p.sectorId === sectorId);
+  // Forged integrated platforms: find the first active constituent as the "anchor" business
+  const forgedPlatformAnchors = useMemo(() => {
+    const anchors: Business[] = [];
+    for (const ip of integratedPlatforms) {
+      // Find the first active constituent that isn't already a manual platform
+      const anchor = ip.constituentBusinessIds
+        .map(id => activeBusinesses.find(b => b.id === id))
+        .find(b => b && !b.isPlatform);
+      if (anchor) {
+        anchors.push(anchor);
+      }
+    }
+    return anchors;
+  }, [integratedPlatforms, activeBusinesses]);
+
+  const getPlatformsForSector = (sectorId: string) => {
+    // Manual platforms in this sector
+    const manualPlatforms = platforms.filter(p => p.sectorId === sectorId);
+    // Forged integrated platform anchors in this sector (or cross-sector platforms that include this sector)
+    const forgedAnchors = forgedPlatformAnchors.filter(anchor => {
+      // Direct sector match on the anchor business
+      if (anchor.sectorId === sectorId) return true;
+      // Cross-sector: check if the integrated platform covers this sector
+      const ip = integratedPlatforms.find(p =>
+        p.constituentBusinessIds.includes(anchor.id)
+      );
+      return ip ? ip.sectorIds.includes(sectorId as SectorId) : false;
+    });
+    // Deduplicate: don't include forged anchors that are already manual platforms
+    const manualIds = new Set(manualPlatforms.map(p => p.id));
+    const uniqueForged = forgedAnchors.filter(a => !manualIds.has(a.id));
+    return [...manualPlatforms, ...uniqueForged];
+  };
 
   // Merge eligibility: need 2+ businesses in same sector
   const getMergeableSectors = () => {
@@ -312,9 +343,16 @@ export function AllocatePhase({
                 {availablePlatformsForDeal.map(platform => {
                   const { tier } = getSizeRatioTier(selectedDeal.business.ebitda, platform.ebitda);
                   const tierSuffix = tier === 'stretch' ? ' ⚠' : tier === 'strained' ? ' ⚠⚠' : tier === 'overreach' ? ' ⛔' : '';
+                  const isForgedAnchor = !platform.isPlatform && platform.integratedPlatformId;
+                  const forgedPlatformName = isForgedAnchor
+                    ? integratedPlatforms.find(ip => ip.constituentBusinessIds.includes(platform.id))?.name
+                    : null;
                   return (
                     <option key={platform.id} value={platform.id}>
-                      {platform.name} (Scale {platform.platformScale}, EBITDA: {formatMoney(platform.ebitda)}){tierSuffix}
+                      {forgedPlatformName
+                        ? `${forgedPlatformName} — ${platform.name} (EBITDA: ${formatMoney(platform.ebitda)})`
+                        : `${platform.name} (Scale ${platform.platformScale}, EBITDA: ${formatMoney(platform.ebitda)})`
+                      }{tierSuffix}
                     </option>
                   );
                 })}

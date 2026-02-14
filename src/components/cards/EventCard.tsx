@@ -224,7 +224,11 @@ export function EventCard({ event, businesses, currentRound, lastEventType, onCh
               {event.buyerProfile.type === 'strategic' ? 'Strategic' :
                event.buyerProfile.type === 'individual' ? 'Individual' :
                event.buyerProfile.type === 'family_office' ? 'Family Office' :
-               event.buyerProfile.type.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+               event.buyerProfile.type === 'small_pe' ? 'Small PE' :
+               event.buyerProfile.type === 'lower_middle_pe' ? 'Lower Middle PE' :
+               event.buyerProfile.type === 'institutional_pe' ? 'Institutional PE' :
+               event.buyerProfile.type === 'large_pe' ? 'Large PE' :
+               event.buyerProfile.type}
             </span>
             {event.buyerProfile.isStrategic && (
               <span className="text-xs bg-accent/20 text-accent px-2 py-0.5 rounded">Strategic Buyer</span>
