@@ -1455,49 +1455,60 @@ export function AllocatePhase({
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 gap-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                   <div>
                     <label className="block text-sm text-text-muted mb-2">First Business</label>
-                    <select
-                      value={mergeSelection.first?.id || ''}
-                      onChange={(e) => {
-                        const biz = activeBusinesses.find(b => b.id === e.target.value);
-                        setMergeSelection(prev => ({
-                          ...prev,
-                          first: biz || null,
-                          second: biz?.sectorId !== prev.second?.sectorId ? null : prev.second
-                        }));
-                      }}
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
-                    >
-                      <option value="">Select business...</option>
+                    <div className="space-y-1 max-h-[200px] overflow-y-auto rounded-lg border border-white/10 p-1">
                       {activeBusinesses.filter(b => !b.parentPlatformId).map(biz => (
-                        <option key={biz.id} value={biz.id}>
-                          {SECTORS[biz.sectorId].emoji} {biz.name} — {biz.subType} ({formatMoney(biz.ebitda)})
-                        </option>
+                        <button
+                          key={biz.id}
+                          type="button"
+                          onClick={() => {
+                            setMergeSelection(prev => ({
+                              ...prev,
+                              first: biz,
+                              second: biz.sectorId !== prev.second?.sectorId ? null : prev.second
+                            }));
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                            mergeSelection.first?.id === biz.id
+                              ? 'bg-accent/20 border border-accent/50 text-accent'
+                              : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                          }`}
+                        >
+                          <span className="font-medium">{SECTORS[biz.sectorId].emoji} {biz.name}</span>
+                          <span className="block text-xs text-text-muted">{biz.subType} — {formatMoney(biz.ebitda)} EBITDA</span>
+                        </button>
                       ))}
-                    </select>
+                    </div>
                   </div>
                   <div>
                     <label className="block text-sm text-text-muted mb-2">Second Business</label>
-                    <select
-                      value={mergeSelection.second?.id || ''}
-                      onChange={(e) => {
-                        const biz = activeBusinesses.find(b => b.id === e.target.value);
-                        setMergeSelection(prev => ({ ...prev, second: biz || null }));
-                      }}
-                      disabled={!mergeSelection.first}
-                      className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent disabled:opacity-50"
-                    >
-                      <option value="">Select business...</option>
-                      {mergeSelection.first && activeBusinesses
-                        .filter(b => b.sectorId === mergeSelection.first?.sectorId && b.id !== mergeSelection.first?.id && !b.parentPlatformId)
-                        .map(biz => (
-                          <option key={biz.id} value={biz.id}>
-                            {biz.name} — {biz.subType} ({formatMoney(biz.ebitda)})
-                          </option>
-                        ))}
-                    </select>
+                    <div className={`space-y-1 max-h-[200px] overflow-y-auto rounded-lg border border-white/10 p-1 ${!mergeSelection.first ? 'opacity-50' : ''}`}>
+                      {!mergeSelection.first ? (
+                        <p className="text-xs text-text-muted px-3 py-2">Select first business</p>
+                      ) : (
+                        activeBusinesses
+                          .filter(b => b.sectorId === mergeSelection.first?.sectorId && b.id !== mergeSelection.first?.id && !b.parentPlatformId)
+                          .map(biz => (
+                            <button
+                              key={biz.id}
+                              type="button"
+                              onClick={() => {
+                                setMergeSelection(prev => ({ ...prev, second: biz }));
+                              }}
+                              className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
+                                mergeSelection.second?.id === biz.id
+                                  ? 'bg-accent/20 border border-accent/50 text-accent'
+                                  : 'bg-white/5 hover:bg-white/10 border border-transparent'
+                              }`}
+                            >
+                              <span className="font-medium">{biz.name}</span>
+                              <span className="block text-xs text-text-muted">{biz.subType} — {formatMoney(biz.ebitda)} EBITDA</span>
+                            </button>
+                          ))
+                      )}
+                    </div>
                   </div>
                 </div>
 
