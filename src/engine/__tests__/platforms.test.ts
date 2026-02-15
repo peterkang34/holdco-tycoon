@@ -8,6 +8,7 @@ import {
   getPlatformBonuses,
   getPlatformMultipleExpansion,
   getPlatformRecessionModifier,
+  checkPlatformDissolution,
 } from '../platforms';
 import { PLATFORM_RECIPES } from '../../data/platformRecipes';
 import { SECTORS } from '../../data/sectors';
@@ -456,5 +457,120 @@ describe('Platform recipe data integrity', () => {
       expect(recipe.name.length).toBeGreaterThan(0);
       expect(recipe.description.length).toBeGreaterThan(0);
     }
+  });
+});
+
+// ── checkPlatformDissolution ──
+
+describe('checkPlatformDissolution', () => {
+  const platform: IntegratedPlatform = {
+    id: 'plat_1',
+    recipeId: 'agency_full_service_digital',
+    name: 'Full-Service Digital Agency',
+    sectorIds: ['agency'],
+    constituentBusinessIds: ['biz_1', 'biz_2', 'biz_3'],
+    forgedInRound: 3,
+    bonuses: { marginBoost: 0.04, growthBoost: 0.03, multipleExpansion: 1.5, recessionResistanceReduction: 0.8 },
+  };
+
+  it('returns true (dissolve) when distinct sub-types drop below minSubTypes', () => {
+    // agency_full_service_digital requires minSubTypes: 2
+    // After selling one, only 1 distinct sub-type remains
+    const remaining: Business[] = [
+      createMockBusiness({ id: 'biz_2', sectorId: 'agency', subType: 'Digital/Ecommerce Agency', status: 'active' }),
+      createMockBusiness({ id: 'biz_3', sectorId: 'agency', subType: 'Digital/Ecommerce Agency', status: 'active' }),
+    ];
+    expect(checkPlatformDissolution(platform, remaining)).toBe(true);
+  });
+
+  it('returns false when enough distinct sub-types remain', () => {
+    const remaining: Business[] = [
+      createMockBusiness({ id: 'biz_2', sectorId: 'agency', subType: 'Digital/Ecommerce Agency', status: 'active' }),
+      createMockBusiness({ id: 'biz_3', sectorId: 'agency', subType: 'Performance Media Agency', status: 'active' }),
+    ];
+    expect(checkPlatformDissolution(platform, remaining)).toBe(false);
+  });
+
+  it('ignores sold businesses when counting sub-types', () => {
+    const remaining: Business[] = [
+      createMockBusiness({ id: 'biz_1', sectorId: 'agency', subType: 'Digital/Ecommerce Agency', status: 'sold' }),
+      createMockBusiness({ id: 'biz_2', sectorId: 'agency', subType: 'Performance Media Agency', status: 'active' }),
+      createMockBusiness({ id: 'biz_3', sectorId: 'agency', subType: 'SEO/Content Agency', status: 'active' }),
+    ];
+    // biz_1 is sold so ignored — still 2 active distinct sub-types
+    expect(checkPlatformDissolution(platform, remaining)).toBe(false);
+  });
+
+  it('returns true when no remaining active constituents', () => {
+    expect(checkPlatformDissolution(platform, [])).toBe(true);
+  });
+
+  it('returns true for unknown recipe', () => {
+    const unknownPlatform: IntegratedPlatform = {
+      ...platform,
+      recipeId: 'nonexistent_recipe',
+    };
+    const remaining: Business[] = [
+      createMockBusiness({ id: 'biz_2', sectorId: 'agency', subType: 'Digital/Ecommerce Agency', status: 'active' }),
+    ];
+    expect(checkPlatformDissolution(unknownPlatform, remaining)).toBe(true);
+  });
+
+  it('counts integrated (tuck-in) businesses as active for dissolution check', () => {
+    const remaining: Business[] = [
+      createMockBusiness({ id: 'biz_2', sectorId: 'agency', subType: 'Digital/Ecommerce Agency', status: 'integrated' }),
+      createMockBusiness({ id: 'biz_3', sectorId: 'agency', subType: 'Performance Media Agency', status: 'active' }),
+    ];
+    expect(checkPlatformDissolution(platform, remaining)).toBe(false);
+  });
+
+  it('only counts businesses that are constituents of the platform', () => {
+    const remaining: Business[] = [
+      createMockBusiness({ id: 'biz_2', sectorId: 'agency', subType: 'Digital/Ecommerce Agency', status: 'active' }),
+      // biz_99 is NOT in platform.constituentBusinessIds — should not count
+      createMockBusiness({ id: 'biz_99', sectorId: 'agency', subType: 'Performance Media Agency', status: 'active' }),
+    ];
+    // Only biz_2 is a constituent, and it has 1 distinct sub-type < 2 minSubTypes
+    expect(checkPlatformDissolution(platform, remaining)).toBe(true);
+  });
+
+  it('works with cross-sector platform dissolution', () => {
+    const crossPlatform: IntegratedPlatform = {
+      id: 'plat_cross',
+      recipeId: 'cross_financial_services',
+      name: 'Financial Services Hub',
+      sectorIds: ['insurance', 'wealthManagement'],
+      constituentBusinessIds: ['biz_ins', 'biz_wm'],
+      forgedInRound: 5,
+      bonuses: { marginBoost: 0.05, growthBoost: 0.03, multipleExpansion: 2.0, recessionResistanceReduction: 0.75 },
+    };
+    // After selling one, only 1 sub-type remains — below minSubTypes: 2
+    const remaining: Business[] = [
+      createMockBusiness({ id: 'biz_wm', sectorId: 'wealthManagement', subType: 'Independent RIA', status: 'active' }),
+    ];
+    expect(checkPlatformDissolution(crossPlatform, remaining)).toBe(true);
+  });
+
+  it('edge case: business that is both isPlatform (roll-up) and in integrated platform', () => {
+    const remaining: Business[] = [
+      createMockBusiness({
+        id: 'biz_2',
+        sectorId: 'agency',
+        subType: 'Digital/Ecommerce Agency',
+        status: 'active',
+        isPlatform: true,
+        platformScale: 2,
+        integratedPlatformId: 'plat_1',
+      }),
+      createMockBusiness({
+        id: 'biz_3',
+        sectorId: 'agency',
+        subType: 'Performance Media Agency',
+        status: 'active',
+        integratedPlatformId: 'plat_1',
+      }),
+    ];
+    // Still 2 distinct sub-types — platform survives
+    expect(checkPlatformDissolution(platform, remaining)).toBe(false);
   });
 });

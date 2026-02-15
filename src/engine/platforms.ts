@@ -1,5 +1,5 @@
 import { Business, GameDifficulty, GameDuration, IntegratedPlatform, PlatformBonuses, PlatformRecipe, SectorId } from './types';
-import { PLATFORM_RECIPES } from '../data/platformRecipes';
+import { PLATFORM_RECIPES, getRecipeById } from '../data/platformRecipes';
 import { INTEGRATION_THRESHOLD_MULTIPLIER } from '../data/gameConfig';
 
 /**
@@ -183,4 +183,26 @@ export function getPlatformRecessionModifier(
 ): number {
   const bonuses = getPlatformBonuses(business, platforms);
   return bonuses ? bonuses.recessionResistanceReduction : 1.0;
+}
+
+/**
+ * Check whether a platform should dissolve after a constituent is removed.
+ * Returns true (should dissolve) if the remaining active constituents
+ * no longer meet the recipe's minSubTypes requirement.
+ */
+export function checkPlatformDissolution(
+  platform: IntegratedPlatform,
+  remainingBusinesses: Business[]
+): boolean {
+  const recipe = getRecipeById(platform.recipeId);
+  if (!recipe) return true; // Unknown recipe — dissolve
+
+  // Only count active/integrated constituents that are still in the platform
+  const constituents = remainingBusinesses.filter(
+    b => platform.constituentBusinessIds.includes(b.id) &&
+         (b.status === 'active' || b.status === 'integrated')
+  );
+
+  const distinctSubTypes = new Set(constituents.map(b => b.subType));
+  return distinctSubTypes.size < recipe.minSubTypes;
 }

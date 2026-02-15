@@ -106,6 +106,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     toggleMASourcing,
     proactiveOutreach,
     forgeIntegratedPlatform,
+    sellPlatform,
     integratedPlatforms,
     turnaroundTier,
     activeTurnarounds,
@@ -322,6 +323,16 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     });
   }, [forgeIntegratedPlatform, addToast]);
 
+  const handleSellPlatform = useCallback((platformId: string) => {
+    const platform = integratedPlatforms.find(p => p.id === platformId);
+    sellPlatform(platformId);
+    addToast({
+      message: `Sold platform ${platform?.name ?? ''}`,
+      detail: 'All constituent businesses sold with platform bonus',
+      type: 'success',
+    });
+  }, [sellPlatform, integratedPlatforms, addToast]);
+
   const handleUnlockTurnaroundTier = useCallback(() => {
     const nextTier = Math.min(turnaroundTier + 1, 3);
     unlockTurnaroundTier();
@@ -531,6 +542,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             onToggleMASourcing={handleToggleMASourcing}
             onProactiveOutreach={handleProactiveOutreach}
             onForgePlatform={handleForgePlatform}
+            onSellPlatform={handleSellPlatform}
             integratedPlatforms={integratedPlatforms}
             difficulty={difficulty}
             duration={duration}

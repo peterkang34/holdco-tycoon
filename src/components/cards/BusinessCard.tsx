@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Business, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
+import { Business, IntegratedPlatform, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { calculateExitValuation } from '../../engine/simulation';
 import { Tooltip } from '../ui/Tooltip';
@@ -19,6 +19,7 @@ interface BusinessCardProps {
   canAffordPlatform?: boolean;
   currentRound?: number;
   lastEventType?: string;
+  integratedPlatforms?: IntegratedPlatform[];
 }
 
 export function BusinessCard({
@@ -36,6 +37,7 @@ export function BusinessCard({
   canAffordPlatform = true,
   currentRound = 1,
   lastEventType,
+  integratedPlatforms = [],
 }: BusinessCardProps) {
   const [showValuation, setShowValuation] = useState(false);
   const sector = SECTORS[business.sectorId];
@@ -43,9 +45,14 @@ export function BusinessCard({
 
   // Memoize exit valuation — involves multiple premium calculations, buyer pool logic, etc.
   const exitValuation = useMemo(
-    () => calculateExitValuation(business, currentRound, lastEventType),
-    [business, currentRound, lastEventType]
+    () => calculateExitValuation(business, currentRound, lastEventType, undefined, integratedPlatforms),
+    [business, currentRound, lastEventType, integratedPlatforms]
   );
+
+  // Look up integrated platform name for badge
+  const integratedPlatformName = business.integratedPlatformId
+    ? integratedPlatforms.find(p => p.id === business.integratedPlatformId)?.name
+    : undefined;
   const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
   const gainLoss = exitValuation.netProceeds - totalInvested;
   const moic = exitValuation.netProceeds / totalInvested;
@@ -88,6 +95,15 @@ export function BusinessCard({
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
+          {integratedPlatformName && (
+            <Tooltip
+              trigger={<span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded truncate max-w-[140px]">{integratedPlatformName}</span>}
+              align="right"
+              width="w-48 md:w-56"
+            >
+              <p className="text-sm text-text-secondary font-normal">Part of the <strong>{integratedPlatformName}</strong> integrated platform. Receives exit multiple premium and recession resistance.</p>
+            </Tooltip>
+          )}
           {isPlatform && (
             <Tooltip
               trigger={<span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded">Scale {platformScale}</span>}
@@ -283,6 +299,12 @@ export function BusinessCard({
                   <div className="flex justify-between text-accent">
                     <span>Improvements ({business.improvements.length})</span>
                     <span className="font-mono">+{exitValuation.improvementsPremium.toFixed(1)}x</span>
+                  </div>
+                )}
+                {exitValuation.integratedPlatformPremium > 0 && (
+                  <div className="flex justify-between">
+                    <span className="text-purple-400">Integrated Platform</span>
+                    <span className="font-mono text-purple-400">+{exitValuation.integratedPlatformPremium.toFixed(1)}x</span>
                   </div>
                 )}
                 {exitValuation.marketModifier !== 0 && (

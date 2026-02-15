@@ -506,6 +506,7 @@ export type GameActionType =
   | 'toggle_ma_sourcing'
   | 'proactive_outreach'
   | 'forge_integrated_platform'
+  | 'sell_platform'
   | 'unlock_turnaround_tier'
   | 'start_turnaround'
   | 'turnaround_resolved';

@@ -35,6 +35,7 @@ import { RollUpGuideModal } from '../ui/RollUpGuideModal';
 import { ImprovementModal } from '../modals/ImprovementModal';
 import { isAIEnabled } from '../../services/aiGeneration';
 import { checkPlatformEligibility, calculateIntegrationCost } from '../../engine/platforms';
+import { PLATFORM_SALE_BONUS } from '../../data/gameConfig';
 import { getEligiblePrograms, calculateTurnaroundCost, canUnlockTier } from '../../engine/turnarounds';
 import { TURNAROUND_TIER_CONFIG, getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
 import { TURNAROUND_FATIGUE_THRESHOLD } from '../../data/gameConfig';
@@ -89,6 +90,7 @@ interface AllocatePhaseProps {
   onToggleMASourcing: () => void;
   onProactiveOutreach: () => void;
   onForgePlatform: (recipeId: string, businessIds: string[], platformName: string, cost: number) => void;
+  onSellPlatform: (platformId: string) => void;
   integratedPlatforms: IntegratedPlatform[];
   difficulty: GameDifficulty;
   duration: GameDuration;
@@ -148,6 +150,7 @@ export function AllocatePhase({
   onToggleMASourcing,
   onProactiveOutreach,
   onForgePlatform,
+  onSellPlatform,
   integratedPlatforms,
   difficulty,
   duration,
@@ -192,6 +195,7 @@ export function AllocatePhase({
   const [windDownConfirmBusiness, setWindDownConfirmBusiness] = useState<Business | null>(null);
   const [dismissedWarnings, setDismissedWarnings] = useState<Set<string>>(new Set());
   const [forgeConfirm, setForgeConfirm] = useState<{ recipeId: string; businessIds: string[] } | null>(null);
+  const [sellPlatformConfirm, setSellPlatformConfirm] = useState<IntegratedPlatform | null>(null);
   const [turnaroundConfirm, setTurnaroundConfirm] = useState<{ businessId: string; programId: string } | null>(null);
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
@@ -892,6 +896,12 @@ export function AllocatePhase({
                             </span>
                           )}
                         </div>
+                        <button
+                          onClick={() => setSellPlatformConfirm(ip)}
+                          className="mt-2 text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 px-3 py-1.5 rounded transition-colors"
+                        >
+                          Sell Platform (+{PLATFORM_SALE_BONUS.toFixed(1)}x bonus)
+                        </button>
                       </div>
                     );
                   })}
@@ -1176,6 +1186,7 @@ export function AllocatePhase({
                   canAffordPlatform={cash >= business.ebitda * 0.05}
                   currentRound={round}
                   lastEventType={lastEventType}
+                  integratedPlatforms={integratedPlatforms}
                 />
               ))}
               {activeBusinesses.length === 0 && (
@@ -2269,7 +2280,7 @@ export function AllocatePhase({
       {/* Sell Confirmation Modal */}
       {sellConfirmBusiness && (() => {
         const biz = sellConfirmBusiness;
-        const valuation = calculateExitValuation(biz, round, lastEventType);
+        const valuation = calculateExitValuation(biz, round, lastEventType, undefined, integratedPlatforms);
         const totalInvested = biz.totalAcquisitionCost || biz.acquisitionPrice;
         const sellMoic = valuation.netProceeds / totalInvested;
         return (
@@ -2466,6 +2477,95 @@ export function AllocatePhase({
                   className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors"
                 >
                   Forge Platform
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Sell Platform Confirmation Modal */}
+      {sellPlatformConfirm && (() => {
+        const ip = sellPlatformConfirm;
+        const constituents = ip.constituentBusinessIds
+          .map(id => activeBusinesses.find(b => b.id === id))
+          .filter((b): b is Business => b != null);
+        if (constituents.length === 0) return null;
+
+        const constituentDetails = constituents.map(biz => {
+          const val = calculateExitValuation(biz, round, lastEventType, undefined, integratedPlatforms);
+          const baseExitMultiple = val.totalMultiple;
+          const withBonus = baseExitMultiple + PLATFORM_SALE_BONUS;
+          const exitPrice = Math.round(biz.ebitda * Math.max(2.0, withBonus));
+          const boltOnDebt = (biz.boltOnIds || [])
+            .map(id => allBusinesses.find(b => b.id === id))
+            .filter(Boolean)
+            .reduce((sum, b) => sum + (b!.sellerNoteBalance + b!.earnoutRemaining), 0);
+          const debt = biz.sellerNoteBalance + biz.bankDebtBalance + biz.earnoutRemaining + boltOnDebt;
+          return { biz, exitPrice, debt, multiple: withBonus };
+        });
+
+        const totalExit = constituentDetails.reduce((s, d) => s + d.exitPrice, 0);
+        const totalDebt = constituentDetails.reduce((s, d) => s + d.debt, 0);
+        const totalNet = Math.max(0, totalExit - totalDebt);
+        const totalInvested = constituents.reduce((s, b) => s + (b.totalAcquisitionCost || b.acquisitionPrice), 0);
+        const combinedMoic = totalNet / totalInvested;
+        const sectorEmojis = ip.sectorIds.map(sid => SECTORS[sid]?.emoji).filter(Boolean).join(' ');
+
+        return (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+            <div className="bg-bg-primary border border-purple-500/30 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+              <h3 className="text-lg sm:text-xl font-bold text-purple-400 mb-2">Sell {sectorEmojis} {ip.name}?</h3>
+              <p className="text-xs text-text-muted mb-4">Sell all constituent businesses as a single platform. Includes a +{PLATFORM_SALE_BONUS.toFixed(1)}x multiple bonus for selling as a unit.</p>
+
+              <div className="mb-4 space-y-1">
+                {constituentDetails.map(({ biz, exitPrice, multiple }) => (
+                  <div key={biz.id} className="flex justify-between gap-2 text-sm bg-white/5 rounded px-3 py-2">
+                    <span className="truncate min-w-0">{SECTORS[biz.sectorId].emoji} {biz.name}</span>
+                    <span className="font-mono whitespace-nowrap flex-shrink-0 text-accent">{formatMoney(exitPrice)} <span className="text-text-muted">({multiple.toFixed(1)}x)</span></span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="space-y-2 mb-4 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Platform Sale Bonus</span>
+                  <span className="font-mono text-purple-400">+{PLATFORM_SALE_BONUS.toFixed(1)}x per business</span>
+                </div>
+                <div className="flex justify-between font-bold">
+                  <span>Total Exit Price</span>
+                  <span className="font-mono text-accent">{formatMoney(totalExit)}</span>
+                </div>
+                {totalDebt > 0 && (
+                  <div className="flex justify-between text-danger">
+                    <span>Total Debt Payoff</span>
+                    <span className="font-mono">-{formatMoney(totalDebt)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold border-t border-white/10 pt-2">
+                  <span>Net Proceeds</span>
+                  <span className="font-mono text-accent">{formatMoney(totalNet)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Combined MOIC</span>
+                  <span className={`font-mono font-bold ${combinedMoic >= 2 ? 'text-accent' : combinedMoic < 1 ? 'text-danger' : ''}`}>
+                    {combinedMoic.toFixed(1)}x
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 justify-end">
+                <button onClick={() => setSellPlatformConfirm(null)} className="btn-secondary px-6 min-h-[44px]">
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    onSellPlatform(ip.id);
+                    setSellPlatformConfirm(null);
+                  }}
+                  className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors"
+                >
+                  Sell Platform
                 </button>
               </div>
             </div>

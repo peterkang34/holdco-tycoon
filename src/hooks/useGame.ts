@@ -78,8 +78,9 @@ import { clampMargin } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
 import { buildChronicleContext } from '../services/chronicleContext';
 import { useToastStore } from './useToast';
-import { calculateIntegrationCost, forgePlatform } from '../engine/platforms';
+import { calculateIntegrationCost, forgePlatform, checkPlatformDissolution } from '../engine/platforms';
 import { getRecipeById } from '../data/platformRecipes';
+import { PLATFORM_SALE_BONUS } from '../data/gameConfig';
 import {
   canUnlockTier,
   calculateTurnaroundCost,
@@ -133,6 +134,7 @@ interface GameStore extends GameState {
 
   // Integrated Platforms
   forgeIntegratedPlatform: (recipeId: string, businessIds: string[]) => void;
+  sellPlatform: (platformId: string) => void;
 
   // Turnaround capability
   unlockTurnaroundTier: () => void;
@@ -1577,11 +1579,33 @@ export const useGameStore = create<GameStore>()(
         const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
         const netProceeds = Math.max(0, exitPrice - debtPayoff);
 
-        const updatedBusinesses = state.businesses.map(b => {
+        let updatedBusinesses = state.businesses.map(b => {
           if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round };
           if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
           return b;
         });
+
+        // Platform dissolution check: if sold business was part of an integrated platform
+        let updatedPlatforms = state.integratedPlatforms;
+        if (business.integratedPlatformId) {
+          const platform = state.integratedPlatforms.find(p => p.id === business.integratedPlatformId);
+          if (platform) {
+            if (checkPlatformDissolution(platform, updatedBusinesses)) {
+              // Dissolve: remove platform, clear integratedPlatformId from remaining constituents
+              updatedPlatforms = updatedPlatforms.filter(p => p.id !== platform.id);
+              updatedBusinesses = updatedBusinesses.map(b =>
+                b.integratedPlatformId === platform.id ? { ...b, integratedPlatformId: undefined } : b
+              );
+            } else {
+              // Still viable: just remove the sold business from constituentBusinessIds
+              updatedPlatforms = updatedPlatforms.map(p =>
+                p.id === platform.id
+                  ? { ...p, constituentBusinessIds: p.constituentBusinessIds.filter(id => id !== businessId) }
+                  : p
+              );
+            }
+          }
+        }
 
         // M-7: Auto-deactivate shared services if opco count drops below minimum
         const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
@@ -1600,6 +1624,7 @@ export const useGameStore = create<GameStore>()(
           totalExitProceeds: state.totalExitProceeds + netProceeds,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
+          integratedPlatforms: updatedPlatforms,
         };
         set({
           ...sellState,
@@ -2131,6 +2156,114 @@ export const useGameStore = create<GameStore>()(
               },
             },
           ],
+        });
+      },
+
+      sellPlatform: (platformId: string) => {
+        const state = get();
+        if (state.phase !== 'allocate') return;
+
+        const platform = state.integratedPlatforms.find(p => p.id === platformId);
+        if (!platform) return;
+
+        const lastEvent = state.eventHistory[state.eventHistory.length - 1];
+
+        // Gather all active constituent businesses (including their bolt-ons)
+        const constituents = state.businesses.filter(
+          b => platform.constituentBusinessIds.includes(b.id) && b.status === 'active'
+        );
+        if (constituents.length === 0) return;
+
+        // Find the largest constituent for buyer pool tier
+        const largestConstituent = constituents.reduce((a, b) => a.ebitda > b.ebitda ? a : b);
+        const buyerProfile = generateBuyerProfile(largestConstituent,
+          calculateExitValuation(largestConstituent, state.round, lastEvent?.type, undefined, state.integratedPlatforms).buyerPoolTier,
+          largestConstituent.sectorId
+        );
+
+        // Calculate total exit across all constituents with platform sale bonus
+        let totalExitPrice = 0;
+        let totalDebtPayoff = 0;
+        const allSoldIds = new Set<string>();
+
+        for (const biz of constituents) {
+          const valuation = calculateExitValuation(biz, state.round, lastEvent?.type, undefined, state.integratedPlatforms);
+          // Apply platform sale bonus + strategic premium + market variance
+          let effectiveMultiple = valuation.totalMultiple + PLATFORM_SALE_BONUS;
+          if (buyerProfile.isStrategic) effectiveMultiple += buyerProfile.strategicPremium;
+          const marketVariance = lastEvent?.type === 'global_bull_market' ? Math.random() * 0.3
+            : lastEvent?.type === 'global_recession' ? -(Math.random() * 0.3)
+            : (Math.random() * 0.2 - 0.1);
+          const exitPrice = Math.max(0, Math.round(biz.ebitda * Math.max(2.0, effectiveMultiple + marketVariance)));
+          totalExitPrice += exitPrice;
+
+          // Debt: seller notes + bank debt + earn-outs for this biz and its bolt-ons
+          const boltOnIds = new Set(biz.boltOnIds || []);
+          const boltOnDebt = state.businesses
+            .filter(b => boltOnIds.has(b.id))
+            .reduce((sum, b) => sum + b.sellerNoteBalance + b.earnoutRemaining, 0);
+          totalDebtPayoff += biz.sellerNoteBalance + biz.bankDebtBalance + biz.earnoutRemaining + boltOnDebt;
+
+          allSoldIds.add(biz.id);
+          for (const boltOnId of biz.boltOnIds || []) allSoldIds.add(boltOnId);
+        }
+
+        const totalNetProceeds = Math.max(0, totalExitPrice - totalDebtPayoff);
+
+        // Mark all constituents + bolt-ons as sold
+        const updatedBusinesses = state.businesses.map(b => {
+          if (allSoldIds.has(b.id)) {
+            return { ...b, status: 'sold' as const, exitPrice: constituents.find(c => c.id === b.id) ? Math.round(totalExitPrice / constituents.length) : 0, exitRound: state.round, integratedPlatformId: undefined };
+          }
+          // Clear integratedPlatformId from any remaining references
+          if (b.integratedPlatformId === platformId) return { ...b, integratedPlatformId: undefined };
+          return b;
+        });
+
+        // Remove the platform
+        const updatedPlatforms = state.integratedPlatforms.filter(p => p.id !== platformId);
+
+        // Auto-deactivate shared services if needed
+        const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
+        const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
+          ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
+          : state.sharedServices;
+
+        // Collect exited businesses
+        const exitedEntries = state.businesses
+          .filter(b => allSoldIds.has(b.id))
+          .map(b => ({ ...b, status: 'sold' as const, exitPrice: constituents.find(c => c.id === b.id) ? Math.round(totalExitPrice / constituents.length) : 0, exitRound: state.round }));
+
+        const sellState = {
+          ...state,
+          cash: state.cash + totalNetProceeds,
+          totalExitProceeds: state.totalExitProceeds + totalNetProceeds,
+          businesses: updatedBusinesses,
+          sharedServices: updatedServices,
+          integratedPlatforms: updatedPlatforms,
+        };
+        set({
+          ...sellState,
+          exitedBusinesses: [...state.exitedBusinesses, ...exitedEntries],
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            {
+              type: 'sell_platform' as const,
+              round: state.round,
+              details: {
+                platformId,
+                platformName: platform.name,
+                totalExitPrice,
+                totalNetProceeds,
+                totalDebtPayoff,
+                businessCount: constituents.length,
+                platformSaleBonus: PLATFORM_SALE_BONUS,
+                buyerName: buyerProfile.name,
+                buyerType: buyerProfile.type,
+              },
+            },
+          ],
+          metrics: calculateMetrics(sellState),
         });
       },
 

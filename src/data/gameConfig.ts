@@ -47,6 +47,12 @@ export const EQUITY_BUYBACK_COOLDOWN = 2;   // rounds between raise↔buyback
 
 // ── Turnaround Constants ──
 
+// ── Platform Sale Constants ──
+
+export const PLATFORM_SALE_BONUS = 0.5;  // +0.5x multiple for selling entire platform as a unit
+
+// ── Turnaround Constants ──
+
 export const TURNAROUND_FATIGUE_THRESHOLD = 4;   // 4+ simultaneous turnarounds = penalty
 export const TURNAROUND_FATIGUE_PENALTY = 0.10;  // -10ppt to all success rates
 export const TURNAROUND_EXIT_PREMIUM = 0.25;     // +0.25x exit multiple
