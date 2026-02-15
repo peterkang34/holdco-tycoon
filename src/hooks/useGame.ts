@@ -1522,6 +1522,10 @@ export const useGameStore = create<GameStore>()(
         const state = get();
         if (state.cash < amount) return;
 
+        // Block buybacks when no active businesses — prevents sell-all-then-buyback FEV exploit
+        const activeCount = state.businesses.filter(b => b.status === 'active').length;
+        if (activeCount === 0) return;
+
         // Cooldown: blocked if equity was raised within EQUITY_BUYBACK_COOLDOWN rounds
         if (state.lastEquityRaiseRound > 0 && state.round - state.lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN) return;
 
@@ -1539,7 +1543,12 @@ export const useGameStore = create<GameStore>()(
         // Cap to outside shares (prevents floating-point rounding from exceeding by a fraction)
         sharesRepurchased = Math.min(sharesRepurchased, outsideShares);
 
-        const newTotalShares = state.sharesOutstanding - sharesRepurchased;
+        // Snap to exact founder shares when buying all remaining outside shares
+        // to avoid floating-point residue (e.g., 0.001 shares left)
+        let newTotalShares = state.sharesOutstanding - sharesRepurchased;
+        if (Math.abs(newTotalShares - state.founderShares) < 0.01) {
+          newTotalShares = state.founderShares;
+        }
         const newFounderOwnership = state.founderShares / newTotalShares;
 
         const buybackState = {

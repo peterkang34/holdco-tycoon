@@ -50,7 +50,7 @@ interface AllocatePhaseProps {
   businesses: Business[];
   allBusinesses: Business[]; // Includes integrated bolt-ons for debt lookups
   cash: number;
-  totalDebt: number;
+  holdcoLoanBalance: number;
   interestRate: number;
   creditTightening: boolean;
   distressLevel: DistressLevel;
@@ -110,7 +110,7 @@ export function AllocatePhase({
   businesses,
   allBusinesses,
   cash,
-  totalDebt,
+  holdcoLoanBalance,
   interestRate,
   creditTightening,
   distressLevel,
@@ -1615,14 +1615,14 @@ export function AllocatePhase({
             {(() => {
               const opcoSellerNotes = businesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
               const opcoBankDebt = businesses.reduce((sum, b) => sum + b.bankDebtBalance, 0);
-              const totalAllDebt = totalDebt + opcoSellerNotes + opcoBankDebt;
+              const totalAllDebt = holdcoLoanBalance + opcoBankDebt + opcoSellerNotes;
               return (
                 <div className="card bg-white/5">
                   <h4 className="font-bold mb-3">Debt Summary</h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                     <div>
                       <p className="text-text-muted">Holdco Debt</p>
-                      <p className="font-mono font-bold text-lg">{formatMoney(totalDebt)}</p>
+                      <p className="font-mono font-bold text-lg">{formatMoney(holdcoLoanBalance)}</p>
                       <p className="text-xs text-text-muted">Auto-amortizes (10%/yr) + manual</p>
                     </div>
                     <div>
@@ -1727,7 +1727,7 @@ export function AllocatePhase({
             <div className="card">
               <h4 className="font-bold mb-3">Pay Down Holdco Debt</h4>
               <p className="text-sm text-text-muted mb-4">
-                Holdco debt: {formatMoney(totalDebt)} @ {formatPercent(interestRate)}
+                Holdco debt: {formatMoney(holdcoLoanBalance)} @ {formatPercent(interestRate)}
               </p>
               <div className="flex gap-2">
                 <div className="flex-1 relative">
@@ -1753,7 +1753,7 @@ export function AllocatePhase({
                       setPayDebtAmount('');
                     }
                   }}
-                  disabled={!payDebtAmount || (parseInt(payDebtAmount) || 0) < 1000 || totalDebt === 0}
+                  disabled={!payDebtAmount || (parseInt(payDebtAmount) || 0) < 1000 || holdcoLoanBalance === 0}
                   className="btn-primary text-sm min-h-[44px]"
                 >
                   Pay
@@ -1900,7 +1900,7 @@ export function AllocatePhase({
             </div>
 
             {/* Buyback Shares */}
-            <div className={`card ${buybackCooldownBlocked ? 'opacity-50' : ''}`}>
+            <div className={`card ${buybackCooldownBlocked || activeBusinesses.length === 0 ? 'opacity-50' : ''}`}>
               <h4 className="font-bold mb-3">Buyback Shares</h4>
               <p className="text-sm text-text-muted mb-2">
                 Repurchase outside investor shares at {formatMoney(intrinsicValuePerShare)}/share.
@@ -1908,6 +1908,9 @@ export function AllocatePhase({
               <p className="text-xs text-text-muted mb-4">
                 Outstanding: {sharesOutstanding.toFixed(0)} total | {(sharesOutstanding - founderShares).toFixed(0)} outside shares
               </p>
+              {activeBusinesses.length === 0 && (
+                <p className="text-xs text-warning mb-4">Buybacks require at least one active business</p>
+              )}
               {buybackCooldownBlocked && (
                 <p className="text-xs text-warning mb-4">Cooldown: equity raised in Y{lastEquityRaiseRound} — wait {buybackCooldownRemainder} more yr</p>
               )}
@@ -1967,7 +1970,7 @@ export function AllocatePhase({
                     }
                   }}
                   disabled={(() => {
-                    if (!buybackAmount || !distressRestrictions.canBuyback || buybackCooldownBlocked) return true;
+                    if (!buybackAmount || !distressRestrictions.canBuyback || buybackCooldownBlocked || activeBusinesses.length === 0) return true;
                     if (buybackMode === 'dollars') {
                       const dollars = parseInt(buybackAmount) || 0;
                       return dollars < 1000 || Math.round(dollars / 1000) > cash;
@@ -1975,12 +1978,12 @@ export function AllocatePhase({
                       const shareCount = parseInt(buybackAmount) || 0;
                       const outsideShares = sharesOutstanding - founderShares;
                       const cost = Math.floor(shareCount * intrinsicValuePerShare);
-                      return shareCount < 1 || shareCount > outsideShares || cost > cash || intrinsicValuePerShare <= 0;
+                      return shareCount < 1 || shareCount > Math.ceil(outsideShares) || cost > cash || intrinsicValuePerShare <= 0;
                     }
                   })()}
                   className="btn-primary text-sm min-h-[44px]"
                 >
-                  {buybackCooldownBlocked ? 'Cooldown' : !distressRestrictions.canBuyback ? 'Blocked' : 'Buyback'}
+                  {buybackCooldownBlocked ? 'Cooldown' : activeBusinesses.length === 0 ? 'No Businesses' : !distressRestrictions.canBuyback ? 'Blocked' : 'Buyback'}
                 </button>
               </div>
               {/* Preview for dollar mode */}

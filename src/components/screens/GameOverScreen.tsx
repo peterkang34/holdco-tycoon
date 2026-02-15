@@ -180,9 +180,27 @@ export function GameOverScreen({
       setSavedEntryId(entry.id);
       setHasSaved(true);
 
-      // Reload global leaderboard to show updated rankings
-      const updated = await loadLeaderboard();
-      setLeaderboard(updated);
+      // Optimistically insert the new entry into the leaderboard so it shows
+      // immediately, even if the GET endpoint returns cached (stale) data.
+      const fullEntry: LeaderboardEntry = {
+        ...entry,
+        founderEquityValue,
+        founderPersonalWealth,
+        difficulty,
+        duration,
+      };
+      setLeaderboard(prev => {
+        // Avoid duplicates if the entry is somehow already present
+        const without = prev.filter(e => e.id !== entry.id);
+        return [...without, fullEntry];
+      });
+
+      // Background re-fetch with cache-bust to eventually get accurate server data
+      loadLeaderboard().then(updated => {
+        // Merge: ensure our new entry is present even if cache is stale
+        const hasEntry = updated.some(e => e.id === entry.id);
+        setLeaderboard(hasEntry ? updated : [...updated, fullEntry]);
+      }).catch(() => { /* keep optimistic state */ });
     } finally {
       setSaving(false);
     }

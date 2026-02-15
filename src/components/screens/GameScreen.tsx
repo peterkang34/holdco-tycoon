@@ -214,13 +214,13 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
 
   const handlePayDebt = useCallback((amount: number) => {
     payDownDebt(amount);
-    const remaining = totalDebt - amount;
+    const remaining = useGameStore.getState().holdcoLoanBalance;
     addToast({
       message: `Paid down ${formatMoney(amount)} debt`,
       detail: remaining > 0 ? `${formatMoney(remaining)} remaining` : 'Debt-free!',
       type: 'success',
     });
-  }, [payDownDebt, totalDebt, addToast]);
+  }, [payDownDebt, addToast]);
 
   const handleIssueEquity = useCallback((amount: number) => {
     const prevShares = sharesOutstanding;
@@ -284,12 +284,22 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
 
   const handleImprove = useCallback((businessId: string, improvementType: OperationalImprovementType) => {
     const biz = businesses.find(b => b.id === businessId);
+    const cashBefore = useGameStore.getState().cash;
     improveBusiness(businessId, improvementType);
-    addToast({
-      message: `${IMPROVEMENT_LABELS[improvementType] ?? improvementType}`,
-      detail: `Applied to ${biz?.name ?? 'business'}`,
-      type: 'success',
-    });
+    const cashAfter = useGameStore.getState().cash;
+    if (cashAfter < cashBefore) {
+      addToast({
+        message: `${IMPROVEMENT_LABELS[improvementType] ?? improvementType}`,
+        detail: `Applied to ${biz?.name ?? 'business'}`,
+        type: 'success',
+      });
+    } else {
+      addToast({
+        message: 'Improvement failed',
+        detail: 'Insufficient cash or already applied',
+        type: 'warning',
+      });
+    }
   }, [improveBusiness, businesses, addToast]);
 
   const handleSourceDeals = useCallback(() => {
@@ -519,7 +529,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             businesses={activeBusinesses}
             allBusinesses={businesses}
             cash={cash}
-            totalDebt={totalDebt}
+            holdcoLoanBalance={holdcoLoanBalance}
             interestRate={interestRate}
             creditTightening={creditTighteningRoundsRemaining > 0}
             distressLevel={metrics.distressLevel}

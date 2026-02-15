@@ -4,6 +4,7 @@ import {
   formatMoney,
 } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
+import { IMPROVEMENT_COST_FLOOR } from '../../data/gameConfig';
 import { Modal } from '../ui/Modal';
 
 // Per-type improvement exit premiums (matches simulation.ts)
@@ -211,7 +212,7 @@ export function ImprovementModal({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {improvements.map((improvement) => {
-            const cost = Math.round(business.ebitda * improvement.costPercent);
+            const cost = Math.max(IMPROVEMENT_COST_FLOOR, Math.round((Math.abs(business.ebitda) || 1) * improvement.costPercent));
             const canAfford = cash >= cost;
             const disabled = !improvement.available || !canAfford;
 

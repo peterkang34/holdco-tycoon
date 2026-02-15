@@ -71,6 +71,11 @@ export function BusinessCard({
           <div className="font-medium truncate">{business.name}</div>
           <div className="text-xs text-text-muted">{sector.name}</div>
         </div>
+        <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
+          business.qualityRating >= 4 ? 'bg-accent/20 text-accent' :
+          business.qualityRating === 3 ? 'bg-yellow-500/20 text-yellow-400' :
+          'bg-danger/20 text-danger'
+        }`}>Q{business.qualityRating}</span>
         <div className="text-right">
           <div className="font-mono font-bold">{formatMoney(business.ebitda)}</div>
           <div className={`text-xs ${isGrowing ? 'text-accent' : isDeclining ? 'text-danger' : 'text-text-muted'}`}>
@@ -95,6 +100,32 @@ export function BusinessCard({
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">
+          <Tooltip
+            trigger={
+              <span className={`text-xs font-mono font-bold px-2 py-1 rounded ${
+                business.qualityRating >= 4 ? 'bg-accent/20 text-accent' :
+                business.qualityRating === 3 ? 'bg-yellow-500/20 text-yellow-400' :
+                'bg-danger/20 text-danger'
+              }`}>
+                Q{business.qualityRating}
+                {(business.qualityImprovedTiers ?? 0) > 0 && (
+                  <span className="text-accent ml-0.5">+{business.qualityImprovedTiers}</span>
+                )}
+              </span>
+            }
+            align="right"
+            width="w-48 md:w-56"
+          >
+            <p className="text-sm text-text-secondary font-normal">Quality Rating: {business.qualityRating}/5</p>
+            <p className="text-xs text-text-muted mt-1 font-normal">
+              {business.qualityRating >= 4 ? 'Strong business — commands premium multiples.' :
+               business.qualityRating === 3 ? 'Average quality — solid foundation for improvements.' :
+               'Below average — turnaround candidate.'}
+            </p>
+            {(business.qualityImprovedTiers ?? 0) > 0 && (
+              <p className="text-xs text-accent mt-1 font-normal">Improved {business.qualityImprovedTiers} tier{(business.qualityImprovedTiers ?? 0) > 1 ? 's' : ''} via turnaround.</p>
+            )}
+          </Tooltip>
           {integratedPlatformName && (
             <Tooltip
               trigger={<span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded truncate max-w-[140px]">{integratedPlatformName}</span>}

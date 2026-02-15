@@ -1040,9 +1040,21 @@ export function generateDealPipeline(
   // L-5/M-11: Copy before sorting to avoid mutating source arrays
   const shuffledMissing = [...missingSectors].sort(() => Math.random() - 0.5);
 
+  // Early rounds: bias toward small/medium deals so players can afford first acquisitions
+  // Round 1: mostly small, 1-2 medium for variety
+  // Round 2: mix of small and medium
+  const isEarlyRound = round <= 2;
+  const getEarlyRoundSize = (index: number): DealSizePreference => {
+    if (!isEarlyRound) return maFocus?.sizePreference || 'any';
+    if (round === 1) return index < 2 ? 'medium' : 'small';
+    return index < 3 ? 'medium' : 'small'; // round 2
+  };
+  let earlyDealIndex = pipeline.length; // track index for size rotation
+
   for (const sectorId of shuffledMissing.slice(0, 3)) {
     if (pipeline.length >= MAX_DEALS) break;
-    pipeline.push(generateDealWithSize(sectorId, round, maFocus?.sizePreference || 'any', portfolioEbitda, heatOpts));
+    const size = getEarlyRoundSize(earlyDealIndex++);
+    pipeline.push(generateDealWithSize(sectorId, round, size, portfolioEbitda, heatOpts));
   }
 
   // 4. Fill remaining slots with weighted random deals
@@ -1050,13 +1062,15 @@ export function generateDealPipeline(
   const targetPipelineLength = Math.min(MAX_DEALS, pipeline.length + targetNewDeals);
   while (pipeline.length < targetPipelineLength) {
     const sectorId = pickWeightedSector(round, maxRounds);
-    pipeline.push(generateDealWithSize(sectorId, round, maFocus?.sizePreference || 'any', portfolioEbitda, heatOpts));
+    const size = getEarlyRoundSize(earlyDealIndex++);
+    pipeline.push(generateDealWithSize(sectorId, round, size, portfolioEbitda, heatOpts));
   }
 
   // Ensure at least 4 deals available
   while (pipeline.length < 4) {
     const sectorId = pickWeightedSector(round, maxRounds);
-    pipeline.push(generateDealWithSize(sectorId, round, 'any', portfolioEbitda, heatOpts));
+    const size = getEarlyRoundSize(earlyDealIndex++);
+    pipeline.push(generateDealWithSize(sectorId, round, size, portfolioEbitda, heatOpts));
   }
 
   return pipeline;
