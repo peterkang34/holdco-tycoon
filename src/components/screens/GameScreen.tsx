@@ -57,6 +57,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     totalDebt,
     holdcoLoanBalance,
     holdcoLoanRate,
+    holdcoLoanRoundsRemaining,
     interestRate,
     creditTighteningRoundsRemaining,
     dealPipeline,
@@ -77,7 +78,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     covenantBreachRounds,
     hasRestructured,
     bankruptRound: _bankruptRound,
-    holdcoAmortizationThisRound,
+    holdcoAmortizationThisRound: _holdcoAmortizationThisRound,
     roundHistory,
     advanceToEvent,
     advanceToAllocate,
@@ -469,6 +470,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             totalDebt={totalDebt}
             holdcoLoanBalance={holdcoLoanBalance}
             holdcoLoanRate={holdcoLoanRate}
+            holdcoLoanRoundsRemaining={holdcoLoanRoundsRemaining}
             interestRate={interestRate}
             sharedServicesCost={sharedServicesCost}
             maSourcingCost={maSourcingCost}
@@ -476,7 +478,6 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             yearChronicle={yearChronicle}
             debtPaymentThisRound={debtPaymentThisRound}
             cashBeforeDebtPayments={cashBeforeDebtPayments}
-            holdcoAmortization={holdcoAmortizationThisRound}
             interestPenalty={getDistressRestrictions(metrics.distressLevel).interestPenalty}
             capexReduction={capexReduction}
             onContinue={advanceToEvent}

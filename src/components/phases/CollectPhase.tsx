@@ -9,6 +9,7 @@ interface CollectPhaseProps {
   totalDebt: number;
   holdcoLoanBalance: number;
   holdcoLoanRate: number;
+  holdcoLoanRoundsRemaining: number;
   interestRate: number;
   sharedServicesCost: number;
   maSourcingCost?: number;
@@ -16,7 +17,6 @@ interface CollectPhaseProps {
   yearChronicle?: string | null;
   debtPaymentThisRound?: number;
   cashBeforeDebtPayments?: number;
-  holdcoAmortization?: number;
   interestPenalty?: number;
   capexReduction?: number;
   onContinue: () => void;
@@ -98,17 +98,17 @@ function calculateIntegratedDebtService(businesses: Business[]): { sellerNotes: 
 export function CollectPhase({
   businesses,
   cash,
-  totalDebt,
+  totalDebt: _totalDebt,
   holdcoLoanBalance,
   holdcoLoanRate,
+  holdcoLoanRoundsRemaining,
   interestRate,
   sharedServicesCost,
   maSourcingCost = 0,
   round,
   yearChronicle,
   debtPaymentThisRound: _debtPaymentThisRound,
-  cashBeforeDebtPayments,
-  holdcoAmortization,
+  cashBeforeDebtPayments: _cashBeforeDebtPayments,
   interestPenalty,
   capexReduction = 0,
   onContinue
@@ -135,8 +135,12 @@ export function CollectPhase({
   const hasDeductions = taxBreakdown.totalTaxSavings > 0;
   const effectiveRatePct = Math.round(taxBreakdown.effectiveTaxRate * 100);
 
-  // Calculate annual interest expense (holdco level — loan only)
-  const holdcoInterest = Math.round(holdcoLoanBalance * (holdcoLoanRate + (interestPenalty ?? 0)));
+  // Holdco loan P&I (interest + principal)
+  const holdcoLoanInterest = Math.round(holdcoLoanBalance * (holdcoLoanRate + (interestPenalty ?? 0)));
+  const holdcoLoanPrincipal = holdcoLoanRoundsRemaining > 0
+    ? Math.round(holdcoLoanBalance / holdcoLoanRoundsRemaining)
+    : 0;
+  const holdcoInterest = holdcoLoanInterest + holdcoLoanPrincipal;
 
   // Total earn-out payments (active businesses + tuck-ins) — uncapped
   const uncappedActiveEarnouts = businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.earnoutPayment, 0);
@@ -496,13 +500,13 @@ export function CollectPhase({
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <span className="text-lg">🏦</span>
-                <span className="text-text-secondary">Holdco Debt Interest</span>
+                <span className="text-text-secondary">Holdco Loan P&I</span>
                 <span className="text-xs text-text-muted">
-                  ({formatMoney(totalDebt)} @ {formatPercent(interestRate)}
+                  ({formatMoney(holdcoLoanBalance)} @ {formatPercent(holdcoLoanRate)}
                   {(interestPenalty ?? 0) > 0 && (
                     <span className="text-red-400"> + {formatPercent(interestPenalty!)} penalty</span>
                   )}
-                  )
+                  , {holdcoLoanRoundsRemaining}yr rem)
                 </span>
               </div>
               <span className="font-mono text-danger">-{formatMoney(holdcoInterest)}</span>
@@ -553,30 +557,6 @@ export function CollectPhase({
           </span>
         </div>
       </div>
-
-      {/* Year-Start Adjustments — holdco amortization only (opco debt is in the waterfall) */}
-      {(holdcoAmortization ?? 0) > 0 && (
-        <div className="card mb-6 bg-white/5 border-l-4 border-warning/50">
-          <h3 className="font-bold text-sm mb-3">Year-Start Adjustments</h3>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-text-secondary">Last Year's Ending Cash</span>
-              <span className="font-mono">{formatMoney(cashBeforeDebtPayments ?? 0)}</span>
-            </div>
-            <div className="flex justify-between text-warning">
-              <span>Holdco Debt Amortization (10% mandatory)</span>
-              <span className="font-mono">-{formatMoney(holdcoAmortization ?? 0)}</span>
-            </div>
-            <div className="flex justify-between border-t border-white/10 pt-2 font-bold">
-              <span>Starting Cash</span>
-              <span className="font-mono">{formatMoney(cash)}</span>
-            </div>
-          </div>
-          <p className="text-xs text-text-muted mt-3 italic">
-            Holdco debt auto-amortizes 10% annually (after 2-year grace period).
-          </p>
-        </div>
-      )}
 
       {/* Holdco Cash */}
       <div className="card text-center mb-6">
