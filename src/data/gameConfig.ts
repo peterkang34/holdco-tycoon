@@ -41,10 +41,9 @@ export const INTEGRATION_THRESHOLD_MULTIPLIER = {
 
 // ── Equity Constants ──
 
-export const MAX_EQUITY_RAISES = {
-  standard: 3,  // 20-year game
-  quick: 2,     // 10-year game
-} as const;
+export const EQUITY_DILUTION_STEP = 0.10;   // 10% discount per prior raise
+export const EQUITY_DILUTION_FLOOR = 0.10;  // minimum 10% of intrinsic value
+export const EQUITY_BUYBACK_COOLDOWN = 2;   // rounds between raise↔buyback
 
 // ── Turnaround Constants ──
 

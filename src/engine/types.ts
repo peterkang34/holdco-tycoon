@@ -430,6 +430,8 @@ export interface GameState {
   totalBuybacks: number;
   totalExitProceeds: number;
   equityRaisesUsed: number;
+  lastEquityRaiseRound: number; // 0 = never raised; cooldown sentinel
+  lastBuybackRound: number;     // 0 = never bought back; cooldown sentinel
 
   // Shared Services
   sharedServices: SharedService[];

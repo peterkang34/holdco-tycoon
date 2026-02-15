@@ -73,7 +73,7 @@ const FOUNDER_SHARES = 800;
 const STARTING_INTEREST_RATE = 0.07;
 const MIN_FOUNDER_OWNERSHIP = 0.51;
 
-import { DIFFICULTY_CONFIG, DURATION_CONFIG, MAX_EQUITY_RAISES } from '../data/gameConfig';
+import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN } from '../data/gameConfig';
 import { clampMargin } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
 import { buildChronicleContext } from '../services/chronicleContext';
@@ -194,6 +194,8 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   totalBuybacks: 0,
   totalExitProceeds: 0,
   equityRaisesUsed: 0,
+  lastEquityRaiseRound: 0,
+  lastBuybackRound: 0,
   sharedServices: initializeSharedServices(),
   dealPipeline: [],
   maFocus: { sectorId: null, sizePreference: 'any' as DealSizePreference, subType: null },
@@ -1438,14 +1440,17 @@ export const useGameStore = create<GameStore>()(
         const state = get();
         if (amount <= 0) return;
 
-        // Enforce per-game equity raise cap
-        const maxRaises = MAX_EQUITY_RAISES[state.duration];
-        if (state.equityRaisesUsed >= maxRaises) return;
+        // Cooldown: blocked if buyback was done within EQUITY_BUYBACK_COOLDOWN rounds
+        if (state.lastBuybackRound > 0 && state.round - state.lastBuybackRound < EQUITY_BUYBACK_COOLDOWN) return;
 
         const metrics = calculateMetrics(state);
         // M-5: Guard against division by zero or negative intrinsic value
         if (metrics.intrinsicValuePerShare <= 0) return;
-        const newShares = Math.round((amount / metrics.intrinsicValuePerShare) * 1000) / 1000;
+
+        // Escalating dilution: each prior raise discounts the price by EQUITY_DILUTION_STEP
+        const discount = Math.max(1 - EQUITY_DILUTION_STEP * state.equityRaisesUsed, EQUITY_DILUTION_FLOOR);
+        const effectivePrice = metrics.intrinsicValuePerShare * discount;
+        const newShares = Math.round((amount / effectivePrice) * 1000) / 1000;
 
         // Calculate what ownership would be after issuance
         const newTotalShares = state.sharesOutstanding + newShares;
@@ -1459,12 +1464,13 @@ export const useGameStore = create<GameStore>()(
           cash: state.cash + amount,
           sharesOutstanding: newTotalShares,
           equityRaisesUsed: state.equityRaisesUsed + 1,
+          lastEquityRaiseRound: state.round,
         };
         set({
           ...issueState,
           actionsThisRound: [
             ...state.actionsThisRound,
-            { type: 'issue_equity', round: state.round, details: { amount, newShares, newOwnership: newFounderOwnership } },
+            { type: 'issue_equity', round: state.round, details: { amount, newShares, newOwnership: newFounderOwnership, discount: 1 - discount } },
           ],
           metrics: calculateMetrics(issueState),
         });
@@ -1473,6 +1479,9 @@ export const useGameStore = create<GameStore>()(
       buybackShares: (amount: number) => {
         const state = get();
         if (state.cash < amount) return;
+
+        // Cooldown: blocked if equity was raised within EQUITY_BUYBACK_COOLDOWN rounds
+        if (state.lastEquityRaiseRound > 0 && state.round - state.lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN) return;
 
         const metrics = calculateMetrics(state);
         // Enforce distress restrictions — covenant breach blocks buybacks
@@ -1496,6 +1505,7 @@ export const useGameStore = create<GameStore>()(
           cash: state.cash - amount,
           sharesOutstanding: newTotalShares,
           totalBuybacks: state.totalBuybacks + amount,
+          lastBuybackRound: state.round,
         };
         set({
           ...buybackState,
@@ -1890,7 +1900,8 @@ export const useGameStore = create<GameStore>()(
         const metrics = calculateMetrics(state);
         if (metrics.intrinsicValuePerShare <= 0) return;
 
-        // Emergency: shares issued at 50% of intrinsic value (2x dilution)
+        // Emergency: shares issued at flat 50% of intrinsic value (2x dilution)
+        // No escalating discount — emergency is already punitive
         const emergencyPrice = metrics.intrinsicValuePerShare * 0.5;
         const newShares = Math.round((amount / emergencyPrice) * 1000) / 1000;
 
@@ -1900,6 +1911,7 @@ export const useGameStore = create<GameStore>()(
           cash: state.cash + amount,
           sharesOutstanding: state.sharesOutstanding + newShares,
           equityRaisesUsed: state.equityRaisesUsed + 1,
+          lastEquityRaiseRound: state.round,
         };
         set({
           ...emergencyState,
@@ -2362,7 +2374,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v17', // v17: turnaround capability
+      name: 'holdco-tycoon-save-v18', // v18: escalating dilution + raise/buyback cooldown
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -2385,6 +2397,8 @@ export const useGameStore = create<GameStore>()(
         totalBuybacks: state.totalBuybacks,
         totalExitProceeds: state.totalExitProceeds,
         equityRaisesUsed: state.equityRaisesUsed,
+        lastEquityRaiseRound: state.lastEquityRaiseRound,
+        lastBuybackRound: state.lastBuybackRound,
         sharedServices: state.sharedServices,
         dealPipeline: state.dealPipeline,
         maFocus: state.maFocus,

@@ -7,6 +7,7 @@ import {
   migrateV13ToV14,
   migrateV14ToV15,
   migrateV16ToV17,
+  migrateV17ToV18,
   runAllMigrations,
 } from '../../hooks/migrations';
 
@@ -421,8 +422,8 @@ describe('runAllMigrations', () => {
 
     // v9 should be consumed
     expect(localStorageMock.getItem('holdco-tycoon-save-v9')).toBeNull();
-    // Final v17 should exist
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v17')!);
+    // Final v18 should exist
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v18')!);
     expect(result.state.difficulty).toBe('easy');
     expect(result.state.maxRounds).toBe(20);
     expect(result.state.founderDistributionsReceived).toBeDefined();
@@ -435,6 +436,9 @@ describe('runAllMigrations', () => {
     expect(result.state.turnaroundTier).toBe(0);
     expect(result.state.activeTurnarounds).toEqual([]);
     expect(result.state.businesses[0].qualityImprovedTiers).toBe(0);
+    // v17→v18 fields
+    expect(result.state.lastEquityRaiseRound).toBe(0);
+    expect(result.state.lastBuybackRound).toBe(0);
   });
 
   it('should be safe to call multiple times (idempotent)', () => {
@@ -448,10 +452,10 @@ describe('runAllMigrations', () => {
     localStorageMock.setItem('holdco-tycoon-save-v14', JSON.stringify(v14Data));
 
     runAllMigrations();
-    const first = localStorageMock.getItem('holdco-tycoon-save-v17');
+    const first = localStorageMock.getItem('holdco-tycoon-save-v18');
 
     runAllMigrations();
-    const second = localStorageMock.getItem('holdco-tycoon-save-v17');
+    const second = localStorageMock.getItem('holdco-tycoon-save-v18');
 
     expect(first).toBe(second);
   });
@@ -464,6 +468,59 @@ describe('runAllMigrations', () => {
     expect(localStorageMock.getItem('holdco-tycoon-save-v13')).toBeNull();
     expect(localStorageMock.getItem('holdco-tycoon-save-v14')).toBeNull();
     expect(localStorageMock.getItem('holdco-tycoon-save-v15')).toBeNull();
+    expect(localStorageMock.getItem('holdco-tycoon-save-v18')).toBeNull();
+  });
+});
+
+describe('v17 → v18 migration (escalating dilution + cooldown)', () => {
+  it('should backfill lastEquityRaiseRound and lastBuybackRound', () => {
+    const v17Data = {
+      state: {
+        equityRaisesUsed: 2,
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v17', JSON.stringify(v17Data));
+
+    migrateV17ToV18();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v18')!);
+    expect(result.state.lastEquityRaiseRound).toBe(0);
+    expect(result.state.lastBuybackRound).toBe(0);
+    expect(result.state.equityRaisesUsed).toBe(2);
+  });
+
+  it('should not overwrite existing cooldown fields', () => {
+    const v17Data = {
+      state: {
+        lastEquityRaiseRound: 5,
+        lastBuybackRound: 3,
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v17', JSON.stringify(v17Data));
+
+    migrateV17ToV18();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v18')!);
+    expect(result.state.lastEquityRaiseRound).toBe(5);
+    expect(result.state.lastBuybackRound).toBe(3);
+  });
+
+  it('should be a no-op if v18 key already exists', () => {
+    localStorageMock.setItem('holdco-tycoon-save-v18', JSON.stringify({ state: { existing: true } }));
+    localStorageMock.setItem('holdco-tycoon-save-v17', JSON.stringify({ state: { old: true } }));
+
+    migrateV17ToV18();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v18')!);
+    expect(result.state.existing).toBe(true);
+  });
+
+  it('should remove v17 key after migration', () => {
+    localStorageMock.setItem('holdco-tycoon-save-v17', JSON.stringify({ state: {} }));
+
+    migrateV17ToV18();
+
     expect(localStorageMock.getItem('holdco-tycoon-save-v17')).toBeNull();
+    expect(localStorageMock.getItem('holdco-tycoon-save-v18')).not.toBeNull();
   });
 });

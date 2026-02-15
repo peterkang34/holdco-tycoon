@@ -139,6 +139,8 @@ export function createMockGameState(overrides: Partial<GameState> = {}): GameSta
     totalBuybacks: 0,
     totalExitProceeds: 0,
     equityRaisesUsed: 0,
+    lastEquityRaiseRound: 0,
+    lastBuybackRound: 0,
     sharedServices: initializeSharedServices(),
     dealPipeline: [],
     maFocus: { sectorId: null, sizePreference: 'any', subType: null },

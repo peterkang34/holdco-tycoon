@@ -62,6 +62,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     currentEvent,
     eventHistory,
     equityRaisesUsed,
+    lastEquityRaiseRound,
+    lastBuybackRound,
     sharesOutstanding,
     founderShares,
     initialRaiseAmount,
@@ -499,6 +501,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             maxRounds={maxRounds}
             lastEventType={lastEventType}
             equityRaisesUsed={equityRaisesUsed}
+            lastEquityRaiseRound={lastEquityRaiseRound}
+            lastBuybackRound={lastBuybackRound}
             sharesOutstanding={sharesOutstanding}
             founderShares={founderShares}
             totalBuybacks={totalBuybacks}

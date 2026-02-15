@@ -21,7 +21,7 @@ import {
   formatPercent,
 } from '../../engine/types';
 import { getDistressRestrictions, getDistressLabel, getDistressDescription } from '../../engine/distress';
-import { MAX_EQUITY_RAISES } from '../../data/gameConfig';
+import { EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN } from '../../data/gameConfig';
 import { SECTOR_LIST } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
@@ -58,6 +58,8 @@ interface AllocatePhaseProps {
   round: number;
   maxRounds?: number;
   equityRaisesUsed: number;
+  lastEquityRaiseRound: number;
+  lastBuybackRound: number;
   sharesOutstanding: number;
   founderShares: number;
   totalBuybacks: number;
@@ -115,6 +117,8 @@ export function AllocatePhase({
   round,
   maxRounds: maxRoundsFromStore,
   equityRaisesUsed,
+  lastEquityRaiseRound,
+  lastBuybackRound,
   sharesOutstanding,
   founderShares,
   totalBuybacks: _totalBuybacks,
@@ -193,6 +197,15 @@ export function AllocatePhase({
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const distressRestrictions = getDistressRestrictions(distressLevel);
   const dealSourcingCost = (maSourcing.active && maSourcing.tier >= 1) ? DEAL_SOURCING_COST_TIER1 : DEAL_SOURCING_COST_BASE;
+
+  // Escalating dilution + cooldown derived values
+  const equityDiscount = Math.max(1 - EQUITY_DILUTION_STEP * equityRaisesUsed, EQUITY_DILUTION_FLOOR);
+  const effectivePricePerShare = intrinsicValuePerShare * equityDiscount;
+  const raiseCooldownBlocked = lastBuybackRound > 0 && round - lastBuybackRound < EQUITY_BUYBACK_COOLDOWN;
+  const buybackCooldownBlocked = lastEquityRaiseRound > 0 && round - lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN;
+  const raiseBlocked = raiseCooldownBlocked || intrinsicValuePerShare <= 0;
+  const raiseCooldownRemainder = raiseCooldownBlocked ? EQUITY_BUYBACK_COOLDOWN - (round - lastBuybackRound) : 0;
+  const buybackCooldownRemainder = buybackCooldownBlocked ? EQUITY_BUYBACK_COOLDOWN - (round - lastEquityRaiseRound) : 0;
   const aiEnabled = isAIEnabled();
   const activeServicesCount = sharedServices.filter(s => s.active).length;
   const canUnlockSharedService =
@@ -438,13 +451,12 @@ export function AllocatePhase({
               </div>
               {/* In-modal equity raise for Scenario A */}
               {(() => {
-                const raisesRemaining = MAX_EQUITY_RAISES[duration] - equityRaisesUsed;
                 const shortfall = Math.max(0, Math.round(selectedDeal.effectivePrice * 0.25) - cash);
-                const suggestedRaise = Math.ceil(shortfall / 100) * 100; // round up to nearest $100K (internal units)
-                const canRaise = raisesRemaining > 0 && intrinsicValuePerShare > 0;
+                const suggestedRaise = Math.ceil(shortfall / 100) * 100;
+                const canRaise = !raiseBlocked;
                 const parsedAmount = parseInt(modalEquityAmount) || 0;
                 const internalAmount = Math.round(parsedAmount / 1000);
-                const newShares = intrinsicValuePerShare > 0 ? Math.round((internalAmount / intrinsicValuePerShare) * 1000) / 1000 : 0;
+                const newShares = effectivePricePerShare > 0 ? Math.round((internalAmount / effectivePricePerShare) * 1000) / 1000 : 0;
                 const newTotal = sharesOutstanding + newShares;
                 const newOwnership = newTotal > 0 ? founderShares / newTotal * 100 : 100;
                 const wouldBreachFloor = newOwnership < 51;
@@ -485,20 +497,20 @@ export function AllocatePhase({
                             <span className="sm:hidden">Raise</span>
                           </button>
                         </div>
-                        {parsedAmount >= 1000 && intrinsicValuePerShare > 0 && (
+                        {parsedAmount >= 1000 && effectivePricePerShare > 0 && (
                           <div className="text-xs space-y-1 mt-2">
-                            <p className="text-text-muted">= {newShares.toFixed(1)} shares @ {formatMoney(intrinsicValuePerShare)}/share</p>
+                            <p className="text-text-muted">= {newShares.toFixed(1)} shares @ {formatMoney(effectivePricePerShare)}/share{equityRaisesUsed > 0 ? ` (${Math.round((1 - equityDiscount) * 100)}% discount)` : ''}</p>
                             <p className={`font-medium ${wouldBreachFloor ? 'text-danger' : newOwnership < 55 ? 'text-warning' : 'text-text-secondary'}`}>
                               Ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% → {newOwnership.toFixed(1)}%
                             </p>
                             {wouldBreachFloor && <p className="text-danger">Below 51% — raise would be blocked</p>}
                           </div>
                         )}
-                        <p className="text-xs text-text-muted mt-2">Raises remaining: {raisesRemaining}/{MAX_EQUITY_RAISES[duration]}</p>
+                        <p className="text-xs text-text-muted mt-2">Raise #{equityRaisesUsed + 1}{equityRaisesUsed > 0 ? ` — ${Math.round((1 - equityDiscount) * 100)}% investor discount` : ' — no discount'}</p>
                       </>
                     ) : (
                       <p className="text-sm text-warning">
-                        {raisesRemaining <= 0 ? 'No equity raises remaining this game.' : 'Cannot raise equity at this time.'}
+                        {raiseCooldownBlocked ? `Cooldown: buyback in Y${lastBuybackRound} — wait ${raiseCooldownRemainder} more yr` : 'Cannot raise equity at this time.'}
                       </p>
                     )}
                   </div>
@@ -590,12 +602,10 @@ export function AllocatePhase({
 
             {/* Scenario B: Collapsible equity raise for when you can afford some structures but want more options */}
             {(() => {
-              const raisesRemaining = MAX_EQUITY_RAISES[duration] - equityRaisesUsed;
-              const canRaise = raisesRemaining > 0 && intrinsicValuePerShare > 0;
-              if (!canRaise) return null;
+              if (raiseBlocked) return null;
               const parsedAmount = parseInt(modalEquityAmount) || 0;
               const internalAmount = Math.round(parsedAmount / 1000);
-              const newShares = intrinsicValuePerShare > 0 ? Math.round((internalAmount / intrinsicValuePerShare) * 1000) / 1000 : 0;
+              const newShares = effectivePricePerShare > 0 ? Math.round((internalAmount / effectivePricePerShare) * 1000) / 1000 : 0;
               const newTotal = sharesOutstanding + newShares;
               const newOwnership = newTotal > 0 ? founderShares / newTotal * 100 : 100;
               const wouldBreachFloor = newOwnership < 51;
@@ -636,7 +646,7 @@ export function AllocatePhase({
                           Raise
                         </button>
                       </div>
-                      {parsedAmount >= 1000 && intrinsicValuePerShare > 0 && (
+                      {parsedAmount >= 1000 && effectivePricePerShare > 0 && (
                         <div className="text-xs space-y-1">
                           <p className={`font-medium ${wouldBreachFloor ? 'text-danger' : newOwnership < 55 ? 'text-warning' : 'text-text-secondary'}`}>
                             Ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% → {newOwnership.toFixed(1)}%
@@ -644,7 +654,7 @@ export function AllocatePhase({
                           {wouldBreachFloor && <p className="text-danger">Below 51% — raise would be blocked</p>}
                         </div>
                       )}
-                      <p className="text-xs text-text-muted mt-2">{raisesRemaining}/{MAX_EQUITY_RAISES[duration]} raises remaining</p>
+                      <p className="text-xs text-text-muted mt-2">Raise #{equityRaisesUsed + 1}{equityRaisesUsed > 0 ? ` — ${Math.round((1 - equityDiscount) * 100)}% investor discount` : ' — no discount'}</p>
                     </div>
                   )}
                 </div>
@@ -1351,7 +1361,7 @@ export function AllocatePhase({
                 </span>
                 <span className="hidden sm:inline text-white/20">|</span>
                 <span className="text-text-muted text-xs sm:text-sm">
-                  Raises: {MAX_EQUITY_RAISES[duration] - equityRaisesUsed}/{MAX_EQUITY_RAISES[duration]} remaining
+                  Next raise: {equityRaisesUsed > 0 ? `${Math.round((1 - equityDiscount) * 100)}% discount` : 'no discount'}{raiseCooldownBlocked ? ` (cooldown: ${raiseCooldownRemainder}yr)` : ''}
                 </span>
               </div>
             )}
@@ -1737,16 +1747,16 @@ export function AllocatePhase({
             </div>
 
             {/* Issue Equity */}
-            <div className={`card ${equityRaisesUsed >= MAX_EQUITY_RAISES[duration] ? 'opacity-50' : ''}`}>
+            <div className={`card ${raiseBlocked ? 'opacity-50' : ''}`}>
               <h4 className="font-bold mb-3">Issue Equity</h4>
               <p className="text-sm text-text-muted mb-2">
-                Raise capital by selling new shares at {formatMoney(intrinsicValuePerShare)}/share.
+                Raise capital by selling new shares at {formatMoney(effectivePricePerShare)}/share{equityRaisesUsed > 0 ? ` (${Math.round((1 - equityDiscount) * 100)}% discount)` : ''}.
               </p>
               <p className="text-xs text-text-muted mb-4">
-                Your ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% | {equityRaisesUsed}/{MAX_EQUITY_RAISES[duration]} raises used
+                Your ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% | Raise #{equityRaisesUsed + 1}
               </p>
-              {equityRaisesUsed >= MAX_EQUITY_RAISES[duration] && (
-                <p className="text-xs text-warning mb-4">No equity raises remaining this game.</p>
+              {raiseCooldownBlocked && (
+                <p className="text-xs text-warning mb-4">Cooldown: buyback in Y{lastBuybackRound} — wait {raiseCooldownRemainder} more yr</p>
               )}
               {/* Mode toggle */}
               <div className="flex gap-1 mb-3 bg-white/5 rounded p-0.5 w-fit">
@@ -1804,8 +1814,8 @@ export function AllocatePhase({
                     }
                   }}
                   disabled={(() => {
-                    if (equityRaisesUsed >= MAX_EQUITY_RAISES[duration]) return true;
-                    if (!equityAmount || intrinsicValuePerShare <= 0) return true;
+                    if (raiseBlocked) return true;
+                    if (!equityAmount || effectivePricePerShare <= 0) return true;
                     if (equityMode === 'dollars') {
                       const dollars = parseInt(equityAmount) || 0;
                       return dollars < 1000;
@@ -1824,15 +1834,15 @@ export function AllocatePhase({
                 <p className="text-xs text-text-muted mt-1">= {formatMoney(Math.round(parseInt(equityAmount) / 1000))}</p>
               )}
               {/* Preview for shares mode */}
-              {equityMode === 'shares' && equityAmount && parseInt(equityAmount) >= 1 && intrinsicValuePerShare > 0 && (() => {
+              {equityMode === 'shares' && equityAmount && parseInt(equityAmount) >= 1 && effectivePricePerShare > 0 && (() => {
                 const shareCount = parseInt(equityAmount) || 0;
-                const cost = Math.floor(shareCount * intrinsicValuePerShare);
+                const cost = Math.floor(shareCount * effectivePricePerShare);
                 return (
-                  <p className="text-xs text-text-muted mt-1">= {formatMoney(cost)} ({shareCount} shares @ {formatMoney(intrinsicValuePerShare)}/share)</p>
+                  <p className="text-xs text-text-muted mt-1">= {formatMoney(cost)} ({shareCount} shares @ {formatMoney(effectivePricePerShare)}/share)</p>
                 );
               })()}
               {/* Detail preview */}
-              {equityAmount && intrinsicValuePerShare > 0 && (() => {
+              {equityAmount && effectivePricePerShare > 0 && (() => {
                 let internalAmt: number;
                 if (equityMode === 'dollars') {
                   const dollars = parseInt(equityAmount) || 0;
@@ -1841,9 +1851,9 @@ export function AllocatePhase({
                 } else {
                   const shareCount = parseInt(equityAmount) || 0;
                   if (shareCount < 1) return null;
-                  internalAmt = Math.floor(shareCount * intrinsicValuePerShare);
+                  internalAmt = Math.floor(shareCount * effectivePricePerShare);
                 }
-                const newShares = Math.round((internalAmt / intrinsicValuePerShare) * 1000) / 1000;
+                const newShares = Math.round((internalAmt / effectivePricePerShare) * 1000) / 1000;
                 const newTotal = sharesOutstanding + newShares;
                 const newOwnership = founderShares / newTotal * 100;
                 return (
@@ -1854,7 +1864,7 @@ export function AllocatePhase({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-text-muted">At price per share</span>
-                      <span className="font-mono">{formatMoney(intrinsicValuePerShare)}</span>
+                      <span className="font-mono">{formatMoney(effectivePricePerShare)}{equityRaisesUsed > 0 ? ` (${Math.round((1 - equityDiscount) * 100)}% off)` : ''}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-text-muted">Your new ownership</span>
@@ -1871,7 +1881,7 @@ export function AllocatePhase({
             </div>
 
             {/* Buyback Shares */}
-            <div className="card">
+            <div className={`card ${buybackCooldownBlocked ? 'opacity-50' : ''}`}>
               <h4 className="font-bold mb-3">Buyback Shares</h4>
               <p className="text-sm text-text-muted mb-2">
                 Repurchase outside investor shares at {formatMoney(intrinsicValuePerShare)}/share.
@@ -1879,6 +1889,9 @@ export function AllocatePhase({
               <p className="text-xs text-text-muted mb-4">
                 Outstanding: {sharesOutstanding.toFixed(0)} total | {(sharesOutstanding - founderShares).toFixed(0)} outside shares
               </p>
+              {buybackCooldownBlocked && (
+                <p className="text-xs text-warning mb-4">Cooldown: equity raised in Y{lastEquityRaiseRound} — wait {buybackCooldownRemainder} more yr</p>
+              )}
               {/* Mode toggle */}
               <div className="flex gap-1 mb-3 bg-white/5 rounded p-0.5 w-fit">
                 <button
@@ -1935,7 +1948,7 @@ export function AllocatePhase({
                     }
                   }}
                   disabled={(() => {
-                    if (!buybackAmount || !distressRestrictions.canBuyback) return true;
+                    if (!buybackAmount || !distressRestrictions.canBuyback || buybackCooldownBlocked) return true;
                     if (buybackMode === 'dollars') {
                       const dollars = parseInt(buybackAmount) || 0;
                       return dollars < 1000 || Math.round(dollars / 1000) > cash;
@@ -1948,7 +1961,7 @@ export function AllocatePhase({
                   })()}
                   className="btn-primary text-sm min-h-[44px]"
                 >
-                  {!distressRestrictions.canBuyback ? 'Blocked' : 'Buyback'}
+                  {buybackCooldownBlocked ? 'Cooldown' : !distressRestrictions.canBuyback ? 'Blocked' : 'Buyback'}
                 </button>
               </div>
               {/* Preview for dollar mode */}

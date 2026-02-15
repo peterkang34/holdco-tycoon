@@ -286,6 +286,33 @@ export function migrateV16ToV17(): void {
   }
 }
 
+// --- v17 → v18: escalating dilution + raise/buyback cooldown ---
+
+export function migrateV17ToV18(): void {
+  try {
+    const v18Key = 'holdco-tycoon-save-v18';
+    const v17Key = 'holdco-tycoon-save-v17';
+    if (localStorage.getItem(v18Key)) return;
+    const v17Raw = localStorage.getItem(v17Key);
+    if (!v17Raw) return;
+    const v17Data = JSON.parse(v17Raw);
+    if (!v17Data?.state) return;
+
+    // Backfill cooldown tracking fields
+    if (v17Data.state.lastEquityRaiseRound === undefined) {
+      v17Data.state.lastEquityRaiseRound = 0;
+    }
+    if (v17Data.state.lastBuybackRound === undefined) {
+      v17Data.state.lastBuybackRound = 0;
+    }
+
+    localStorage.setItem(v18Key, JSON.stringify(v17Data));
+    localStorage.removeItem(v17Key);
+  } catch (e) {
+    console.error('v17→v18 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -299,4 +326,5 @@ export function runAllMigrations(): void {
   migrateV14ToV15();
   migrateV15ToV16();
   migrateV16ToV17();
+  migrateV17ToV18();
 }

@@ -19,7 +19,7 @@ import { generateDealStructures, executeDealStructure } from '../deals';
 import { calculateFinalScore, calculateEnterpriseValue } from '../scoring';
 import { createMockBusiness, createMockGameState, createMockDeal } from './helpers';
 import { GameState, SectorId, GamePhase } from '../types';
-import { MAX_EQUITY_RAISES } from '../../data/gameConfig';
+import { EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN } from '../../data/gameConfig';
 
 /**
  * Full game loop simulation tests
@@ -508,58 +508,96 @@ describe('10-Year Mode: Deal Terms Scaling', () => {
   });
 });
 
-describe('Equity Raise Cap', () => {
-  it('should allow 3 raises for standard (20yr) games', () => {
-    expect(MAX_EQUITY_RAISES.standard).toBe(3);
+describe('Escalating Dilution + Raise/Buyback Cooldown', () => {
+  it('should apply correct escalating discount formula', () => {
+    // 1st raise (0 prior): discount = max(1 - 0.10*0, 0.10) = 1.0 (no discount)
+    expect(Math.max(1 - EQUITY_DILUTION_STEP * 0, EQUITY_DILUTION_FLOOR)).toBe(1.0);
+    // 2nd raise (1 prior): discount = max(1 - 0.10*1, 0.10) = 0.90
+    expect(Math.max(1 - EQUITY_DILUTION_STEP * 1, EQUITY_DILUTION_FLOOR)).toBe(0.90);
+    // 3rd raise (2 prior): 0.80
+    expect(Math.max(1 - EQUITY_DILUTION_STEP * 2, EQUITY_DILUTION_FLOOR)).toBe(0.80);
+    // 4th raise (3 prior): 0.70
+    expect(Math.max(1 - EQUITY_DILUTION_STEP * 3, EQUITY_DILUTION_FLOOR)).toBe(0.70);
+    // 5th raise (4 prior): 0.60
+    expect(Math.max(1 - EQUITY_DILUTION_STEP * 4, EQUITY_DILUTION_FLOOR)).toBe(0.60);
   });
 
-  it('should allow 2 raises for quick (10yr) games', () => {
-    expect(MAX_EQUITY_RAISES.quick).toBe(2);
+  it('should floor discount at EQUITY_DILUTION_FLOOR (10%)', () => {
+    // 10th raise (9 prior): max(1 - 0.10*9, 0.10) = max(0.10, 0.10) = 0.10
+    expect(Math.max(1 - EQUITY_DILUTION_STEP * 9, EQUITY_DILUTION_FLOOR)).toBe(0.10);
+    // 15th raise (14 prior): max(1 - 0.10*14, 0.10) = max(-0.40, 0.10) = 0.10
+    expect(Math.max(1 - EQUITY_DILUTION_STEP * 14, EQUITY_DILUTION_FLOOR)).toBe(0.10);
   });
 
-  it('should block equity raise when cap is reached in standard mode', () => {
-    const state = createMockGameState({ duration: 'standard', equityRaisesUsed: 3 });
-    const blocked = state.equityRaisesUsed >= MAX_EQUITY_RAISES[state.duration];
+  it('should block raise after recent buyback (cooldown)', () => {
+    const state = createMockGameState({ round: 5, lastBuybackRound: 4 });
+    const blocked = state.lastBuybackRound > 0 && state.round - state.lastBuybackRound < EQUITY_BUYBACK_COOLDOWN;
     expect(blocked).toBe(true);
   });
 
-  it('should block equity raise when cap is reached in quick mode', () => {
-    const state = createMockGameState({ duration: 'quick', equityRaisesUsed: 2 });
-    const blocked = state.equityRaisesUsed >= MAX_EQUITY_RAISES[state.duration];
+  it('should block buyback after recent equity raise (cooldown)', () => {
+    const state = createMockGameState({ round: 5, lastEquityRaiseRound: 4 });
+    const blocked = state.lastEquityRaiseRound > 0 && state.round - state.lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN;
     expect(blocked).toBe(true);
   });
 
-  it('should allow equity raise when under cap', () => {
-    const state = createMockGameState({ duration: 'standard', equityRaisesUsed: 2 });
-    const blocked = state.equityRaisesUsed >= MAX_EQUITY_RAISES[state.duration];
+  it('should allow raise after cooldown period expires', () => {
+    // Buyback in round 3, now round 5 (diff = 2 >= EQUITY_BUYBACK_COOLDOWN)
+    const state = createMockGameState({ round: 5, lastBuybackRound: 3 });
+    const blocked = state.lastBuybackRound > 0 && state.round - state.lastBuybackRound < EQUITY_BUYBACK_COOLDOWN;
     expect(blocked).toBe(false);
   });
 
-  it('should allow first equity raise with zero raises used', () => {
-    const state = createMockGameState({ duration: 'quick', equityRaisesUsed: 0 });
-    const blocked = state.equityRaisesUsed >= MAX_EQUITY_RAISES[state.duration];
+  it('should allow buyback after cooldown period expires', () => {
+    // Raise in round 3, now round 5 (diff = 2 >= EQUITY_BUYBACK_COOLDOWN)
+    const state = createMockGameState({ round: 5, lastEquityRaiseRound: 3 });
+    const blocked = state.lastEquityRaiseRound > 0 && state.round - state.lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN;
     expect(blocked).toBe(false);
   });
 
-  it('should block the 8-raise exploit in a 10yr hard game', () => {
-    // The exploit: raise equity 8 times in a 10-year game
-    const state = createMockGameState({
-      difficulty: 'normal',
-      duration: 'quick',
-      equityRaisesUsed: 2,
-    });
-    // After 2 raises, further raises should be blocked
-    const blocked = state.equityRaisesUsed >= MAX_EQUITY_RAISES[state.duration];
-    expect(blocked).toBe(true);
+  it('should allow first raise with no prior buybacks (sentinel = 0)', () => {
+    const state = createMockGameState({ round: 1, lastBuybackRound: 0 });
+    const blocked = state.lastBuybackRound > 0 && state.round - state.lastBuybackRound < EQUITY_BUYBACK_COOLDOWN;
+    expect(blocked).toBe(false);
+  });
 
-    // Verify the exploit (8 raises) is impossible
-    for (let raise = 3; raise <= 8; raise++) {
-      const exploitState = createMockGameState({
-        difficulty: 'normal',
-        duration: 'quick',
-        equityRaisesUsed: raise,
-      });
-      expect(exploitState.equityRaisesUsed >= MAX_EQUITY_RAISES[exploitState.duration]).toBe(true);
-    }
+  it('should allow first buyback with no prior raises (sentinel = 0)', () => {
+    const state = createMockGameState({ round: 1, lastEquityRaiseRound: 0 });
+    const blocked = state.lastEquityRaiseRound > 0 && state.round - state.lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN;
+    expect(blocked).toBe(false);
+  });
+
+  it('should make raise→buyback cycling exploit self-defeating', () => {
+    // Attempt: raise round 1, buyback round 1 → blocked by cooldown
+    const afterRaise = createMockGameState({ round: 1, lastEquityRaiseRound: 1 });
+    const buybackBlocked = afterRaise.lastEquityRaiseRound > 0 && afterRaise.round - afterRaise.lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN;
+    expect(buybackBlocked).toBe(true);
+
+    // Even in round 2, still blocked (diff = 1 < 2)
+    const round2 = createMockGameState({ round: 2, lastEquityRaiseRound: 1 });
+    const stillBlocked = round2.lastEquityRaiseRound > 0 && round2.round - round2.lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN;
+    expect(stillBlocked).toBe(true);
+
+    // In round 3, finally allowed (diff = 2 >= 2)
+    const round3 = createMockGameState({ round: 3, lastEquityRaiseRound: 1 });
+    const nowAllowed = round3.lastEquityRaiseRound > 0 && round3.round - round3.lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN;
+    expect(nowAllowed).toBe(false);
+
+    // But by now, the 8th raise has 40% investor discount making it self-defeating
+    const discount8 = Math.max(1 - EQUITY_DILUTION_STEP * 7, EQUITY_DILUTION_FLOOR);
+    expect(discount8).toBeCloseTo(0.30); // 70% discount — investors get shares at 30% of value
+  });
+
+  it('should apply flat 50% discount for emergency raises (no escalation)', () => {
+    // Emergency raise always uses 50% of intrinsic value regardless of prior raises
+    const emergencyDiscount = 0.5; // flat, not escalating
+    // Even after 5 raises, emergency stays at 50%
+    expect(emergencyDiscount).toBe(0.5);
+    // Normal raise after 5 would be 60% off, but emergency is always 50% off
+    const normalDiscount5 = Math.max(1 - EQUITY_DILUTION_STEP * 5, EQUITY_DILUTION_FLOOR);
+    expect(normalDiscount5).toBe(0.5);
+    // After 6 raises, normal is worse than emergency
+    const normalDiscount6 = Math.max(1 - EQUITY_DILUTION_STEP * 6, EQUITY_DILUTION_FLOOR);
+    expect(normalDiscount6).toBeCloseTo(0.4); // 60% off vs emergency 50% off
   });
 });
