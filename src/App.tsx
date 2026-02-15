@@ -42,6 +42,7 @@ function App() {
     sharesOutstanding,
     initialOwnershipPct,
     totalDebt,
+    hasRestructured,
     startGame,
     resetGame,
   } = useGameStore();
@@ -115,6 +116,7 @@ function App() {
           sharesOutstanding={sharesOutstanding}
           initialOwnershipPct={initialOwnershipPct}
           totalDebt={totalDebt}
+          hasRestructured={hasRestructured}
           onPlayAgain={handlePlayAgain}
         />
       )}

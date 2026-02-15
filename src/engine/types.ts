@@ -558,6 +558,7 @@ export interface LeaderboardEntry {
   duration?: GameDuration;
   founderEquityValue?: number;
   founderPersonalWealth?: number;
+  hasRestructured?: boolean;
 }
 
 // Utility types

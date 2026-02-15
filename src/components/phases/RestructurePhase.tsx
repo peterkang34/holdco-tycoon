@@ -56,8 +56,8 @@ export function RestructurePhase({
     return { business: b, valuation, fireSalePrice, netProceeds, postSaleNDE };
   });
 
-  const canContinue = actionsTaken > 0;
   const breachResolved = netDebtToEbitda < 4.5 && cash >= 0;
+  const canContinue = actionsTaken > 0 && breachResolved;
 
   // Calculate how much cash needed to reach comfortable (2.5x) and breach exit (4.5x)
   const netDebt = totalDebt - cash;
@@ -66,6 +66,13 @@ export function RestructurePhase({
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 pb-8">
+      {/* Penalty Warning Banner */}
+      <div className="bg-orange-900/30 border border-orange-500/50 rounded-xl p-4 mb-6 text-center">
+        <p className="text-orange-300 text-sm font-medium">
+          Restructuring imposes a permanent <strong>-20% penalty</strong> on your final Founder Equity Value (FEV).
+        </p>
+      </div>
+
       {/* Danger Banner */}
       <div className="bg-red-900/40 border-2 border-red-500/60 rounded-xl p-6 mb-8 text-center">
         <h2 className="text-3xl font-bold text-red-400 mb-2">Financial Distress</h2>
@@ -328,8 +335,10 @@ export function RestructurePhase({
         }`}
       >
         {canContinue
-          ? (breachResolved ? 'Continue (Breach Resolved) →' : 'Continue to Events →')
-          : 'Take at least one action to continue'}
+          ? 'Continue (Breach Resolved) →'
+          : actionsTaken > 0 && !breachResolved
+          ? 'Resolve breach (ND/E < 4.5x) or declare bankruptcy'
+          : 'Take action to resolve the breach'}
       </button>
     </div>
   );

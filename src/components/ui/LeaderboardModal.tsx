@@ -3,7 +3,7 @@ import { LeaderboardEntry, GameDifficulty, GameDuration, formatMoney } from '../
 import { loadLeaderboard } from '../../engine/scoring';
 import { getGradeColor, getRankColor } from '../../utils/gradeColors';
 import { Modal } from './Modal';
-import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
+import { DIFFICULTY_CONFIG, RESTRUCTURING_FEV_PENALTY } from '../../data/gameConfig';
 
 type LeaderboardTab = 'overall' | 'hard20' | 'hard10' | 'easy20' | 'easy10' | 'distributions';
 
@@ -41,7 +41,8 @@ function formatDate(dateStr: string) {
 function getAdjustedFEV(entry: LeaderboardEntry): number {
   const raw = entry.founderEquityValue ?? entry.enterpriseValue;
   const difficulty = entry.difficulty ?? 'easy';
-  return Math.round(raw * (DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0));
+  const restructuringPenalty = entry.hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0;
+  return Math.round(raw * (DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0) * restructuringPenalty);
 }
 
 function getEntryDifficulty(entry: LeaderboardEntry): GameDifficulty {
@@ -276,7 +277,10 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
       <div className="flex items-center gap-2 sm:gap-4 md:gap-6 text-right shrink-0">
         <div className="min-w-[4.5rem]">
           <p className="text-xs text-text-muted">{displayLabel}</p>
-          <p className="font-mono tabular-nums font-bold text-accent">{formatMoney(displayValue)}</p>
+          <p className="font-mono tabular-nums font-bold text-accent">
+            {formatMoney(displayValue)}
+            {entry.hasRestructured && <span className="text-red-400 text-[10px] ml-1" title="Restructured — 20% FEV penalty">(R)</span>}
+          </p>
         </div>
         <div className="min-w-[3.5rem]">
           <p className="text-xs text-text-muted">Score</p>

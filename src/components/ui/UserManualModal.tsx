@@ -190,7 +190,8 @@ function GameLoopContent() {
       <P>
         If you are in covenant breach, you enter a mandatory restructuring phase before events.
         Here you can perform a distressed sale, raise emergency equity, or declare bankruptcy.
-        You must resolve your financial distress before proceeding.
+        You must resolve the breach (reduce ND/E below 4.5x) before you can continue.
+        Restructuring imposes a permanent <strong>-20% penalty</strong> on your final FEV.
       </P>
 
       <SubHeading>3. Event Phase</SubHeading>
@@ -395,7 +396,7 @@ function FinancialContent() {
         headers={['Type', 'Level', 'Rate', 'Notes']}
         rows={[
           ['Seller Notes', 'Deal-level', '5-6%', 'Amortizes over 4-5 years; tied to individual acquisition'],
-          ['Bank Debt', 'Holdco-level', '7% base', 'Amortizes over 5-10 years; affected by events and distress penalties'],
+          ['Bank Debt', 'Per-business', '7% base', 'Amortizes over 5-10 years; can be paid down voluntarily in the Allocate phase; affected by events and distress penalties'],
           ['Earn-outs', 'Deal-level', 'N/A', 'Contingent payments based on EBITDA growth targets; not traditional debt'],
         ]}
       />
@@ -480,10 +481,11 @@ function DistressContent() {
         <><strong>Emergency Equity Raise:</strong> Raise equity at a flat 50% discount to inject cash (triggers raise/buyback cooldown)</>,
         <><strong>Declare Bankruptcy:</strong> End the game immediately (F grade)</>,
       ]} />
-      <P>
-        Restructuring is a one-time lifeline. If you breach covenants again after restructuring,
-        it leads to automatic game over.
-      </P>
+      <HighlightBox variant="warning">
+        <strong>Restructuring Penalty:</strong> Restructuring imposes a permanent <strong>-20% penalty</strong> on
+        your final Founder Equity Value (FEV). It is a one-time lifeline — if you breach covenants
+        or go cash-negative again after restructuring, it leads to automatic bankruptcy.
+      </HighlightBox>
 
       <SubHeading>When EBITDA Goes to Zero</SubHeading>
       <P>
@@ -826,7 +828,7 @@ function ScoringContent() {
 
       <SubHeading>Leaderboard Tabs</SubHeading>
       <BulletList items={[
-        <><strong>Overall:</strong> All runs ranked by Adjusted FEV (raw FEV x difficulty multiplier)</>,
+        <><strong>Overall:</strong> All runs ranked by Adjusted FEV (raw FEV x difficulty multiplier x restructuring penalty if applicable)</>,
         <><strong>Hard / 20yr:</strong> Normal difficulty, full game only — ranked by raw FEV</>,
         <><strong>Hard / 10yr:</strong> Normal difficulty, quick play only — ranked by raw FEV</>,
         <><strong>Easy / 20yr:</strong> Easy difficulty, full game only — ranked by raw FEV</>,
@@ -838,7 +840,8 @@ function ScoringContent() {
       <P>
         On the Overall leaderboard, Normal mode runs receive a <strong>1.15x multiplier</strong> to
         their FEV, compensating for the harder starting position ($5M vs $20M, debt from day one,
-        100% ownership). Within mode-specific tabs, raw FEV is used for fair comparison.
+        100% ownership). Games that required restructuring receive a <strong>0.80x penalty</strong> (20%
+        haircut). Within mode-specific tabs, raw FEV is used for fair comparison.
       </P>
     </>
   );

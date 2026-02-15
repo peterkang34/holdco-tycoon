@@ -34,6 +34,7 @@ import {
   TURNAROUND_FATIGUE_PENALTY,
   TURNAROUND_EXIT_PREMIUM,
   TURNAROUND_EXIT_PREMIUM_MIN_TIERS,
+  RESTRUCTURING_FEV_PENALTY,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG } from '../../data/turnaroundPrograms';
 
@@ -705,6 +706,68 @@ describe('Display Proofreader', () => {
         expect(sector.organicGrowthRange).toHaveLength(2);
         expect(sector.subTypes.length).toBeGreaterThan(0);
       }
+    });
+  });
+
+  // ── Restructuring Proofreader ──
+
+  describe('Restructuring FEV Penalty', () => {
+    it('RESTRUCTURING_FEV_PENALTY equals 0.80', () => {
+      expect(RESTRUCTURING_FEV_PENALTY).toBe(0.80);
+    });
+
+    it('RestructurePhase mentions 20% penalty', () => {
+      const restructurePhase = readComponent('components/phases/RestructurePhase.tsx');
+      expect(restructurePhase).toContain('-20%');
+      expect(restructurePhase).toContain('penalty');
+    });
+
+    it('RestructurePhase requires breach resolution to continue', () => {
+      const restructurePhase = readComponent('components/phases/RestructurePhase.tsx');
+      // canContinue must require breachResolved
+      expect(restructurePhase).toContain('actionsTaken > 0 && breachResolved');
+    });
+
+    it('GameOverScreen applies restructuring multiplier to adjustedFEV', () => {
+      const gameOverScreen = readComponent('components/screens/GameOverScreen.tsx');
+      expect(gameOverScreen).toContain('RESTRUCTURING_FEV_PENALTY');
+      expect(gameOverScreen).toContain('restructuringMultiplier');
+    });
+
+    it('LeaderboardModal applies restructuring penalty in getAdjustedFEV', () => {
+      const leaderboardModal = readComponent('components/ui/LeaderboardModal.tsx');
+      expect(leaderboardModal).toContain('RESTRUCTURING_FEV_PENALTY');
+      expect(leaderboardModal).toContain('hasRestructured');
+    });
+  });
+
+  // ── UserManual Restructuring Copy ──
+
+  describe('UserManual restructuring copy', () => {
+    it('mentions -20% FEV penalty in restructure phase description', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('-20% penalty');
+    });
+
+    it('mentions breach resolution requirement (ND/E below 4.5x)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('4.5x');
+    });
+
+    it('mentions 0.80x restructuring penalty in leaderboard section', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('0.80x penalty');
+    });
+
+    it('bank debt described as per-business with voluntary paydown', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Per-business');
+      expect(manual).toContain('paid down voluntarily');
+    });
+
+    it('AllocatePhase debt explanation mentions voluntary bank debt paydown', () => {
+      const allocatePhase = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocatePhase).toContain('paid down voluntarily');
     });
   });
 });

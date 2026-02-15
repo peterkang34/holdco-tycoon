@@ -90,6 +90,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     unlockSharedService,
     deactivateSharedService,
     payDownDebt,
+    payDownBankDebt,
     issueEquity,
     buybackShares,
     distributeToOwners,
@@ -216,11 +217,23 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     payDownDebt(amount);
     const remaining = useGameStore.getState().holdcoLoanBalance;
     addToast({
-      message: `Paid down ${formatMoney(amount)} debt`,
-      detail: remaining > 0 ? `${formatMoney(remaining)} remaining` : 'Debt-free!',
+      message: `Paid down ${formatMoney(amount)} holdco debt`,
+      detail: remaining > 0 ? `${formatMoney(remaining)} remaining` : 'Holdco debt-free!',
       type: 'success',
     });
   }, [payDownDebt, addToast]);
+
+  const handlePayBankDebt = useCallback((businessId: string, amount: number) => {
+    const biz = businesses.find(b => b.id === businessId);
+    payDownBankDebt(businessId, amount);
+    const updatedBiz = useGameStore.getState().businesses.find(b => b.id === businessId);
+    const remaining = updatedBiz?.bankDebtBalance ?? 0;
+    addToast({
+      message: `Paid down ${formatMoney(amount)} bank debt on ${biz?.name ?? 'business'}`,
+      detail: remaining > 0 ? `${formatMoney(remaining)} remaining` : 'Bank debt cleared!',
+      type: 'success',
+    });
+  }, [payDownBankDebt, businesses, addToast]);
 
   const handleIssueEquity = useCallback((amount: number) => {
     const prevShares = sharesOutstanding;
@@ -543,6 +556,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             onUnlockSharedService={handleUnlockSharedService}
             onDeactivateSharedService={handleDeactivateSharedService}
             onPayDebt={handlePayDebt}
+            onPayBankDebt={handlePayBankDebt}
             onIssueEquity={handleIssueEquity}
             onBuyback={handleBuyback}
             onDistribute={handleDistribute}

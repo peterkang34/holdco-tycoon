@@ -39,6 +39,10 @@ export const INTEGRATION_THRESHOLD_MULTIPLIER = {
   normal: { standard: 0.7, quick: 0.5 },
 } as const;
 
+// ── Restructuring Constants ──
+
+export const RESTRUCTURING_FEV_PENALTY = 0.80; // 20% FEV haircut for restructured games
+
 // ── Equity Constants ──
 
 export const EQUITY_DILUTION_STEP = 0.10;   // 10% discount per prior raise

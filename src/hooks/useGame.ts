@@ -121,6 +121,7 @@ interface GameStore extends GameState {
   unlockSharedService: (serviceType: SharedServiceType) => void;
   deactivateSharedService: (serviceType: SharedServiceType) => void;
   payDownDebt: (amount: number) => void;
+  payDownBankDebt: (businessId: string, amount: number) => void;
   issueEquity: (amount: number) => void;
   buybackShares: (amount: number) => void;
   distributeToOwners: (amount: number) => void;
@@ -472,11 +473,20 @@ export const useGameStore = create<GameStore>()(
         // Fire financial stress toasts
         const cashChange = newCash - state.cash;
 
-        // Negative cash triggers restructuring
+        // Negative cash triggers restructuring (or bankruptcy if already restructured)
         let requiresRestructuring = state.requiresRestructuring;
+        let gameOverFromNegativeCash = false;
+        let negativeCashBankruptRound: number | undefined;
         if (newCash < 0) {
-          requiresRestructuring = true;
-          addToast({ message: 'Cash depleted — forced restructuring triggered', type: 'danger' });
+          if (state.hasRestructured) {
+            // Second distress event → immediate bankruptcy
+            gameOverFromNegativeCash = true;
+            negativeCashBankruptRound = state.round;
+            addToast({ message: 'Cash depleted again — bankruptcy declared', type: 'danger' });
+          } else {
+            requiresRestructuring = true;
+            addToast({ message: 'Cash depleted — forced restructuring triggered', type: 'danger' });
+          }
           newCash = 0; // Floor at 0
         } else if (cashChange < 0) {
           addToast({
@@ -499,6 +509,26 @@ export const useGameStore = create<GameStore>()(
 
         // Recompute totalDebt from holdco loan + per-business bank debt
         const newTotalDebt = computeTotalDebt(updatedBusinesses, updatedHoldcoLoanBalance);
+
+        // If negative-cash triggered bankruptcy, end game immediately
+        if (gameOverFromNegativeCash) {
+          const bankruptState: GameState = {
+            ...state,
+            businesses: updatedBusinesses,
+            cash: 0,
+            totalDebt: newTotalDebt,
+            holdcoLoanBalance: updatedHoldcoLoanBalance,
+            holdcoLoanRoundsRemaining: updatedHoldcoLoanRoundsRemaining,
+            gameOver: true,
+            bankruptRound: negativeCashBankruptRound,
+            requiresRestructuring: false,
+          };
+          set({
+            ...bankruptState,
+            metrics: calculateMetrics(bankruptState),
+          });
+          return;
+        }
 
         let gameState: GameState = {
           ...state,
@@ -1472,6 +1502,36 @@ export const useGameStore = create<GameStore>()(
             { type: 'pay_debt', round: state.round, details: { amount: actualPayment } },
           ],
           metrics: calculateMetrics(payDebtState),
+        });
+      },
+
+      payDownBankDebt: (businessId: string, amount: number) => {
+        const state = get();
+        const business = state.businesses.find(b => b.id === businessId);
+        if (!business || business.status !== 'active' || business.bankDebtBalance <= 0) return;
+
+        const actualPayment = Math.min(amount, business.bankDebtBalance, state.cash);
+        if (actualPayment <= 0) return;
+
+        const updatedBusinesses = state.businesses.map(b => {
+          if (b.id !== businessId) return b;
+          return { ...b, bankDebtBalance: b.bankDebtBalance - actualPayment };
+        });
+        const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
+
+        const payBankDebtState = {
+          ...state,
+          cash: state.cash - actualPayment,
+          totalDebt: newTotalDebt,
+          businesses: updatedBusinesses,
+        };
+        set({
+          ...payBankDebtState,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'pay_debt', round: state.round, details: { amount: actualPayment, businessId, bankDebt: true } },
+          ],
+          metrics: calculateMetrics(payBankDebtState),
         });
       },
 

@@ -4,7 +4,7 @@ import { SECTORS } from '../../data/sectors';
 import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLeaderboardRankFromList } from '../../engine/scoring';
 import { calculateExitValuation } from '../../engine/simulation';
 import { AIAnalysisSection } from '../ui/AIAnalysisSection';
-import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
+import { DIFFICULTY_CONFIG, RESTRUCTURING_FEV_PENALTY } from '../../data/gameConfig';
 import { getGradeColor, getRankColor } from '../../utils/gradeColors';
 import { TABS, filterAndSort, getDisplayValue } from '../ui/LeaderboardModal';
 import type { LeaderboardTab } from '../ui/LeaderboardModal';
@@ -35,6 +35,7 @@ interface GameOverScreenProps {
   sharesOutstanding: number;
   initialOwnershipPct: number;
   totalDebt: number;
+  hasRestructured?: boolean;
   onPlayAgain: () => void;
 }
 
@@ -63,6 +64,7 @@ export function GameOverScreen({
   sharesOutstanding,
   initialOwnershipPct,
   totalDebt,
+  hasRestructured = false,
   onPlayAgain,
 }: GameOverScreenProps) {
   const [initials, setInitials] = useState('');
@@ -94,7 +96,8 @@ export function GameOverScreen({
     [businesses]
   );
   const difficultyMultiplier = DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0;
-  const adjustedFEV = Math.round(founderEquityValue * difficultyMultiplier);
+  const restructuringMultiplier = hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0;
+  const adjustedFEV = Math.round(founderEquityValue * difficultyMultiplier * restructuringMultiplier);
   const canMakeLeaderboard = wouldMakeLeaderboardFromList(leaderboard, adjustedFEV);
   const potentialRank = getLeaderboardRankFromList(leaderboard, adjustedFEV);
 
@@ -174,6 +177,7 @@ export function GameOverScreen({
           duration,
           founderEquityValue,
           founderPersonalWealth,
+          hasRestructured,
         }
       );
 
@@ -188,6 +192,7 @@ export function GameOverScreen({
         founderPersonalWealth,
         difficulty,
         duration,
+        hasRestructured,
       };
       setLeaderboard(prev => {
         // Avoid duplicates if the entry is somehow already present
@@ -301,12 +306,28 @@ export function GameOverScreen({
       )}
 
       {/* Founder Equity Value - Hero Display */}
-      <div className="card mb-6 bg-gradient-to-r from-accent/20 to-accent-secondary/20 border-accent/30">
+      <div className={`card mb-6 bg-gradient-to-r ${hasRestructured ? 'from-red-900/20 to-orange-900/20 border-red-500/30' : 'from-accent/20 to-accent-secondary/20 border-accent/30'}`}>
         <div className="text-center">
-          <p className="text-text-muted text-sm mb-1">Founder Equity Value</p>
-          <p className="text-3xl sm:text-5xl font-bold font-mono text-accent mb-2">
-            {formatMoney(founderEquityValue)}
+          <p className="text-text-muted text-sm mb-1">
+            Founder Equity Value
+            {hasRestructured && (
+              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-red-900/30 border border-red-500/50 text-red-400" title="Your FEV has been reduced by 20% due to financial restructuring.">
+                -20% Restructuring
+              </span>
+            )}
           </p>
+          {hasRestructured ? (
+            <div className="mb-2">
+              <p className="text-lg font-mono text-text-muted line-through">{formatMoney(founderEquityValue)}</p>
+              <p className="text-3xl sm:text-5xl font-bold font-mono text-red-400">
+                {formatMoney(adjustedFEV)}
+              </p>
+            </div>
+          ) : (
+            <p className="text-3xl sm:text-5xl font-bold font-mono text-accent mb-2">
+              {formatMoney(founderEquityValue)}
+            </p>
+          )}
           <div className="flex flex-col sm:flex-row justify-center gap-3 sm:gap-6 mt-3">
             <div>
               <p className="text-text-muted text-xs">Enterprise Value</p>
@@ -361,9 +382,27 @@ export function GameOverScreen({
                 <span className="font-mono"></span>
               </div>
               <div className="flex justify-between text-sm font-bold text-accent">
-                <span>= Founder Equity Value</span>
+                <span>= Raw FEV</span>
                 <span className="font-mono">{formatMoney(founderEquityValue)}</span>
               </div>
+              {difficultyMultiplier !== 1.0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-text-muted">x Difficulty ({formatMultiple(difficultyMultiplier)})</span>
+                  <span className="font-mono">{formatMoney(Math.round(founderEquityValue * difficultyMultiplier))}</span>
+                </div>
+              )}
+              {hasRestructured && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-red-400">x Restructuring (-20%)</span>
+                  <span className="font-mono text-red-400">-{formatMoney(Math.round(founderEquityValue * difficultyMultiplier) - adjustedFEV)}</span>
+                </div>
+              )}
+              {(difficultyMultiplier !== 1.0 || hasRestructured) && (
+                <div className="border-t border-white/10 pt-2 flex justify-between text-sm font-bold">
+                  <span>= Adjusted FEV</span>
+                  <span className={`font-mono ${hasRestructured ? 'text-red-400' : 'text-accent'}`}>{formatMoney(adjustedFEV)}</span>
+                </div>
+              )}
             </div>
 
             {/* Ownership Impact */}
@@ -706,7 +745,10 @@ function GameOverLeaderboard({
                 <div className="flex items-center gap-4 sm:gap-6 text-right shrink-0">
                   <div className="min-w-[4.5rem]">
                     <p className="text-xs text-text-muted">{displayLabel}</p>
-                    <p className="font-mono tabular-nums font-bold text-accent">{formatMoney(displayValue)}</p>
+                    <p className="font-mono tabular-nums font-bold text-accent">
+                      {formatMoney(displayValue)}
+                      {entry.hasRestructured && <span className="text-red-400 text-[10px] ml-1" title="Restructured — 20% FEV penalty">(R)</span>}
+                    </p>
                   </div>
                   <div className="min-w-[3.5rem]">
                     <p className="text-xs text-text-muted">Score</p>

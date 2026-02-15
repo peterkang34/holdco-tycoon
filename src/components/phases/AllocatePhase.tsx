@@ -74,6 +74,7 @@ interface AllocatePhaseProps {
   onUnlockSharedService: (serviceType: SharedServiceType) => void;
   onDeactivateSharedService: (serviceType: SharedServiceType) => void;
   onPayDebt: (amount: number) => void;
+  onPayBankDebt: (businessId: string, amount: number) => void;
   onIssueEquity: (amount: number) => void;
   onBuyback: (amount: number) => void;
   onDistribute: (amount: number) => void;
@@ -134,6 +135,7 @@ export function AllocatePhase({
   onUnlockSharedService,
   onDeactivateSharedService,
   onPayDebt,
+  onPayBankDebt,
   onIssueEquity,
   onBuyback,
   onDistribute,
@@ -167,6 +169,7 @@ export function AllocatePhase({
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [selectedBusinessForImprovement, setSelectedBusinessForImprovement] = useState<Business | null>(null);
   const [payDebtAmount, setPayDebtAmount] = useState('');
+  const [bankDebtAmounts, setBankDebtAmounts] = useState<Record<string, string>>({});
   const [equityAmount, setEquityAmount] = useState('');
   const [equityMode, setEquityMode] = useState<'dollars' | 'shares'>('dollars');
   const [buybackAmount, setBuybackAmount] = useState('');
@@ -1641,7 +1644,7 @@ export function AllocatePhase({
                     </div>
                   </div>
                   <div className="mt-4 p-3 bg-white/5 rounded text-xs text-text-muted">
-                    <strong>How debt works:</strong> Holdco debt has a 2-year grace period, then 10% of the balance amortizes automatically each year. You can also pay down extra here. Seller notes auto-amortize each year. Bank debt at opco level stays until you sell the business (proceeds net of debt).
+                    <strong>How debt works:</strong> Holdco debt has a 2-year grace period, then 10% of the balance amortizes automatically each year. You can also pay down extra here. Seller notes auto-amortize each year. Bank debt at the business level amortizes automatically and can also be paid down voluntarily below.
                   </div>
                 </div>
               );
@@ -1764,6 +1767,68 @@ export function AllocatePhase({
               )}
               <p className="text-xs text-text-muted mt-2">Interest charged annually on remaining balance</p>
             </div>
+
+            {/* Pay Down Bank Debt (per-business) */}
+            {(() => {
+              const bizWithBankDebt = allBusinesses.filter(b => b.status === 'active' && b.bankDebtBalance > 0);
+              if (bizWithBankDebt.length === 0) return null;
+              return (
+                <div className="card">
+                  <h4 className="font-bold mb-3">Pay Down Bank Debt</h4>
+                  <p className="text-sm text-text-muted mb-4">
+                    Per-business bank debt — voluntary prepayment reduces interest costs.
+                  </p>
+                  <div className="space-y-3">
+                    {bizWithBankDebt.map(biz => {
+                      const sector = SECTORS[biz.sectorId];
+                      const inputVal = bankDebtAmounts[biz.id] || '';
+                      return (
+                        <div key={biz.id} className="p-3 bg-white/5 rounded-lg">
+                          <div className="flex items-center gap-2 mb-2">
+                            <span>{sector.emoji}</span>
+                            <span className="font-medium text-sm truncate">{biz.name}</span>
+                            <span className="text-xs text-text-muted ml-auto font-mono">{formatMoney(biz.bankDebtBalance)} @ {formatPercent(biz.bankDebtRate || interestRate)}</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <div className="flex-1 relative">
+                              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                              <input
+                                type="text"
+                                inputMode="numeric"
+                                value={inputVal}
+                                onChange={(e) => {
+                                  const raw = e.target.value.replace(/[^0-9]/g, '');
+                                  setBankDebtAmounts(prev => ({ ...prev, [biz.id]: raw }));
+                                }}
+                                placeholder="1,000,000"
+                                className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2 text-sm"
+                              />
+                            </div>
+                            <button
+                              onClick={() => {
+                                const dollars = parseInt(inputVal) || 0;
+                                const internalAmount = Math.round(dollars / 1000);
+                                if (internalAmount > 0) {
+                                  onPayBankDebt(biz.id, internalAmount);
+                                  setBankDebtAmounts(prev => ({ ...prev, [biz.id]: '' }));
+                                }
+                              }}
+                              disabled={!inputVal || (parseInt(inputVal) || 0) < 1000}
+                              className="btn-primary text-sm min-h-[40px]"
+                            >
+                              Pay
+                            </button>
+                          </div>
+                          {inputVal && parseInt(inputVal) >= 1000 && (
+                            <p className="text-xs text-text-muted mt-1">= {formatMoney(Math.round(parseInt(inputVal) / 1000))}</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Issue Equity */}
             <div className={`card ${raiseBlocked ? 'opacity-50' : ''}`}>

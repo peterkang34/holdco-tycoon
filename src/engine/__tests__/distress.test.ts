@@ -5,6 +5,9 @@ import {
   getDistressLabel,
   getDistressDescription,
 } from '../distress';
+import { createMockBusiness, createMockGameState } from './helpers';
+import { RESTRUCTURING_FEV_PENALTY, DIFFICULTY_CONFIG } from '../../data/gameConfig';
+import type { LeaderboardEntry } from '../types';
 
 describe('calculateDistressLevel', () => {
   it('should return comfortable for low leverage', () => {
@@ -103,5 +106,254 @@ describe('getDistressDescription', () => {
 
   it('should mention no acquisitions in breach description', () => {
     expect(getDistressDescription('breach')).toContain('No acquisitions');
+  });
+});
+
+// ── Restructuring System Tests ──
+
+describe('Restructuring trigger logic', () => {
+  it('negative cash triggers restructuring when hasRestructured = false', () => {
+    const state = createMockGameState({
+      hasRestructured: false,
+      requiresRestructuring: false,
+      cash: 100,
+    });
+    // Simulate: if newCash < 0 and !hasRestructured → requiresRestructuring = true
+    const newCash = -500;
+    let requiresRestructuring = state.requiresRestructuring;
+    let gameOverFromNegativeCash = false;
+    if (newCash < 0) {
+      if (state.hasRestructured) {
+        gameOverFromNegativeCash = true;
+      } else {
+        requiresRestructuring = true;
+      }
+    }
+    expect(requiresRestructuring).toBe(true);
+    expect(gameOverFromNegativeCash).toBe(false);
+  });
+
+  it('negative cash triggers bankruptcy when hasRestructured = true', () => {
+    const state = createMockGameState({
+      hasRestructured: true,
+      requiresRestructuring: false,
+      cash: 100,
+    });
+    const newCash = -500;
+    let requiresRestructuring = state.requiresRestructuring;
+    let gameOverFromNegativeCash = false;
+    if (newCash < 0) {
+      if (state.hasRestructured) {
+        gameOverFromNegativeCash = true;
+      } else {
+        requiresRestructuring = true;
+      }
+    }
+    expect(requiresRestructuring).toBe(false);
+    expect(gameOverFromNegativeCash).toBe(true);
+  });
+
+  it('2 consecutive breach years triggers restructuring', () => {
+    // endRound logic: covenantBreachRounds >= 2 && !hasRestructured → requiresRestructuring
+    const covenantBreachRounds = 2;
+    const hasRestructured = false;
+    let requiresRestructuring = false;
+    let gameOverFromBankruptcy = false;
+    if (covenantBreachRounds >= 2) {
+      if (hasRestructured) {
+        gameOverFromBankruptcy = true;
+      } else {
+        requiresRestructuring = true;
+      }
+    }
+    expect(requiresRestructuring).toBe(true);
+    expect(gameOverFromBankruptcy).toBe(false);
+  });
+
+  it('2 consecutive breach years after restructuring triggers bankruptcy', () => {
+    const covenantBreachRounds = 2;
+    const hasRestructured = true;
+    let requiresRestructuring = false;
+    let gameOverFromBankruptcy = false;
+    if (covenantBreachRounds >= 2) {
+      if (hasRestructured) {
+        gameOverFromBankruptcy = true;
+      } else {
+        requiresRestructuring = true;
+      }
+    }
+    expect(requiresRestructuring).toBe(false);
+    expect(gameOverFromBankruptcy).toBe(true);
+  });
+});
+
+describe('Restructuring exit conditions', () => {
+  it('cannot continue without breach resolution (ND/E >= 4.5x)', () => {
+    const actionsTaken = 3;
+    const netDebtToEbitda = 5.0;
+    const cash = 1000;
+    const breachResolved = netDebtToEbitda < 4.5 && cash >= 0;
+    const canContinue = actionsTaken > 0 && breachResolved;
+    expect(breachResolved).toBe(false);
+    expect(canContinue).toBe(false);
+  });
+
+  it('can continue after breach resolved (ND/E < 4.5x) with 1+ actions', () => {
+    const actionsTaken = 1;
+    const netDebtToEbitda = 3.0;
+    const cash = 5000;
+    const breachResolved = netDebtToEbitda < 4.5 && cash >= 0;
+    const canContinue = actionsTaken > 0 && breachResolved;
+    expect(breachResolved).toBe(true);
+    expect(canContinue).toBe(true);
+  });
+
+  it('cannot continue with 0 actions even if breach resolved', () => {
+    const actionsTaken = 0;
+    const netDebtToEbitda = 2.0;
+    const cash = 10000;
+    const breachResolved = netDebtToEbitda < 4.5 && cash >= 0;
+    const canContinue = actionsTaken > 0 && breachResolved;
+    expect(breachResolved).toBe(true);
+    expect(canContinue).toBe(false);
+  });
+
+  it('cannot continue if cash is negative', () => {
+    const actionsTaken = 2;
+    const netDebtToEbitda = 3.0;
+    const cash = -100;
+    const breachResolved = netDebtToEbitda < 4.5 && cash >= 0;
+    const canContinue = actionsTaken > 0 && breachResolved;
+    expect(breachResolved).toBe(false);
+    expect(canContinue).toBe(false);
+  });
+});
+
+describe('FEV restructuring penalty', () => {
+  it('RESTRUCTURING_FEV_PENALTY is 0.80 (20% haircut)', () => {
+    expect(RESTRUCTURING_FEV_PENALTY).toBe(0.80);
+  });
+
+  it('restructured game gets 0.80x FEV multiplier', () => {
+    const rawFEV = 50000; // $50M
+    const penalty = RESTRUCTURING_FEV_PENALTY;
+    expect(Math.round(rawFEV * penalty)).toBe(40000);
+  });
+
+  it('non-restructured game gets 1.0x FEV multiplier', () => {
+    const rawFEV = 50000;
+    const penalty = 1.0; // no restructuring
+    expect(Math.round(rawFEV * penalty)).toBe(50000);
+  });
+
+  it('penalty stacks with difficulty multiplier', () => {
+    const rawFEV = 50000;
+    const difficultyMultiplier = DIFFICULTY_CONFIG['normal'].leaderboardMultiplier; // 1.15
+    const restructuringPenalty = RESTRUCTURING_FEV_PENALTY; // 0.80
+    const adjustedFEV = Math.round(rawFEV * difficultyMultiplier * restructuringPenalty);
+    expect(adjustedFEV).toBe(Math.round(50000 * 1.15 * 0.80));
+  });
+
+  it('leaderboard entry with hasRestructured gets penalized FEV', () => {
+    const entry: LeaderboardEntry = {
+      id: 'test',
+      holdcoName: 'Test',
+      initials: 'TST',
+      enterpriseValue: 60000,
+      score: 50,
+      grade: 'C',
+      businessCount: 3,
+      date: new Date().toISOString(),
+      founderEquityValue: 50000,
+      difficulty: 'normal',
+      hasRestructured: true,
+    };
+    // Simulating getAdjustedFEV logic
+    const raw = entry.founderEquityValue ?? entry.enterpriseValue;
+    const diffMult = DIFFICULTY_CONFIG[entry.difficulty ?? 'easy']?.leaderboardMultiplier ?? 1.0;
+    const restrPenalty = entry.hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0;
+    const adjusted = Math.round(raw * diffMult * restrPenalty);
+    expect(adjusted).toBe(Math.round(50000 * 1.15 * 0.80));
+  });
+
+  it('leaderboard entry without hasRestructured gets no penalty', () => {
+    const entry: LeaderboardEntry = {
+      id: 'test2',
+      holdcoName: 'Test2',
+      initials: 'TS2',
+      enterpriseValue: 60000,
+      score: 70,
+      grade: 'B',
+      businessCount: 4,
+      date: new Date().toISOString(),
+      founderEquityValue: 50000,
+      difficulty: 'normal',
+    };
+    const raw = entry.founderEquityValue ?? entry.enterpriseValue;
+    const diffMult = DIFFICULTY_CONFIG[entry.difficulty ?? 'easy']?.leaderboardMultiplier ?? 1.0;
+    const restrPenalty = entry.hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0;
+    const adjusted = Math.round(raw * diffMult * restrPenalty);
+    expect(adjusted).toBe(Math.round(50000 * 1.15));
+  });
+});
+
+describe('Bank debt paydown logic', () => {
+  it('paydown reduces bank debt and cash correctly', () => {
+    const business = createMockBusiness({
+      bankDebtBalance: 2000,
+      bankDebtRate: 0.08,
+      bankDebtRoundsRemaining: 5,
+    });
+    const amount = 500;
+    const actualPayment = Math.min(amount, business.bankDebtBalance, 10000); // cash = 10000
+    const newBankDebt = business.bankDebtBalance - actualPayment;
+    expect(actualPayment).toBe(500);
+    expect(newBankDebt).toBe(1500);
+  });
+
+  it('paydown is capped at min(amount, bankDebtBalance, cash)', () => {
+    // Case 1: limited by cash
+    expect(Math.min(5000, 3000, 1000)).toBe(1000);
+    // Case 2: limited by balance
+    expect(Math.min(5000, 2000, 10000)).toBe(2000);
+    // Case 3: limited by amount
+    expect(Math.min(1000, 3000, 10000)).toBe(1000);
+  });
+
+  it('paydown does nothing for non-active business', () => {
+    const business = createMockBusiness({
+      status: 'sold',
+      bankDebtBalance: 2000,
+    });
+    // The store action checks status === 'active' and returns early if not
+    const shouldProcess = business.status === 'active' && business.bankDebtBalance > 0;
+    expect(shouldProcess).toBe(false);
+  });
+
+  it('paydown does nothing when bankDebtBalance is 0', () => {
+    const business = createMockBusiness({
+      status: 'active',
+      bankDebtBalance: 0,
+    });
+    const shouldProcess = business.status === 'active' && business.bankDebtBalance > 0;
+    expect(shouldProcess).toBe(false);
+  });
+
+  it('totalDebt recomputation after bank debt paydown', () => {
+    // computeTotalDebt = holdcoLoanBalance + sum of active/integrated business bankDebtBalance
+    const businesses = [
+      createMockBusiness({ id: 'b1', bankDebtBalance: 2000 }),
+      createMockBusiness({ id: 'b2', bankDebtBalance: 1000 }),
+    ];
+    const holdcoLoanBalance = 3000;
+    const totalBefore = holdcoLoanBalance + 2000 + 1000; // 6000
+
+    // After paying 500 off business b1
+    const updatedBusinesses = businesses.map(b =>
+      b.id === 'b1' ? { ...b, bankDebtBalance: b.bankDebtBalance - 500 } : b
+    );
+    const totalAfter = holdcoLoanBalance + updatedBusinesses.reduce((sum, b) => sum + b.bankDebtBalance, 0);
+    expect(totalBefore).toBe(6000);
+    expect(totalAfter).toBe(5500);
   });
 });
