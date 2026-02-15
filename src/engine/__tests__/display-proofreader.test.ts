@@ -187,12 +187,12 @@ describe('Display Proofreader', () => {
       expect(0.05 + 0.01).toBeCloseTo(0.06);
     });
 
-    it('Seller note term: 5yr standard, 4yr quick', () => {
-      // deals.ts line 15: Math.max(4, Math.ceil(maxRounds * 0.25))
-      const standardTerm = Math.max(4, Math.ceil(20 * 0.25));
-      const quickTerm = Math.max(4, Math.ceil(10 * 0.25));
+    it('Seller note term: 5yr standard, 5yr quick', () => {
+      // deals.ts: Quick games use 0.50 multiplier, Standard uses 0.25
+      const standardTerm = Math.max(4, Math.ceil(20 * 0.25)); // 5yr
+      const quickTerm = Math.max(4, Math.ceil(10 * 0.50));    // 5yr (stretched for quick)
       expect(standardTerm).toBe(5);
-      expect(quickTerm).toBe(4); // Math.ceil(2.5) = 3, max(4,3) = 4
+      expect(quickTerm).toBe(5);
     });
 
     it('Bank debt: 35% equity split', () => {
@@ -200,12 +200,12 @@ describe('Display Proofreader', () => {
       expect(0.35).toBe(0.35);
     });
 
-    it('Bank debt term: 10yr standard, 5yr quick', () => {
-      // deals.ts line 16: Math.max(4, Math.ceil(maxRounds * 0.50))
-      const standardTerm = Math.max(4, Math.ceil(20 * 0.50));
-      const quickTerm = Math.max(4, Math.ceil(10 * 0.50));
+    it('Bank debt term: 10yr standard, 10yr quick', () => {
+      // deals.ts: Quick games get full game length, Standard get half
+      const standardTerm = Math.max(4, Math.ceil(20 * 0.50)); // 10yr
+      const quickTerm = 10; // Quick: maxRounds (10)
       expect(standardTerm).toBe(10);
-      expect(quickTerm).toBe(5);
+      expect(quickTerm).toBe(10);
     });
 
     it('LBO: 25% equity, 35% note, 40% bank', () => {

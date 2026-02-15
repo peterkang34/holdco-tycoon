@@ -41,12 +41,12 @@ describe('generateDealStructures', () => {
     }
   });
 
-  it('should set seller note term to 4 for 10yr mode', () => {
+  it('should set seller note term to 5 for 10yr mode', () => {
     const deal = createMockDeal({ askingPrice: 4000 });
     const structures = generateDealStructures(deal, 3000, 0.07, false, 10);
     const sellerNote = structures.find(s => s.type === 'seller_note');
     expect(sellerNote).toBeDefined();
-    expect(sellerNote!.sellerNote!.termRounds).toBe(4);
+    expect(sellerNote!.sellerNote!.termRounds).toBe(5);
   });
 
   it('should set seller note term to 5 for 20yr mode', () => {

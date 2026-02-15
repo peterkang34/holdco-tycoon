@@ -12,8 +12,10 @@ export function generateDealStructures(
   const structures: DealStructure[] = [];
 
   // Scale debt terms by game duration
-  const sellerNoteTerms = Math.max(4, Math.ceil(maxRounds * 0.25)); // 5 for 20yr, 4 for 10yr
-  const bankDebtTerms = Math.max(4, Math.ceil(maxRounds * 0.50));   // 10 for 20yr, 5 for 10yr
+  // Quick games: stretch terms so debt isn't crushing in 10 rounds
+  const isQuick = maxRounds <= 10;
+  const sellerNoteTerms = isQuick ? Math.max(4, Math.ceil(maxRounds * 0.50)) : Math.max(4, Math.ceil(maxRounds * 0.25)); // Quick: 5yr, Standard: 5yr
+  const bankDebtTerms = isQuick ? maxRounds : Math.max(4, Math.ceil(maxRounds * 0.50));   // Quick: 10yr, Standard: 10yr
 
   // Seed pseudo-random from deal ID for deterministic structures per deal
   // (prevents structures from changing on re-render)

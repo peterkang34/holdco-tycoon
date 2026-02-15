@@ -255,8 +255,9 @@ export const useGameStore = create<GameStore>()(
         // Holdco loan setup: Normal mode gets a structured loan, Easy mode has none
         const holdcoLoanBalance = diffConfig.startingDebt;
         const holdcoLoanRate = holdcoLoanBalance > 0 ? STARTING_INTEREST_RATE : 0;
+        // Quick games: full game length (10yr) so P&I isn't crushing; Standard: half (10yr of 20)
         const holdcoLoanRoundsRemaining = holdcoLoanBalance > 0
-          ? Math.max(4, Math.ceil(maxRounds * 0.50))
+          ? (duration === 'quick' ? maxRounds : Math.max(4, Math.ceil(maxRounds * 0.50)))
           : 0;
 
         const newState: GameState = {

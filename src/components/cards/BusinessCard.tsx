@@ -359,12 +359,36 @@ export function BusinessCard({
                   </button>
                 )}
                 {onSell && (
-                  <button
-                    onClick={onSell}
-                    className={`btn-secondary text-xs flex-1 ${moic >= 2 ? 'border-accent' : moic < 1 ? 'border-danger' : ''}`}
-                  >
-                    Sell for {formatMoney(exitValuation.netProceeds)}
-                  </button>
+                  exitValuation.yearsHeld < 2 ? (
+                    <Tooltip
+                      trigger={
+                        <button
+                          onClick={onSell}
+                          className={`btn-secondary text-xs flex-1 ${moic >= 2 ? 'border-accent' : moic < 1 ? 'border-danger' : ''}`}
+                        >
+                          Sell for {formatMoney(exitValuation.netProceeds)}
+                        </button>
+                      }
+                      width="w-64"
+                    >
+                      <p className="text-sm text-text-secondary font-normal">
+                        {exitValuation.yearsHeld === 0
+                          ? 'Just acquired — exit premiums don\'t apply yet. Buyers won\'t pay above the base acquisition multiple until you\'ve proven ownership.'
+                          : 'Held for 1 year — exit premiums are at 50%. Buyers discount new ownership; full premiums apply after 2 years.'}
+                      </p>
+                      <p className="text-xs text-text-muted mt-2 font-normal">
+                        Seasoning: {Math.round(Math.min(1, exitValuation.yearsHeld / 2) * 100)}% of premiums applied.
+                        {exitValuation.yearsHeld === 0 ? ' Hold for 2 years for full value.' : ' Full value next year.'}
+                      </p>
+                    </Tooltip>
+                  ) : (
+                    <button
+                      onClick={onSell}
+                      className={`btn-secondary text-xs flex-1 ${moic >= 2 ? 'border-accent' : moic < 1 ? 'border-danger' : ''}`}
+                    >
+                      Sell for {formatMoney(exitValuation.netProceeds)}
+                    </button>
+                  )
                 )}
                 {onWindDown && (
                   <button
