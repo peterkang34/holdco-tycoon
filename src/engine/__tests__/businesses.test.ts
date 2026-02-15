@@ -637,7 +637,8 @@ describe('generateDealWithSize heat integration', () => {
   it('should have effectivePrice > askingPrice for hot/contested deals', () => {
     for (let i = 0; i < 100; i++) {
       const deal = generateDealWithSize('agency', 5, 'any');
-      if (deal.heat === 'hot' || deal.heat === 'contested') {
+      // Distressed sellers have a price cap that can neutralize the heat premium
+      if ((deal.heat === 'hot' || deal.heat === 'contested') && deal.sellerArchetype !== 'distressed_seller') {
         expect(deal.effectivePrice).toBeGreaterThan(deal.askingPrice);
       }
     }
@@ -865,7 +866,7 @@ describe('size ratio impact on integration', () => {
     // Even with all mitigators, overreach should still reduce success vs ideal
     let overreachMitigatedSuccesses = 0;
     let idealSuccesses = 0;
-    const trials = 2000;
+    const trials = 5000;
     const mockBusiness = {
       qualityRating: 5 as QualityRating,
       sectorId: 'agency' as SectorId,
