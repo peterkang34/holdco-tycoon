@@ -277,7 +277,7 @@ export function AllocatePhase({
   const renderDealStructuring = () => {
     if (!selectedDeal) return null;
 
-    const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening || !distressRestrictions.canTakeDebt, maxRoundsFromStore ?? 20);
+    const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening, maxRoundsFromStore ?? 20, !distressRestrictions.canTakeDebt);
     const availablePlatformsForDeal = getPlatformsForSector(selectedDeal.business.sectorId);
     const canTuckIn = availablePlatformsForDeal.length > 0;
 
@@ -523,12 +523,17 @@ export function AllocatePhase({
               {structures.map((structure, index) => (
                 <div
                   key={index}
-                  className={`card cursor-pointer transition-all hover:border-accent ${
+                  className={`card transition-all ${
+                    !distressRestrictions.canAcquire || acquisitionsThisRound >= maxAcquisitionsPerRound
+                      ? 'opacity-50 cursor-not-allowed'
+                      : 'cursor-pointer hover:border-accent'
+                  } ${
                     structure.risk === 'low' ? 'border-green-500/30' :
                     structure.risk === 'medium' ? 'border-yellow-500/30' :
                     'border-red-500/30'
                   }`}
                   onClick={() => {
+                    if (!distressRestrictions.canAcquire || acquisitionsThisRound >= maxAcquisitionsPerRound) return;
                     if (acquiringRef.current) return;
                     acquiringRef.current = true;
                     if (selectedTuckInPlatform) {
@@ -593,8 +598,11 @@ export function AllocatePhase({
                     </div>
                   </div>
 
-                  <button className="btn-primary w-full mt-4 text-sm">
-                    Acquire
+                  <button
+                    className={`w-full mt-4 text-sm ${!distressRestrictions.canAcquire || acquisitionsThisRound >= maxAcquisitionsPerRound ? 'btn-primary opacity-50 cursor-not-allowed' : 'btn-primary'}`}
+                    disabled={!distressRestrictions.canAcquire || acquisitionsThisRound >= maxAcquisitionsPerRound}
+                  >
+                    {!distressRestrictions.canAcquire ? 'Blocked — Covenant Breach' : acquisitionsThisRound >= maxAcquisitionsPerRound ? 'Max Acquisitions Reached' : 'Acquire'}
                   </button>
                 </div>
               ))}

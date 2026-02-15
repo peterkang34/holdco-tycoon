@@ -216,7 +216,8 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
         <div>
           <p className="text-xs text-text-muted">Asking Price</p>
           <p className="font-mono font-bold text-base sm:text-lg">{formatMoney(deal.effectivePrice)}</p>
-          {hasHeatPremium ? (
+          <p className="text-xs text-text-muted">{deal.business.acquisitionMultiple.toFixed(1)}x EBITDA</p>
+          {hasHeatPremium && (
             <Tooltip
               trigger={
                 <span className="text-xs text-text-muted inline-flex items-center gap-1">
@@ -229,8 +230,6 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
             >
               Competitive premium: other buyers are bidding up the price. Sourced and off-market deals face less competition.
             </Tooltip>
-          ) : (
-            <p className="text-xs text-text-muted">{deal.business.acquisitionMultiple.toFixed(1)}x EBITDA</p>
           )}
         </div>
         <div>

@@ -137,6 +137,33 @@ describe('generateDealStructures', () => {
     const lbo = structures.find(s => s.type === 'seller_note_bank_debt');
     expect(lbo).toBeUndefined();
   });
+
+  it('should block ALL debt structures when noNewDebt is true (covenant breach)', () => {
+    const deal = createMockDeal({ askingPrice: 4000 });
+    const structures = generateDealStructures(deal, 10000, 0.07, false, 20, true);
+    const sellerNote = structures.find(s => s.type === 'seller_note');
+    const bankDebt = structures.find(s => s.type === 'bank_debt');
+    const lbo = structures.find(s => s.type === 'seller_note_bank_debt');
+    expect(sellerNote).toBeUndefined();
+    expect(bankDebt).toBeUndefined();
+    expect(lbo).toBeUndefined();
+    // All-cash and earn-out should still be available
+    const allCash = structures.find(s => s.type === 'all_cash');
+    expect(allCash).toBeDefined();
+  });
+
+  it('should allow seller notes during credit tightening but not during noNewDebt', () => {
+    const deal = createMockDeal({ askingPrice: 4000 });
+    // Credit tightening: seller notes available, bank debt not
+    const tightStructures = generateDealStructures(deal, 10000, 0.07, true, 20, false);
+    expect(tightStructures.find(s => s.type === 'seller_note')).toBeDefined();
+    expect(tightStructures.find(s => s.type === 'bank_debt')).toBeUndefined();
+
+    // noNewDebt (covenant breach): no seller notes, no bank debt
+    const breachStructures = generateDealStructures(deal, 10000, 0.07, false, 20, true);
+    expect(breachStructures.find(s => s.type === 'seller_note')).toBeUndefined();
+    expect(breachStructures.find(s => s.type === 'bank_debt')).toBeUndefined();
+  });
 });
 
 describe('executeDealStructure', () => {

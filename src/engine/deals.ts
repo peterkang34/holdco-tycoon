@@ -5,7 +5,8 @@ export function generateDealStructures(
   playerCash: number,
   interestRate: number,
   creditTightening: boolean,
-  maxRounds: number = 20
+  maxRounds: number = 20,
+  noNewDebt: boolean = false,
 ): DealStructure[] {
   const askingPrice = deal.effectivePrice;
   const structures: DealStructure[] = [];
@@ -35,7 +36,7 @@ export function generateDealStructures(
   const sellerNoteAmount = askingPrice - sellerNoteCash;
   const sellerNoteRate = 0.05 + seededRandom(0, 0.01); // 5-6%
 
-  if (playerCash >= sellerNoteCash) {
+  if (playerCash >= sellerNoteCash && !noNewDebt) {
     structures.push({
       type: 'seller_note',
       cashRequired: sellerNoteCash,
@@ -49,8 +50,8 @@ export function generateDealStructures(
     });
   }
 
-  // Option C: Cash + Bank Debt (not available during credit tightening)
-  if (!creditTightening) {
+  // Option C: Cash + Bank Debt (not available during credit tightening or covenant breach)
+  if (!creditTightening && !noNewDebt) {
     const bankDebtCashPercent = 0.35; // 35% equity
     const bankDebtCash = Math.round(askingPrice * bankDebtCashPercent);
     const bankDebtAmount = askingPrice - bankDebtCash;
@@ -90,8 +91,8 @@ export function generateDealStructures(
     }
   }
 
-  // Option E: LBO Combo — Cash + Seller Note + Bank Debt (not available during credit tightening)
-  if (!creditTightening) {
+  // Option E: LBO Combo — Cash + Seller Note + Bank Debt (not available during credit tightening or covenant breach)
+  if (!creditTightening && !noNewDebt) {
     const lboCashPercent = 0.25; // 25% equity
     const lboNotePercent = 0.35; // 35% seller note
     const lboCash = Math.round(askingPrice * lboCashPercent);
