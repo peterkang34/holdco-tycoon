@@ -11,9 +11,9 @@ interface IntroScreenProps {
 export function IntroScreen({ onStart }: IntroScreenProps) {
   const [step, setStep] = useState<'mode' | 'setup'>('mode');
   const [holdcoName, setHoldcoName] = useState('');
-  const [selectedSector, setSelectedSector] = useState<SectorId | 'random'>('agency');
+  const [selectedSector, setSelectedSector] = useState<SectorId | 'random'>('random');
   const [selectedDifficulty, setSelectedDifficulty] = useState<GameDifficulty>('easy');
-  const [selectedDuration, setSelectedDuration] = useState<GameDuration>('standard');
+  const [selectedDuration, setSelectedDuration] = useState<GameDuration>('quick');
   const [showNameError, setShowNameError] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
 
@@ -167,7 +167,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
                 className={`w-full mb-2 p-3 rounded-lg border text-center transition-all border-dashed ${
                   selectedSector === 'random'
                     ? 'border-accent bg-accent/10'
-                    : 'border-accent/40 bg-accent/5 hover:border-accent hover:bg-accent/10'
+                    : 'border-white/10 bg-white/5 hover:border-white/30'
                 }`}
               >
                 <span className="text-sm font-medium text-accent">🎲 Surprise Me</span>

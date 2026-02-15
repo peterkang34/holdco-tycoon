@@ -133,7 +133,7 @@ function GettingStartedContent() {
       <P>You will select a difficulty and a duration when starting a new game:</P>
 
       <DataTable
-        headers={['Setting', 'Easy (Institutional Fund)', 'Normal (Self-Funded Search)']}
+        headers={['Setting', 'Easy (Institutional Capital)', 'Normal (Self-Funded)']}
         rows={[
           ['Starting Capital', '$20M', '$5M ($2M equity + $3M debt)'],
           ['Founder Ownership', '80%', '100%'],

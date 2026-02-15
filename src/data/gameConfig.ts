@@ -11,7 +11,7 @@ export const DIFFICULTY_CONFIG = {
     startingQuality: 3 as const,
     holdcoDebtStartRound: 0,
     leaderboardMultiplier: 1.0,
-    label: 'Easy — Institutional Fund',
+    label: 'Easy — Institutional Capital',
     description: '$20M from patient LPs. 80% ownership. Clean balance sheet.',
   },
   normal: {
@@ -24,14 +24,14 @@ export const DIFFICULTY_CONFIG = {
     startingQuality: 3 as const,
     holdcoDebtStartRound: 1,
     leaderboardMultiplier: 1.15, // Compensates for harder start without double-rewarding 100% ownership
-    label: 'Hard — Self-Funded Search',
+    label: 'Hard — Self-Funded',
     description: '$2M personal equity + $3M bank debt. 100% ownership. Real leverage from day one.',
   },
 } as const;
 
 export const DURATION_CONFIG = {
-  standard: { rounds: 20, label: 'Full Game (20 Years)' },
   quick: { rounds: 10, label: 'Quick Play (10 Years)' },
+  standard: { rounds: 20, label: 'Full Game (20 Years)' },
 } as const;
 
 export const INTEGRATION_THRESHOLD_MULTIPLIER = {

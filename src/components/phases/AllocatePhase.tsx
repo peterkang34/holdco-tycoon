@@ -898,7 +898,7 @@ export function AllocatePhase({
                         </div>
                         <button
                           onClick={() => setSellPlatformConfirm(ip)}
-                          className="mt-2 text-xs bg-purple-600/20 hover:bg-purple-600/40 text-purple-400 px-3 py-1.5 rounded transition-colors"
+                          className="mt-3 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg border border-purple-500/50 hover:border-purple-400 shadow-sm hover:shadow-md hover:shadow-purple-500/20 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
                         >
                           Sell Platform (+{PLATFORM_SALE_BONUS.toFixed(1)}x bonus)
                         </button>
