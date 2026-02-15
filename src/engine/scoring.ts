@@ -86,6 +86,7 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   // Bankruptcy = immediate F grade, score 0
   if (state.bankruptRound) {
     return {
+      valueCreation: 0,
       fcfShareGrowth: 0,
       portfolioRoic: 0,
       capitalDeployment: 0,
@@ -102,35 +103,53 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons, merged, and child bolt-ons
   // Merged businesses' capital is already captured in the merged entity's totalAcquisitionCost
   const allBusinesses = getAllDedupedBusinesses(state.businesses, state.exitedBusinesses);
-
-  // 1. FCF/Share Growth (25 points max)
-  let fcfShareGrowth = 0;
   const maxRounds = state.maxRounds || 20;
+
+  // 1. Value Creation (20 points max) — FEV / initial raise
+  let valueCreation = 0;
+  if (state.initialRaiseAmount > 0) {
+    const fev = calculateFounderEquityValue(state);
+    const fevMultiple = fev / state.initialRaiseAmount;
+    const target = maxRounds >= 20 ? 10 : 5; // 10x for 20yr, 5x for 10yr
+    if (fevMultiple >= target) {
+      valueCreation = 20;
+    } else if (fevMultiple >= target / 2) {
+      valueCreation = 10 + ((fevMultiple - target / 2) / (target / 2)) * 10;
+    } else if (fevMultiple >= 1) {
+      valueCreation = ((fevMultiple - 1) / (target / 2 - 1)) * 10;
+    } else {
+      valueCreation = 0;
+    }
+    valueCreation = Math.min(20, Math.max(0, valueCreation));
+  }
+
+  // 2. FCF/Share Growth (20 points max)
+  let fcfShareGrowth = 0;
   const fcfGrowthTarget = maxRounds >= 20 ? 3.0 : 1.5; // 300% for 20yr, 150% for 10yr
   if (state.metricsHistory.length > 1) {
     const startFcfPerShare = state.metricsHistory[0]?.metrics.fcfPerShare ?? 0;
     const endFcfPerShare = metrics.fcfPerShare;
     if (startFcfPerShare > 0) {
       const growth = (endFcfPerShare - startFcfPerShare) / startFcfPerShare;
-      fcfShareGrowth = Math.min(25, Math.max(0, (growth / fcfGrowthTarget) * 25));
+      fcfShareGrowth = Math.min(20, Math.max(0, (growth / fcfGrowthTarget) * 20));
     } else if (endFcfPerShare > 0) {
-      fcfShareGrowth = 15; // Started from 0, grew to positive
+      fcfShareGrowth = 12; // Started from 0, grew to positive
     }
   }
 
-  // 2. Portfolio ROIC (20 points max)
+  // 3. Portfolio ROIC (15 points max)
   let portfolioRoic = 0;
   if (metrics.portfolioRoic >= 0.25) {
-    portfolioRoic = 20;
+    portfolioRoic = 15;
   } else if (metrics.portfolioRoic >= 0.15) {
-    portfolioRoic = 15 + ((metrics.portfolioRoic - 0.15) / 0.10) * 5;
+    portfolioRoic = 11.25 + ((metrics.portfolioRoic - 0.15) / 0.10) * 3.75;
   } else if (metrics.portfolioRoic >= 0.08) {
-    portfolioRoic = 8 + ((metrics.portfolioRoic - 0.08) / 0.07) * 7;
+    portfolioRoic = 6 + ((metrics.portfolioRoic - 0.08) / 0.07) * 5.25;
   } else {
-    portfolioRoic = Math.max(0, (metrics.portfolioRoic / 0.08) * 8);
+    portfolioRoic = Math.max(0, (metrics.portfolioRoic / 0.08) * 6);
   }
 
-  // 3. Capital Deployment - MOIC + ROIIC (20 points max)
+  // 4. Capital Deployment - MOIC + ROIIC (15 points max)
   let capitalDeployment = 0;
 
   // Average MOIC across all investments
@@ -155,34 +174,34 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
 
   const avgMoic = totalCapitalDeployed > 0 ? totalMoicWeighted / totalCapitalDeployed : 1;
 
-  // MOIC component (10 points) — scale target by duration
+  // MOIC component (7.5 points) — scale target by duration
   const moicFullMarks = maxRounds >= 20 ? 2.5 : 2.0;
   let moicScore = 0;
   if (avgMoic >= moicFullMarks) {
-    moicScore = 10;
+    moicScore = 7.5;
   } else if (avgMoic >= 1.5) {
-    moicScore = 5 + ((avgMoic - 1.5) / (moicFullMarks - 1.5)) * 5;
+    moicScore = 3.75 + ((avgMoic - 1.5) / (moicFullMarks - 1.5)) * 3.75;
   } else {
-    moicScore = Math.max(0, (avgMoic / 1.5) * 5);
+    moicScore = Math.max(0, (avgMoic / 1.5) * 3.75);
   }
 
-  // ROIIC component (10 points)
+  // ROIIC component (7.5 points)
   let roiicScore = 0;
   const avgRoiic = state.metricsHistory.length > 0
     ? state.metricsHistory.reduce((sum, h) => sum + h.metrics.roiic, 0) / state.metricsHistory.length
     : 0;
 
   if (avgRoiic >= 0.20) {
-    roiicScore = 10;
+    roiicScore = 7.5;
   } else if (avgRoiic >= 0.10) {
-    roiicScore = 5 + ((avgRoiic - 0.10) / 0.10) * 5;
+    roiicScore = 3.75 + ((avgRoiic - 0.10) / 0.10) * 3.75;
   } else {
-    roiicScore = Math.max(0, (avgRoiic / 0.10) * 5);
+    roiicScore = Math.max(0, (avgRoiic / 0.10) * 3.75);
   }
 
   capitalDeployment = moicScore + roiicScore;
 
-  // 4. Balance Sheet Health (15 points max)
+  // 5. Balance Sheet Health (15 points max)
   let balanceSheetHealth = 0;
 
   // Net Debt/EBITDA component
@@ -213,34 +232,31 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
     balanceSheetHealth = Math.max(0, balanceSheetHealth - 5);
   }
 
-  // 5. Strategic Discipline (20 points max)
+  // 6. Strategic Discipline (15 points max)
   let strategicDiscipline = 0;
 
-  // Sector focus utilization (5 points)
+  // Sector focus utilization (3 points)
   const focusBonus = calculateSectorFocusBonus(activeBusinesses);
   let sectorFocusScore = 0;
   if (focusBonus) {
-    sectorFocusScore = Math.min(5, focusBonus.tier * 1.5 + (focusBonus.opcoCount >= 4 ? 1 : 0));
+    sectorFocusScore = Math.min(3, focusBonus.tier * 0.9 + (focusBonus.opcoCount >= 4 ? 0.6 : 0));
   } else if (activeBusinesses.length >= 4) {
-    // Reward diversification — now competitive with focus scoring
     const uniqueSectors = new Set(activeBusinesses.map(b => b.sectorId));
-    sectorFocusScore = Math.min(5, uniqueSectors.size >= 8 ? 5 : uniqueSectors.size >= 4 ? 4 : uniqueSectors.size);
+    sectorFocusScore = Math.min(3, uniqueSectors.size >= 8 ? 3 : uniqueSectors.size >= 4 ? 2.4 : uniqueSectors.size * 0.6);
   }
 
-  // Shared services ROI (5 points)
+  // Shared services ROI (3 points)
   const activeServices = state.sharedServices.filter(s => s.active);
   let sharedServicesScore = 0;
   if (activeServices.length > 0 && activeBusinesses.length >= 3) {
-    sharedServicesScore = Math.min(5, activeServices.length * 1.5);
+    sharedServicesScore = Math.min(3, activeServices.length * 0.9);
   }
-  // MA Sourcing bonus: tier 2+ with 3+ opcos adds +1 (capped at 5)
+  // MA Sourcing bonus: tier 2+ with 3+ opcos adds +0.6 (capped at 3)
   if (state.maSourcing && state.maSourcing.tier >= 2 && activeBusinesses.length >= 3) {
-    sharedServicesScore = Math.min(5, sharedServicesScore + 1);
+    sharedServicesScore = Math.min(3, sharedServicesScore + 0.6);
   }
 
-  // Capital return discipline (5 points)
-  // The hierarchy: 1) Reinvest above hurdle, 2) Deleverage, 3) Buyback when cheap, 4) Distribute
-  // Both hoarding cash AND distributing at the wrong time are penalized.
+  // Capital return discipline (4 points)
   let distributionScore = 0;
 
   const madeDistributions = state.totalDistributions > 0;
@@ -248,50 +264,37 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
     ? state.metricsHistory.reduce((sum, h) => sum + h.metrics.roiic, 0) / state.metricsHistory.length
     : 0;
 
-  // Idle cash penalty: ending with excess cash and low leverage means you should have returned capital
   const cashToEbitda = metrics.totalEbitda > 0 ? state.cash / metrics.totalEbitda : 0;
   const hasExcessCash = cashToEbitda > 2.0 && metrics.netDebtToEbitda < 1.0;
 
   if (madeDistributions) {
-    // Base: well-timed distributions earn points
     if (avgRoiicDuringGame < 0.15 && metrics.netDebtToEbitda < 2.0) {
-      // Distributed when reinvestment returns were modest and balance sheet was healthy — good discipline
-      distributionScore += 4;
+      distributionScore += 3.2;
     } else if (avgRoiicDuringGame < 0.20 && metrics.netDebtToEbitda < 2.5) {
-      // Acceptable — returns were decent but not great, leverage manageable
-      distributionScore += 2;
-    } else {
-      // Distributed while ROIIC was high (should have reinvested) or leverage was high (should have deleveraged)
-      distributionScore += 0;
+      distributionScore += 1.6;
     }
 
-    // Penalty for distributing while ending with leverage > 2.5x
     if (metrics.netDebtToEbitda > 2.5) {
-      distributionScore = Math.max(0, distributionScore - 2);
+      distributionScore = Math.max(0, distributionScore - 1.6);
     }
 
-    // Bonus for meaningful capital return (not token amounts)
     const distributionPct = state.totalInvestedCapital > 0
       ? state.totalDistributions / state.totalInvestedCapital
       : 0;
     if (distributionPct > 0.10 && metrics.netDebtToEbitda < 1.5) {
-      distributionScore = Math.min(5, distributionScore + 1);
+      distributionScore = Math.min(4, distributionScore + 0.8);
     }
   } else {
-    // Never distributed — fine if capital was well-deployed, penalized if hoarding
     if (hasExcessCash) {
-      // Sitting on excess cash with low leverage = idle capital = bad allocation
-      distributionScore = 1;
+      distributionScore = 0.8;
     } else if (avgRoiicDuringGame > 0.15) {
-      // High ROIIC and no excess cash — reinvested everything productively
-      distributionScore = 4;
+      distributionScore = 3.2;
     } else {
-      // Mediocre returns and didn't distribute — neutral
-      distributionScore = 2;
+      distributionScore = 1.6;
     }
   }
 
-  // Deal quality (5 points)
+  // Deal quality (5 points — kept to amplify quality's importance)
   const avgQuality = allBusinesses.length > 0
     ? allBusinesses.reduce((sum, b) => sum + b.qualityRating, 0) / allBusinesses.length
     : 3;
@@ -301,7 +304,7 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
 
   // Calculate total
   const total = Math.round(
-    fcfShareGrowth + portfolioRoic + capitalDeployment + balanceSheetHealth + strategicDiscipline
+    valueCreation + fcfShareGrowth + portfolioRoic + capitalDeployment + balanceSheetHealth + strategicDiscipline
   );
 
   // Determine grade
@@ -329,6 +332,7 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   }
 
   return {
+    valueCreation: Math.round(valueCreation * 10) / 10,
     fcfShareGrowth: Math.round(fcfShareGrowth * 10) / 10,
     portfolioRoic: Math.round(portfolioRoic * 10) / 10,
     capitalDeployment: Math.round(capitalDeployment * 10) / 10,

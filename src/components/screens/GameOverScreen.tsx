@@ -420,11 +420,12 @@ export function GameOverScreen({
       {/* Score Breakdown */}
       <div className="card mb-6">
         <h2 className="text-lg font-bold mb-4">Score Breakdown</h2>
-        <ScoreBar label="FCF/Share Growth" value={score.fcfShareGrowth} max={25} />
-        <ScoreBar label="Portfolio ROIC" value={score.portfolioRoic} max={20} />
-        <ScoreBar label="Capital Deployment (MOIC + ROIIC)" value={score.capitalDeployment} max={20} />
+        <ScoreBar label="Value Creation (FEV / Capital)" value={score.valueCreation} max={20} />
+        <ScoreBar label="FCF/Share Growth" value={score.fcfShareGrowth} max={20} />
+        <ScoreBar label="Portfolio ROIC" value={score.portfolioRoic} max={15} />
+        <ScoreBar label="Capital Deployment (MOIC + ROIIC)" value={score.capitalDeployment} max={15} />
         <ScoreBar label="Balance Sheet Health" value={score.balanceSheetHealth} max={15} />
-        <ScoreBar label="Strategic Discipline" value={score.strategicDiscipline} max={20} />
+        <ScoreBar label="Strategic Discipline" value={score.strategicDiscipline} max={15} />
         <div className="mt-4 pt-4 border-t border-white/10 text-center">
           <span className="text-2xl font-bold font-mono">{score.total} / 100</span>
         </div>

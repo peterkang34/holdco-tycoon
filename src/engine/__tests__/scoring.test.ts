@@ -160,6 +160,7 @@ describe('calculateFinalScore', () => {
   it('should have all score components be non-negative', () => {
     const state = createScoringState();
     const score = calculateFinalScore(state);
+    expect(score.valueCreation).toBeGreaterThanOrEqual(0);
     expect(score.fcfShareGrowth).toBeGreaterThanOrEqual(0);
     expect(score.portfolioRoic).toBeGreaterThanOrEqual(0);
     expect(score.capitalDeployment).toBeGreaterThanOrEqual(0);
@@ -170,11 +171,20 @@ describe('calculateFinalScore', () => {
   it('should cap each component at its max', () => {
     const state = createScoringState();
     const score = calculateFinalScore(state);
-    expect(score.fcfShareGrowth).toBeLessThanOrEqual(25);
-    expect(score.portfolioRoic).toBeLessThanOrEqual(20);
-    expect(score.capitalDeployment).toBeLessThanOrEqual(20);
+    expect(score.valueCreation).toBeLessThanOrEqual(20);
+    expect(score.fcfShareGrowth).toBeLessThanOrEqual(20);
+    expect(score.portfolioRoic).toBeLessThanOrEqual(15);
+    expect(score.capitalDeployment).toBeLessThanOrEqual(15);
     expect(score.balanceSheetHealth).toBeLessThanOrEqual(15);
-    expect(score.strategicDiscipline).toBeLessThanOrEqual(20);
+    expect(score.strategicDiscipline).toBeLessThanOrEqual(15);
+  });
+
+  it('should include valueCreation in score breakdown', () => {
+    const state = createScoringState();
+    const score = calculateFinalScore(state);
+    expect(score.valueCreation).toBeDefined();
+    expect(score.valueCreation).toBeGreaterThanOrEqual(0);
+    expect(score.valueCreation).toBeLessThanOrEqual(20);
   });
 
   it('should give S grade for total >= 90', () => {
@@ -252,6 +262,7 @@ describe('calculateFinalScore', () => {
     });
     const score = calculateFinalScore(emptyState);
 
+    expect(Number.isNaN(score.valueCreation)).toBe(false);
     expect(Number.isNaN(score.fcfShareGrowth)).toBe(false);
     expect(Number.isNaN(score.portfolioRoic)).toBe(false);
     expect(Number.isNaN(score.capitalDeployment)).toBe(false);
@@ -418,7 +429,7 @@ describe('calculateFinalScore with 10-year mode', () => {
     expect(score.total).toBeGreaterThanOrEqual(0);
     expect(score.total).toBeLessThanOrEqual(100);
     expect(score.fcfShareGrowth).toBeGreaterThanOrEqual(0);
-    expect(score.fcfShareGrowth).toBeLessThanOrEqual(25);
+    expect(score.fcfShareGrowth).toBeLessThanOrEqual(20);
   });
 
   it('should use 2.0x MOIC target for 10-year mode', () => {
@@ -426,7 +437,7 @@ describe('calculateFinalScore with 10-year mode', () => {
     const score = calculateFinalScore(state);
     // Verify MOIC component is within bounds
     expect(score.capitalDeployment).toBeGreaterThanOrEqual(0);
-    expect(score.capitalDeployment).toBeLessThanOrEqual(20);
+    expect(score.capitalDeployment).toBeLessThanOrEqual(15);
   });
 
   it('should not produce NaN in 10-year mode', () => {
@@ -449,6 +460,7 @@ describe('Bankruptcy/Insolvency Scoring Edge Cases', () => {
     expect(score.grade).toBe('F');
     expect(score.title).toContain('Bankrupt');
     expect(score.title).toContain('Year 8');
+    expect(score.valueCreation).toBe(0);
   });
 
   it('should handle business with 0 EBITDA at game end', () => {

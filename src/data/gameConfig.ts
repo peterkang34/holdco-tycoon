@@ -58,6 +58,14 @@ export const TURNAROUND_FATIGUE_PENALTY = 0.10;  // -10ppt to all success rates
 export const TURNAROUND_EXIT_PREMIUM = 0.25;     // +0.25x exit multiple
 export const TURNAROUND_EXIT_PREMIUM_MIN_TIERS = 2; // need 2+ quality tiers improved
 
+// ── Improvement Constants ──
+
+export const IMPROVEMENT_COST_FLOOR = 200; // $200K minimum improvement cost
+
+export const QUALITY_IMPROVEMENT_MULTIPLIER: Record<1 | 2 | 3 | 4 | 5, number> = {
+  1: 0.6, 2: 0.8, 3: 1.0, 4: 1.1, 5: 1.2,
+};
+
 export const BASE_QUALITY_IMPROVEMENT_CHANCE = 0.30; // 30% base chance on op improvement
 export const QUALITY_IMPROVEMENT_TIER_BONUS: Record<1 | 2 | 3, number> = {
   1: 0.15, // total 45%

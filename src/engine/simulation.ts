@@ -132,13 +132,20 @@ export function calculateExitValuation(
   // Turnaround premium — businesses that improved 2+ quality tiers command higher multiples
   const turnaroundPremium = getTurnaroundExitPremium(business);
 
-  // Calculate exit multiple
-  const totalMultiple = Math.max(
-    2.0, // Absolute floor - distressed sale
-    baseMultiple + growthPremium + qualityPremium + platformPremium + holdPremium +
+  // Seasoning: recently acquired businesses haven't been proven under new ownership
+  // Premiums ramp from 0% to 100% over 2 years of ownership
+  const seasoningMultiplier = Math.min(1.0, yearsHeld / 2);
+
+  // Sum all premiums above base
+  const totalPremiums = growthPremium + qualityPremium + platformPremium + holdPremium +
     improvementsPremium + marketModifier + sizeTierPremium + deRiskingPremium +
     ruleOf40Premium + marginExpansionPremium + mergerPremium + integratedPlatformPremium +
-    turnaroundPremium
+    turnaroundPremium;
+
+  // Calculate exit multiple (premiums scaled by seasoning, raw premiums preserved for display)
+  const totalMultiple = Math.max(
+    2.0, // Absolute floor - distressed sale
+    baseMultiple + totalPremiums * seasoningMultiplier
   );
 
   const exitPrice = Math.max(0, Math.round(business.ebitda * totalMultiple));
@@ -1177,13 +1184,10 @@ export function calculateMetrics(state: GameState): Metrics {
   // Net FCF after interest and shared services costs
   const netFcf = totalFcf - annualInterest - opcoInterest - sharedServicesCost;
 
-  // Portfolio value (using sector average multiples, adjusted for quality)
+  // Portfolio value (full exit valuation engine — aligns buyback/equity pricing with FEV)
   const portfolioValue = activeBusinesses.reduce((sum, b) => {
-    const sector = SECTORS[b.sectorId];
-    const avgMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
-    const qualityAdj = (b.qualityRating - 3) * 0.35;
-    const multiple = Math.max(sector.acquisitionMultiple[0], avgMultiple + qualityAdj);
-    return sum + b.ebitda * multiple;
+    const valuation = calculateExitValuation(b, state.round, undefined, undefined, state.integratedPlatforms);
+    return sum + b.ebitda * valuation.totalMultiple;
   }, 0);
 
   // Intrinsic value per share

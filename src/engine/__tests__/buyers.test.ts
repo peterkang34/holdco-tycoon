@@ -24,7 +24,7 @@ describe('calculateSizeTierPremium', () => {
     const result = calculateSizeTierPremium(3500); // $3.5M
     expect(result.tier).toBe('small_pe');
     expect(result.premium).toBeGreaterThanOrEqual(0.5);
-    expect(result.premium).toBeLessThanOrEqual(1.0);
+    expect(result.premium).toBeLessThanOrEqual(0.8);
   });
 
   it('should interpolate within small_pe tier', () => {
@@ -33,35 +33,35 @@ describe('calculateSizeTierPremium', () => {
     const high = calculateSizeTierPremium(4999);
     expect(low.premium).toBeCloseTo(0.5, 1);
     expect(mid.premium).toBeGreaterThan(low.premium);
-    expect(high.premium).toBeLessThan(1.0);
+    expect(high.premium).toBeLessThan(0.8);
   });
 
   it('should return lower_middle_pe tier for $5-10M EBITDA', () => {
     const result = calculateSizeTierPremium(7500); // $7.5M
     expect(result.tier).toBe('lower_middle_pe');
-    expect(result.premium).toBeGreaterThanOrEqual(1.0);
-    expect(result.premium).toBeLessThanOrEqual(2.0);
+    expect(result.premium).toBeGreaterThanOrEqual(0.8);
+    expect(result.premium).toBeLessThanOrEqual(1.5);
   });
 
   it('should return institutional_pe tier for $10-20M EBITDA', () => {
     const result = calculateSizeTierPremium(15000); // $15M
     expect(result.tier).toBe('institutional_pe');
-    expect(result.premium).toBeGreaterThanOrEqual(2.0);
-    expect(result.premium).toBeLessThanOrEqual(3.5);
+    expect(result.premium).toBeGreaterThanOrEqual(1.5);
+    expect(result.premium).toBeLessThanOrEqual(2.5);
   });
 
   it('should return large_pe tier for $20M+ EBITDA', () => {
     const result = calculateSizeTierPremium(25000); // $25M
     expect(result.tier).toBe('large_pe');
-    expect(result.premium).toBeGreaterThanOrEqual(3.5);
-    expect(result.premium).toBeLessThanOrEqual(5.0);
+    expect(result.premium).toBeGreaterThanOrEqual(2.5);
+    expect(result.premium).toBeLessThanOrEqual(3.5);
   });
 
   it('should cap premium at $30M EBITDA', () => {
     const at30 = calculateSizeTierPremium(30000);
     const at50 = calculateSizeTierPremium(50000);
-    expect(at30.premium).toBeCloseTo(5.0, 1);
-    expect(at50.premium).toBeCloseTo(5.0, 1);
+    expect(at30.premium).toBeCloseTo(3.5, 1);
+    expect(at50.premium).toBeCloseTo(3.5, 1);
   });
 
   it('should produce smooth interpolation across boundaries', () => {

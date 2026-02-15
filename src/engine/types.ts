@@ -518,11 +518,12 @@ export interface GameAction {
 }
 
 export interface ScoreBreakdown {
-  fcfShareGrowth: number; // max 25
-  portfolioRoic: number; // max 20
-  capitalDeployment: number; // max 20
+  valueCreation: number; // max 20
+  fcfShareGrowth: number; // max 20
+  portfolioRoic: number; // max 15
+  capitalDeployment: number; // max 15
   balanceSheetHealth: number; // max 15
-  strategicDiscipline: number; // max 20
+  strategicDiscipline: number; // max 15
   total: number;
   grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
   title: string;

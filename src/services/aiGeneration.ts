@@ -681,15 +681,21 @@ export function generateFallbackAnalysis(input: GameAnalysisInput): AIGameAnalys
   const specificLessons: Array<{ observation: string; lesson: string; reference?: string }> = [];
 
   // Analyze score components
-  if (input.score.fcfShareGrowth >= 20) {
+  if (input.score.valueCreation >= 16) {
+    keyStrengths.push('Outstanding value creation - you multiplied your initial capital impressively.');
+  } else if (input.score.valueCreation < 8) {
+    areasForImprovement.push('Value creation was below target. Focus on growing FEV through quality acquisitions and operational improvements.');
+  }
+
+  if (input.score.fcfShareGrowth >= 16) {
     keyStrengths.push('Excellent FCF per share growth - you compounded value effectively for shareholders.');
-  } else if (input.score.fcfShareGrowth < 10) {
+  } else if (input.score.fcfShareGrowth < 8) {
     areasForImprovement.push('FCF per share growth was below expectations. Focus on EBITDA growth and limiting share dilution.');
   }
 
-  if (input.score.portfolioRoic >= 15) {
+  if (input.score.portfolioRoic >= 12) {
     keyStrengths.push('Strong portfolio ROIC indicates you allocated capital to high-return opportunities.');
-  } else if (input.score.portfolioRoic < 10) {
+  } else if (input.score.portfolioRoic < 7) {
     areasForImprovement.push('Portfolio ROIC was low - be more selective about acquisitions and focus on operational improvements.');
   }
 
@@ -699,9 +705,9 @@ export function generateFallbackAnalysis(input: GameAnalysisInput): AIGameAnalys
     areasForImprovement.push('Over-leveraged balance sheet increased risk. Aim for <2.5x Net Debt/EBITDA.');
   }
 
-  if (input.score.strategicDiscipline >= 15) {
+  if (input.score.strategicDiscipline >= 12) {
     keyStrengths.push('Disciplined strategic approach - good sector focus and reinvestment decisions.');
-  } else if (input.score.strategicDiscipline < 10) {
+  } else if (input.score.strategicDiscipline < 7) {
     areasForImprovement.push('Lacked strategic discipline. Consider sector focus, shared services, and following the distribution hierarchy.');
   }
 

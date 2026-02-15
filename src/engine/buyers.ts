@@ -27,17 +27,17 @@ export function calculateSizeTierPremium(ebitda: number): SizeTierResult {
     return { tier: 'individual', premium: 0.0 };
   }
   if (ebitda < 5000) {
-    return { tier: 'small_pe', premium: lerp(ebitda, 2000, 5000, 0.5, 1.0) };
+    return { tier: 'small_pe', premium: lerp(ebitda, 2000, 5000, 0.5, 0.8) };
   }
   if (ebitda < 10000) {
-    return { tier: 'lower_middle_pe', premium: lerp(ebitda, 5000, 10000, 1.0, 2.0) };
+    return { tier: 'lower_middle_pe', premium: lerp(ebitda, 5000, 10000, 0.8, 1.5) };
   }
   if (ebitda < 20000) {
-    return { tier: 'institutional_pe', premium: lerp(ebitda, 10000, 20000, 2.0, 3.5) };
+    return { tier: 'institutional_pe', premium: lerp(ebitda, 10000, 20000, 1.5, 2.5) };
   }
   // $20M+ EBITDA — caps at $30M
   const capped = Math.min(ebitda, 30000);
-  return { tier: 'large_pe', premium: lerp(capped, 20000, 30000, 3.5, 5.0) };
+  return { tier: 'large_pe', premium: lerp(capped, 20000, 30000, 2.5, 3.5) };
 }
 
 // ── De-Risking Premium ─────────────────────────────────────────────

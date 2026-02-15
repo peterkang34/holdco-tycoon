@@ -58,11 +58,12 @@ GAME RESULTS:
 - Founder Ownership: ${founderOwnership}
 
 SCORE BREAKDOWN:
-- FCF/Share Growth: ${score.fcfShareGrowth}/25
-- Portfolio ROIC: ${score.portfolioRoic}/20
-- Capital Deployment: ${score.capitalDeployment}/20
+- Value Creation (FEV / Capital): ${score.valueCreation}/20
+- FCF/Share Growth: ${score.fcfShareGrowth}/20
+- Portfolio ROIC: ${score.portfolioRoic}/15
+- Capital Deployment: ${score.capitalDeployment}/15
 - Balance Sheet Health: ${score.balanceSheetHealth}/15
-- Strategic Discipline: ${score.strategicDiscipline}/20
+- Strategic Discipline: ${score.strategicDiscipline}/15
 
 PORTFOLIO ACTIVITY:
 - Total Acquisitions: ${totalAcquisitions}

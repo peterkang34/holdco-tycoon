@@ -73,7 +73,7 @@ const FOUNDER_SHARES = 800;
 const STARTING_INTEREST_RATE = 0.07;
 const MIN_FOUNDER_OWNERSHIP = 0.51;
 
-import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN } from '../data/gameConfig';
+import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, IMPROVEMENT_COST_FLOOR, QUALITY_IMPROVEMENT_MULTIPLIER } from '../data/gameConfig';
 import { clampMargin } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
 import { buildChronicleContext } from '../services/chronicleContext';
@@ -1289,7 +1289,16 @@ export const useGameStore = create<GameStore>()(
             return;
         }
 
+        // Cost floor: prevents mashing improvements on tiny businesses
+        cost = Math.max(IMPROVEMENT_COST_FLOOR, cost);
+
         if (state.cash < cost) return;
+
+        // Quality multiplier: higher quality businesses get more from improvements
+        const qualityMult = QUALITY_IMPROVEMENT_MULTIPLIER[business.qualityRating as 1|2|3|4|5] ?? 1.0;
+        if (marginBoost > 0) marginBoost *= qualityMult;
+        if (revenueBoost > 0) revenueBoost *= qualityMult;
+        if (growthBoost > 0) growthBoost *= qualityMult;
 
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id !== businessId) return b;

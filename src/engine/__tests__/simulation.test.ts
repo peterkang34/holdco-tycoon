@@ -620,50 +620,39 @@ describe('calculateMetrics', () => {
     expect(metrics.totalDebt).toBe(1500); // 1000 holdco + 500 seller note (bankDebtBalance ignored)
   });
 
-  it('should apply quality adjustment to portfolio valuation multiple', () => {
-    // Agency sector: [2.5, 5.0], midpoint = 3.75
-    // Quality 5: adjustment = (5-3) * 0.35 = +0.70 → multiple = 4.45
-    // Quality 1: adjustment = (1-3) * 0.35 = -0.70 → multiple = 3.05
+  it('should value higher quality businesses higher than lower quality', () => {
+    // Portfolio value now uses full exit valuation engine (same as FEV)
+    // Businesses need to be held 2+ rounds for seasoning to fully apply premiums
     const highQState = createMockGameState({
       cash: 0,
       totalDebt: 0,
-      businesses: [createMockBusiness({ qualityRating: 5, ebitda: 1000 })],
+      round: 5,
+      businesses: [createMockBusiness({ qualityRating: 5, ebitda: 1000, acquisitionRound: 1 })],
     });
     const lowQState = createMockGameState({
       cash: 0,
       totalDebt: 0,
-      businesses: [createMockBusiness({ qualityRating: 1, ebitda: 1000 })],
+      round: 5,
+      businesses: [createMockBusiness({ qualityRating: 1, ebitda: 1000, acquisitionRound: 1 })],
     });
     const highMetrics = calculateMetrics(highQState);
     const lowMetrics = calculateMetrics(lowQState);
 
     // High quality should be valued higher than low quality
     expect(highMetrics.intrinsicValuePerShare).toBeGreaterThan(lowMetrics.intrinsicValuePerShare);
+  });
 
-    // Quality 3 (neutral) should match the sector midpoint
-    const neutralState = createMockGameState({
+  it('should value portfolio using exit valuation multiples (not sector averages)', () => {
+    // Portfolio value now uses calculateExitValuation — should be >= 2.0x multiple floor
+    const state = createMockGameState({
       cash: 0,
       totalDebt: 0,
       businesses: [createMockBusiness({ qualityRating: 3, ebitda: 1000 })],
     });
-    const neutralMetrics = calculateMetrics(neutralState);
-    // portfolioValue = 1000 * 3.75 = 3750, intrinsic/share = 3750/1000 = 3.75
-    expect(neutralMetrics.intrinsicValuePerShare).toBeCloseTo(3.75, 1);
-  });
-
-  it('should floor quality-adjusted multiple at sector minimum', () => {
-    // Agency sector min = 2.5, midpoint = 3.75
-    // Quality 1: adjustment = -0.70 → 3.75 - 0.70 = 3.05 (above floor, ok)
-    // Even with extreme hypothetical values, the floor should hold
-    const state = createMockGameState({
-      cash: 0,
-      totalDebt: 0,
-      businesses: [createMockBusiness({ qualityRating: 1, ebitda: 1000 })],
-    });
     const metrics = calculateMetrics(state);
-    // Multiple should be 3.05 (not below 2.5 floor)
-    // portfolioValue = 1000 * 3.05 = 3050, intrinsic/share = 3050/1000 = 3.05
-    expect(metrics.intrinsicValuePerShare).toBeGreaterThanOrEqual(2.5);
+    // With exit valuation engine, the multiple includes all premiums
+    // Intrinsic value per share should be at least 2.0 (floor multiple)
+    expect(metrics.intrinsicValuePerShare).toBeGreaterThanOrEqual(2.0);
   });
 
   it('should handle zero businesses gracefully', () => {
@@ -812,6 +801,57 @@ describe('calculateExitValuation', () => {
     const valuation = calculateExitValuation(business, 5);
     // Should not crash
     expect(Number.isFinite(valuation.totalMultiple) || valuation.totalMultiple === 2.0).toBe(true);
+  });
+
+  it('should apply seasoning multiplier — 0 years held gets no premiums', () => {
+    const business = createMockBusiness({
+      ebitda: 5000,
+      acquisitionEbitda: 5000,
+      acquisitionMultiple: 5.0,
+      acquisitionRound: 10,
+      qualityRating: 5,
+    });
+    // currentRound = 10, yearsHeld = 0 → seasoning = 0
+    const valuation = calculateExitValuation(business, 10);
+    // totalMultiple should be close to baseMultiple (premiums × 0)
+    expect(valuation.totalMultiple).toBeCloseTo(business.acquisitionMultiple, 0);
+  });
+
+  it('should apply full premiums after 2+ years held', () => {
+    const business = createMockBusiness({
+      ebitda: 5000,
+      acquisitionEbitda: 5000,
+      acquisitionMultiple: 5.0,
+      acquisitionRound: 1,
+      qualityRating: 5,
+    });
+    // currentRound = 5, yearsHeld = 4 → seasoning = 1.0 (full)
+    const valuation = calculateExitValuation(business, 5);
+    expect(valuation.totalMultiple).toBeGreaterThan(business.acquisitionMultiple);
+  });
+
+  it('should apply half premiums at 1 year held', () => {
+    const bizHalf = createMockBusiness({
+      ebitda: 5000,
+      acquisitionEbitda: 5000,
+      acquisitionMultiple: 5.0,
+      acquisitionRound: 4,
+      qualityRating: 5,
+    });
+    const bizFull = createMockBusiness({
+      ebitda: 5000,
+      acquisitionEbitda: 5000,
+      acquisitionMultiple: 5.0,
+      acquisitionRound: 1,
+      qualityRating: 5,
+    });
+    // 1 year held → seasoning 0.5, 4 years held → seasoning 1.0
+    const halfVal = calculateExitValuation(bizHalf, 5);
+    const fullVal = calculateExitValuation(bizFull, 5);
+    // Half seasoning should produce lower multiple than full
+    expect(halfVal.totalMultiple).toBeLessThan(fullVal.totalMultiple);
+    // But still above base multiple
+    expect(halfVal.totalMultiple).toBeGreaterThanOrEqual(bizHalf.acquisitionMultiple);
   });
 });
 
@@ -1077,26 +1117,27 @@ describe('Rule of 40 + Margin Expansion Exit Premiums', () => {
 describe('day-1 multiple expansion fix', () => {
   it('net sizeTierPremium = 0 for a no-growth business at same EBITDA', () => {
     // Business with EBITDA 3000 at acquisition, still 3000 now
+    // With flattened premiums: lerp(3000, 2000, 5000, 0.5, 0.8) = 0.6
     const biz = createMockBusiness({
       ebitda: 3000,
       acquisitionEbitda: 3000,
-      acquisitionSizeTierPremium: 0.667, // lerp(3000, 2000, 5000, 0.5, 1.0)
+      acquisitionSizeTierPremium: 0.6,
     });
     const valuation = calculateExitValuation(biz, 3);
-    // Current premium from 3000 EBITDA ≈ 0.667 minus acquisition 0.667 = 0
+    // Current premium from 3000 EBITDA ≈ 0.6 minus acquisition 0.6 = 0
     expect(valuation.sizeTierPremium).toBeCloseTo(0, 1);
   });
 
   it('net sizeTierPremium > 0 for EBITDA growth', () => {
     // Business grew from 3000 to 8000 EBITDA
+    // With flattened premiums: lerp(8000, 5000, 10000, 0.8, 1.5) = 1.22
     const biz = createMockBusiness({
       ebitda: 8000,
       acquisitionEbitda: 3000,
-      acquisitionSizeTierPremium: 0.667,
+      acquisitionSizeTierPremium: 0.6,
     });
     const valuation = calculateExitValuation(biz, 5);
-    // Current premium from 8000 ≈ lerp(8000, 5000, 10000, 1.0, 2.0) = 1.6
-    // Net = 1.6 - 0.667 = 0.933
+    // Net = 1.22 - 0.6 = 0.62
     expect(valuation.sizeTierPremium).toBeGreaterThan(0.5);
   });
 
