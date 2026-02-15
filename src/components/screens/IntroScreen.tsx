@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { SectorId, GameDifficulty, GameDuration } from '../../engine/types';
 import { SECTOR_LIST } from '../../data/sectors';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
+import { ChangelogModal } from '../ui/ChangelogModal';
 import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../../data/gameConfig';
 
 interface IntroScreenProps {
@@ -16,6 +17,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
   const [selectedDuration, setSelectedDuration] = useState<GameDuration>('quick');
   const [showNameError, setShowNameError] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [showChangelog, setShowChangelog] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,13 +209,21 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
           </>
         )}
 
-        {/* Global Leaderboard */}
-        <button
-          onClick={() => setShowLeaderboard(true)}
-          className="mt-4 text-sm text-text-muted hover:text-accent transition-colors"
-        >
-          🌍 Global Leaderboard
-        </button>
+        {/* Global Leaderboard + Changelog */}
+        <div className="mt-4 flex flex-col items-center gap-2">
+          <button
+            onClick={() => setShowLeaderboard(true)}
+            className="text-sm text-text-muted hover:text-accent transition-colors"
+          >
+            🌍 Global Leaderboard
+          </button>
+          <button
+            onClick={() => setShowChangelog(true)}
+            className="text-sm text-text-muted hover:text-accent transition-colors"
+          >
+            📋 What's New
+          </button>
+        </div>
 
         {/* Info */}
         <div className="mt-8 text-sm text-text-muted">
@@ -224,6 +234,9 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
 
       {showLeaderboard && (
         <LeaderboardModal onClose={() => setShowLeaderboard(false)} />
+      )}
+      {showChangelog && (
+        <ChangelogModal onClose={() => setShowChangelog(false)} />
       )}
     </div>
   );
