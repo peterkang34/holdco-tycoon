@@ -20,7 +20,8 @@ import { fileURLToPath } from 'node:url';
 import { TAX_RATE, calculateAnnualFcf, calculatePortfolioTax } from '../simulation';
 import { createMockBusiness } from './helpers';
 import { calculateDistressLevel, getDistressRestrictions } from '../distress';
-import { calculateHeatPremium } from '../businesses';
+import { calculateHeatPremium, getMaxAcquisitions } from '../businesses';
+import { MA_SOURCING_CONFIG } from '../../data/sharedServices';
 import { SECTORS, SECTOR_LIST } from '../../data/sectors';
 import {
   DIFFICULTY_CONFIG,
@@ -768,6 +769,48 @@ describe('Display Proofreader', () => {
     it('AllocatePhase debt explanation mentions voluntary bank debt paydown', () => {
       const allocatePhase = readComponent('components/phases/AllocatePhase.tsx');
       expect(allocatePhase).toContain('paid down voluntarily');
+    });
+  });
+
+  // ── M&A Sourcing Acquisition Capacity ──
+  describe('M&A Sourcing Acquisition Capacity', () => {
+    it('baseline (tier 0) allows 2 acquisitions', () => {
+      expect(getMaxAcquisitions(0)).toBe(2);
+    });
+
+    it('tier 1 allows 3 acquisitions', () => {
+      expect(getMaxAcquisitions(1)).toBe(3);
+    });
+
+    it('tier 2 allows 4 acquisitions', () => {
+      expect(getMaxAcquisitions(2)).toBe(4);
+    });
+
+    it('tier 3 stays at 4 acquisitions (same as tier 2)', () => {
+      expect(getMaxAcquisitions(3 as any)).toBe(4);
+    });
+
+    it('sharedServices tier 1 effects mention acquisition capacity 3', () => {
+      expect(MA_SOURCING_CONFIG[1].effects).toContain('Acquisition capacity: 3/year (was 2)');
+    });
+
+    it('sharedServices tier 2 effects mention acquisition capacity 4', () => {
+      expect(MA_SOURCING_CONFIG[2].effects).toContain('Acquisition capacity: 4/year (was 3)');
+    });
+
+    it('UserManual mentions baseline 2 acquisitions per year', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('2 acquisitions per year');
+    });
+
+    it('UserManual tier 1 row mentions acquisition capacity 3/year', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('acquisition capacity: 3/year');
+    });
+
+    it('UserManual tier 2 row mentions acquisition capacity 4/year', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('acquisition capacity: 4/year');
     });
   });
 });

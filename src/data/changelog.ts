@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 15, 2025',
+    title: 'M&A Sourcing Clarity',
+    sections: [
+      {
+        heading: 'Acquisition Capacity Now Visible',
+        items: [
+          'M&A Sourcing tier effects now show how many acquisitions you can attempt per year (Tier 1: 3/year, Tier 2+: 4/year, baseline: 2/year).',
+          'User Manual updated with acquisition capacity per tier and baseline note.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 15, 2025',
     title: 'The "No More Free Lunches" Update',
     sections: [
       {

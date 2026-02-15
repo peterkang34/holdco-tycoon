@@ -82,6 +82,7 @@ export const MA_SOURCING_CONFIG: Record<1 | 2 | 3, MASourcingTierConfig> = {
       '+2 focus-sector deals per round',
       'Source Deals costs $300k (was $500k)',
       'Focus deals last 3 rounds (was 2)',
+      'Acquisition capacity: 3/year (was 2)',
     ],
   },
   2: {
@@ -94,6 +95,7 @@ export const MA_SOURCING_CONFIG: Record<1 | 2 | 3, MASourcingTierConfig> = {
       'Sub-type targeting unlocked',
       '1-2 sub-type matched deals per round',
       'Quality floor of 2 on sourced deals',
+      'Acquisition capacity: 4/year (was 3)',
     ],
   },
   3: {
