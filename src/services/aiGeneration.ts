@@ -319,8 +319,6 @@ export async function generateGameAnalysis(input: GameAnalysisInput): Promise<AI
 
   const totalAcquisitions = allBusinesses.length;
   const totalSold = input.exitedBusinesses.filter(b => b.status === 'sold').length;
-  const totalWoundDown = input.exitedBusinesses.filter(b => b.status === 'wound_down').length;
-
   const soldWithProfit = input.exitedBusinesses.filter(b =>
     b.status === 'sold' && b.exitPrice && b.exitPrice > b.acquisitionPrice
   ).length;
@@ -376,7 +374,7 @@ export async function generateGameAnalysis(input: GameAnalysisInput): Promise<AI
         totalAcquisitions,
         totalSold,
         soldWithProfit,
-        totalWoundDown,
+
         avgHoldPeriod,
         avgQuality,
         totalImprovements,

@@ -212,7 +212,7 @@ function GameLoopContent() {
       </P>
       <BulletList items={[
         'Acquire new businesses from the deal pipeline',
-        'Sell or wind down underperforming businesses',
+        'Sell underperforming businesses',
         'Apply operational improvements',
         'Unlock or deactivate shared services',
         'Forge integrated platforms',
@@ -719,12 +719,6 @@ function SellingContent() {
         Net Proceeds = Exit Price - Outstanding Seller Notes - Outstanding Earn-outs
       </HighlightBox>
 
-      <SubHeading>Wind Down</SubHeading>
-      <P>
-        If a business is unprofitable or not worth selling, you can wind it down. You receive
-        no sale proceeds, but you stop the bleeding from negative cash flows and free up
-        management attention.
-      </P>
     </>
   );
 }

@@ -73,7 +73,7 @@ export type SubTypeAffinity = 'match' | 'related' | 'distant';
 
 export type DealHeat = 'cold' | 'warm' | 'hot' | 'contested';
 
-export type BusinessStatus = 'active' | 'sold' | 'wound_down' | 'integrated' | 'merged';
+export type BusinessStatus = 'active' | 'sold' | 'wound_down' | 'integrated' | 'merged'; // wound_down kept for save compat
 
 export type QualityRating = 1 | 2 | 3 | 4 | 5;
 
@@ -505,7 +505,6 @@ export type GameActionType =
   | 'buyback'
   | 'distribute'
   | 'sell'
-  | 'wind_down'
   | 'accept_offer'
   | 'decline_offer'
   | 'source_deals' // Hire investment banker for additional deal flow

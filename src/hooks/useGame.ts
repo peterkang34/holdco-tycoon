@@ -125,7 +125,7 @@ interface GameStore extends GameState {
   buybackShares: (amount: number) => void;
   distributeToOwners: (amount: number) => void;
   sellBusiness: (businessId: string) => void;
-  windDownBusiness: (businessId: string) => void;
+
   acceptOffer: () => void;
   declineOffer: () => void;
   grantEquityDemand: () => void;
@@ -1694,63 +1694,6 @@ export const useGameStore = create<GameStore>()(
             },
           ],
           metrics: calculateMetrics(sellState),
-        });
-      },
-
-      windDownBusiness: (businessId: string) => {
-        const state = get();
-        const business = state.businesses.find(b => b.id === businessId);
-        if (!business || business.status !== 'active') return;
-
-        const windDownCost = 250; // $250k
-        const debtWriteOff = business.sellerNoteBalance + business.bankDebtBalance;
-
-        // Also mark bolt-ons as wound down when winding down a platform
-        const boltOnIds = new Set(business.boltOnIds || []);
-        const boltOnDebtWriteOff = state.businesses
-          .filter(b => boltOnIds.has(b.id))
-          .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance, 0);
-
-        const updatedBusinesses = state.businesses.map(b => {
-          if (b.id === businessId) return { ...b, status: 'wound_down' as const, exitRound: state.round };
-          if (boltOnIds.has(b.id)) return { ...b, status: 'wound_down' as const, exitRound: state.round };
-          return b;
-        });
-
-        // C-3: Floor cash at 0
-        const newCash = Math.max(0, state.cash - windDownCost - debtWriteOff - boltOnDebtWriteOff);
-
-        // M-7: Auto-deactivate shared services if opco count drops below minimum
-        const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
-        const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
-          ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
-          : state.sharedServices;
-
-        // Collect bolt-on businesses for exitedBusinesses
-        const exitedBoltOns = state.businesses
-          .filter(b => boltOnIds.has(b.id))
-          .map(b => ({ ...b, status: 'wound_down' as const, exitRound: state.round }));
-
-        const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
-        const windDownState = {
-          ...state,
-          cash: newCash,
-          totalDebt: newTotalDebt,
-          businesses: updatedBusinesses,
-          sharedServices: updatedServices,
-        };
-        set({
-          ...windDownState,
-          exitedBusinesses: [
-            ...state.exitedBusinesses,
-            { ...business, status: 'wound_down' as const, exitRound: state.round },
-            ...exitedBoltOns,
-          ],
-          actionsThisRound: [
-            ...state.actionsThisRound,
-            { type: 'wind_down', round: state.round, details: { businessId, cost: windDownCost + debtWriteOff } },
-          ],
-          metrics: calculateMetrics(windDownState),
         });
       },
 

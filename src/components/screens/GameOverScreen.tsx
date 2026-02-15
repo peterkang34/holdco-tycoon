@@ -488,8 +488,6 @@ export function GameOverScreen({
             let exitMultiple: number | null = null;
             if (business.status === 'sold') {
               exitValue = business.exitPrice || 0;
-            } else if (business.status === 'wound_down') {
-              exitValue = 0;
             } else {
               const valuation = calculateExitValuation(business, maxRounds);
               exitMultiple = valuation.totalMultiple;

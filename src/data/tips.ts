@@ -290,7 +290,7 @@ export const POST_GAME_INSIGHTS: Record<string, { pattern: string; insight: stri
   },
   held_losers: {
     pattern: 'Held losers too long',
-    insight: "The best holdcos cut losses when the economics no longer justify the capital. A wind-down isn't failure — it's discipline.",
+    insight: "The best holdcos cut losses when the economics no longer justify the capital. Selling underperformers early frees up capital for better opportunities.",
     bookReference: 'Ch. IX',
   },
   good_shared_services: {

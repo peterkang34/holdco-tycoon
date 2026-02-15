@@ -94,7 +94,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     buybackShares,
     distributeToOwners,
     sellBusiness,
-    windDownBusiness,
+
     improveBusiness,
     acceptOffer,
     declineOffer,
@@ -271,16 +271,6 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
       type: 'success',
     });
   }, [sellBusiness, businesses, addToast]);
-
-  const handleWindDown = useCallback((businessId: string) => {
-    const biz = businesses.find(b => b.id === businessId);
-    windDownBusiness(businessId);
-    addToast({
-      message: `Winding down ${biz?.name ?? 'business'}`,
-      detail: 'Business will be closed',
-      type: 'warning',
-    });
-  }, [windDownBusiness, businesses, addToast]);
 
   const handleImprove = useCallback((businessId: string, improvementType: OperationalImprovementType) => {
     const biz = businesses.find(b => b.id === businessId);
@@ -557,7 +547,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             onBuyback={handleBuyback}
             onDistribute={handleDistribute}
             onSell={handleSell}
-            onWindDown={handleWindDown}
+
             onImprove={handleImprove}
             onEndRound={endRound}
             onSourceDeals={handleSourceDeals}

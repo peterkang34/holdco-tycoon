@@ -21,7 +21,7 @@ function actionTypeSummary(type: string): string {
     case 'buyback': return 'Buyback';
     case 'distribute': return 'Distribution';
     case 'sell': return 'Sale';
-    case 'wind_down': return 'Wind Down';
+
     case 'accept_offer': return 'Accepted Offer';
     case 'decline_offer': return 'Declined Offer';
     case 'source_deals': return 'Sourced Deals';

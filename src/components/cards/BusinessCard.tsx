@@ -9,7 +9,7 @@ interface BusinessCardProps {
   showDetails?: boolean;
   onSell?: () => void;
   onImprove?: () => void;
-  onWindDown?: () => void;
+
   onDesignatePlatform?: () => void;
   onShowRollUpGuide?: () => void;
   compact?: boolean;
@@ -27,7 +27,7 @@ export function BusinessCard({
   showDetails = true,
   onSell,
   onImprove,
-  onWindDown,
+
   onDesignatePlatform,
   onShowRollUpGuide,
   compact = false,
@@ -421,15 +421,7 @@ export function BusinessCard({
                     </button>
                   )
                 )}
-                {onWindDown && (
-                  <button
-                    onClick={onWindDown}
-                    className="btn-secondary text-xs text-danger/70 hover:text-danger"
-                    title="Shut down the business. Costs $250k + any seller note payoff."
-                  >
-                    Wind Down
-                  </button>
-                )}
+
               </div>
               {onDesignatePlatform && !isPlatform && (
                 <div>

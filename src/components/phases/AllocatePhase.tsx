@@ -78,7 +78,7 @@ interface AllocatePhaseProps {
   onBuyback: (amount: number) => void;
   onDistribute: (amount: number) => void;
   onSell: (businessId: string) => void;
-  onWindDown: (businessId: string) => void;
+
   onImprove: (businessId: string, improvementType: OperationalImprovementType) => void;
   onEndRound: () => void;
   onSourceDeals: () => void;
@@ -138,7 +138,7 @@ export function AllocatePhase({
   onBuyback,
   onDistribute,
   onSell,
-  onWindDown,
+
   onImprove,
   onEndRound,
   onSourceDeals,
@@ -192,7 +192,7 @@ export function AllocatePhase({
   const [showRollUpGuide, setShowRollUpGuide] = useState(false);
   const [sellConfirmBusiness, setSellConfirmBusiness] = useState<Business | null>(null);
   const [sellCelebration, setSellCelebration] = useState<{ name: string; moic: number } | null>(null);
-  const [windDownConfirmBusiness, setWindDownConfirmBusiness] = useState<Business | null>(null);
+
   const [dismissedWarnings, setDismissedWarnings] = useState<Set<string>>(new Set());
   const [forgeConfirm, setForgeConfirm] = useState<{ recipeId: string; businessIds: string[] } | null>(null);
   const [sellPlatformConfirm, setSellPlatformConfirm] = useState<IntegratedPlatform | null>(null);
@@ -1178,7 +1178,7 @@ export function AllocatePhase({
                   onSell={() => setSellConfirmBusiness(business)}
                   onImprove={() => setSelectedBusinessForImprovement(business)}
                   onDesignatePlatform={!business.isPlatform ? () => onDesignatePlatform(business.id) : undefined}
-                  onWindDown={() => setWindDownConfirmBusiness(business)}
+
                   onShowRollUpGuide={() => setShowRollUpGuide(true)}
                   isPlatform={business.isPlatform}
                   platformScale={business.platformScale}
@@ -1633,7 +1633,7 @@ export function AllocatePhase({
                     <div>
                       <p className="text-text-muted">Opco Bank Debt</p>
                       <p className="font-mono font-bold text-lg">{formatMoney(opcoBankDebt)}</p>
-                      <p className="text-xs text-text-muted">Paid on sale/wind-down</p>
+                      <p className="text-xs text-text-muted">Paid on sale</p>
                     </div>
                     <div>
                       <p className="text-text-muted">Total Debt</p>
@@ -1641,7 +1641,7 @@ export function AllocatePhase({
                     </div>
                   </div>
                   <div className="mt-4 p-3 bg-white/5 rounded text-xs text-text-muted">
-                    <strong>How debt works:</strong> Holdco debt has a 2-year grace period, then 10% of the balance amortizes automatically each year. You can also pay down extra here. Seller notes auto-amortize each year. Bank debt at opco level stays until you sell or wind down the business (proceeds net of debt).
+                    <strong>How debt works:</strong> Holdco debt has a 2-year grace period, then 10% of the balance amortizes automatically each year. You can also pay down extra here. Seller notes auto-amortize each year. Bank debt at opco level stays until you sell the business (proceeds net of debt).
                   </div>
                 </div>
               );
@@ -2330,64 +2330,6 @@ export function AllocatePhase({
                   className="btn-primary px-6"
                 >
                   Sell
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-
-      {/* Wind-Down Confirmation Modal */}
-      {windDownConfirmBusiness && (() => {
-        const biz = windDownConfirmBusiness;
-        const boltOnCount = biz.boltOnIds?.length || 0;
-        const boltOnDebt = allBusinesses
-          .filter(b => biz.boltOnIds?.includes(b.id))
-          .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
-        const totalCost = 250 + biz.sellerNoteBalance + boltOnDebt;
-        return (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-            <div className="bg-bg-primary border border-white/10 rounded-xl max-w-md w-full p-6">
-              <h3 className="text-xl font-bold mb-4 text-danger">Confirm Wind-Down</h3>
-              <p className="text-sm text-text-secondary mb-4">
-                This will permanently shut down <span className="font-bold text-text-primary">{biz.name}</span>
-                {boltOnCount > 0 && ` and its ${boltOnCount} bolt-on${boltOnCount > 1 ? 's' : ''}`}.
-                You will not recover any invested capital.
-              </p>
-              <div className="space-y-2 mb-6 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-text-muted">Wind-down fee</span>
-                  <span className="font-mono text-danger">-{formatMoney(250)}</span>
-                </div>
-                {biz.sellerNoteBalance > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-text-muted">Seller note writeoff</span>
-                    <span className="font-mono text-danger">-{formatMoney(biz.sellerNoteBalance)}</span>
-                  </div>
-                )}
-                {boltOnDebt > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-text-muted">Bolt-on debt writeoff</span>
-                    <span className="font-mono text-danger">-{formatMoney(boltOnDebt)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between border-t border-white/10 pt-2 font-bold">
-                  <span>Total cost</span>
-                  <span className="font-mono text-danger">-{formatMoney(totalCost)}</span>
-                </div>
-              </div>
-              <div className="flex gap-3 justify-end">
-                <button onClick={() => setWindDownConfirmBusiness(null)} className="btn-secondary px-6">
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    onWindDown(biz.id);
-                    setWindDownConfirmBusiness(null);
-                  }}
-                  className="bg-danger/80 hover:bg-danger text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors"
-                >
-                  Wind Down
                 </button>
               </div>
             </div>
