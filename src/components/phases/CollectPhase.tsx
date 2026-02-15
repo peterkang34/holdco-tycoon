@@ -7,6 +7,8 @@ interface CollectPhaseProps {
   businesses: Business[];
   cash: number;
   totalDebt: number;
+  holdcoLoanBalance: number;
+  holdcoLoanRate: number;
   interestRate: number;
   sharedServicesCost: number;
   maSourcingCost?: number;
@@ -21,7 +23,7 @@ interface CollectPhaseProps {
 }
 
 // Calculate detailed FCF breakdown for a business (pre-tax — tax is at portfolio level)
-function calculateFcfBreakdown(business: Business, interestRate: number, capexReduction: number = 0) {
+function calculateFcfBreakdown(business: Business, _interestRate: number, capexReduction: number = 0) {
   const sector = SECTORS[business.sectorId];
   const ebitda = business.ebitda;
   const effectiveCapexRate = sector.capexRate * (1 - capexReduction);
@@ -32,7 +34,10 @@ function calculateFcfBreakdown(business: Business, interestRate: number, capexRe
   const sellerNotePrincipal = business.sellerNoteRoundsRemaining > 0
     ? Math.round(business.sellerNoteBalance / business.sellerNoteRoundsRemaining)
     : 0;
-  const bankDebtInterest = Math.round(business.bankDebtBalance * interestRate);
+  const bankDebtInterest = Math.round(business.bankDebtBalance * (business.bankDebtRate || 0));
+  const bankDebtPrincipal = business.bankDebtRoundsRemaining > 0
+    ? Math.round(business.bankDebtBalance / business.bankDebtRoundsRemaining)
+    : 0;
 
   // Earn-out: triggers when cumulative EBITDA growth meets target
   let earnoutPayment = 0;
@@ -43,7 +48,7 @@ function calculateFcfBreakdown(business: Business, interestRate: number, capexRe
     }
   }
 
-  const totalDeductions = capex + sellerNoteInterest + sellerNotePrincipal + bankDebtInterest + earnoutPayment;
+  const totalDeductions = capex + sellerNoteInterest + sellerNotePrincipal + bankDebtInterest + bankDebtPrincipal + earnoutPayment;
   const fcf = ebitda - totalDeductions;
 
   return {
@@ -54,22 +59,29 @@ function calculateFcfBreakdown(business: Business, interestRate: number, capexRe
     sellerNotePrincipal,
     sellerNoteBalance: business.sellerNoteBalance,
     bankDebtInterest,
+    bankDebtPrincipal,
     bankDebtBalance: business.bankDebtBalance,
     earnoutPayment,
     fcf,
   };
 }
 
-// Calculate all debt service for integrated (tuck-in) businesses: seller notes + earnouts
-function calculateIntegratedDebtService(businesses: Business[]): { sellerNotes: number; earnouts: number; total: number } {
+// Calculate all debt service for integrated (tuck-in) businesses: seller notes + bank debt + earnouts
+function calculateIntegratedDebtService(businesses: Business[]): { sellerNotes: number; bankDebt: number; earnouts: number; total: number } {
   const integrated = businesses.filter(b => b.status === 'integrated');
   let sellerNotes = 0;
+  let bankDebt = 0;
   let earnouts = 0;
   for (const b of integrated) {
     // Seller note interest + principal
     if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
       sellerNotes += Math.round(b.sellerNoteBalance * b.sellerNoteRate);
       sellerNotes += Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
+    }
+    // Bank debt interest + principal
+    if (b.bankDebtBalance > 0 && b.bankDebtRoundsRemaining > 0) {
+      bankDebt += Math.round(b.bankDebtBalance * (b.bankDebtRate || 0));
+      bankDebt += Math.round(b.bankDebtBalance / b.bankDebtRoundsRemaining);
     }
     // Earn-out using platform growth as proxy
     if (b.earnoutRemaining > 0 && b.earnoutTarget > 0 && b.parentPlatformId) {
@@ -80,13 +92,15 @@ function calculateIntegratedDebtService(businesses: Business[]): { sellerNotes: 
       }
     }
   }
-  return { sellerNotes, earnouts, total: sellerNotes + earnouts };
+  return { sellerNotes, bankDebt, earnouts, total: sellerNotes + bankDebt + earnouts };
 }
 
 export function CollectPhase({
   businesses,
   cash,
   totalDebt,
+  holdcoLoanBalance,
+  holdcoLoanRate,
   interestRate,
   sharedServicesCost,
   maSourcingCost = 0,
@@ -116,20 +130,20 @@ export function CollectPhase({
   // Debt service from integrated (tuck-in) businesses: seller notes + earnouts
   const integratedDebt = calculateIntegratedDebtService(businesses);
 
-  // Portfolio-level tax with all deductions
-  const taxBreakdown = calculatePortfolioTax(activeBusinesses, totalDebt, interestRate, sharedServicesCost + (maSourcingCost ?? 0));
+  // Portfolio-level tax with all deductions (uses holdco loan balance, not total debt)
+  const taxBreakdown = calculatePortfolioTax(activeBusinesses, holdcoLoanBalance, holdcoLoanRate, sharedServicesCost + (maSourcingCost ?? 0));
   const hasDeductions = taxBreakdown.totalTaxSavings > 0;
   const effectiveRatePct = Math.round(taxBreakdown.effectiveTaxRate * 100);
 
-  // Calculate annual interest expense (holdco level)
-  const holdcoInterest = Math.round(totalDebt * (interestRate + (interestPenalty ?? 0)));
+  // Calculate annual interest expense (holdco level — loan only)
+  const holdcoInterest = Math.round(holdcoLoanBalance * (holdcoLoanRate + (interestPenalty ?? 0)));
 
   // Total earn-out payments (active businesses + tuck-ins) — uncapped
   const uncappedActiveEarnouts = businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.earnoutPayment, 0);
   const uncappedTotalEarnouts = uncappedActiveEarnouts + integratedDebt.earnouts;
 
   // Net FCF WITHOUT earn-outs (to determine how much cash is available for earn-outs)
-  const netFcfBeforeEarnouts = totalBusinessFcf + uncappedActiveEarnouts - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - integratedDebt.sellerNotes;
+  const netFcfBeforeEarnouts = totalBusinessFcf + uncappedActiveEarnouts - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - integratedDebt.sellerNotes - integratedDebt.bankDebt;
   const availableForEarnouts = Math.max(0, cash + netFcfBeforeEarnouts);
 
   // Cap earn-outs at available cash (matches store's Math.min logic)
@@ -144,15 +158,16 @@ export function CollectPhase({
   // What cash will be after collection
   const projectedCash = cash + netFcf;
 
-  // OpCo debt service (seller notes + bank debt, excluding earn-outs)
+  // OpCo debt service (seller notes + bank debt P&I, excluding earn-outs)
   const opcoDebtService = businessBreakdowns.reduce((s, { breakdown }) =>
-    s + breakdown.sellerNoteInterest + breakdown.sellerNotePrincipal + breakdown.bankDebtInterest, 0) + integratedDebt.sellerNotes;
+    s + breakdown.sellerNoteInterest + breakdown.sellerNotePrincipal + breakdown.bankDebtInterest + breakdown.bankDebtPrincipal, 0)
+    + integratedDebt.sellerNotes + integratedDebt.bankDebt;
 
   // Coverage ratios
   const totalInterestExpense = holdcoInterest +
     businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNoteInterest + breakdown.bankDebtInterest, 0);
   const totalDebtService = totalInterestExpense +
-    businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNotePrincipal, 0);
+    businessBreakdowns.reduce((s, { breakdown }) => s + breakdown.sellerNotePrincipal + breakdown.bankDebtPrincipal, 0);
   const interestCoverage = totalInterestExpense > 0 ? totalEbitda / totalInterestExpense : Infinity;
   const debtServiceCoverage = totalDebtService > 0 ? netFcf / totalDebtService : Infinity;
   const hasDebtObligations = totalDebtService > 0;

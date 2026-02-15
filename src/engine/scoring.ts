@@ -8,16 +8,16 @@ import {
 import { calculateMetrics, calculateSectorFocusBonus, calculateExitValuation } from './simulation';
 import { POST_GAME_INSIGHTS } from '../data/tips';
 import { getAllDedupedBusinesses } from './helpers';
+import { DIFFICULTY_CONFIG } from '../data/gameConfig';
 
 const LEADERBOARD_KEY = 'holdco-tycoon-leaderboard';
 const MAX_LEADERBOARD_ENTRIES = 10;
 
-const DIFFICULTY_MULTIPLIER: Record<string, number> = { easy: 1.0, normal: 1.15 };
-
 /** Compute adjusted FEV for a leaderboard entry (applies difficulty multiplier) */
 function getAdjustedFEV(entry: LeaderboardEntry): number {
   const raw = entry.founderEquityValue ?? entry.enterpriseValue;
-  const multiplier = DIFFICULTY_MULTIPLIER[entry.difficulty ?? 'easy'] ?? 1.0;
+  const difficulty = entry.difficulty ?? 'easy';
+  const multiplier = DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0;
   return Math.round(raw * multiplier);
 }
 
@@ -49,13 +49,12 @@ export function calculateEnterpriseValue(state: GameState): number {
   const blendedMultiple = totalEbitda > 0 ? weightedMultiple / totalEbitda : 0;
   const portfolioValue = totalEbitda * blendedMultiple;
 
-  // Calculate total holdco-level debt including opco-level seller notes
-  // L-13: Only include sellerNoteBalance (bank debt is tracked at holdco level in state.totalDebt)
-  const opcoDebt = activeBusinesses.reduce(
+  // Total debt: state.totalDebt (holdco loan + per-business bank debt) + seller notes
+  const opcoSellerNotes = activeBusinesses.reduce(
     (sum, b) => sum + b.sellerNoteBalance,
     0
   );
-  const totalDebt = state.totalDebt + opcoDebt;
+  const totalDebt = state.totalDebt + opcoSellerNotes;
 
   // EV = Portfolio Value + Cash - All Debt (no distribution add-back)
   const ev = portfolioValue + state.cash - totalDebt;

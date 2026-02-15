@@ -65,6 +65,13 @@ import { SECTORS } from '../data/sectors';
 
 import type { GameDifficulty, GameDuration } from '../engine/types';
 
+/** Recompute totalDebt from holdco loan + per-business bank debt */
+function computeTotalDebt(businesses: Business[], holdcoLoanBalance: number): number {
+  return holdcoLoanBalance + businesses
+    .filter(b => b.status === 'active' || b.status === 'integrated')
+    .reduce((sum, b) => sum + b.bankDebtBalance, 0);
+}
+
 // Capital structure constants (defaults for Easy mode — overridden by DIFFICULTY_CONFIG)
 const INITIAL_RAISE = 20000;
 const FOUNDER_OWNERSHIP = 0.80;
@@ -214,6 +221,9 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   actionsThisRound: [],
   debtPaymentThisRound: 0,
   cashBeforeDebtPayments: 0,
+  holdcoLoanBalance: 0,
+  holdcoLoanRate: 0,
+  holdcoLoanRoundsRemaining: 0,
   holdcoDebtStartRound: 0,
   requiresRestructuring: false,
   covenantBreachRounds: 0,
@@ -242,6 +252,13 @@ export const useGameStore = create<GameStore>()(
         const startingBusiness = createStartingBusiness(startingSector, diffConfig.startingEbitda, diffConfig.startingMultipleCap);
         const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds);
 
+        // Holdco loan setup: Normal mode gets a structured loan, Easy mode has none
+        const holdcoLoanBalance = diffConfig.startingDebt;
+        const holdcoLoanRate = holdcoLoanBalance > 0 ? STARTING_INTEREST_RATE : 0;
+        const holdcoLoanRoundsRemaining = holdcoLoanBalance > 0
+          ? Math.max(4, Math.ceil(maxRounds * 0.50))
+          : 0;
+
         const newState: GameState = {
           ...initialState,
           holdcoName,
@@ -259,6 +276,9 @@ export const useGameStore = create<GameStore>()(
           initialRaiseAmount: diffConfig.initialCash,
           initialOwnershipPct: diffConfig.founderShares / diffConfig.totalShares,
           holdcoDebtStartRound: diffConfig.holdcoDebtStartRound,
+          holdcoLoanBalance,
+          holdcoLoanRate,
+          holdcoLoanRoundsRemaining,
           sharedServices: initializeSharedServices(),
           dealPipeline: initialDealPipeline,
           maSourcing: { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 },
@@ -330,15 +350,24 @@ export const useGameStore = create<GameStore>()(
           state.businesses.filter(b => b.status === 'active'),
           sharedBenefits.capexReduction,
           sharedBenefits.cashConversionBonus,
-          state.totalDebt,
+          state.holdcoLoanBalance,
           effectiveRate,
           totalDeductibleCosts
         );
 
-        // Interest and shared services are still cash costs (separate from tax)
-        const annualInterest = Math.round(state.totalDebt * effectiveRate);
+        // Holdco loan P&I (replaces old holdco interest-only)
+        let holdcoLoanPayment = 0;
+        let updatedHoldcoLoanBalance = state.holdcoLoanBalance;
+        let updatedHoldcoLoanRoundsRemaining = state.holdcoLoanRoundsRemaining;
+        if (state.holdcoLoanBalance > 0 && state.holdcoLoanRoundsRemaining > 0) {
+          const holdcoInterest = Math.round(state.holdcoLoanBalance * (state.holdcoLoanRate + distressRestrictions.interestPenalty));
+          const holdcoPrincipal = Math.round(state.holdcoLoanBalance / state.holdcoLoanRoundsRemaining);
+          holdcoLoanPayment = holdcoInterest + holdcoPrincipal;
+          updatedHoldcoLoanBalance = Math.max(0, state.holdcoLoanBalance - holdcoPrincipal);
+          updatedHoldcoLoanRoundsRemaining = state.holdcoLoanRoundsRemaining - 1;
+        }
 
-        let newCash = state.cash + annualFcf - annualInterest - sharedServicesCost - maSourcingCost - turnaroundTierCost - turnaroundProgramCosts;
+        let newCash = state.cash + annualFcf - holdcoLoanPayment - sharedServicesCost - maSourcingCost - turnaroundTierCost - turnaroundProgramCosts;
 
         // Pay opco-level debt (seller notes, earnouts, bank debt interest)
         // This aligns with the waterfall display — all deductions happen at collection time
@@ -400,13 +429,28 @@ export const useGameStore = create<GameStore>()(
             }
           }
 
-          // Bank debt interest (opco-level, uses base rate — distress penalty is holdco only)
-          if (b.bankDebtBalance > 0) {
-            const bankInterest = Math.round(b.bankDebtBalance * state.interestRate);
+          // Bank debt: interest + principal (mandatory, per-business amortization)
+          if (b.bankDebtBalance > 0 && b.bankDebtRoundsRemaining > 0) {
+            const bankInterest = Math.round(b.bankDebtBalance * (b.bankDebtRate || state.interestRate));
+            const bankPrincipal = Math.round(b.bankDebtBalance / b.bankDebtRoundsRemaining);
+            const totalBankPayment = bankInterest + bankPrincipal;
             const availableForBank = Math.max(0, newCash + opcoDebtAdjustment);
-            const actualBankPayment = Math.min(bankInterest, availableForBank);
-            if (actualBankPayment < bankInterest) hadSkippedPayments = true;
+            const actualBankPayment = Math.min(totalBankPayment, availableForBank);
             opcoDebtAdjustment -= actualBankPayment;
+            if (actualBankPayment < totalBankPayment) hadSkippedPayments = true;
+            const bankPrincipalPaid = Math.max(0, actualBankPayment - bankInterest);
+            updated.bankDebtBalance = Math.max(0, b.bankDebtBalance - bankPrincipalPaid);
+            if (actualBankPayment >= totalBankPayment) {
+              updated.bankDebtRoundsRemaining = b.bankDebtRoundsRemaining - 1;
+            }
+          }
+          // Final bank debt balance payment when rounds expire
+          if (updated.bankDebtRoundsRemaining !== undefined && updated.bankDebtRoundsRemaining <= 0 && (updated.bankDebtBalance ?? b.bankDebtBalance) > 0) {
+            const remainingBalance = updated.bankDebtBalance ?? b.bankDebtBalance;
+            const availableForFinal = Math.max(0, newCash + opcoDebtAdjustment);
+            const finalPayment = Math.min(remainingBalance, availableForFinal);
+            opcoDebtAdjustment -= finalPayment;
+            updated.bankDebtBalance = remainingBalance - finalPayment;
           }
 
           return updated;
@@ -452,10 +496,16 @@ export const useGameStore = create<GameStore>()(
         // Generate event
         const event = generateEvent(state as GameState);
 
+        // Recompute totalDebt from holdco loan + per-business bank debt
+        const newTotalDebt = computeTotalDebt(updatedBusinesses, updatedHoldcoLoanBalance);
+
         let gameState: GameState = {
           ...state,
           businesses: updatedBusinesses,
           cash: Math.round(newCash),
+          totalDebt: newTotalDebt,
+          holdcoLoanBalance: updatedHoldcoLoanBalance,
+          holdcoLoanRoundsRemaining: updatedHoldcoLoanRoundsRemaining,
           currentEvent: event,
           requiresRestructuring,
           phase: requiresRestructuring ? 'restructure' as GamePhase : 'event' as GamePhase,
@@ -684,29 +734,9 @@ export const useGameStore = create<GameStore>()(
         const newRoundHistory = [...(state.roundHistory ?? []), roundHistoryEntry];
 
         if (!gameOver) {
-          // Advance to collect phase — opco debt is now paid in advanceToEvent (aligned with waterfall)
-          // Only holdco bank debt amortization happens at year-end
-          let cashAdjustment = 0;
-          let holdcoAmortizationAmount = 0;
-
-          let newTotalDebt = state.totalDebt;
-          const holdcoDebtStartRound = state.holdcoDebtStartRound;
-          const gracePeriod = Math.max(2, Math.ceil(state.maxRounds * 0.10));
-          if (state.totalDebt > 0 && holdcoDebtStartRound > 0) {
-            const yearsWithDebt = newRound - holdcoDebtStartRound;
-            if (yearsWithDebt >= gracePeriod) {
-              const scheduledPayment = Math.round(state.totalDebt * 0.10);
-              const availableCash = Math.max(0, state.cash + cashAdjustment);
-              const actualPayment = Math.min(scheduledPayment, availableCash);
-              if (actualPayment > 0) {
-                cashAdjustment -= actualPayment;
-                newTotalDebt = state.totalDebt - actualPayment;
-                holdcoAmortizationAmount = actualPayment;
-              }
-            }
-          }
-
-          const newCash = Math.max(0, state.cash + cashAdjustment);
+          // Advance to collect phase — all debt P&I is now handled in advanceToEvent waterfall
+          // Just recompute totalDebt for consistency
+          const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
 
           set({
             businesses: updatedBusinesses,
@@ -722,35 +752,18 @@ export const useGameStore = create<GameStore>()(
             yearChronicle: null,
             metrics: endMetrics,
             focusBonus: calculateSectorFocusBonus(updatedBusinesses),
-            cash: newCash,
+            cash: state.cash,
             totalDebt: newTotalDebt,
             cashBeforeDebtPayments: state.cash,
-            debtPaymentThisRound: holdcoAmortizationAmount,
-            holdcoAmortizationThisRound: holdcoAmortizationAmount,
+            debtPaymentThisRound: 0,
+            holdcoAmortizationThisRound: 0,
             acquisitionsThisRound: 0,
             lastAcquisitionResult: null,
           });
         } else {
-          // Game over — opco debt already settled in last advanceToEvent
-          // Only process holdco amortization for accurate final state
-          let gameOverCashAdj = 0;
-          let gameOverDebt = state.totalDebt;
-          const gameOverGracePeriod = Math.max(2, Math.ceil(state.maxRounds * 0.10));
-          if (state.totalDebt > 0 && state.holdcoDebtStartRound > 0) {
-            const yearsWithDebt = newRound - state.holdcoDebtStartRound;
-            if (yearsWithDebt >= gameOverGracePeriod) {
-              const scheduledPayment = Math.round(state.totalDebt * 0.10);
-              const availableCash = Math.max(0, state.cash + gameOverCashAdj);
-              const actualPayment = Math.min(scheduledPayment, availableCash);
-              if (actualPayment > 0) {
-                gameOverCashAdj -= actualPayment;
-                gameOverDebt = state.totalDebt - actualPayment;
-              }
-            }
-          }
-
-          const gameOverCash = Math.max(0, state.cash + gameOverCashAdj);
-          const gameOverMetrics = calculateMetrics({ ...state, businesses: updatedBusinesses, cash: gameOverCash, totalDebt: gameOverDebt });
+          // Game over — all debt P&I already settled in last advanceToEvent
+          const gameOverDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
+          const gameOverMetrics = calculateMetrics({ ...state, businesses: updatedBusinesses, totalDebt: gameOverDebt });
 
           set({
             businesses: updatedBusinesses,
@@ -764,7 +777,7 @@ export const useGameStore = create<GameStore>()(
             phase: 'collect' as GamePhase,
             currentEvent: null,
             yearChronicle: null,
-            cash: gameOverCash,
+            cash: state.cash,
             totalDebt: gameOverDebt,
             metrics: gameOverMetrics,
             focusBonus: calculateSectorFocusBonus(updatedBusinesses),
@@ -774,6 +787,9 @@ export const useGameStore = create<GameStore>()(
 
       acquireBusiness: (deal: Deal, structure: DealStructure) => {
         const state = get();
+
+        // Guard: no acquisitions during restructuring
+        if (state.requiresRestructuring) return;
 
         // Enforce distress restrictions — covenant breach blocks new acquisitions
         const restrictions = getDistressRestrictions(calculateMetrics(state).distressLevel);
@@ -809,20 +825,16 @@ export const useGameStore = create<GameStore>()(
           acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0,
         };
 
-        // Add bank debt to holdco if applicable
-        const newTotalDebt = state.totalDebt + (structure.bankDebt?.amount ?? 0);
-
-        // Track when first holdco debt was taken
-        const holdcoDebtStartRound = (structure.bankDebt?.amount ?? 0) > 0 && state.holdcoDebtStartRound === 0
-          ? state.round
-          : state.holdcoDebtStartRound;
+        // Bank debt now tracked per-business (set on businessWithPlatformFields via executeDealStructure)
+        // Recompute totalDebt from holdco loan + all per-business bank debt
+        const newBusinesses = [...state.businesses, businessWithPlatformFields];
+        const newTotalDebt = computeTotalDebt(newBusinesses, state.holdcoLoanBalance);
 
         set({
           cash: state.cash - structure.cashRequired,
           totalDebt: newTotalDebt,
-          holdcoDebtStartRound,
           totalInvestedCapital: state.totalInvestedCapital + deal.effectivePrice,
-          businesses: [...state.businesses, businessWithPlatformFields],
+          businesses: newBusinesses,
           dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
           acquisitionsThisRound: state.acquisitionsThisRound + 1,
           lastAcquisitionResult: 'success',
@@ -838,7 +850,7 @@ export const useGameStore = create<GameStore>()(
             ...state,
             cash: state.cash - structure.cashRequired,
             totalDebt: newTotalDebt,
-            businesses: [...state.businesses, businessWithPlatformFields],
+            businesses: newBusinesses,
           }),
         });
       },
@@ -846,6 +858,9 @@ export const useGameStore = create<GameStore>()(
       // Acquire a tuck-in and fold it into an existing platform
       acquireTuckIn: (deal: Deal, structure: DealStructure, targetPlatformId: string) => {
         const state = get();
+
+        // Guard: no acquisitions during restructuring
+        if (state.requiresRestructuring) return;
 
         // Enforce distress restrictions — covenant breach blocks new acquisitions
         const restrictions = getDistressRestrictions(calculateMetrics(state).distressLevel);
@@ -913,7 +928,9 @@ export const useGameStore = create<GameStore>()(
           sellerNoteBalance: structure.sellerNote?.amount ?? 0,
           sellerNoteRate: structure.sellerNote?.rate ?? 0,
           sellerNoteRoundsRemaining: structure.sellerNote?.termRounds ?? 0,
-          bankDebtBalance: 0,
+          bankDebtBalance: structure.bankDebt?.amount ?? 0,
+          bankDebtRate: structure.bankDebt?.rate ?? 0,
+          bankDebtRoundsRemaining: structure.bankDebt?.termRounds ?? 0,
           earnoutRemaining: structure.earnout?.amount ?? 0,
           earnoutTarget: structure.earnout?.targetEbitdaGrowth ?? 0,
           status: 'integrated', // H-3: Mark as integrated so EBITDA isn't double-counted (it's folded into platform)
@@ -967,13 +984,9 @@ export const useGameStore = create<GameStore>()(
           return b;
         });
 
-        // Add bank debt to holdco if applicable
-        const newTotalDebt = state.totalDebt + (structure.bankDebt?.amount ?? 0);
-
-        // Track when first holdco debt was taken
-        const holdcoDebtStartRound = (structure.bankDebt?.amount ?? 0) > 0 && state.holdcoDebtStartRound === 0
-          ? state.round
-          : state.holdcoDebtStartRound;
+        // Bank debt tracked per-business; recompute totalDebt
+        const tuckInBusinesses = [...updatedBusinesses, boltOnBusiness];
+        const newTotalDebt = computeTotalDebt(tuckInBusinesses, state.holdcoLoanBalance);
 
         const tuckInCash = Math.max(0, state.cash - structure.cashRequired - restructuringCost);
 
@@ -989,7 +1002,6 @@ export const useGameStore = create<GameStore>()(
         set({
           cash: tuckInCash,
           totalDebt: newTotalDebt,
-          holdcoDebtStartRound,
           totalInvestedCapital: state.totalInvestedCapital + deal.effectivePrice + restructuringCost,
           businesses: [...updatedBusinesses, boltOnBusiness],
           dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
@@ -1129,7 +1141,17 @@ export const useGameStore = create<GameStore>()(
                 / (biz1.sellerNoteBalance + biz2.sellerNoteBalance)
               )
             : 0,
-          bankDebtBalance: 0, // Bank debt tracked at holdco level, not opco
+          bankDebtBalance: biz1.bankDebtBalance + biz2.bankDebtBalance,
+          bankDebtRate: (biz1.bankDebtBalance + biz2.bankDebtBalance) > 0
+            ? (biz1.bankDebtBalance * (biz1.bankDebtRate || 0) + biz2.bankDebtBalance * (biz2.bankDebtRate || 0))
+              / (biz1.bankDebtBalance + biz2.bankDebtBalance)
+            : 0,
+          bankDebtRoundsRemaining: (biz1.bankDebtBalance + biz2.bankDebtBalance) > 0
+            ? Math.ceil(
+                (biz1.bankDebtBalance * (biz1.bankDebtRoundsRemaining || 0) + biz2.bankDebtBalance * (biz2.bankDebtRoundsRemaining || 0))
+                / (biz1.bankDebtBalance + biz2.bankDebtBalance)
+              )
+            : 0,
           earnoutRemaining: biz1.earnoutRemaining + biz2.earnoutRemaining,
           earnoutTarget: Math.max(biz1.earnoutTarget, biz2.earnoutTarget),
           status: 'active',
@@ -1429,13 +1451,18 @@ export const useGameStore = create<GameStore>()(
 
       payDownDebt: (amount: number) => {
         const state = get();
-        const actualPayment = Math.min(amount, state.totalDebt, state.cash);
+        // Pay down holdco loan balance (voluntary prepayment)
+        const actualPayment = Math.min(amount, state.holdcoLoanBalance, state.cash);
         if (actualPayment <= 0) return;
+
+        const newHoldcoLoanBalance = state.holdcoLoanBalance - actualPayment;
+        const newTotalDebt = computeTotalDebt(state.businesses, newHoldcoLoanBalance);
 
         const payDebtState = {
           ...state,
           cash: state.cash - actualPayment,
-          totalDebt: state.totalDebt - actualPayment,
+          totalDebt: newTotalDebt,
+          holdcoLoanBalance: newHoldcoLoanBalance,
         };
         set({
           ...payDebtState,
@@ -1450,6 +1477,9 @@ export const useGameStore = create<GameStore>()(
       issueEquity: (amount: number) => {
         const state = get();
         if (amount <= 0) return;
+
+        // Guard: no normal equity raises during restructuring (use emergencyEquityRaise instead)
+        if (state.requiresRestructuring) return;
 
         // Cooldown: blocked if buyback was done within EQUITY_BUYBACK_COOLDOWN rounds
         if (state.lastBuybackRound > 0 && state.round - state.lastBuybackRound < EQUITY_BUYBACK_COOLDOWN) return;
@@ -1627,9 +1657,13 @@ export const useGameStore = create<GameStore>()(
           .filter(b => boltOnIds.has(b.id))
           .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round }));
 
+        // Recompute totalDebt after sale (sold business bank debt removed)
+        const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
+
         const sellState = {
           ...state,
           cash: state.cash + netProceeds,
+          totalDebt: newTotalDebt,
           totalExitProceeds: state.totalExitProceeds + netProceeds,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
@@ -1659,13 +1693,13 @@ export const useGameStore = create<GameStore>()(
         if (!business || business.status !== 'active') return;
 
         const windDownCost = 250; // $250k
-        const debtWriteOff = business.sellerNoteBalance; // L-13: Only seller note on opco
+        const debtWriteOff = business.sellerNoteBalance + business.bankDebtBalance;
 
         // Also mark bolt-ons as wound down when winding down a platform
         const boltOnIds = new Set(business.boltOnIds || []);
         const boltOnDebtWriteOff = state.businesses
           .filter(b => boltOnIds.has(b.id))
-          .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+          .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance, 0);
 
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id === businessId) return { ...b, status: 'wound_down' as const, exitRound: state.round };
@@ -1687,9 +1721,11 @@ export const useGameStore = create<GameStore>()(
           .filter(b => boltOnIds.has(b.id))
           .map(b => ({ ...b, status: 'wound_down' as const, exitRound: state.round }));
 
+        const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
         const windDownState = {
           ...state,
           cash: newCash,
+          totalDebt: newTotalDebt,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
         };
@@ -1722,7 +1758,7 @@ export const useGameStore = create<GameStore>()(
         // Include bolt-on debt + earn-out obligations in total debt payoff
         const boltOnDebt = state.businesses
           .filter(b => boltOnIds.has(b.id))
-          .reduce((sum, b) => sum + b.sellerNoteBalance + b.earnoutRemaining, 0);
+          .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0);
         const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
         const netProceeds = Math.max(0, event.offerAmount - debtPayoff);
         const updatedBusinesses = state.businesses.map(b => {
@@ -1730,6 +1766,7 @@ export const useGameStore = create<GameStore>()(
           if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
           return b;
         });
+        const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
 
         // Auto-deactivate shared services if opco count drops below minimum
         const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
@@ -1745,6 +1782,7 @@ export const useGameStore = create<GameStore>()(
         const acceptState = {
           ...state,
           cash: state.cash + netProceeds,
+          totalDebt: newTotalDebt,
           totalExitProceeds: state.totalExitProceeds + netProceeds,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
@@ -1887,7 +1925,7 @@ export const useGameStore = create<GameStore>()(
         // Include bolt-on debt + earn-out obligations in total debt payoff
         const boltOnDebt = state.businesses
           .filter(b => boltOnIds.has(b.id))
-          .reduce((sum, b) => sum + b.sellerNoteBalance + b.earnoutRemaining, 0);
+          .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0);
         const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
         const netProceeds = Math.max(0, exitPrice - debtPayoff);
         const updatedBusinesses = state.businesses.map(b => {
@@ -1895,6 +1933,7 @@ export const useGameStore = create<GameStore>()(
           if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
           return b;
         });
+        const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
 
         // Auto-deactivate shared services if opco count drops below minimum
         const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
@@ -1910,6 +1949,7 @@ export const useGameStore = create<GameStore>()(
         const distressState = {
           ...state,
           cash: state.cash + netProceeds,
+          totalDebt: newTotalDebt,
           totalExitProceeds: state.totalExitProceeds + netProceeds,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
@@ -2516,7 +2556,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v18', // v18: escalating dilution + raise/buyback cooldown
+      name: 'holdco-tycoon-save-v19', // v19: per-business bank debt + holdco loan
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

@@ -139,7 +139,9 @@ export function executeDealStructure(
     sellerNoteBalance: structure.sellerNote?.amount ?? 0,
     sellerNoteRate: structure.sellerNote?.rate ?? 0,
     sellerNoteRoundsRemaining: structure.sellerNote?.termRounds ?? 0,
-    bankDebtBalance: 0, // L-13: Bank debt tracked at holdco level (state.totalDebt), not on individual business
+    bankDebtBalance: structure.bankDebt?.amount ?? 0,
+    bankDebtRate: structure.bankDebt?.rate ?? 0,
+    bankDebtRoundsRemaining: structure.bankDebt?.termRounds ?? 0,
     earnoutRemaining: structure.earnout?.amount ?? 0,
     earnoutTarget: structure.earnout?.targetEbitdaGrowth ?? 0,
   };

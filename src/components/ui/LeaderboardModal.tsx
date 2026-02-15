@@ -3,6 +3,7 @@ import { LeaderboardEntry, GameDifficulty, GameDuration, formatMoney } from '../
 import { loadLeaderboard } from '../../engine/scoring';
 import { getGradeColor, getRankColor } from '../../utils/gradeColors';
 import { Modal } from './Modal';
+import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
 
 type LeaderboardTab = 'overall' | 'hard20' | 'hard10' | 'easy20' | 'easy10' | 'distributions';
 
@@ -37,15 +38,10 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-const DIFF_MULT: Record<string, number> = { easy: 1.0, normal: 1.15 };
-
 function getAdjustedFEV(entry: LeaderboardEntry): number {
   const raw = entry.founderEquityValue ?? entry.enterpriseValue;
-  return Math.round(raw * (DIFF_MULT[entry.difficulty ?? 'easy'] ?? 1.0));
-}
-
-function getRawFEV(entry: LeaderboardEntry): number {
-  return entry.founderEquityValue ?? entry.enterpriseValue;
+  const difficulty = entry.difficulty ?? 'easy';
+  return Math.round(raw * (DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0));
 }
 
 function getEntryDifficulty(entry: LeaderboardEntry): GameDifficulty {
@@ -66,19 +62,19 @@ function filterAndSort(entries: LeaderboardEntry[], tab: LeaderboardTab): Leader
       break;
     case 'hard20':
       filtered = entries.filter(e => getEntryDifficulty(e) === 'normal' && getEntryDuration(e) === 'standard');
-      filtered.sort((a, b) => getRawFEV(b) - getRawFEV(a));
+      filtered.sort((a, b) => getAdjustedFEV(b) - getAdjustedFEV(a));
       break;
     case 'hard10':
       filtered = entries.filter(e => getEntryDifficulty(e) === 'normal' && getEntryDuration(e) === 'quick');
-      filtered.sort((a, b) => getRawFEV(b) - getRawFEV(a));
+      filtered.sort((a, b) => getAdjustedFEV(b) - getAdjustedFEV(a));
       break;
     case 'easy20':
       filtered = entries.filter(e => getEntryDifficulty(e) === 'easy' && getEntryDuration(e) === 'standard');
-      filtered.sort((a, b) => getRawFEV(b) - getRawFEV(a));
+      filtered.sort((a, b) => getAdjustedFEV(b) - getAdjustedFEV(a));
       break;
     case 'easy10':
       filtered = entries.filter(e => getEntryDifficulty(e) === 'easy' && getEntryDuration(e) === 'quick');
-      filtered.sort((a, b) => getRawFEV(b) - getRawFEV(a));
+      filtered.sort((a, b) => getAdjustedFEV(b) - getAdjustedFEV(a));
       break;
     case 'distributions':
       filtered = entries.filter(e => (e.founderPersonalWealth ?? 0) > 0);
@@ -92,14 +88,12 @@ function filterAndSort(entries: LeaderboardEntry[], tab: LeaderboardTab): Leader
 /** Get the display value for an entry in a given tab */
 function getDisplayValue(entry: LeaderboardEntry, tab: LeaderboardTab): number {
   if (tab === 'distributions') return entry.founderPersonalWealth ?? 0;
-  if (tab === 'overall') return getAdjustedFEV(entry);
-  return getRawFEV(entry);
+  return getAdjustedFEV(entry);
 }
 
 function getDisplayLabel(tab: LeaderboardTab): string {
   if (tab === 'distributions') return 'Wealth';
-  if (tab === 'overall') return 'Adj FEV';
-  return 'FEV';
+  return 'Adj FEV';
 }
 
 /** Get the ghost row value for a given tab, or -1 if no ghost should show */
@@ -180,7 +174,7 @@ export function LeaderboardModal({
     ? 'All runs ranked by adjusted FEV'
     : activeTab === 'distributions'
     ? 'Ranked by founder distributions received'
-    : 'Ranked by raw FEV within mode';
+    : 'Ranked by adjusted FEV within mode';
 
   return (
     <Modal
@@ -268,7 +262,7 @@ function RankBadge({ rank }: { rank: number }) {
 
 function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEntry; rank: number; showWealth: boolean; tab: LeaderboardTab }) {
   const displayValue = getDisplayValue(entry, tab);
-  const displayLabel = showWealth ? 'Wealth' : (entry.founderEquityValue ? 'FEV' : 'EV');
+  const displayLabel = showWealth ? 'Wealth' : 'Adj FEV';
 
   return (
     <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">

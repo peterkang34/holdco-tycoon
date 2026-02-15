@@ -118,6 +118,8 @@ export interface Business {
   sellerNoteRate: number;
   sellerNoteRoundsRemaining: number;
   bankDebtBalance: number;
+  bankDebtRate: number;
+  bankDebtRoundsRemaining: number;
   earnoutRemaining: number;
   earnoutTarget: number;
   status: BusinessStatus;
@@ -465,7 +467,12 @@ export interface GameState {
   debtPaymentThisRound?: number;
   cashBeforeDebtPayments?: number;
 
-  // Holdco debt amortization
+  // Holdco loan (replaces old pool-based holdco debt)
+  holdcoLoanBalance: number;          // remaining holdco loan principal
+  holdcoLoanRate: number;             // interest rate on holdco loan
+  holdcoLoanRoundsRemaining: number;  // amortization years remaining
+
+  // Legacy holdco debt fields (kept for migration compatibility)
   holdcoDebtStartRound: number; // round when first holdco bank debt was taken (0 = never)
   holdcoAmortizationThisRound?: number; // amount of mandatory amortization paid this round
 

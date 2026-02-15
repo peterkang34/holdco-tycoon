@@ -233,6 +233,8 @@ export function generateBusiness(
     sellerNoteRate: 0,
     sellerNoteRoundsRemaining: 0,
     bankDebtBalance: 0,
+    bankDebtRate: 0,
+    bankDebtRoundsRemaining: 0,
     earnoutRemaining: 0,
     earnoutTarget: 0,
     // Platform fields

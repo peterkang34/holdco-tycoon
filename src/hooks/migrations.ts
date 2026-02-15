@@ -313,6 +313,48 @@ export function migrateV17ToV18(): void {
   }
 }
 
+// --- v18 → v19: per-business bank debt + holdco loan ---
+
+export function migrateV18ToV19(): void {
+  try {
+    const v19Key = 'holdco-tycoon-save-v19';
+    const v18Key = 'holdco-tycoon-save-v18';
+    if (localStorage.getItem(v19Key)) return;
+    const v18Raw = localStorage.getItem(v18Key);
+    if (!v18Raw) return;
+    const v18Data = JSON.parse(v18Raw);
+    if (!v18Data?.state) return;
+
+    // Holdco loan: migrate pool debt to structured holdco loan
+    const totalDebt = v18Data.state.totalDebt ?? 0;
+    const interestRate = v18Data.state.interestRate ?? 0.07;
+    const maxRounds = v18Data.state.maxRounds ?? 20;
+    const currentRound = v18Data.state.round ?? 1;
+    v18Data.state.holdcoLoanBalance = totalDebt;
+    v18Data.state.holdcoLoanRate = interestRate;
+    v18Data.state.holdcoLoanRoundsRemaining = Math.max(1, Math.ceil((maxRounds - currentRound) * 0.5));
+
+    // Backfill per-business bank debt fields
+    const backfillBusiness = (b: any) => ({
+      ...b,
+      bankDebtRate: b.bankDebtRate ?? 0,
+      bankDebtRoundsRemaining: b.bankDebtRoundsRemaining ?? 0,
+    });
+
+    if (Array.isArray(v18Data.state.businesses)) {
+      v18Data.state.businesses = v18Data.state.businesses.map(backfillBusiness);
+    }
+    if (Array.isArray(v18Data.state.exitedBusinesses)) {
+      v18Data.state.exitedBusinesses = v18Data.state.exitedBusinesses.map(backfillBusiness);
+    }
+
+    localStorage.setItem(v19Key, JSON.stringify(v18Data));
+    localStorage.removeItem(v18Key);
+  } catch (e) {
+    console.error('v18→v19 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -327,4 +369,5 @@ export function runAllMigrations(): void {
   migrateV15ToV16();
   migrateV16ToV17();
   migrateV17ToV18();
+  migrateV18ToV19();
 }

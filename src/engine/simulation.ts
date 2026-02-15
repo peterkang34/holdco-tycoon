@@ -269,7 +269,8 @@ export function calculatePortfolioTax(
   // Interest calculations
   const holdcoInterest = Math.round(holdcoDebt * holdcoInterestRate);
   const opcoInterest = activeBusinesses.reduce(
-    (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate),
+    (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate)
+               + Math.round(b.bankDebtBalance * (b.bankDebtRate || 0)),
     0
   );
   const totalInterest = holdcoInterest + opcoInterest;
@@ -1152,32 +1153,36 @@ export function calculateMetrics(state: GameState): Metrics {
 
   // Total FCF (annual - each round is now 1 year)
   // Portfolio-level tax is computed inside calculatePortfolioFcf
+  // holdcoLoanBalance is the holdco-level loan; per-business bank debt is on each business
+  const holdcoLoanBalance = state.holdcoLoanBalance ?? 0;
+  const holdcoLoanRate = state.holdcoLoanRate ?? state.interestRate;
+
   const totalFcf = calculatePortfolioFcf(
     activeBusinesses,
     sharedServicesBenefits.capexReduction,
     sharedServicesBenefits.cashConversionBonus,
-    state.totalDebt,
-    state.interestRate,
+    holdcoLoanBalance,
+    holdcoLoanRate,
     totalDeductibleCosts
   );
 
   // Portfolio tax breakdown for NOPAT calculation
   const taxBreakdown = calculatePortfolioTax(
-    activeBusinesses, state.totalDebt, state.interestRate, totalDeductibleCosts
+    activeBusinesses, holdcoLoanBalance, holdcoLoanRate, totalDeductibleCosts
   );
 
-  // Total debt (holdco + opco level seller notes only)
-  // L-13: Bank debt is tracked at holdco level (state.totalDebt) only
-  const opcoDebt = activeBusinesses.reduce(
+  // Total debt = holdco loan + per-business bank debt + seller notes
+  const opcoSellerNotes = activeBusinesses.reduce(
     (sum, b) => sum + b.sellerNoteBalance,
     0
   );
-  const totalDebt = state.totalDebt + opcoDebt;
+  const totalDebt = state.totalDebt + opcoSellerNotes;
 
   // Interest expense
-  const annualInterest = state.totalDebt * state.interestRate;
+  const annualInterest = holdcoLoanBalance * holdcoLoanRate;
   const opcoInterest = activeBusinesses.reduce(
-    (sum, b) => sum + b.sellerNoteBalance * b.sellerNoteRate,
+    (sum, b) => sum + b.sellerNoteBalance * b.sellerNoteRate
+               + b.bankDebtBalance * (b.bankDebtRate || 0),
     0
   );
 
@@ -1266,7 +1271,7 @@ export function recordHistoricalMetrics(state: GameState): HistoricalMetrics {
     .reduce((sum, s) => sum + s.annualCost, 0);
   const maHistCost = state.maSourcing?.active ? getMASourcingAnnualCost(state.maSourcing.tier) : 0;
   const taxBreakdown = calculatePortfolioTax(
-    activeBusinesses, state.totalDebt, state.interestRate, ssHistCost + maHistCost
+    activeBusinesses, state.holdcoLoanBalance ?? 0, state.holdcoLoanRate ?? state.interestRate, ssHistCost + maHistCost
   );
   const nopat = totalEbitda - taxBreakdown.taxAmount;
 

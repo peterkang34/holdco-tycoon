@@ -201,8 +201,10 @@ describe('executeDealStructure', () => {
     });
 
     const business = executeDealStructure(deal, structure, 1);
-    // L-13: Bank debt tracked at holdco level (state.totalDebt), not on business
-    expect(business.bankDebtBalance).toBe(0);
+    // Per-business bank debt tracking
+    expect(business.bankDebtBalance).toBe(3000);
+    expect(business.bankDebtRate).toBe(0.07);
+    expect(business.bankDebtRoundsRemaining).toBe(10);
   });
 
   it('should set earnout fields from structure', () => {

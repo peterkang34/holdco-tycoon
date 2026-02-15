@@ -55,6 +55,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     businesses,
     cash,
     totalDebt,
+    holdcoLoanBalance,
+    holdcoLoanRate,
     interestRate,
     creditTighteningRoundsRemaining,
     dealPipeline,
@@ -220,13 +222,25 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
   }, [payDownDebt, totalDebt, addToast]);
 
   const handleIssueEquity = useCallback((amount: number) => {
-    const prevOwnership = founderShares / sharesOutstanding;
+    const prevShares = sharesOutstanding;
     issueEquity(amount);
-    addToast({
-      message: `Raised ${formatMoney(amount)} equity`,
-      detail: `Ownership: ${(prevOwnership * 100).toFixed(1)}% → diluted`,
-      type: 'info',
-    });
+    // Check if equity raise actually succeeded (sharesOutstanding would change)
+    // We need to read from store directly since state update is synchronous in Zustand
+    const newShares = useGameStore.getState().sharesOutstanding;
+    if (newShares === prevShares) {
+      addToast({
+        message: 'Equity raise blocked',
+        detail: 'Would breach 51% founder ownership floor',
+        type: 'warning',
+      });
+    } else {
+      const newOwnership = founderShares / newShares;
+      addToast({
+        message: `Raised ${formatMoney(amount)} equity`,
+        detail: `Ownership: ${(newOwnership * 100).toFixed(1)}%`,
+        type: 'info',
+      });
+    }
   }, [issueEquity, founderShares, sharesOutstanding, addToast]);
 
   const handleBuyback = useCallback((amount: number) => {
@@ -453,6 +467,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             businesses={businesses}
             cash={cash}
             totalDebt={totalDebt}
+            holdcoLoanBalance={holdcoLoanBalance}
+            holdcoLoanRate={holdcoLoanRate}
             interestRate={interestRate}
             sharedServicesCost={sharedServicesCost}
             maSourcingCost={maSourcingCost}
