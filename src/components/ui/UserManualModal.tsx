@@ -300,9 +300,9 @@ function AcquiringContent() {
       <SubHeading>Tuck-in Acquisitions</SubHeading>
       <P>
         If you have a business designated as a platform, you can acquire compatible businesses
-        as bolt-on &ldquo;tuck-ins.&rdquo; Tuck-ins receive a 10% price discount and integrate into the
-        parent platform, sharing overhead and scaling the platform. Integration period depends
-        on operator quality (1-3 years).
+        as bolt-on &ldquo;tuck-ins.&rdquo; Tuck-ins receive a quality-dependent price discount (5-25%,
+        lower quality = deeper discount) and integrate into the parent platform, sharing overhead
+        and scaling the platform. Integration period depends on operator quality (1-3 years).
       </P>
     </>
   );
@@ -416,10 +416,10 @@ function FinancialContent() {
         are limited:
       </P>
       <BulletList items={[
-        <><strong>Full Game (20 years):</strong> Maximum 3 equity raises</>,
-        <><strong>Quick Play (10 years):</strong> Maximum 2 equity raises</>,
-        'New shares are issued at intrinsic value per share',
-        'Each raise reduces your founder ownership percentage',
+        'Each raise applies escalating dilution (10% more discount per prior raise, floor of 10% of intrinsic value)',
+        'There is no hard cap — but successive raises become increasingly expensive',
+        '2-round cooldown between equity raises and buybacks',
+        'New shares are issued at intrinsic value per share (minus escalating discount)',
       ]} />
 
       <SubHeading>Share Buybacks</SubHeading>
@@ -477,7 +477,7 @@ function DistressContent() {
       </P>
       <BulletList items={[
         <><strong>Distressed Sale:</strong> Sell a business at a steep discount to raise cash and reduce leverage</>,
-        <><strong>Emergency Equity Raise:</strong> Raise equity at a significant dilution to inject cash (counts toward your equity raise limit)</>,
+        <><strong>Emergency Equity Raise:</strong> Raise equity at a flat 50% discount to inject cash (triggers raise/buyback cooldown)</>,
         <><strong>Declare Bankruptcy:</strong> End the game immediately (F grade)</>,
       ]} />
       <P>
@@ -506,7 +506,7 @@ function PlatformsContent() {
       <SubHeading>Manual Platforms</SubHeading>
       <P>
         You can designate any active business as a &ldquo;platform&rdquo; company. This lets it receive
-        tuck-in acquisitions (bolt-ons) at a 10% price discount. As tuck-ins are added, the
+        tuck-in acquisitions (bolt-ons) at a quality-dependent price discount (5-25%). As tuck-ins are added, the
         platform&apos;s scale increases (1-3), which provides a small exit multiple premium
         (+0.2x per scale level).
       </P>
@@ -796,11 +796,12 @@ function ScoringContent() {
       <DataTable
         headers={['Category', 'Max Points', 'What It Measures']}
         rows={[
-          ['FCF/Share Growth', '25', 'How much free cash flow per share grew over the game (target: 3x for 20yr, 1.5x for 10yr)'],
-          ['Portfolio ROIC', '20', 'Return on invested capital — are you earning above your cost of capital? (target: 25%+)'],
-          ['Capital Deployment', '20', 'Average MOIC across investments + Return on Incremental Invested Capital (ROIIC)'],
+          ['Value Creation', '20', 'FEV as a multiple of initial raise (target: 10x for 20yr, 5x for 10yr)'],
+          ['FCF/Share Growth', '20', 'How much free cash flow per share grew over the game (target: 3x for 20yr, 1.5x for 10yr)'],
+          ['Portfolio ROIC', '15', 'Return on invested capital — are you earning above your cost of capital? (target: 25%+)'],
+          ['Capital Deployment', '15', 'Average MOIC across investments + Return on Incremental Invested Capital (ROIIC)'],
           ['Balance Sheet Health', '15', 'Ending leverage ratio, with penalties for over-leveraging, covenant breaches, and restructuring'],
-          ['Strategic Discipline', '20', 'Sector focus, shared services usage, capital return discipline, deal quality'],
+          ['Strategic Discipline', '15', 'Sector focus, shared services usage, capital return discipline, deal quality'],
         ]}
       />
 
@@ -1002,8 +1003,8 @@ function GlossaryContent() {
         </div>
         <div>
           <strong className="text-white">Tuck-in (Bolt-on)</strong> &mdash; A small acquisition
-          integrated into an existing platform business. Tuck-ins receive a 10% price discount
-          and add scale to the platform.
+          integrated into an existing platform business. Tuck-ins receive a quality-dependent
+          price discount (5-25%) and add scale to the platform.
         </div>
         <div>
           <strong className="text-white">Platform</strong> &mdash; A business designated to
