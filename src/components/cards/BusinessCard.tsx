@@ -381,7 +381,7 @@ export function BusinessCard({
             )}
           </div>
 
-          {(onSell || onImprove || onWindDown || onDesignatePlatform) && (
+          {(onSell || onImprove || onDesignatePlatform) && (
             <div className="flex flex-col gap-2 mt-3">
               <div className="flex gap-2">
                 {onImprove && (
