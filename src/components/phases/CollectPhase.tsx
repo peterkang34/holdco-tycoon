@@ -447,11 +447,18 @@ export function CollectPhase({
                           </>
                         )}
                         {breakdown.bankDebtBalance > 0 && (
-                          <tr className="text-danger">
-                            <td className="py-1">(-) Bank Debt Interest</td>
-                            <td className="py-1 text-right font-mono">-{formatMoney(breakdown.bankDebtInterest)}</td>
-                            <td className="py-1 text-right text-text-muted text-xs">{formatPercent(interestRate)}</td>
-                          </tr>
+                          <>
+                            <tr className="text-danger">
+                              <td className="py-1">(-) Bank Debt Interest</td>
+                              <td className="py-1 text-right font-mono">-{formatMoney(breakdown.bankDebtInterest)}</td>
+                              <td className="py-1 text-right text-text-muted text-xs">{formatPercent(business.bankDebtRate)}</td>
+                            </tr>
+                            <tr className="text-danger">
+                              <td className="py-1">(-) Bank Debt Principal</td>
+                              <td className="py-1 text-right font-mono">-{formatMoney(breakdown.bankDebtPrincipal)}</td>
+                              <td className="py-1 text-right text-text-muted text-xs">{business.bankDebtRoundsRemaining}y left</td>
+                            </tr>
+                          </>
                         )}
                         {breakdown.earnoutPayment > 0 && (
                           <tr className="text-danger">
