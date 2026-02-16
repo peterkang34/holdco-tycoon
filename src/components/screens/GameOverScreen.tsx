@@ -178,6 +178,7 @@ export function GameOverScreen({
           founderEquityValue,
           founderPersonalWealth,
           hasRestructured,
+          submittedMultiplier: difficultyMultiplier,
         }
       );
 
@@ -193,6 +194,7 @@ export function GameOverScreen({
         difficulty,
         duration,
         hasRestructured,
+        submittedMultiplier: difficultyMultiplier,
       };
       setLeaderboard(prev => {
         // Avoid duplicates if the entry is somehow already present
@@ -394,24 +396,20 @@ export function GameOverScreen({
                 <span>= Raw FEV</span>
                 <span className="font-mono">{formatMoney(founderEquityValue)}</span>
               </div>
-              {difficultyMultiplier !== 1.0 && (
-                <div className="flex justify-between text-sm">
-                  <span className="text-text-muted">x Difficulty ({formatMultiple(difficultyMultiplier)})</span>
-                  <span className="font-mono">{formatMoney(Math.round(founderEquityValue * difficultyMultiplier))}</span>
-                </div>
-              )}
+              <div className="flex justify-between text-sm">
+                <span className="text-text-muted">x Difficulty ({formatMultiple(difficultyMultiplier)})</span>
+                <span className="font-mono">{formatMoney(Math.round(founderEquityValue * difficultyMultiplier))}</span>
+              </div>
               {hasRestructured && (
                 <div className="flex justify-between text-sm">
                   <span className="text-red-400">x Restructuring (-20%)</span>
                   <span className="font-mono text-red-400">-{formatMoney(Math.round(founderEquityValue * difficultyMultiplier) - adjustedFEV)}</span>
                 </div>
               )}
-              {(difficultyMultiplier !== 1.0 || hasRestructured) && (
-                <div className="border-t border-white/10 pt-2 flex justify-between text-sm font-bold">
-                  <span>= Adjusted FEV</span>
-                  <span className={`font-mono ${hasRestructured ? 'text-red-400' : 'text-accent'}`}>{formatMoney(adjustedFEV)}</span>
-                </div>
-              )}
+              <div className="border-t border-white/10 pt-2 flex justify-between text-sm font-bold">
+                <span>= Adjusted FEV</span>
+                <span className={`font-mono ${hasRestructured ? 'text-red-400' : 'text-accent'}`}>{formatMoney(adjustedFEV)}</span>
+              </div>
             </div>
 
             {/* Ownership Impact */}

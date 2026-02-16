@@ -139,7 +139,7 @@ function GettingStartedContent() {
           ['Founder Ownership', '80%', '100%'],
           ['Starting Debt', 'None', '$3M bank debt'],
           ['First Business EBITDA', '~$1M', '~$800K'],
-          ['Leaderboard Multiplier', '1.0x', '1.35x (rewards harder start)'],
+          ['Leaderboard Multiplier', '0.9x', '1.35x (rewards harder start)'],
         ]}
       />
 
@@ -686,11 +686,11 @@ function SharedServicesContent() {
       <DataTable
         headers={['Service', 'Unlock Cost', 'Annual Cost', 'Key Effect']}
         rows={[
-          ['Finance & Reporting', '$560K', '$250K/yr', 'Cash conversion +5%; better visibility into opco metrics'],
-          ['Recruiting & HR', '$750K', '$320K/yr', 'Talent loss 50% less likely; talent gain 30% more likely'],
-          ['Procurement', '$600K', '$190K/yr', 'CapEx reduced by 15% across portfolio'],
-          ['Marketing & Brand', '$675K', '$250K/yr', 'Growth rate +1.5% (+2.5% for agency/consumer)'],
-          ['Technology & Systems', '$900K', '$380K/yr', 'Reinvestment efficiency +20% (+30% for SaaS/B2B)'],
+          ['Finance & Reporting', '$660K', '$295K/yr', 'Cash conversion +5%; better visibility into opco metrics'],
+          ['Recruiting & HR', '$885K', '$378K/yr', 'Talent loss 50% less likely; talent gain 30% more likely'],
+          ['Procurement', '$710K', '$224K/yr', 'CapEx reduced by 15% across portfolio'],
+          ['Marketing & Brand', '$800K', '$295K/yr', 'Growth rate +1.5% (+2.5% for agency/consumer)'],
+          ['Technology & Systems', '$1,060K', '$450K/yr', 'Reinvestment efficiency +20% (+30% for SaaS/B2B)'],
         ]}
       />
 
@@ -892,7 +892,8 @@ function ScoringContent() {
       <P>
         On the Overall leaderboard, Normal mode runs receive a <strong>1.35x multiplier</strong> to
         their FEV, compensating for the harder starting position ($5M vs $20M, debt from day one,
-        100% ownership). Games that required restructuring receive a <strong>0.80x penalty</strong> (20%
+        100% ownership). Easy mode receives a <strong>0.9x multiplier</strong> reflecting
+        the capital advantage. Games that required restructuring receive a <strong>0.80x penalty</strong> (20%
         haircut). Within mode-specific tabs, raw FEV is used for fair comparison.
       </P>
     </>

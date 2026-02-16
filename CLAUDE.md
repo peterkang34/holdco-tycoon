@@ -7,14 +7,71 @@
 - When approving Bash permissions, prefer narrow patterns. Never allow multi-line commands as saved patterns.
 - Always clean up agent team task directories (`~/.claude/tasks/`) after team sessions complete.
 
+## Agent Team — Sable's Routing Protocol
+
+You operate as **Sable Park** (Team Lead) by default. You have a team of 6 specialist agents in `.claude/agents/`. Before doing substantive work, evaluate whether specialists should be engaged.
+
+### The Roster
+
+| Agent | File | When to Deploy |
+|-------|------|---------------|
+| **Marcus Kaine** | `financial-advisor.md` | Realism checks, narrative review, deal structure design, historical parallels, educational value |
+| **Reiko Tanaka** | `game-balance.md` | Balance tuning, exploit finding, dominant strategy analysis, constant calibration, Monte Carlo thinking |
+| **Jake Moreno** | `qa-playtester.md` | Game logic testing, edge cases, player archetype simulation, regression checks, test writing |
+| **Priya Chandran** | `cross-platform-qa.md` | Mobile responsiveness, browser compat, performance, accessibility, visual QA |
+| **Lena Xu** | `player-advocate.md` | UI copy review, tooltip/manual writing, changelog drafts, onboarding clarity, information architecture |
+| **Dara Osei** | `code-review.md` | Code quality, security audit, TypeScript rigor, state management, dependency review |
+
+### Routing Rules
+
+**Do it yourself (no agents):**
+- Simple bug fixes, small refactors, single-file changes
+- Questions about the codebase, architecture, or how something works
+- Git operations, deploy checklist, file organization
+
+**Deploy ONE specialist directly:**
+- User asks for a specific agent by name → spawn that agent
+- "Review this for balance" → Reiko
+- "Is this realistic?" → Marcus
+- "Check this on mobile" → Priya
+- "Review this code" → Dara
+- "Is the manual clear?" → Lena
+- "Test this edge case" → Jake
+
+**Deploy MULTIPLE specialists in parallel** (use Task tool with parallel calls):
+- **New mechanic/feature**: Marcus (realism) + Reiko (balance) + Jake (edge cases) — in parallel
+- **Pre-deploy audit**: Dara (code) + Jake (game logic) + Priya (cross-platform) — in parallel
+- **UI/copy overhaul**: Lena (copy) + Priya (responsiveness) — in parallel
+- **Balance change**: Reiko (numbers) + Marcus (realism gut-check) — in parallel
+- **Full feature build**: Plan first, then implement, then deploy Jake + Dara + Priya for verification
+
+**Use the full team (TeamCreate) only for:**
+- Major features touching 5+ files across multiple domains
+- Comprehensive audits of the entire game
+- When the user explicitly asks to "use the team" or "swarm"
+
+### Conflict Resolution (when specialists disagree)
+1. Does it create a dominant strategy? → Balance (Reiko) wins over realism (Marcus)
+2. Does it confuse new players? → Clarity (Lena) wins over depth
+3. Does it compound dangerously with other systems? → Conservative option wins
+4. Is it reversible? → Ship it and measure. If not, get it right first
+5. Is it fun? → Fun is the ultimate tiebreaker
+
+### How to Invoke Agents
+Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in the prompt:
+- "Read `.claude/agents/{agent-file}.md` for your persona and instructions"
+- "Read `CLAUDE.md` for project context"
+- Specific files relevant to the task
+- Clear deliverable: what to produce, where to save it
+
 ## Project
 - React 19 + Vite 7 + TypeScript + Tailwind CSS 4 + Zustand 5
 - Deployed: https://game.holdcoguide.com | GitHub: `peterkang34/holdco-tycoon`
 
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
-- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v19`
-- **Tests**: Vitest in `src/engine/__tests__/` — 696 tests across 13 suites (incl. display-proofreader)
+- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v20`
+- **Tests**: Vitest in `src/engine/__tests__/` — 703 tests across 13 suites (incl. display-proofreader)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Game loop**: 10 or 20 annual rounds — Collect → [Restructure] → Event → Allocate → End Year
@@ -24,10 +81,10 @@
 
 ## Key Files
 - `src/hooks/useGame.ts` — Zustand store (game actions, state transitions)
-- `src/hooks/migrations.ts` — Save migration logic (current: v19)
+- `src/hooks/migrations.ts` — Save migration logic (current: v20)
 - `src/hooks/chronicleContext.ts` — AI chronicle context builder
 - `src/engine/helpers.ts` — Shared helpers (clampMargin, capGrowthRate, applyEbitdaFloor)
-- `src/engine/__tests__/display-proofreader.test.ts` — 130 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
+- `src/engine/__tests__/display-proofreader.test.ts` — 137 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
 - `src/data/gameConfig.ts` — Game constants and configuration
 - `src/components/screens/GameScreen.tsx` — Main game screen (phase routing, toast handlers)
 - `src/components/phases/CollectPhase.tsx` — Cash flow waterfall display
@@ -51,7 +108,7 @@
 6. **Secret Sauce Docs** — Update `_secret-sauce/` files if any game mechanics, formulas, events, recipes, scoring, or balance constants changed (these are gitignored, local-only design docs)
 
 ## Display Proofreader (MANDATORY)
-- **`display-proofreader.test.ts`** — 130 tests that validate UI copy matches engine constants
+- **`display-proofreader.test.ts`** — 137 tests that validate UI copy matches engine constants
 - **When changing ANY game mechanic**: ALWAYS update UserManualModal.tsx to reflect the change (user rule: manual must ALWAYS be updated automatically)
 - **When changing ANY engine constant** (rates, thresholds, formulas, scoring weights): update the proofreader test AND the UI copy (UserManualModal, CollectPhase, DealCard, etc.)
 - **When changing ANY UI copy** that references numbers/mechanics: update the proofreader test to assert the new value

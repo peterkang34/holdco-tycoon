@@ -138,6 +138,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       founderPersonalWealth: validPersonalWealth,
       difficulty: validDifficulty,
       duration: validDuration,
+      submittedMultiplier: multiplier,
       score,
       grade,
       businessCount,

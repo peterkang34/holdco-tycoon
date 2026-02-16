@@ -2841,7 +2841,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v19', // v19: per-business bank debt + holdco loan
+      name: 'holdco-tycoon-save-v20', // v20: shared services cost increase + easy multiplier 0.9x
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

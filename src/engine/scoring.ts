@@ -8,7 +8,7 @@ import {
 import { calculateMetrics, calculateSectorFocusBonus, calculateExitValuation } from './simulation';
 import { POST_GAME_INSIGHTS } from '../data/tips';
 import { getAllDedupedBusinesses } from './helpers';
-import { DIFFICULTY_CONFIG, RESTRUCTURING_FEV_PENALTY } from '../data/gameConfig';
+import { RESTRUCTURING_FEV_PENALTY } from '../data/gameConfig';
 
 const LEADERBOARD_KEY = 'holdco-tycoon-leaderboard';
 const MAX_LEADERBOARD_ENTRIES = 10;
@@ -17,7 +17,9 @@ const MAX_LEADERBOARD_ENTRIES = 10;
 function getAdjustedFEV(entry: LeaderboardEntry): number {
   const raw = entry.founderEquityValue ?? entry.enterpriseValue;
   const difficulty = entry.difficulty ?? 'easy';
-  const multiplier = DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0;
+  // Grandfather: use stored multiplier if available, otherwise legacy defaults
+  const multiplier = entry.submittedMultiplier
+    ?? (difficulty === 'easy' ? 1.0 : 1.35);
   const restructuringPenalty = entry.hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0;
   return Math.round(raw * multiplier * restructuringPenalty);
 }
@@ -579,7 +581,7 @@ export async function loadLeaderboard(): Promise<LeaderboardEntry[]> {
  */
 export async function saveToLeaderboard(
   entry: Omit<LeaderboardEntry, 'id' | 'date'>,
-  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number; hasRestructured?: boolean }
+  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number; hasRestructured?: boolean; submittedMultiplier?: number }
 ): Promise<LeaderboardEntry> {
   const newEntry: LeaderboardEntry = {
     ...entry,
@@ -607,6 +609,7 @@ export async function saveToLeaderboard(
     ...(extra?.difficulty ? { difficulty: extra.difficulty as GameDifficulty } : {}),
     ...(extra?.duration ? { duration: extra.duration as 'standard' | 'quick' } : {}),
     ...(extra?.hasRestructured ? { hasRestructured: extra.hasRestructured } : {}),
+    ...(extra?.submittedMultiplier != null ? { submittedMultiplier: extra.submittedMultiplier } : {}),
   };
   saveToLocalLeaderboard(localEntry);
   return newEntry;

@@ -12,6 +12,26 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 16, 2025',
+    title: 'Balance Tuning: Difficulty & Shared Services',
+    sections: [
+      {
+        heading: 'Balance Changes',
+        items: [
+          'Easy mode leaderboard multiplier reduced from 1.0x to 0.9x — the capital advantage now carries a cost on the overall leaderboard. Hard mode keeps its 1.35x reward.',
+          'Shared services costs increased ~18% across the board — unlocking shared services is no longer a trivial decision. The effects remain unchanged.',
+          'API multiplier for Normal mode fixed to 1.35x (was incorrectly 1.15x server-side).',
+        ],
+      },
+      {
+        heading: 'Grandfathering',
+        items: [
+          'Existing leaderboard entries keep their original multiplier. Only new submissions use the updated values.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 16, 2025',
     title: 'Management Buyout Event',
     sections: [
       {

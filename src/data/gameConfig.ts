@@ -10,7 +10,7 @@ export const DIFFICULTY_CONFIG = {
     startingMultipleCap: undefined as number | undefined,
     startingQuality: 3 as const,
     holdcoDebtStartRound: 0,
-    leaderboardMultiplier: 1.0,
+    leaderboardMultiplier: 0.9,
     label: 'Easy — Institutional Capital',
     description: '$20M from patient LPs. 80% ownership. Clean balance sheet.',
   },

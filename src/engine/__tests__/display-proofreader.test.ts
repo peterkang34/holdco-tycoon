@@ -21,7 +21,7 @@ import { TAX_RATE, calculateAnnualFcf, calculatePortfolioTax } from '../simulati
 import { createMockBusiness } from './helpers';
 import { calculateDistressLevel, getDistressRestrictions, getDistressDescription, calculateCovenantHeadroom } from '../distress';
 import { calculateHeatPremium, getMaxAcquisitions } from '../businesses';
-import { MA_SOURCING_CONFIG } from '../../data/sharedServices';
+import { MA_SOURCING_CONFIG, SHARED_SERVICES_CONFIG } from '../../data/sharedServices';
 import { SECTORS, SECTOR_LIST } from '../../data/sectors';
 import {
   DIFFICULTY_CONFIG,
@@ -149,11 +149,11 @@ describe('Display Proofreader', () => {
   // ══════════════════════════════════════════════════════════════════
 
   describe('Difficulty Config', () => {
-    it('Easy: $20M cash, 80% ownership, 0 debt, 1.0x multiplier', () => {
+    it('Easy: $20M cash, 80% ownership, 0 debt, 0.9x multiplier', () => {
       expect(DIFFICULTY_CONFIG.easy.initialCash).toBe(20000);
       expect(DIFFICULTY_CONFIG.easy.founderShares / DIFFICULTY_CONFIG.easy.totalShares).toBe(0.8);
       expect(DIFFICULTY_CONFIG.easy.startingDebt).toBe(0);
-      expect(DIFFICULTY_CONFIG.easy.leaderboardMultiplier).toBe(1.0);
+      expect(DIFFICULTY_CONFIG.easy.leaderboardMultiplier).toBe(0.9);
     });
 
     it('Normal: $5M cash, 100% ownership, $3M debt, 1.35x multiplier', () => {
@@ -709,14 +709,20 @@ describe('Display Proofreader', () => {
       expect(DIFFICULTY_CONFIG.normal.leaderboardMultiplier).toBe(1.35);
     });
 
-    it('Easy difficulty multiplier = 1.0x', () => {
-      expect(DIFFICULTY_CONFIG.easy.leaderboardMultiplier).toBe(1.0);
+    it('Easy difficulty multiplier = 0.9x', () => {
+      expect(DIFFICULTY_CONFIG.easy.leaderboardMultiplier).toBe(0.9);
     });
 
     it('UserManualModal shows correct Normal multiplier (Strategy B)', () => {
       const manual = readComponent('components/ui/UserManualModal.tsx');
       expect(manual).toContain(`${DIFFICULTY_CONFIG.normal.leaderboardMultiplier}x multiplier`);
       expect(manual).not.toContain('1.15x multiplier');
+    });
+
+    it('UserManualModal shows correct Easy multiplier 0.9x (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain(`${DIFFICULTY_CONFIG.easy.leaderboardMultiplier}x`);
+      expect(manual).toContain('0.9x multiplier');
     });
   });
 
@@ -1021,6 +1027,50 @@ describe('Display Proofreader', () => {
     it('events.ts contains mbo_proposal event definition (Strategy B)', () => {
       const events = readComponent('data/events.ts');
       expect(events).toContain('mbo_proposal');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // SHARED SERVICES COSTS
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Shared Services Costs', () => {
+    it('Finance & Reporting: $660K unlock, $295K/yr annual (Strategy A)', () => {
+      expect(SHARED_SERVICES_CONFIG.finance_reporting.unlockCost).toBe(660);
+      expect(SHARED_SERVICES_CONFIG.finance_reporting.annualCost).toBe(295);
+    });
+
+    it('Recruiting & HR: $885K unlock, $378K/yr annual (Strategy A)', () => {
+      expect(SHARED_SERVICES_CONFIG.recruiting_hr.unlockCost).toBe(885);
+      expect(SHARED_SERVICES_CONFIG.recruiting_hr.annualCost).toBe(378);
+    });
+
+    it('Procurement: $710K unlock, $224K/yr annual (Strategy A)', () => {
+      expect(SHARED_SERVICES_CONFIG.procurement.unlockCost).toBe(710);
+      expect(SHARED_SERVICES_CONFIG.procurement.annualCost).toBe(224);
+    });
+
+    it('Marketing & Brand: $800K unlock, $295K/yr annual (Strategy A)', () => {
+      expect(SHARED_SERVICES_CONFIG.marketing_brand.unlockCost).toBe(800);
+      expect(SHARED_SERVICES_CONFIG.marketing_brand.annualCost).toBe(295);
+    });
+
+    it('Technology & Systems: $1,060K unlock, $450K/yr annual (Strategy A)', () => {
+      expect(SHARED_SERVICES_CONFIG.technology_systems.unlockCost).toBe(1060);
+      expect(SHARED_SERVICES_CONFIG.technology_systems.annualCost).toBe(450);
+    });
+
+    it('UserManualModal shows correct shared services costs (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('$660K');
+      expect(manual).toContain('$295K/yr');
+      expect(manual).toContain('$885K');
+      expect(manual).toContain('$378K/yr');
+      expect(manual).toContain('$710K');
+      expect(manual).toContain('$224K/yr');
+      expect(manual).toContain('$800K');
+      expect(manual).toContain('$1,060K');
+      expect(manual).toContain('$450K/yr');
     });
   });
 });

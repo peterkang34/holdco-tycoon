@@ -563,6 +563,7 @@ export interface LeaderboardEntry {
   founderEquityValue?: number;
   founderPersonalWealth?: number;
   hasRestructured?: boolean;
+  submittedMultiplier?: number;
 }
 
 // Utility types

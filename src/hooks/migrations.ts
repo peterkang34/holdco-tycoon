@@ -9,6 +9,7 @@
  */
 
 import { SECTORS } from '../data/sectors';
+import { SHARED_SERVICES_CONFIG } from '../data/sharedServices';
 
 // --- v9 → v10: adds maSourcing + maFocus.subType ---
 
@@ -355,6 +356,36 @@ export function migrateV18ToV19(): void {
   }
 }
 
+// --- v19 → v20: shared services cost increase ~18% ---
+
+export function migrateV19ToV20(): void {
+  try {
+    const v20Key = 'holdco-tycoon-save-v20';
+    const v19Key = 'holdco-tycoon-save-v19';
+    if (localStorage.getItem(v20Key)) return;
+    const v19Raw = localStorage.getItem(v19Key);
+    if (!v19Raw) return;
+    const v19Data = JSON.parse(v19Raw);
+    if (!v19Data?.state) return;
+
+    // Update shared services costs to new config values
+    if (Array.isArray(v19Data.state.sharedServices)) {
+      v19Data.state.sharedServices = v19Data.state.sharedServices.map((s: any) => {
+        const config = SHARED_SERVICES_CONFIG[s.type as keyof typeof SHARED_SERVICES_CONFIG];
+        if (config) {
+          return { ...s, unlockCost: config.unlockCost, annualCost: config.annualCost };
+        }
+        return s;
+      });
+    }
+
+    localStorage.setItem(v20Key, JSON.stringify(v19Data));
+    localStorage.removeItem(v19Key);
+  } catch (e) {
+    console.error('v19→v20 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -370,4 +401,5 @@ export function runAllMigrations(): void {
   migrateV16ToV17();
   migrateV17ToV18();
   migrateV18ToV19();
+  migrateV19ToV20();
 }

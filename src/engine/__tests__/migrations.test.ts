@@ -422,8 +422,8 @@ describe('runAllMigrations', () => {
 
     // v9 should be consumed
     expect(localStorageMock.getItem('holdco-tycoon-save-v9')).toBeNull();
-    // Final v19 should exist (chain goes through all migrations including v18→v19)
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v19')!);
+    // Final v20 should exist (chain goes through all migrations including v19→v20)
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v20')!);
     expect(result.state.difficulty).toBe('easy');
     expect(result.state.maxRounds).toBe(20);
     expect(result.state.founderDistributionsReceived).toBeDefined();
