@@ -4,7 +4,7 @@ import { useToastStore } from '../../hooks/useToast';
 import { getDistressRestrictions } from '../../engine/distress';
 import { getMASourcingAnnualCost, MA_SOURCING_CONFIG } from '../../data/sharedServices';
 import { SECTORS } from '../../data/sectors';
-import { Deal, DealStructure, SharedServiceType, OperationalImprovementType, formatMoney, IntegrationOutcome } from '../../engine/types';
+import { Deal, DealStructure, SharedServiceType, OperationalImprovementType, formatMoney } from '../../engine/types';
 import { getStructureLabel } from '../../engine/deals';
 import { Dashboard } from '../dashboard/Dashboard';
 import { CollectPhase } from '../phases/CollectPhase';
@@ -162,7 +162,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
       addToast({
         message: `Outbid on ${deal.business.name}`,
         detail: 'Another buyer snatched the deal',
-        type: 'error',
+        type: 'danger',
       });
     } else {
       addToast({
@@ -183,11 +183,11 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
       addToast({
         message: `Outbid on ${deal.business.name}`,
         detail: 'Another buyer snatched the deal',
-        type: 'error',
+        type: 'danger',
       });
     } else {
       const structureLabel = `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`;
-      const toastType = integrationOutcome === 'failure' ? 'error' : integrationOutcome === 'partial' ? 'info' : 'success';
+      const toastType = integrationOutcome === 'failure' ? 'danger' : integrationOutcome === 'partial' ? 'info' : 'success';
       const suffix = integrationOutcome === 'failure' ? ' — troubled integration'
         : integrationOutcome === 'partial' ? ' — rocky integration, reduced synergies'
         : ' — seamless integration';
@@ -205,7 +205,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     mergeBusinesses(id1, id2, newName);
     const integrationOutcome = useGameStore.getState().lastIntegrationOutcome;
     const names = b1 && b2 ? `${b1.name} + ${b2.name}` : undefined;
-    const toastType = integrationOutcome === 'failure' ? 'error' : integrationOutcome === 'partial' ? 'info' : 'success';
+    const toastType = integrationOutcome === 'failure' ? 'danger' : integrationOutcome === 'partial' ? 'info' : 'success';
     const suffix = integrationOutcome === 'failure' ? ' — troubled integration'
       : integrationOutcome === 'partial' ? ' — rocky integration, reduced synergies'
       : ' — seamless integration';
