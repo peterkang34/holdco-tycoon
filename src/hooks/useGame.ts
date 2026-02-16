@@ -87,7 +87,7 @@ import { buildChronicleContext } from '../services/chronicleContext';
 import { useToastStore } from './useToast';
 import { calculateIntegrationCost, forgePlatform, checkPlatformDissolution, calculateAddToPlatformCost } from '../engine/platforms';
 import { getRecipeById } from '../data/platformRecipes';
-import { PLATFORM_SALE_BONUS } from '../data/gameConfig';
+import { PLATFORM_SALE_BONUS, COVENANT_BREACH_ROUNDS_THRESHOLD } from '../data/gameConfig';
 import {
   canUnlockTier,
   calculateTurnaroundCost,
@@ -728,8 +728,9 @@ export const useGameStore = create<GameStore>()(
         let newCovenantBreachRounds = state.covenantBreachRounds;
         if (endMetrics.distressLevel === 'breach') {
           newCovenantBreachRounds += 1;
-        } else {
-          newCovenantBreachRounds = 0;
+        } else if (!state.hasRestructured) {
+          newCovenantBreachRounds = 0; // pre-restructuring: forgiving reset
+          // post-restructuring: counter never resets (strict monitoring)
         }
 
         // Check for forced restructuring from prolonged breach
@@ -737,13 +738,31 @@ export const useGameStore = create<GameStore>()(
         let gameOverFromBankruptcy = false;
         let bankruptRound: number | undefined = state.bankruptRound;
 
-        if (newCovenantBreachRounds >= 2) {
+        if (newCovenantBreachRounds >= COVENANT_BREACH_ROUNDS_THRESHOLD) {
           if (state.hasRestructured) {
             // Already used restructuring — bankruptcy
             gameOverFromBankruptcy = true;
             bankruptRound = state.round;
           } else {
             requiresRestructuring = true;
+          }
+        }
+
+        // Insolvency check: equity value wiped out after restructuring → bankruptcy
+        if (state.hasRestructured && !gameOverFromBankruptcy) {
+          const intrinsicValue = endMetrics.intrinsicValuePerShare * state.sharesOutstanding;
+          if (intrinsicValue <= 0) {
+            gameOverFromBankruptcy = true;
+            bankruptRound = state.round;
+          }
+        }
+
+        // Empty portfolio insolvency: no businesses + no cash to recover
+        if (state.hasRestructured && !gameOverFromBankruptcy) {
+          const activeCount = updatedBusinesses.filter(b => b.status === 'active').length;
+          if (activeCount === 0 && state.cash <= 0) {
+            gameOverFromBankruptcy = true;
+            bankruptRound = state.round;
           }
         }
 

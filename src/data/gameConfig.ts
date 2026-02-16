@@ -39,6 +39,10 @@ export const INTEGRATION_THRESHOLD_MULTIPLIER = {
   normal: { standard: 0.7, quick: 0.5 },
 } as const;
 
+// ── Covenant / Bankruptcy Constants ──
+
+export const COVENANT_BREACH_ROUNDS_THRESHOLD = 2; // breach years before restructuring/bankruptcy
+
 // ── Restructuring Constants ──
 
 export const RESTRUCTURING_FEV_PENALTY = 0.80; // 20% FEV haircut for restructured games

@@ -476,8 +476,10 @@ function DistressContent() {
 
       <HighlightBox variant="warning">
         <strong>Bankruptcy Rule:</strong> If you remain in covenant breach for <strong>2
-        consecutive years</strong>, you are forced into bankruptcy. This ends your game
-        immediately with an F grade and a score of 0.
+        cumulative years</strong> (consecutive or not after restructuring), you are forced
+        into bankruptcy. This ends your game immediately with an F grade and a score of 0.
+        Post-restructuring, breach years accumulate even if you temporarily exit breach —
+        lenders don&apos;t reset the clock.
       </HighlightBox>
 
       <SubHeading>Restructuring Options</SubHeading>
@@ -923,7 +925,7 @@ function StrategyContent() {
 
       <SubHeading>Capital Management</SubHeading>
       <BulletList items={[
-        <><strong>Don&apos;t over-leverage.</strong> Stay under 3.5x Net Debt/EBITDA for safety. Once you hit 4.5x, you&apos;re in breach with severe restrictions. Two consecutive years of breach = bankruptcy.</>,
+        <><strong>Don&apos;t over-leverage.</strong> Stay under 3.5x Net Debt/EBITDA for safety. Once you hit 4.5x, you&apos;re in breach with severe restrictions. Two years of breach = bankruptcy. After restructuring, breach years are cumulative (non-consecutive counts) and insolvency (wiped-out equity) triggers automatic game over.</>,
         <><strong>Quality matters more than price.</strong> A quality-4 business at 6x is often better than a quality-2 at 3x. Higher quality means better growth, stronger margins, easier integration, and higher exit multiples.</>,
         <><strong>Watch margin drift.</strong> Most sectors slowly compress margins over time. Without active intervention (shared services, improvements), your cash flows will erode. Restaurants and agencies drift the fastest.</>,
       ]} />

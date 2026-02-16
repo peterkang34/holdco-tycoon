@@ -266,8 +266,17 @@ export function GameOverScreen({
 
           <div className="card mt-6 bg-red-900/20 border-red-500/30">
             <p className="text-text-secondary">
-              Your holding company couldn't service its debt obligations and was forced into bankruptcy.
-              All equity value was wiped out.
+              {(() => {
+                const activeCount = businesses.filter(b => b.status === 'active').length;
+                const intrinsicValue = metrics.intrinsicValuePerShare * sharesOutstanding;
+                if (activeCount === 0 && cash <= 0) {
+                  return 'With no portfolio businesses and no capital to rebuild, your holding company was dissolved.';
+                }
+                if (intrinsicValue <= 0 && hasRestructured) {
+                  return "Your holding company's equity value was completely wiped out. With no remaining value for shareholders, the company was declared insolvent.";
+                }
+                return "Your holding company couldn't service its debt obligations and was forced into bankruptcy. All equity value was wiped out.";
+              })()}
             </p>
             <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4 text-center">
               <div>

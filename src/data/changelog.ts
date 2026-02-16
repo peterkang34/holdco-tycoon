@@ -11,6 +11,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'February 16, 2025',
+    title: 'Bankruptcy Detection Overhaul',
+    sections: [
+      {
+        heading: 'Tighter Post-Restructuring Rules',
+        items: [
+          'Post-restructuring covenant breaches now accumulate — exiting breach no longer resets the counter. Any 2 breach years (even non-consecutive) after restructuring triggers bankruptcy.',
+          'New insolvency check: if your equity value is completely wiped out after restructuring, the game ends immediately.',
+          'Empty portfolio insolvency: no active businesses + no cash after restructuring = automatic dissolution.',
+          'Breach description and User Manual updated to explain cumulative post-restructuring rules.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 15, 2025',
     title: 'Credit Tightening Balance',
     sections: [

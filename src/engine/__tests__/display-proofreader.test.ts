@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 // ── Engine Imports ──
 import { TAX_RATE, calculateAnnualFcf, calculatePortfolioTax } from '../simulation';
 import { createMockBusiness } from './helpers';
-import { calculateDistressLevel, getDistressRestrictions } from '../distress';
+import { calculateDistressLevel, getDistressRestrictions, getDistressDescription } from '../distress';
 import { calculateHeatPremium, getMaxAcquisitions } from '../businesses';
 import { MA_SOURCING_CONFIG } from '../../data/sharedServices';
 import { SECTORS, SECTOR_LIST } from '../../data/sectors';
@@ -36,6 +36,7 @@ import {
   TURNAROUND_EXIT_PREMIUM,
   TURNAROUND_EXIT_PREMIUM_MIN_TIERS,
   RESTRUCTURING_FEV_PENALTY,
+  COVENANT_BREACH_ROUNDS_THRESHOLD,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG } from '../../data/turnaroundPrograms';
 
@@ -344,6 +345,25 @@ describe('Display Proofreader', () => {
       const manual = readComponent('components/ui/UserManualModal.tsx');
       expect(manual).toContain('2.5');
       expect(manual).toContain('4.5');
+    });
+
+    it('COVENANT_BREACH_ROUNDS_THRESHOLD matches UI copy', () => {
+      expect(COVENANT_BREACH_ROUNDS_THRESHOLD).toBe(2);
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      // Manual mentions the threshold and cumulative rule
+      expect(manual).toContain('cumulative years');
+      expect(manual).toContain(`${COVENANT_BREACH_ROUNDS_THRESHOLD}`);
+    });
+
+    it('Breach description mentions post-restructuring cumulative rule', () => {
+      const desc = getDistressDescription('breach');
+      expect(desc).toContain('cumulative');
+      expect(desc).toContain('restructuring');
+    });
+
+    it('useGame.ts uses COVENANT_BREACH_ROUNDS_THRESHOLD constant (Strategy B)', () => {
+      const useGame = readComponent('hooks/useGame.ts');
+      expect(useGame).toContain('COVENANT_BREACH_ROUNDS_THRESHOLD');
     });
   });
 

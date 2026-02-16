@@ -6,7 +6,7 @@ import {
   getDistressDescription,
 } from '../distress';
 import { createMockBusiness, createMockGameState } from './helpers';
-import { RESTRUCTURING_FEV_PENALTY, DIFFICULTY_CONFIG } from '../../data/gameConfig';
+import { RESTRUCTURING_FEV_PENALTY, DIFFICULTY_CONFIG, COVENANT_BREACH_ROUNDS_THRESHOLD } from '../../data/gameConfig';
 import type { LeaderboardEntry } from '../types';
 
 describe('calculateDistressLevel', () => {
@@ -153,13 +153,12 @@ describe('Restructuring trigger logic', () => {
     expect(gameOverFromNegativeCash).toBe(true);
   });
 
-  it('2 consecutive breach years triggers restructuring', () => {
-    // endRound logic: covenantBreachRounds >= 2 && !hasRestructured → requiresRestructuring
-    const covenantBreachRounds = 2;
+  it('2 breach years triggers restructuring', () => {
+    const covenantBreachRounds = COVENANT_BREACH_ROUNDS_THRESHOLD;
     const hasRestructured = false;
     let requiresRestructuring = false;
     let gameOverFromBankruptcy = false;
-    if (covenantBreachRounds >= 2) {
+    if (covenantBreachRounds >= COVENANT_BREACH_ROUNDS_THRESHOLD) {
       if (hasRestructured) {
         gameOverFromBankruptcy = true;
       } else {
@@ -170,12 +169,12 @@ describe('Restructuring trigger logic', () => {
     expect(gameOverFromBankruptcy).toBe(false);
   });
 
-  it('2 consecutive breach years after restructuring triggers bankruptcy', () => {
-    const covenantBreachRounds = 2;
+  it('2 breach years after restructuring triggers bankruptcy', () => {
+    const covenantBreachRounds = COVENANT_BREACH_ROUNDS_THRESHOLD;
     const hasRestructured = true;
     let requiresRestructuring = false;
     let gameOverFromBankruptcy = false;
-    if (covenantBreachRounds >= 2) {
+    if (covenantBreachRounds >= COVENANT_BREACH_ROUNDS_THRESHOLD) {
       if (hasRestructured) {
         gameOverFromBankruptcy = true;
       } else {
@@ -184,6 +183,103 @@ describe('Restructuring trigger logic', () => {
     }
     expect(requiresRestructuring).toBe(false);
     expect(gameOverFromBankruptcy).toBe(true);
+  });
+
+  it('pre-restructuring breach counter resets when exiting breach', () => {
+    // Before restructuring, exiting breach resets the counter (forgiving)
+    const hasRestructured = false;
+    let covenantBreachRounds = 1; // was in breach for 1 year
+    const inBreach = false; // now exiting breach
+    if (inBreach) {
+      covenantBreachRounds += 1;
+    } else if (!hasRestructured) {
+      covenantBreachRounds = 0;
+    }
+    expect(covenantBreachRounds).toBe(0);
+  });
+
+  it('post-restructuring breach counter does NOT reset when temporarily exiting breach', () => {
+    // After restructuring, exiting breach does NOT reset the counter (strict)
+    const hasRestructured = true;
+    let covenantBreachRounds = 1; // was in breach for 1 year
+    const inBreach = false; // now exiting breach
+    if (inBreach) {
+      covenantBreachRounds += 1;
+    } else if (!hasRestructured) {
+      covenantBreachRounds = 0;
+    }
+    // Counter stays at 1, not reset
+    expect(covenantBreachRounds).toBe(1);
+  });
+
+  it('post-restructuring non-consecutive breach years still trigger bankruptcy', () => {
+    const hasRestructured = true;
+    let covenantBreachRounds = 0;
+
+    // Year 1: breach
+    covenantBreachRounds += 1;
+    // Year 2: no breach — counter stays (post-restructuring)
+    // (no reset because hasRestructured = true)
+    // Year 3: breach again
+    covenantBreachRounds += 1;
+
+    let gameOverFromBankruptcy = false;
+    if (covenantBreachRounds >= COVENANT_BREACH_ROUNDS_THRESHOLD) {
+      if (hasRestructured) {
+        gameOverFromBankruptcy = true;
+      }
+    }
+    expect(gameOverFromBankruptcy).toBe(true);
+  });
+
+  it('insolvency after restructuring triggers bankruptcy (wiped equity)', () => {
+    const hasRestructured = true;
+    const intrinsicValuePerShare = -5; // negative equity
+    const sharesOutstanding = 1000;
+    const intrinsicValue = intrinsicValuePerShare * sharesOutstanding;
+    let gameOverFromBankruptcy = false;
+
+    if (hasRestructured && intrinsicValue <= 0) {
+      gameOverFromBankruptcy = true;
+    }
+    expect(gameOverFromBankruptcy).toBe(true);
+  });
+
+  it('insolvency does NOT trigger before restructuring', () => {
+    const hasRestructured = false;
+    const intrinsicValuePerShare = -5;
+    const sharesOutstanding = 1000;
+    const intrinsicValue = intrinsicValuePerShare * sharesOutstanding;
+    let gameOverFromBankruptcy = false;
+
+    if (hasRestructured && intrinsicValue <= 0) {
+      gameOverFromBankruptcy = true;
+    }
+    expect(gameOverFromBankruptcy).toBe(false);
+  });
+
+  it('empty portfolio after restructuring triggers bankruptcy', () => {
+    const hasRestructured = true;
+    const activeBusinesses = 0;
+    const cash = -100;
+    let gameOverFromBankruptcy = false;
+
+    if (hasRestructured && activeBusinesses === 0 && cash <= 0) {
+      gameOverFromBankruptcy = true;
+    }
+    expect(gameOverFromBankruptcy).toBe(true);
+  });
+
+  it('empty portfolio does NOT trigger if cash is positive', () => {
+    const hasRestructured = true;
+    const activeBusinesses = 0;
+    const cash = 5000;
+    let gameOverFromBankruptcy = false;
+
+    if (hasRestructured && activeBusinesses === 0 && cash <= 0) {
+      gameOverFromBankruptcy = true;
+    }
+    expect(gameOverFromBankruptcy).toBe(false);
   });
 });
 

@@ -67,6 +67,6 @@ export function getDistressDescription(level: DistressLevel): string {
     case 'stressed':
       return 'Your lenders have put you on covenant watch. Bank debt is no longer available, and you\'re paying a 1% interest rate penalty. Reduce leverage to regain full access.';
     case 'breach':
-      return 'You\'ve breached your debt covenants. No acquisitions, distributions, or buybacks allowed. You\'re paying a 2% interest penalty. If this continues for 2 consecutive years, you\'ll be forced into restructuring.';
+      return 'You\'ve breached your debt covenants. No acquisitions, distributions, or buybacks allowed. You\'re paying a 2% interest penalty. If this continues for 2 years, you\'ll be forced into restructuring. After a restructuring, any further breach years are cumulative — lenders won\'t reset the clock.';
   }
 }
