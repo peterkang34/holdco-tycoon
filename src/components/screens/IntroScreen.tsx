@@ -211,7 +211,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
           </>
         )}
 
-        {/* Global Leaderboard + Changelog */}
+        {/* Global Leaderboard + Changelog + Manual */}
         <div className="mt-4 flex flex-col items-center gap-2">
           <button
             onClick={() => setShowLeaderboard(true)}
@@ -219,18 +219,21 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
           >
             🌍 Global Leaderboard
           </button>
-          <button
-            onClick={() => setShowChangelog(true)}
-            className="text-sm text-text-muted hover:text-accent transition-colors"
-          >
-            📋 What's New
-          </button>
-          <button
-            onClick={() => setShowUserManual(true)}
-            className="text-sm text-text-muted hover:text-accent transition-colors"
-          >
-            📖 User Manual
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowChangelog(true)}
+              className="text-sm text-text-muted hover:text-accent transition-colors"
+            >
+              📋 What's New
+            </button>
+            <span className="text-text-muted/40">·</span>
+            <button
+              onClick={() => setShowUserManual(true)}
+              className="text-sm text-text-muted hover:text-accent transition-colors"
+            >
+              📖 User Manual
+            </button>
+          </div>
         </div>
 
         {/* Info */}
