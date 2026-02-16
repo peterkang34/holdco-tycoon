@@ -32,7 +32,9 @@ export function getFevBucket(fev: number): string {
   if (fev < 20000) return '10000-20000';
   if (fev < 50000) return '20000-50000';
   if (fev < 100000) return '50000-100000';
-  return '100000+';
+  if (fev < 200000) return '100000-200000';
+  if (fev < 500000) return '200000-500000';
+  return '500000+';
 }
 
 interface ValidatedPayload {

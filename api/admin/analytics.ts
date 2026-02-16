@@ -88,10 +88,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       completed: Number(results[allTimeOffset + 1]) || 0,
     };
 
-    // Fetch leaderboard top 10
+    // Fetch leaderboard top 25 (negative indices = highest scores)
     let leaderboardEntries: unknown[] = [];
     try {
-      const raw = await kv.zrange(LEADERBOARD_KEY, 0, 9);
+      const raw = await kv.zrange(LEADERBOARD_KEY, -25, -1);
       leaderboardEntries = raw.map((entry) => {
         try {
           return typeof entry === 'string' ? JSON.parse(entry) : entry;

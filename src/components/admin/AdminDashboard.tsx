@@ -5,6 +5,7 @@ import { MetricCard } from '../ui/MetricCard';
 import { getGradeColor } from '../../utils/gradeColors';
 import { SECTORS } from '../../data/sectors';
 import { formatMoney } from '../../engine/types';
+import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
 
 // Types matching the API response
 interface MonthData {
@@ -20,17 +21,47 @@ interface MonthData {
   abandonByRound: Record<string, number>;
 }
 
+interface LeaderboardEntry {
+  holdcoName: string;
+  initials: string;
+  founderEquityValue: number;
+  grade: string;
+  difficulty: string;
+  duration?: string;
+  businessCount?: number;
+  score?: number;
+  date: string;
+}
+
 interface AnalyticsData {
   allTime: { started: number; completed: number };
   months: MonthData[];
-  leaderboardEntries: Array<{
-    holdcoName: string;
-    initials: string;
-    founderEquityValue: number;
-    grade: string;
-    difficulty: string;
-    date: string;
-  }>;
+  leaderboardEntries: LeaderboardEntry[];
+}
+
+/** Tiny inline bar chart for monthly trends — no library needed */
+function MiniTrend({ label, data }: { label: string; data: { month: string; value: number }[] }) {
+  const max = Math.max(...data.map(d => d.value), 1);
+  return (
+    <div className="card p-3">
+      <h4 className="text-xs font-semibold text-text-secondary mb-2">{label}</h4>
+      <div className="flex items-end gap-1 h-10">
+        {data.map(d => (
+          <div key={d.month} className="flex-1 flex flex-col items-center gap-0.5">
+            <div
+              className="w-full rounded-sm bg-accent/70 transition-all duration-300"
+              style={{ height: `${Math.max((d.value / max) * 100, 4)}%` }}
+              title={`${d.month}: ${d.value}`}
+            />
+            <span className="text-[8px] text-text-muted leading-none">{d.month.slice(5)}</span>
+          </div>
+        ))}
+      </div>
+      <div className="text-right text-[10px] text-text-muted mt-1">
+        Latest: {data[data.length - 1]?.value ?? 0}
+      </div>
+    </div>
+  );
 }
 
 const EMPTY_RECORD: Record<string, number> = {};
@@ -71,7 +102,7 @@ export function AdminDashboard() {
     if (!data) return {
       allConfig: EMPTY_RECORD, allSectors: EMPTY_RECORD, allGrades: EMPTY_RECORD,
       allFev: EMPTY_RECORD, allAbandon: EMPTY_RECORD, allRounds: EMPTY_RECORD,
-      totalUnique: 0, completionRate: '0%', avgFev: 0, normalPct: '0%', quickPct: '0%',
+      totalUnique: 0, completionRate: '0%', avgFev: 0, topFev: 0, normalPct: '0%', quickPct: '0%',
     };
 
     const allConfig: Record<string, number> = {};
@@ -98,7 +129,9 @@ export function AdminDashboard() {
 
     const bucketMidpoints: Record<string, number> = {
       '0-5000': 2500, '5000-10000': 7500, '10000-20000': 15000,
-      '20000-50000': 35000, '50000-100000': 75000, '100000+': 150000,
+      '20000-50000': 35000, '50000-100000': 75000,
+      '100000+': 150000, // legacy bucket
+      '100000-200000': 150000, '200000-500000': 350000, '500000+': 750000,
     };
     let fevSum = 0, fevCount = 0;
     for (const [bucket, count] of Object.entries(allFev)) {
@@ -108,13 +141,18 @@ export function AdminDashboard() {
     }
     const avgFev = fevCount > 0 ? Math.round(fevSum / fevCount) : 0;
 
+    // Top FEV from actual leaderboard data (exact, not bucket-estimated)
+    const topFev = data.leaderboardEntries.length > 0
+      ? Math.max(...data.leaderboardEntries.map(e => e.founderEquityValue))
+      : 0;
+
     const normalCount = (allConfig['normal:standard'] || 0) + (allConfig['normal:quick'] || 0);
     const normalPct = data.allTime.started > 0 ? ((normalCount / data.allTime.started) * 100).toFixed(0) + '%' : '0%';
 
     const quickCount = (allConfig['easy:quick'] || 0) + (allConfig['normal:quick'] || 0);
     const quickPct = data.allTime.started > 0 ? ((quickCount / data.allTime.started) * 100).toFixed(0) + '%' : '0%';
 
-    return { allConfig, allSectors, allGrades, allFev, allAbandon, allRounds, totalUnique, completionRate, avgFev, normalPct, quickPct };
+    return { allConfig, allSectors, allGrades, allFev, allAbandon, allRounds, totalUnique, completionRate, avgFev, topFev, normalPct, quickPct };
   }, [data]);
 
   const sectorItems = useMemo(() =>
@@ -155,15 +193,20 @@ export function AdminDashboard() {
     })), [totals.allGrades]);
 
   const fevItems = useMemo(() => {
-    const order = ['0-5000', '5000-10000', '10000-20000', '20000-50000', '50000-100000', '100000+'];
+    const order = [
+      '0-5000', '5000-10000', '10000-20000', '20000-50000', '50000-100000',
+      '100000+', // legacy bucket — hidden when empty
+      '100000-200000', '200000-500000', '500000+',
+    ];
     const labels: Record<string, string> = {
       '0-5000': '$0-5M', '5000-10000': '$5-10M', '10000-20000': '$10-20M',
-      '20000-50000': '$20-50M', '50000-100000': '$50-100M', '100000+': '$100M+',
+      '20000-50000': '$20-50M', '50000-100000': '$50-100M',
+      '100000+': '$100M+ (old)',
+      '100000-200000': '$100-200M', '200000-500000': '$200-500M', '500000+': '$500M+',
     };
-    return order.map(k => ({
-      label: labels[k] || k,
-      value: totals.allFev[k] || 0,
-    }));
+    return order
+      .map(k => ({ label: labels[k] || k, value: totals.allFev[k] || 0 }))
+      .filter(item => item.value > 0 || !item.label.includes('(old)'));
   }, [totals.allFev]);
 
   const handleLogout = () => {
@@ -212,13 +255,30 @@ export function AdminDashboard() {
       </div>
 
       {/* Summary metrics */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 mb-6">
         <MetricCard label="Games Started" value={data.allTime.started} />
         <MetricCard label="Completion Rate" value={totals.completionRate} status={parseFloat(totals.completionRate) > 50 ? 'positive' : 'warning'} />
-        <MetricCard label="Avg FEV" value={formatMoney(totals.avgFev)} />
+        <MetricCard label="Avg FEV (est)" value={formatMoney(totals.avgFev)} />
+        <MetricCard label="Top FEV" value={formatMoney(totals.topFev)} status="positive" />
         <MetricCard label="Unique Players" value={totals.totalUnique} />
         <MetricCard label="Normal Mode" value={totals.normalPct} />
         <MetricCard label="Quick Play" value={totals.quickPct} />
+      </div>
+
+      {/* Monthly trends */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <MiniTrend
+          label="Games Started / mo"
+          data={[...data.months].reverse().map(m => ({ month: m.month, value: m.started }))}
+        />
+        <MiniTrend
+          label="Completions / mo"
+          data={[...data.months].reverse().map(m => ({ month: m.month, value: m.completed }))}
+        />
+        <MiniTrend
+          label="Unique Players / mo"
+          data={[...data.months].reverse().map(m => ({ month: m.month, value: m.uniquePlayers }))}
+        />
       </div>
 
       {/* Charts grid */}
@@ -260,37 +320,51 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* Recent leaderboard */}
+      {/* Top leaderboard entries */}
       {data.leaderboardEntries.length > 0 && (
         <div className="card p-4">
-          <h3 className="text-sm font-semibold text-text-secondary mb-3">Recent Leaderboard Entries (Top 10)</h3>
+          <h3 className="text-sm font-semibold text-text-secondary mb-3">Top Leaderboard Entries</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
                 <tr className="text-text-muted border-b border-border">
-                  <th className="text-left py-2 pr-4">#</th>
-                  <th className="text-left py-2 pr-4">Name</th>
-                  <th className="text-right py-2 pr-4">FEV</th>
-                  <th className="text-center py-2 pr-4">Grade</th>
-                  <th className="text-center py-2 pr-4">Mode</th>
+                  <th className="text-left py-2 pr-3">#</th>
+                  <th className="text-left py-2 pr-3">Name</th>
+                  <th className="text-right py-2 pr-3">Adj FEV</th>
+                  <th className="text-right py-2 pr-3">Raw FEV</th>
+                  <th className="text-center py-2 pr-3">Score</th>
+                  <th className="text-center py-2 pr-3">Grade</th>
+                  <th className="text-center py-2 pr-3">Mode</th>
+                  <th className="text-center py-2 pr-3">Biz</th>
                   <th className="text-right py-2">Date</th>
                 </tr>
               </thead>
               <tbody>
-                {data.leaderboardEntries.map((entry, i) => (
-                  <tr key={i} className="border-b border-border/50">
-                    <td className="py-1.5 pr-4 text-text-muted font-mono">{i + 1}</td>
-                    <td className="py-1.5 pr-4 text-text-primary truncate max-w-[150px]">{entry.holdcoName}</td>
-                    <td className="py-1.5 pr-4 text-right font-mono text-accent">{formatMoney(entry.founderEquityValue)}</td>
-                    <td className={`py-1.5 pr-4 text-center font-bold ${getGradeColor(entry.grade)}`}>{entry.grade}</td>
-                    <td className="py-1.5 pr-4 text-center">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
-                        {entry.difficulty === 'normal' ? 'Normal' : 'Easy'}
-                      </span>
-                    </td>
-                    <td className="py-1.5 text-right text-text-muted font-mono">{new Date(entry.date).toLocaleDateString()}</td>
-                  </tr>
-                ))}
+                {data.leaderboardEntries.map((entry, i) => {
+                  const multiplier = entry.difficulty === 'normal'
+                    ? DIFFICULTY_CONFIG.normal.leaderboardMultiplier
+                    : DIFFICULTY_CONFIG.easy.leaderboardMultiplier;
+                  const adjFev = Math.round(entry.founderEquityValue * multiplier);
+                  const durationLabel = entry.duration === 'quick' ? '10' : '20';
+                  const diffLabel = entry.difficulty === 'normal' ? 'H' : 'E';
+                  return (
+                    <tr key={i} className="border-b border-border/50">
+                      <td className="py-1.5 pr-3 text-text-muted font-mono">{i + 1}</td>
+                      <td className="py-1.5 pr-3 text-text-primary truncate max-w-[150px]">{entry.holdcoName}</td>
+                      <td className="py-1.5 pr-3 text-right font-mono text-accent">{formatMoney(adjFev)}</td>
+                      <td className="py-1.5 pr-3 text-right font-mono text-text-secondary">{formatMoney(entry.founderEquityValue)}</td>
+                      <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.score ?? '—'}</td>
+                      <td className={`py-1.5 pr-3 text-center font-bold ${getGradeColor(entry.grade)}`}>{entry.grade}</td>
+                      <td className="py-1.5 pr-3 text-center">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
+                          {diffLabel}/{durationLabel}
+                        </span>
+                      </td>
+                      <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.businessCount ?? '—'}</td>
+                      <td className="py-1.5 text-right text-text-muted font-mono">{new Date(entry.date).toLocaleDateString()}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
