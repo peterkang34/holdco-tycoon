@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 15, 2025',
+    title: 'Platform Integrity Fix',
+    sections: [
+      {
+        heading: 'Integrated Platforms Now Stay Tight',
+        items: [
+          'Merging two businesses no longer breaks their Integrated Platform membership. The merged company inherits platform bonuses and stays in the constituent list.',
+          'New: Add businesses to existing platforms post-forge. Acquired a new MSP after forging your platform? You can now integrate it directly from the platform card.',
+          'Platform dissolution now triggers properly after merges if sub-type diversity drops below the recipe minimum.',
+          'Fixed orphaned platforms that couldn\'t be sold after all members were merged away.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 15, 2025',
     title: 'M&A Sourcing Clarity',
     sections: [
       {

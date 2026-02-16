@@ -9,6 +9,8 @@ import {
   getPlatformMultipleExpansion,
   getPlatformRecessionModifier,
   checkPlatformDissolution,
+  getEligibleBusinessesForExistingPlatform,
+  calculateAddToPlatformCost,
 } from '../platforms';
 import { PLATFORM_RECIPES } from '../../data/platformRecipes';
 import { SECTORS } from '../../data/sectors';
@@ -572,5 +574,124 @@ describe('checkPlatformDissolution', () => {
     ];
     // Still 2 distinct sub-types — platform survives
     expect(checkPlatformDissolution(platform, remaining)).toBe(false);
+  });
+});
+
+describe('getEligibleBusinessesForExistingPlatform', () => {
+  const platform: IntegratedPlatform = {
+    id: 'platform_agency_full_service_digital_r3',
+    recipeId: 'agency_full_service_digital',
+    name: 'Full-Service Digital Agency',
+    sectorIds: ['agency'],
+    constituentBusinessIds: ['biz_1', 'biz_2'],
+    forgedInRound: 3,
+    bonuses: { marginBoost: 0.04, growthBoost: 0.03, multipleExpansion: 1.5, recessionResistanceReduction: 0.8 },
+  };
+
+  it('returns businesses with matching sector and sub-type that are not already in a platform', () => {
+    const businesses = [
+      createMockBusiness({ id: 'biz_1', sectorId: 'agency', subType: 'Digital/Ecommerce Agency', integratedPlatformId: platform.id }),
+      createMockBusiness({ id: 'biz_2', sectorId: 'agency', subType: 'Performance Media Agency', integratedPlatformId: platform.id }),
+      createMockBusiness({ id: 'biz_3', sectorId: 'agency', subType: 'SEO/Content Agency' }),
+    ];
+    const eligible = getEligibleBusinessesForExistingPlatform(platform, businesses);
+    expect(eligible).toHaveLength(1);
+    expect(eligible[0].id).toBe('biz_3');
+  });
+
+  it('excludes non-active businesses', () => {
+    const businesses = [
+      createMockBusiness({ id: 'biz_3', sectorId: 'agency', subType: 'SEO/Content Agency', status: 'sold' }),
+    ];
+    expect(getEligibleBusinessesForExistingPlatform(platform, businesses)).toHaveLength(0);
+  });
+
+  it('excludes businesses already in another platform', () => {
+    const businesses = [
+      createMockBusiness({ id: 'biz_3', sectorId: 'agency', subType: 'SEO/Content Agency', integratedPlatformId: 'other_platform' }),
+    ];
+    expect(getEligibleBusinessesForExistingPlatform(platform, businesses)).toHaveLength(0);
+  });
+
+  it('excludes businesses with non-matching sub-types', () => {
+    const businesses = [
+      createMockBusiness({ id: 'biz_3', sectorId: 'agency', subType: 'Staffing/Recruiting Agency' }),
+    ];
+    expect(getEligibleBusinessesForExistingPlatform(platform, businesses)).toHaveLength(0);
+  });
+
+  it('excludes businesses from wrong sector', () => {
+    const businesses = [
+      createMockBusiness({ id: 'biz_3', sectorId: 'saas', subType: 'Digital/Ecommerce Agency' }),
+    ];
+    expect(getEligibleBusinessesForExistingPlatform(platform, businesses)).toHaveLength(0);
+  });
+});
+
+describe('calculateAddToPlatformCost', () => {
+  const platform: IntegratedPlatform = {
+    id: 'platform_agency_full_service_digital_r3',
+    recipeId: 'agency_full_service_digital',
+    name: 'Full-Service Digital Agency',
+    sectorIds: ['agency'],
+    constituentBusinessIds: ['biz_1'],
+    forgedInRound: 3,
+    bonuses: { marginBoost: 0.04, growthBoost: 0.03, multipleExpansion: 1.5, recessionResistanceReduction: 0.8 },
+  };
+
+  it('calculates cost as integrationCostFraction × business EBITDA', () => {
+    const biz = createMockBusiness({ ebitda: 1000 });
+    // agency_full_service_digital has integrationCostFraction: 0.20
+    expect(calculateAddToPlatformCost(platform, biz)).toBe(200);
+  });
+
+  it('uses absolute EBITDA for negative-EBITDA businesses', () => {
+    const biz = createMockBusiness({ ebitda: -500 });
+    expect(calculateAddToPlatformCost(platform, biz)).toBe(100);
+  });
+});
+
+describe('Platform integrity through merge scenarios', () => {
+  const platform: IntegratedPlatform = {
+    id: 'platform_b2b_integrated_msp_r3',
+    recipeId: 'b2b_integrated_msp',
+    name: 'Integrated MSP & Cyber Platform',
+    sectorIds: ['b2bServices'],
+    constituentBusinessIds: ['msp_1', 'data_1'],
+    forgedInRound: 3,
+    bonuses: { marginBoost: 0.05, growthBoost: 0.03, multipleExpansion: 2.0, recessionResistanceReduction: 0.8 },
+  };
+
+  it('dissolution check: merged businesses (status merged) are not counted as valid constituents', () => {
+    const remaining = [
+      createMockBusiness({ id: 'msp_1', sectorId: 'b2bServices', subType: 'IT Managed Services (MSP)', status: 'merged' as Business['status'] }),
+      createMockBusiness({ id: 'data_1', sectorId: 'b2bServices', subType: 'Data / Analytics Services', status: 'merged' as Business['status'] }),
+    ];
+    expect(checkPlatformDissolution(platform, remaining)).toBe(true);
+  });
+
+  it('dissolution check: platform survives when merged business replaces old IDs in constituent list', () => {
+    const fixedPlatform = {
+      ...platform,
+      constituentBusinessIds: ['merged_biz', 'data_1'],
+    };
+    const remaining = [
+      createMockBusiness({ id: 'merged_biz', sectorId: 'b2bServices', subType: 'IT Managed Services (MSP)', status: 'active' }),
+      createMockBusiness({ id: 'data_1', sectorId: 'b2bServices', subType: 'Data / Analytics Services', status: 'active' }),
+    ];
+    expect(checkPlatformDissolution(fixedPlatform, remaining)).toBe(false);
+  });
+
+  it('dissolution occurs when merge reduces sub-type diversity below minimum', () => {
+    // Both constituents have same sub-type after merge (lost diversity)
+    const sameSubTypePlatform = {
+      ...platform,
+      constituentBusinessIds: ['merged_biz'],
+    };
+    const remaining = [
+      createMockBusiness({ id: 'merged_biz', sectorId: 'b2bServices', subType: 'IT Managed Services (MSP)', status: 'active' }),
+    ];
+    // Only 1 sub-type, need 2 → dissolve
+    expect(checkPlatformDissolution(sameSubTypePlatform, remaining)).toBe(true);
   });
 });

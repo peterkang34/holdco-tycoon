@@ -34,7 +34,7 @@ import { MarketGuideModal } from '../ui/MarketGuideModal';
 import { RollUpGuideModal } from '../ui/RollUpGuideModal';
 import { ImprovementModal } from '../modals/ImprovementModal';
 import { isAIEnabled } from '../../services/aiGeneration';
-import { checkPlatformEligibility, calculateIntegrationCost } from '../../engine/platforms';
+import { checkPlatformEligibility, calculateIntegrationCost, getEligibleBusinessesForExistingPlatform, calculateAddToPlatformCost } from '../../engine/platforms';
 import { PLATFORM_SALE_BONUS } from '../../data/gameConfig';
 import { getEligiblePrograms, calculateTurnaroundCost, canUnlockTier } from '../../engine/turnarounds';
 import { TURNAROUND_TIER_CONFIG, getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
@@ -91,6 +91,7 @@ interface AllocatePhaseProps {
   onToggleMASourcing: () => void;
   onProactiveOutreach: () => void;
   onForgePlatform: (recipeId: string, businessIds: string[], platformName: string, cost: number) => void;
+  onAddToIntegratedPlatform: (platformId: string, businessId: string, businessName: string, cost: number) => void;
   onSellPlatform: (platformId: string) => void;
   integratedPlatforms: IntegratedPlatform[];
   difficulty: GameDifficulty;
@@ -152,6 +153,7 @@ export function AllocatePhase({
   onToggleMASourcing,
   onProactiveOutreach,
   onForgePlatform,
+  onAddToIntegratedPlatform,
   onSellPlatform,
   integratedPlatforms,
   difficulty,
@@ -874,6 +876,7 @@ export function AllocatePhase({
                       .map(sid => SECTORS[sid]?.emoji)
                       .filter(Boolean)
                       .join(' ');
+                    const eligibleToAdd = getEligibleBusinessesForExistingPlatform(ip, businesses);
                     return (
                       <div key={ip.id} className="bg-white/5 rounded-lg p-3">
                         <div className="flex items-center justify-between gap-2 mb-1">
@@ -899,6 +902,33 @@ export function AllocatePhase({
                             </span>
                           )}
                         </div>
+                        {eligibleToAdd.length > 0 && (
+                          <div className="mt-3 border-t border-white/10 pt-2">
+                            <p className="text-xs text-purple-300 mb-2">Add to platform:</p>
+                            <div className="space-y-1">
+                              {eligibleToAdd.map(biz => {
+                                const addCost = calculateAddToPlatformCost(ip, biz);
+                                const canAfford = cash >= addCost;
+                                return (
+                                  <div key={biz.id} className="flex items-center justify-between gap-2 text-xs bg-white/5 rounded px-2 py-1.5">
+                                    <span className="truncate min-w-0">{SECTORS[biz.sectorId].emoji} {biz.name}</span>
+                                    <button
+                                      onClick={() => onAddToIntegratedPlatform(ip.id, biz.id, biz.name, addCost)}
+                                      disabled={!canAfford}
+                                      className={`whitespace-nowrap flex-shrink-0 px-2 py-1 rounded font-medium transition-colors ${
+                                        canAfford
+                                          ? 'bg-purple-600 hover:bg-purple-500 text-white cursor-pointer'
+                                          : 'bg-white/5 text-text-muted cursor-not-allowed'
+                                      }`}
+                                    >
+                                      Add ({formatMoney(addCost)})
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        )}
                         <button
                           onClick={() => setSellPlatformConfirm(ip)}
                           className="mt-3 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg border border-purple-500/50 hover:border-purple-400 shadow-sm hover:shadow-md hover:shadow-purple-500/20 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"

@@ -186,6 +186,43 @@ export function getPlatformRecessionModifier(
 }
 
 /**
+ * Find active businesses eligible to join an existing forged platform.
+ * A business can join if:
+ * 1. Not already in any integrated platform
+ * 2. In the right sector(s) for the platform's recipe
+ * 3. Has a sub-type that matches the recipe's requiredSubTypes
+ */
+export function getEligibleBusinessesForExistingPlatform(
+  platform: IntegratedPlatform,
+  businesses: Business[]
+): Business[] {
+  const recipe = getRecipeById(platform.recipeId);
+  if (!recipe) return [];
+
+  return businesses.filter(b => {
+    if (b.status !== 'active') return false;
+    if (b.integratedPlatformId) return false;
+    if (!recipe.requiredSubTypes.includes(b.subType)) return false;
+    if (recipe.sectorId) return b.sectorId === recipe.sectorId;
+    if (recipe.crossSectorIds) return recipe.crossSectorIds.includes(b.sectorId);
+    return false;
+  });
+}
+
+/**
+ * Calculate the integration cost for adding a single business to an existing platform.
+ * Cost = recipe.integrationCostFraction × business EBITDA
+ */
+export function calculateAddToPlatformCost(
+  platform: IntegratedPlatform,
+  business: Business
+): number {
+  const recipe = getRecipeById(platform.recipeId);
+  if (!recipe) return 0;
+  return Math.round(Math.abs(business.ebitda) * recipe.integrationCostFraction);
+}
+
+/**
  * Check whether a platform should dissolve after a constituent is removed.
  * Returns true (should dissolve) if the remaining active constituents
  * no longer meet the recipe's minSubTypes requirement.

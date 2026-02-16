@@ -110,6 +110,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     toggleMASourcing,
     proactiveOutreach,
     forgeIntegratedPlatform,
+    addToIntegratedPlatform,
     sellPlatform,
     integratedPlatforms,
     turnaroundTier,
@@ -351,6 +352,16 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     });
   }, [forgeIntegratedPlatform, addToast]);
 
+  const handleAddToIntegratedPlatform = useCallback((platformId: string, businessId: string, businessName: string, cost: number) => {
+    const platform = integratedPlatforms.find(p => p.id === platformId);
+    addToIntegratedPlatform(platformId, businessId);
+    addToast({
+      message: `${businessName} joined ${platform?.name ?? 'platform'}`,
+      detail: `${formatMoney(cost)} integration cost — bonuses applied`,
+      type: 'success',
+    });
+  }, [addToIntegratedPlatform, integratedPlatforms, addToast]);
+
   const handleSellPlatform = useCallback((platformId: string) => {
     const platform = integratedPlatforms.find(p => p.id === platformId);
     sellPlatform(platformId);
@@ -573,6 +584,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             onToggleMASourcing={handleToggleMASourcing}
             onProactiveOutreach={handleProactiveOutreach}
             onForgePlatform={handleForgePlatform}
+            onAddToIntegratedPlatform={handleAddToIntegratedPlatform}
             onSellPlatform={handleSellPlatform}
             integratedPlatforms={integratedPlatforms}
             difficulty={difficulty}

@@ -85,7 +85,7 @@ import { clampMargin } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
 import { buildChronicleContext } from '../services/chronicleContext';
 import { useToastStore } from './useToast';
-import { calculateIntegrationCost, forgePlatform, checkPlatformDissolution } from '../engine/platforms';
+import { calculateIntegrationCost, forgePlatform, checkPlatformDissolution, calculateAddToPlatformCost } from '../engine/platforms';
 import { getRecipeById } from '../data/platformRecipes';
 import { PLATFORM_SALE_BONUS } from '../data/gameConfig';
 import {
@@ -142,6 +142,7 @@ interface GameStore extends GameState {
 
   // Integrated Platforms
   forgeIntegratedPlatform: (recipeId: string, businessIds: string[]) => void;
+  addToIntegratedPlatform: (platformId: string, businessId: string) => void;
   sellPlatform: (platformId: string) => void;
 
   // Turnaround capability
@@ -1127,6 +1128,9 @@ export const useGameStore = create<GameStore>()(
         // Use higher quality rating
         const bestQuality = Math.max(biz1.qualityRating, biz2.qualityRating) as 1 | 2 | 3 | 4 | 5;
 
+        // Inherit integratedPlatformId from source businesses (prefer matching, fall back to either)
+        const mergedIntegratedPlatformId = biz1.integratedPlatformId || biz2.integratedPlatformId;
+
         // Create merged business
         const mergedBusiness: Business = {
           id: generateBusinessId(),
@@ -1189,6 +1193,7 @@ export const useGameStore = create<GameStore>()(
           isPlatform: true,
           platformScale: newPlatformScale,
           boltOnIds: [...biz1.boltOnIds, ...biz2.boltOnIds],
+          integratedPlatformId: mergedIntegratedPlatformId,
           integrationOutcome: outcome,
           synergiesRealized: (biz1.synergiesRealized || 0) + (biz2.synergiesRealized || 0) + synergies,
           totalAcquisitionCost: combinedTotalCost,
@@ -1200,14 +1205,58 @@ export const useGameStore = create<GameStore>()(
 
         // Remove old businesses, add merged one, and update bolt-on parent references
         const allBoltOnIds = new Set([...biz1.boltOnIds, ...biz2.boltOnIds]);
-        const updatedBusinesses = state.businesses
+        let updatedBusinesses = state.businesses
           .filter(b => b.id !== businessId1 && b.id !== businessId2)
           .map(b => allBoltOnIds.has(b.id) ? { ...b, parentPlatformId: mergedBusiness.id } : b);
+
+        // Update integrated platform constituent lists after merge
+        let updatedIntegratedPlatforms = state.integratedPlatforms;
+        if (mergedIntegratedPlatformId) {
+          updatedIntegratedPlatforms = updatedIntegratedPlatforms.map(ip => {
+            if (ip.id !== mergedIntegratedPlatformId) return ip;
+            // Replace old business IDs with the merged business ID
+            const newConstituents = ip.constituentBusinessIds
+              .filter(id => id !== businessId1 && id !== businessId2);
+            newConstituents.push(mergedBusiness.id);
+            return { ...ip, constituentBusinessIds: newConstituents };
+          });
+
+          // Check dissolution: if merge reduces sub-type diversity below recipe minimum
+          const platform = updatedIntegratedPlatforms.find(ip => ip.id === mergedIntegratedPlatformId);
+          if (platform && checkPlatformDissolution(platform, [...updatedBusinesses, mergedBusiness])) {
+            // Dissolve: remove platform, clear integratedPlatformId
+            updatedIntegratedPlatforms = updatedIntegratedPlatforms.filter(ip => ip.id !== mergedIntegratedPlatformId);
+            mergedBusiness.integratedPlatformId = undefined;
+            updatedBusinesses = updatedBusinesses.map(b =>
+              b.integratedPlatformId === mergedIntegratedPlatformId ? { ...b, integratedPlatformId: undefined } : b
+            );
+          }
+        }
+
+        // If both businesses were in different platforms, handle the second one too
+        const secondPlatformId = biz1.integratedPlatformId && biz2.integratedPlatformId
+          && biz1.integratedPlatformId !== biz2.integratedPlatformId
+          ? biz2.integratedPlatformId : undefined;
+        if (secondPlatformId) {
+          updatedIntegratedPlatforms = updatedIntegratedPlatforms.map(ip => {
+            if (ip.id !== secondPlatformId) return ip;
+            return { ...ip, constituentBusinessIds: ip.constituentBusinessIds.filter(id => id !== businessId2) };
+          });
+          // Check dissolution for the second platform (lost a member)
+          const secondPlatform = updatedIntegratedPlatforms.find(ip => ip.id === secondPlatformId);
+          if (secondPlatform && checkPlatformDissolution(secondPlatform, [...updatedBusinesses, mergedBusiness])) {
+            updatedIntegratedPlatforms = updatedIntegratedPlatforms.filter(ip => ip.id !== secondPlatformId);
+            updatedBusinesses = updatedBusinesses.map(b =>
+              b.integratedPlatformId === secondPlatformId ? { ...b, integratedPlatformId: undefined } : b
+            );
+          }
+        }
 
         set({
           cash: state.cash - totalMergeCost,
           totalInvestedCapital: state.totalInvestedCapital + totalMergeCost,
           businesses: [...updatedBusinesses, mergedBusiness],
+          integratedPlatforms: updatedIntegratedPlatforms,
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...biz1, status: 'merged' as const, exitRound: state.round },
@@ -1239,6 +1288,7 @@ export const useGameStore = create<GameStore>()(
             ...state,
             cash: state.cash - totalMergeCost,
             businesses: [...updatedBusinesses, mergedBusiness],
+            integratedPlatforms: updatedIntegratedPlatforms,
           }),
         });
       },
@@ -2215,6 +2265,69 @@ export const useGameStore = create<GameStore>()(
                 marginBoost: recipe.bonuses.marginBoost,
                 growthBoost: recipe.bonuses.growthBoost,
                 multipleExpansion: recipe.bonuses.multipleExpansion,
+              },
+            },
+          ],
+        });
+      },
+
+      addToIntegratedPlatform: (platformId: string, businessId: string) => {
+        const state = get();
+        if (state.phase !== 'allocate') return;
+
+        const platform = state.integratedPlatforms.find(p => p.id === platformId);
+        if (!platform) return;
+
+        const business = state.businesses.find(b => b.id === businessId && b.status === 'active');
+        if (!business || business.integratedPlatformId) return;
+
+        const recipe = getRecipeById(platform.recipeId);
+        if (!recipe) return;
+
+        // Validate sub-type and sector match
+        if (!recipe.requiredSubTypes.includes(business.subType)) return;
+        if (recipe.sectorId && business.sectorId !== recipe.sectorId) return;
+        if (recipe.crossSectorIds && !recipe.crossSectorIds.includes(business.sectorId)) return;
+
+        const integrationCost = calculateAddToPlatformCost(platform, business);
+        if (state.cash < integrationCost) return;
+
+        // Apply one-time bonuses (same as forge)
+        const updatedBusinesses = state.businesses.map(b => {
+          if (b.id !== businessId) return b;
+          return {
+            ...b,
+            integratedPlatformId: platform.id,
+            ebitdaMargin: b.ebitdaMargin + recipe.bonuses.marginBoost,
+            revenueGrowthRate: b.revenueGrowthRate + recipe.bonuses.growthBoost,
+            ebitda: Math.round(b.revenue * (b.ebitdaMargin + recipe.bonuses.marginBoost)),
+          };
+        });
+
+        // Add to constituent list
+        const updatedPlatforms = state.integratedPlatforms.map(p =>
+          p.id === platformId
+            ? { ...p, constituentBusinessIds: [...p.constituentBusinessIds, businessId] }
+            : p
+        );
+
+        set({
+          businesses: updatedBusinesses,
+          integratedPlatforms: updatedPlatforms,
+          cash: state.cash - integrationCost,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            {
+              type: 'add_to_integrated_platform' as const,
+              round: state.round,
+              details: {
+                platformId,
+                platformName: platform.name,
+                businessId,
+                businessName: business.name,
+                integrationCost,
+                marginBoost: recipe.bonuses.marginBoost,
+                growthBoost: recipe.bonuses.growthBoost,
               },
             },
           ],

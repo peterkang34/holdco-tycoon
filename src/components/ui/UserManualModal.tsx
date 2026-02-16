@@ -551,11 +551,27 @@ function PlatformsContent() {
         ]}
       />
 
+      <SubHeading>Adding Businesses Post-Forge</SubHeading>
+      <P>
+        After forging a platform, you can add new acquisitions to it. Any active business with a
+        matching sector and sub-type that isn&apos;t already in another platform can be integrated.
+        The new member receives the same one-time margin and growth bonuses, and the integration
+        cost is the recipe&apos;s fraction applied to that business&apos;s EBITDA.
+      </P>
+
+      <SubHeading>Merging Platform Members</SubHeading>
+      <P>
+        Merging two businesses that belong to a platform preserves the platform membership.
+        The merged company inherits the platform affiliation and replaces the old constituents in
+        the platform. If the merge reduces sub-type diversity below the recipe&apos;s minimum, the
+        platform dissolves.
+      </P>
+
       <HighlightBox variant="tip">
         <strong>Strategy:</strong> Plan your platform recipe early. Look at the sub-types of
         businesses available in your deal pipeline and work toward assembling a qualifying
         combination. The margin and growth boosts are permanent, making platforms the strongest
-        value driver in the game.
+        value driver in the game. You can always add more businesses after forging.
       </HighlightBox>
     </>
   );
