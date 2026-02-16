@@ -2615,6 +2615,10 @@ export function AllocatePhase({
                   onClick={() => {
                     onSellPlatform(ip.id);
                     setSellPlatformConfirm(null);
+                    if (combinedMoic >= 1.5) {
+                      setSellCelebration({ name: ip.name, moic: combinedMoic });
+                      setTimeout(() => setSellCelebration(null), 4000);
+                    }
                   }}
                   className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors"
                 >

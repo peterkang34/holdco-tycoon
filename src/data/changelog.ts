@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 15, 2025',
+    title: 'Platform Sale Celebration',
+    sections: [
+      {
+        heading: 'Exit Feedback',
+        items: [
+          'Selling an integrated platform now triggers a celebration overlay when MOIC is 1.5x or higher — same "Solid / Great / Incredible Exit" fanfare as regular business sales.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 15, 2025',
     title: 'M&A Infrastructure Copy Update',
     sections: [
       {
