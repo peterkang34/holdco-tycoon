@@ -157,21 +157,39 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
   // Toast-wrapped action handlers
   const handleAcquire = useCallback((deal: Deal, structure: DealStructure) => {
     acquireBusiness(deal, structure);
-    addToast({
-      message: `Acquired ${deal.business.name}`,
-      detail: `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`,
-      type: 'success',
-    });
+    const result = useGameStore.getState().lastAcquisitionResult;
+    if (result === 'snatched') {
+      addToast({
+        message: `Outbid on ${deal.business.name}`,
+        detail: 'Another buyer snatched the deal',
+        type: 'error',
+      });
+    } else {
+      addToast({
+        message: `Acquired ${deal.business.name}`,
+        detail: `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`,
+        type: 'success',
+      });
+    }
   }, [acquireBusiness, addToast]);
 
   const handleAcquireTuckIn = useCallback((deal: Deal, structure: DealStructure, platformId: string) => {
     const platform = businesses.find(b => b.id === platformId);
     acquireTuckIn(deal, structure, platformId);
-    addToast({
-      message: `Tucked ${deal.business.name} into ${platform?.name ?? 'platform'}`,
-      detail: `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`,
-      type: 'success',
-    });
+    const result = useGameStore.getState().lastAcquisitionResult;
+    if (result === 'snatched') {
+      addToast({
+        message: `Outbid on ${deal.business.name}`,
+        detail: 'Another buyer snatched the deal',
+        type: 'error',
+      });
+    } else {
+      addToast({
+        message: `Tucked ${deal.business.name} into ${platform?.name ?? 'platform'}`,
+        detail: `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`,
+        type: 'success',
+      });
+    }
   }, [acquireTuckIn, businesses, addToast]);
 
   const handleMerge = useCallback((id1: string, id2: string, newName: string) => {

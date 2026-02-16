@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 15, 2025',
+    title: 'Contested Deal Notification Fix',
+    sections: [
+      {
+        heading: 'Clearer Outbid Feedback',
+        items: [
+          'Fixed conflicting notifications when outbid on a contested deal. You\'ll now see a clear red "Outbid" toast instead of a false "Acquired" success message.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 15, 2025',
     title: 'Platform Integrity Fix',
     sections: [
       {
