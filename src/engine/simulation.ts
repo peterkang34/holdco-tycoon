@@ -622,6 +622,10 @@ export function generateEvent(state: GameState): GameEvent | null {
         const eligible = activeBusinesses.filter(b => b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining >= 2);
         if (eligible.length === 0) adjustedProb = 0;
       }
+      if (eventDef.type === 'mbo_proposal') {
+        const eligible = activeBusinesses.filter(b => b.qualityRating >= 4 && (state.round - b.acquisitionRound) >= 3);
+        if (eligible.length === 0) adjustedProb = 0;
+      }
 
       // Adjust talent events based on shared services
       // H-1: Clamp adjusted probabilities to prevent exceeding 1.0
@@ -655,6 +659,30 @@ export function generateEvent(state: GameState): GameEvent | null {
             { label: `Pay Early (${formatMoney(discountAmt)})`, description: `Pay ${Math.round(discountRate * 100)}% of remaining balance now`, action: 'acceptSellerNoteRenego', variant: 'positive' },
             { label: 'Decline', description: 'Note continues normally', action: 'declineSellerNoteRenego', variant: 'neutral' },
           ];
+        } else if (eventDef.type === 'mbo_proposal') {
+          const eligible = activeBusinesses.filter(b => b.qualityRating >= 4 && (state.round - b.acquisitionRound) >= 3);
+          affectedBusiness = pickRandom(eligible) || affectedBusiness;
+          const valuation = calculateExitValuation(affectedBusiness, state.round, undefined, undefined, state.integratedPlatforms);
+          const fairValue = Math.round(affectedBusiness.ebitda * valuation.totalMultiple);
+          const discountPct = 0.85 + Math.random() * 0.05; // 85-90%
+          const offerAmount = Math.round(fairValue * discountPct);
+          const newQuality = Math.max(1, affectedBusiness.qualityRating - 1);
+          choices = [
+            { label: `Accept ${formatMoney(offerAmount)}`, description: `Sell at ${Math.round(discountPct * 100)}% of ${formatMoney(fairValue)} fair value`, action: 'acceptMBOOffer', variant: 'positive' },
+            { label: 'Decline', description: `40% chance CEO leaves (quality drops to Q${newQuality}), 60% stays with -2% growth`, action: 'declineMBOOffer', variant: 'negative' },
+          ];
+          return {
+            id: `event_${state.round}_${eventDef.type}`,
+            type: eventDef.type,
+            title: eventDef.title,
+            description: `${affectedBusiness.name}'s CEO proposes buying out your stake for ${formatMoney(offerAmount)} (${Math.round(discountPct * 100)}% of ${formatMoney(fairValue)} fair value).`,
+            effect: eventDef.effectDescription,
+            tip: eventDef.tip,
+            tipSource: eventDef.tipSource,
+            affectedBusinessId: affectedBusiness.id,
+            offerAmount,
+            choices,
+          };
         } else if (eventDef.type === 'portfolio_referral_deal') {
           // Referral deal — no affectedBusiness needed, deal injected in applyEventEffects
           affectedBusiness = undefined as unknown as typeof affectedBusiness;

@@ -129,6 +129,8 @@ interface GameStore extends GameState {
 
   acceptOffer: () => void;
   declineOffer: () => void;
+  acceptMBOOffer: () => void;
+  declineMBOOffer: () => void;
   grantEquityDemand: () => void;
   declineEquityDemand: () => void;
   acceptSellerNoteRenego: () => void;
@@ -1915,6 +1917,121 @@ export const useGameStore = create<GameStore>()(
             { type: 'decline_offer', round: state.round, details: {} },
           ],
           metrics: calculateMetrics(state),
+        });
+      },
+
+      acceptMBOOffer: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'mbo_proposal' || !event.affectedBusinessId || !event.offerAmount) return;
+
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+
+        // Same sale flow as acceptOffer — mark sold, cascade bolt-ons, deduct debt, add net proceeds
+        const boltOnIds = new Set(business.boltOnIds || []);
+        const boltOnDebt = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0);
+        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
+        const netProceeds = Math.max(0, event.offerAmount - debtPayoff);
+
+        let updatedBusinesses = state.businesses.map(b => {
+          if (b.id === event.affectedBusinessId) return { ...b, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round };
+          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
+          return b;
+        });
+        const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
+
+        // Platform dissolution check
+        let updatedPlatforms = state.integratedPlatforms;
+        if (business.integratedPlatformId) {
+          const platform = state.integratedPlatforms.find(p => p.id === business.integratedPlatformId);
+          if (platform) {
+            if (checkPlatformDissolution(platform, updatedBusinesses)) {
+              updatedPlatforms = updatedPlatforms.filter(p => p.id !== platform.id);
+              updatedBusinesses = updatedBusinesses.map(b =>
+                b.integratedPlatformId === platform.id ? { ...b, integratedPlatformId: undefined } : b
+              );
+            } else {
+              updatedPlatforms = updatedPlatforms.map(p =>
+                p.id === platform.id
+                  ? { ...p, constituentBusinessIds: p.constituentBusinessIds.filter(id => id !== business.id) }
+                  : p
+              );
+            }
+          }
+        }
+
+        // Auto-deactivate shared services if opco count drops below minimum
+        const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
+        const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
+          ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
+          : state.sharedServices;
+
+        // Remove active turnarounds for sold business
+        const updatedTurnarounds = state.activeTurnarounds.filter(t => t.businessId !== business.id);
+
+        const exitedBoltOns = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round }));
+
+        const acceptState = {
+          ...state,
+          cash: state.cash + netProceeds,
+          totalDebt: newTotalDebt,
+          totalExitProceeds: state.totalExitProceeds + netProceeds,
+          businesses: updatedBusinesses,
+          sharedServices: updatedServices,
+          integratedPlatforms: updatedPlatforms,
+          activeTurnarounds: updatedTurnarounds,
+        };
+        set({
+          ...acceptState,
+          exitedBusinesses: [
+            ...state.exitedBusinesses,
+            { ...business, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round },
+            ...exitedBoltOns,
+          ],
+          currentEvent: null,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'accept_offer', round: state.round, details: { businessId: event.affectedBusinessId, price: event.offerAmount } },
+          ],
+          metrics: calculateMetrics(acceptState),
+        });
+      },
+
+      declineMBOOffer: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'mbo_proposal' || !event.affectedBusinessId) return;
+
+        let declineState = { ...state, currentEvent: null as typeof state.currentEvent };
+        if (Math.random() < 0.40) {
+          // CEO leaves: quality -1 (floor Q1), recalculate EBITDA with adjusted margin
+          declineState.businesses = state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            const newQuality = Math.max(1, b.qualityRating - 1) as 1 | 2 | 3 | 4 | 5;
+            const marginDelta = -0.015; // -1.5ppt per quality tier
+            const newMargin = clampMargin(b.ebitdaMargin + marginDelta);
+            const newEbitda = Math.round(b.revenue * newMargin);
+            return { ...b, qualityRating: newQuality, ebitdaMargin: newMargin, ebitda: newEbitda };
+          });
+        } else {
+          // CEO stays but resentful: -2% growth penalty
+          declineState.businesses = state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            return {
+              ...b,
+              organicGrowthRate: b.organicGrowthRate - 0.02,
+              revenueGrowthRate: b.revenueGrowthRate - 0.02,
+            };
+          });
+        }
+        set({
+          ...declineState,
+          metrics: calculateMetrics(declineState),
         });
       },
 

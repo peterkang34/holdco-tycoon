@@ -99,6 +99,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     improveBusiness,
     acceptOffer,
     declineOffer,
+    acceptMBOOffer,
+    declineMBOOffer,
     grantEquityDemand,
     declineEquityDemand,
     acceptSellerNoteRenego,
@@ -146,6 +148,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     switch (action) {
       case 'acceptOffer': acceptOffer(); break;
       case 'declineOffer': declineOffer(); break;
+      case 'acceptMBOOffer': acceptMBOOffer(); break;
+      case 'declineMBOOffer': declineMBOOffer(); break;
       case 'grantEquityDemand': grantEquityDemand(); break;
       case 'declineEquityDemand': declineEquityDemand(); break;
       case 'acceptSellerNoteRenego': acceptSellerNoteRenego(); break;

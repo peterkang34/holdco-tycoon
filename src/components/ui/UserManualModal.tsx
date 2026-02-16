@@ -826,6 +826,7 @@ function EventsContent() {
           ['Breakthrough', 'Significant positive impact — new product, market expansion, etc.'],
           ['Compliance Issue', 'Cash cost and potential EBITDA impact for one business'],
           ['Unsolicited Offer', 'A buyer offers a premium for one of your businesses (accept/decline)'],
+          ['Management Buyout', 'CEO offers 85-90% of fair value; accept to sell, decline risks CEO departure (quality -1)'],
           ['Equity Demand', 'A key employee demands equity; grant or risk losing them'],
           ['Seller Note Renegotiation', 'A seller asks to renegotiate their note terms'],
         ]}

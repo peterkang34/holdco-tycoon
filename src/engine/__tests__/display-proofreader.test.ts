@@ -1007,4 +1007,20 @@ describe('Display Proofreader', () => {
       expect(manual).toContain('6 cross-sector');
     });
   });
+
+  // ══════════════════════════════════════════════════════════════════
+  // MBO PROPOSAL EVENT
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('MBO Proposal Event', () => {
+    it('UserManualModal documents Management Buyout event (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Management Buyout');
+    });
+
+    it('events.ts contains mbo_proposal event definition (Strategy B)', () => {
+      const events = readComponent('data/events.ts');
+      expect(events).toContain('mbo_proposal');
+    });
+  });
 });

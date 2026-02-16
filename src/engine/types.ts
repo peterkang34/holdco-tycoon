@@ -322,6 +322,7 @@ export type EventType =
   | 'portfolio_referral_deal'
   | 'portfolio_equity_demand'
   | 'portfolio_seller_note_renego'
+  | 'mbo_proposal'
   | 'unsolicited_offer'
   | 'sector_event';
 

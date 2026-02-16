@@ -152,6 +152,15 @@ export const PORTFOLIO_EVENTS: EventDefinition[] = [
     effectDescription: 'Pay 70-80% of remaining balance now or continue normal payments',
     tip: 'Discounted early payoffs can be great returns on capital — if you have the liquidity.',
   },
+  {
+    type: 'mbo_proposal',
+    title: 'Management Buyout Proposal',
+    description: 'The CEO of one of your portfolio companies proposes buying out your stake.',
+    probability: 0.05,
+    effectDescription: 'CEO offers 85-90% of fair value; accept to sell, decline risks CEO departure (quality -1)',
+    tip: 'The best PE firms know that management buyouts preserve relationships and reputation. If the price is fair and you can redeploy capital better elsewhere, consider it.',
+    tipSource: 'Ch. IV',
+  },
 ];
 
 export interface SectorEventDefinition extends EventDefinition {

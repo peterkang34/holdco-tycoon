@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 16, 2025',
+    title: 'Management Buyout Event',
+    sections: [
+      {
+        heading: 'New Event',
+        items: [
+          'Management Buyout Proposal — your CEO may offer to buy the business at 85-90% of fair value. Accept for instant liquidity, or decline and risk the CEO leaving (quality -1) or staying resentful (-2% growth).',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 16, 2025',
     title: 'Balance & Polish Update',
     sections: [
       {
