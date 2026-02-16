@@ -3,6 +3,7 @@ import { SectorId, GameDifficulty, GameDuration } from '../../engine/types';
 import { SECTOR_LIST } from '../../data/sectors';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { ChangelogModal } from '../ui/ChangelogModal';
+import { UserManualModal } from '../ui/UserManualModal';
 import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../../data/gameConfig';
 
 interface IntroScreenProps {
@@ -18,6 +19,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
   const [showNameError, setShowNameError] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
+  const [showUserManual, setShowUserManual] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -223,6 +225,12 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
           >
             📋 What's New
           </button>
+          <button
+            onClick={() => setShowUserManual(true)}
+            className="text-sm text-text-muted hover:text-accent transition-colors"
+          >
+            📖 User Manual
+          </button>
         </div>
 
         {/* Info */}
@@ -237,6 +245,9 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
       )}
       {showChangelog && (
         <ChangelogModal onClose={() => setShowChangelog(false)} />
+      )}
+      {showUserManual && (
+        <UserManualModal onClose={() => setShowUserManual(false)} />
       )}
     </div>
   );

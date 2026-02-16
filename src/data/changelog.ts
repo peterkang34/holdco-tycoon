@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 16, 2025',
+    title: 'User Manual on Start Screen',
+    sections: [
+      {
+        heading: 'Quality of Life',
+        items: [
+          'Added a User Manual link to the start screen — browse all game mechanics before starting a new run.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 16, 2025',
     title: 'Cleaner Allocate Screen',
     sections: [
       {
