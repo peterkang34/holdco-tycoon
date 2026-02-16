@@ -608,7 +608,7 @@ export function AllocatePhase({
                     )}
                     {structure.earnout && (
                       <div className="flex justify-between">
-                        <span className="text-text-muted">Earnout (if {Math.round(structure.earnout.targetEbitdaGrowth * 100)}%+ growth)</span>
+                        <span className="text-text-muted">Earnout (if {Math.round(structure.earnout.targetEbitdaGrowth * 100)}%+ growth, 4yr window)</span>
                         <span className="font-mono">{formatMoney(structure.earnout.amount)}</span>
                       </div>
                     )}
@@ -1104,7 +1104,7 @@ export function AllocatePhase({
                                   {SECTORS[biz.sectorId]?.emoji} {biz.name}
                                 </span>
                                 <span className="text-xs text-amber-400 whitespace-nowrap">
-                                  Q{prog.sourceQuality} → Q{prog.targetQuality}
+                                  {prog.displayName} (Q{prog.sourceQuality} → Q{prog.targetQuality})
                                 </span>
                               </div>
                               <div className="flex items-center gap-2 mb-1">
@@ -1172,7 +1172,8 @@ export function AllocatePhase({
                                   return (
                                     <div key={prog.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-white/5 rounded p-2">
                                       <div className="text-xs">
-                                        <span className="text-amber-400 font-medium">Q{prog.sourceQuality} → Q{prog.targetQuality}</span>
+                                        <span className="text-amber-400 font-medium">{prog.displayName}</span>
+                                        <span className="text-text-muted ml-1">Q{prog.sourceQuality} → Q{prog.targetQuality}</span>
                                         <span className="text-text-muted ml-2">
                                           {prog.durationStandard}yr &middot; {formatPercent(prog.successRate)} success
                                         </span>
@@ -2631,7 +2632,7 @@ export function AllocatePhase({
         return (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
             <div className="bg-bg-primary border border-white/10 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-              <h3 className="text-lg font-bold text-amber-400 mb-2">Start Turnaround Program?</h3>
+              <h3 className="text-lg font-bold text-amber-400 mb-2">{prog.displayName}</h3>
               <div className="bg-white/5 rounded-lg p-3 mb-4">
                 <p className="font-medium text-sm">{SECTORS[biz.sectorId]?.emoji} {biz.name}</p>
                 <p className="text-xs text-text-muted mt-1">{biz.subType} &middot; Current Quality: Q{biz.qualityRating}</p>

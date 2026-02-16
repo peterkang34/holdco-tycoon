@@ -121,12 +121,11 @@ describe('getEligiblePrograms', () => {
 
     const bizQ2 = createMockBusiness({ qualityRating: 2, sectorId: 'healthcare' });
     const programsQ2 = getEligiblePrograms(bizQ2, 3, []);
-    // T1: t1_plan_b (Q2→Q3) + T2: t2_plan_b (Q2→Q4) + T3: t3_plan_b (Q2→Q5)
-    expect(programsQ2).toHaveLength(3);
+    // T1: t1_plan_b (Q2→Q3) + T2: t2_plan_b (Q2→Q4) — t3_plan_b (Q2→Q5) excluded by HC ceiling=4
+    expect(programsQ2).toHaveLength(2);
     const idsQ2 = programsQ2.map(p => p.id);
     expect(idsQ2).toContain('t1_plan_b');
     expect(idsQ2).toContain('t2_plan_b');
-    expect(idsQ2).toContain('t3_plan_b');
   });
 
   it('returns no programs for Q3+ businesses (no source matches)', () => {
@@ -200,14 +199,14 @@ describe('Quality ceiling enforcement', () => {
     expect(hasQ5).toBe(false);
   });
 
-  it('healthcare can reach Q5 (default ceiling)', () => {
-    expect(getQualityCeiling('healthcare')).toBe(DEFAULT_QUALITY_CEILING);
-    expect(DEFAULT_QUALITY_CEILING).toBe(5);
+  it('healthcare has Q4 ceiling', () => {
+    expect(getQualityCeiling('healthcare')).toBe(4);
 
     const biz = createMockBusiness({ qualityRating: 2, sectorId: 'healthcare' });
     const programs = getEligiblePrograms(biz, 3, []);
+    // Q2→Q5 program excluded by healthcare ceiling=4
     const hasQ5 = programs.some(p => p.targetQuality === 5);
-    expect(hasQ5).toBe(true);
+    expect(hasQ5).toBe(false);
   });
 
   it('industrial businesses cannot turnaround past Q4', () => {

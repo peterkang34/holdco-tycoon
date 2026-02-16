@@ -53,11 +53,13 @@ export const EQUITY_DILUTION_STEP = 0.10;   // 10% discount per prior raise
 export const EQUITY_DILUTION_FLOOR = 0.10;  // minimum 10% of intrinsic value
 export const EQUITY_BUYBACK_COOLDOWN = 2;   // rounds between raise↔buyback
 
-// ── Turnaround Constants ──
+// ── Earn-out Constants ──
+
+export const EARNOUT_EXPIRATION_YEARS = 4; // earn-outs expire after 4 years
 
 // ── Platform Sale Constants ──
 
-export const PLATFORM_SALE_BONUS = 0.5;  // +0.5x multiple for selling entire platform as a unit
+export const PLATFORM_SALE_BONUS = 0.8;  // +0.8x multiple for selling entire platform as a unit
 
 // ── Turnaround Constants ──
 

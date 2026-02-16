@@ -137,10 +137,18 @@ export function calculateExitValuation(
   const seasoningMultiplier = Math.min(1.0, yearsHeld / 2);
 
   // Sum all premiums above base
-  const totalPremiums = growthPremium + qualityPremium + platformPremium + holdPremium +
+  const rawTotalPremiums = growthPremium + qualityPremium + platformPremium + holdPremium +
     improvementsPremium + marketModifier + sizeTierPremium + deRiskingPremium +
     ruleOf40Premium + marginExpansionPremium + mergerPremium + integratedPlatformPremium +
     turnaroundPremium;
+
+  // Cap aggregate premiums to prevent runaway multiples
+  // Floor of 10x ensures well-built platforms still get rewarded;
+  // 1.5× base keeps premium proportional to sector baseline
+  const premiumCap = Math.max(10, baseMultiple * 1.5);
+  const totalPremiums = rawTotalPremiums > 0
+    ? Math.min(rawTotalPremiums, premiumCap)
+    : rawTotalPremiums;
 
   // Calculate exit multiple (premiums scaled by seasoning, raw premiums preserved for display)
   const totalMultiple = Math.max(

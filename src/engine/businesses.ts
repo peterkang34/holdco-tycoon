@@ -336,7 +336,8 @@ export function calculateDealHeat(
   round: number,
   lastEventType?: EventType,
   sellerArchetype?: SellerArchetype,
-  maxRounds: number = 20
+  maxRounds: number = 20,
+  creditTighteningActive: boolean = false
 ): DealHeat {
   // Base distribution: cold 25%, warm 35%, hot 30%, contested 10%
   const roll = Math.random();
@@ -353,6 +354,9 @@ export function calculateDealHeat(
   // Market event modifier
   if (lastEventType === 'global_bull_market') tierIndex += 1;
   if (lastEventType === 'global_recession') tierIndex -= 1;
+
+  // Credit tightening: fewer buyers in market = cooler deals
+  if (creditTighteningActive) tierIndex -= 1;
 
   // Late game: more capital in market
   const lateGameRound = Math.ceil(maxRounds * 0.75);
@@ -381,7 +385,7 @@ export function calculateHeatPremium(heat: DealHeat): number {
     case 'cold': return 1.0;
     case 'warm': return randomInRange([1.10, 1.15]);
     case 'hot': return randomInRange([1.20, 1.30]);
-    case 'contested': return randomInRange([1.30, 1.50]);
+    case 'contested': return randomInRange([1.20, 1.35]);
   }
 }
 
@@ -756,6 +760,7 @@ export interface DealGenerationOptions {
   multipleDiscount?: number; // e.g., 0.15 = 15% off asking price
   lastEventType?: EventType; // for deal heat calculation
   maxRounds?: number; // 20 or 10 — for scaling heat/weights
+  creditTighteningActive?: boolean; // reduces deal heat by 1 tier
 }
 
 // Generate a deal with size preference
@@ -888,7 +893,7 @@ export function generateDealWithSize(
   const dealSource = options.source ?? (Math.random() > 0.4 ? 'inbound' : 'brokered');
 
   // Calculate deal heat and effective price (pass archetype for heat modifier)
-  const heat = calculateDealHeat(quality, dealSource, round, options.lastEventType, sellerArchetype, options.maxRounds ?? 20);
+  const heat = calculateDealHeat(quality, dealSource, round, options.lastEventType, sellerArchetype, options.maxRounds ?? 20, options.creditTighteningActive ?? false);
   const heatPremium = calculateHeatPremium(heat);
   let effectivePrice = Math.round(finalAskingPrice * heatPremium);
 
@@ -939,7 +944,8 @@ export function generateDealPipeline(
   maSourcingTier: number = 0,
   maSourcingActive: boolean = false,
   lastEventType?: EventType,
-  maxRounds: number = 20
+  maxRounds: number = 20,
+  creditTighteningActive: boolean = false
 ): Deal[] {
   // Age existing deals first
   let pipeline = currentPipeline.map(deal => ({
@@ -957,8 +963,8 @@ export function generateDealPipeline(
   const sectorsInPipeline = new Set(pipeline.map(d => d.business.sectorId));
   const allSectorIds = SECTOR_LIST.map(s => s.id);
 
-  // Shared options to pass lastEventType and maxRounds for heat calculation
-  const heatOpts: DealGenerationOptions = { lastEventType, maxRounds };
+  // Shared options to pass lastEventType, maxRounds, and credit tightening for heat calculation
+  const heatOpts: DealGenerationOptions = { lastEventType, maxRounds, creditTighteningActive };
 
   // 1. Generate deals based on M&A focus (if set)
   if (maFocus?.sectorId && pipeline.length < MAX_DEALS) {
@@ -977,6 +983,7 @@ export function generateDealPipeline(
       source: 'sourced',
       lastEventType,
       maxRounds,
+      creditTighteningActive,
     };
 
     // Tier 2+: sub-type targeting + quality floor
@@ -1020,6 +1027,8 @@ export function generateDealPipeline(
           multipleDiscount: 0.15,
           freshnessBonus: 1,
           lastEventType,
+          maxRounds,
+          creditTighteningActive,
         }
       ));
       }
@@ -1084,12 +1093,13 @@ export function generateSourcedDeals(
   portfolioFocusSector?: SectorId,
   portfolioEbitda: number = 0,
   maSourcingTier: number = 0,
-  maxRounds: number = 20
+  maxRounds: number = 20,
+  creditTighteningActive: boolean = false
 ): Deal[] {
   const deals: Deal[] = [];
 
   // Build options based on MA sourcing tier
-  const sourcingOptions: DealGenerationOptions = { source: 'sourced', maxRounds };
+  const sourcingOptions: DealGenerationOptions = { source: 'sourced', maxRounds, creditTighteningActive };
   if (maSourcingTier >= 2) {
     sourcingOptions.qualityFloor = 2;
     if (maFocus?.subType) sourcingOptions.subType = maFocus.subType;
@@ -1138,7 +1148,8 @@ export function generateProactiveOutreachDeals(
   round: number,
   maFocus: MAFocus,
   portfolioEbitda: number = 0,
-  maxRounds: number = 20
+  maxRounds: number = 20,
+  creditTighteningActive: boolean = false
 ): Deal[] {
   const deals: Deal[] = [];
   const sectorId = maFocus.sectorId ?? pickWeightedSector(round, maxRounds);
@@ -1151,6 +1162,7 @@ export function generateProactiveOutreachDeals(
         qualityFloor: 3,
         source: 'proprietary',
         maxRounds,
+        creditTighteningActive,
       }
     ));
   }

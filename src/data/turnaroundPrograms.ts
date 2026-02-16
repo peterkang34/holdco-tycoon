@@ -56,6 +56,7 @@ export const TURNAROUND_PROGRAMS: TurnaroundProgram[] = [
   // Tier 1
   {
     id: 't1_plan_a',
+    displayName: 'Operational Cleanup',
     tierId: 1,
     sourceQuality: 1,
     targetQuality: 2,
@@ -72,6 +73,7 @@ export const TURNAROUND_PROGRAMS: TurnaroundProgram[] = [
   },
   {
     id: 't1_plan_b',
+    displayName: 'Performance Acceleration',
     tierId: 1,
     sourceQuality: 2,
     targetQuality: 3,
@@ -90,14 +92,15 @@ export const TURNAROUND_PROGRAMS: TurnaroundProgram[] = [
   // Tier 2
   {
     id: 't2_plan_a',
+    displayName: 'Full Restructuring',
     tierId: 2,
     sourceQuality: 1,
     targetQuality: 3,
     durationStandard: 5,
     durationQuick: 3,
     successRate: 0.68,
-    partialRate: 0.27,
-    failureRate: 0.05,
+    partialRate: 0.24,
+    failureRate: 0.08,
     ebitdaBoostOnSuccess: 0.11,
     ebitdaBoostOnPartial: 0.05,
     ebitdaDamageOnFailure: 0.05,
@@ -106,14 +109,15 @@ export const TURNAROUND_PROGRAMS: TurnaroundProgram[] = [
   },
   {
     id: 't2_plan_b',
+    displayName: 'Strategic Repositioning',
     tierId: 2,
     sourceQuality: 2,
     targetQuality: 4,
     durationStandard: 5,
     durationQuick: 3,
     successRate: 0.65,
-    partialRate: 0.30,
-    failureRate: 0.05,
+    partialRate: 0.25,
+    failureRate: 0.10,
     ebitdaBoostOnSuccess: 0.09,
     ebitdaBoostOnPartial: 0.04,
     ebitdaDamageOnFailure: 0.04,
@@ -124,14 +128,15 @@ export const TURNAROUND_PROGRAMS: TurnaroundProgram[] = [
   // Tier 3
   {
     id: 't3_plan_a',
+    displayName: 'Enterprise Turnaround',
     tierId: 3,
     sourceQuality: 1,
     targetQuality: 4,
     durationStandard: 6,
     durationQuick: 3,
     successRate: 0.73,
-    partialRate: 0.22,
-    failureRate: 0.05,
+    partialRate: 0.15,
+    failureRate: 0.12,
     ebitdaBoostOnSuccess: 0.15,
     ebitdaBoostOnPartial: 0.07,
     ebitdaDamageOnFailure: 0.06,
@@ -140,14 +145,15 @@ export const TURNAROUND_PROGRAMS: TurnaroundProgram[] = [
   },
   {
     id: 't3_plan_b',
+    displayName: 'Total Transformation',
     tierId: 3,
     sourceQuality: 2,
     targetQuality: 5,
     durationStandard: 6,
     durationQuick: 3,
     successRate: 0.70,
-    partialRate: 0.25,
-    failureRate: 0.05,
+    partialRate: 0.20,
+    failureRate: 0.10,
     ebitdaBoostOnSuccess: 0.13,
     ebitdaBoostOnPartial: 0.06,
     ebitdaDamageOnFailure: 0.06,
@@ -156,14 +162,15 @@ export const TURNAROUND_PROGRAMS: TurnaroundProgram[] = [
   },
   {
     id: 't3_quick',
+    displayName: '100-Day Blitz',
     tierId: 3,
     sourceQuality: 1,
     targetQuality: 4,
     durationStandard: 3,
     durationQuick: 2,
     successRate: 0.63, // T3 Plan A (0.73) minus 10ppt
-    partialRate: 0.32, // adjusted to sum to 1.0
-    failureRate: 0.05,
+    partialRate: 0.22, // adjusted to sum to 1.0
+    failureRate: 0.15,
     ebitdaBoostOnSuccess: 0.15,
     ebitdaBoostOnPartial: 0.07,
     ebitdaDamageOnFailure: 0.06,
@@ -179,9 +186,9 @@ export const SECTOR_QUALITY_CEILINGS: Partial<Record<SectorId, number>> = {
   saas: 4,
   agency: 3,
   restaurant: 3,
-  // healthcare: 5 (default)
-  // industrial: 4 — manufacturing has practical ceiling
   industrial: 4,
+  healthcare: 4,
+  wealthManagement: 4,
 };
 
 export const DEFAULT_QUALITY_CEILING = 5;

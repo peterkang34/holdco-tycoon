@@ -352,8 +352,8 @@ describe('checkPlatformEligibility', () => {
 // ── Recipe Data Integrity ──
 
 describe('Platform recipe data integrity', () => {
-  it('should have exactly 35 recipes (29 within-sector + 6 cross-sector)', () => {
-    expect(PLATFORM_RECIPES).toHaveLength(35);
+  it('should have exactly 38 recipes (32 within-sector + 6 cross-sector)', () => {
+    expect(PLATFORM_RECIPES).toHaveLength(38);
   });
 
   it('every recipe should have a unique id', () => {
@@ -449,9 +449,9 @@ describe('Platform recipe data integrity', () => {
     }
   });
 
-  it('within-sector recipes should have 29 total', () => {
+  it('within-sector recipes should have 32 total', () => {
     const withinSector = PLATFORM_RECIPES.filter(r => r.sectorId !== null);
-    expect(withinSector).toHaveLength(29);
+    expect(withinSector).toHaveLength(32);
   });
 
   it('every recipe should have a non-empty name and description', () => {

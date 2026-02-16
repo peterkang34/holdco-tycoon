@@ -12,6 +12,49 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 16, 2025',
+    title: 'Balance & Polish Update',
+    sections: [
+      {
+        heading: 'Exit Valuation',
+        items: [
+          'Aggregate premium cap — total positive exit premiums now capped at the higher of 10x or 1.5x the base multiple. Prevents runaway valuations on stacked portfolios.',
+          'Contested deal heat range tightened from 1.30-1.50x to 1.20-1.35x — still a meaningful auction premium, but less punishing.',
+        ],
+      },
+      {
+        heading: 'Deal Flow',
+        items: [
+          'Credit tightening now reduces deal heat by 1 tier — fewer competing buyers when bank financing is frozen.',
+          'Earn-outs now expire after 4 years. Unpaid earn-outs are removed automatically, and a countdown shows on each business card.',
+          '3 new platform recipes: B2B Back-Office Platform, Commercial RE Platform, Full-Service Dining Group (38 total, up from 35).',
+        ],
+      },
+      {
+        heading: 'Turnarounds',
+        items: [
+          'Scaled turnaround failure rates — bigger quality jumps now carry real risk. T3 programs can fail 10-15% of the time instead of a flat 5%.',
+          'Healthcare and Wealth Management sectors now have a Q4 quality ceiling, joining SaaS and Industrial.',
+        ],
+      },
+      {
+        heading: 'Quality of Life',
+        items: [
+          'Turnaround programs now have descriptive names (Operational Cleanup, Full Restructuring, 100-Day Blitz, etc.).',
+          'Platform sale bonus increased from 0.5x to 0.8x — selling a complete platform is now properly rewarded.',
+          'User Manual corrections: leaderboard multiplier, quality ceilings, wind-down references cleaned up.',
+        ],
+      },
+      {
+        heading: 'By the Numbers',
+        items: [
+          '694 automated tests (up from 679)',
+          '128 display-proofreader checks ensuring every number in the UI matches the engine',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 16, 2025',
     title: 'Scoring Rebalance',
     sections: [
       {

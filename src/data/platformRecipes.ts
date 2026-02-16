@@ -156,6 +156,19 @@ export const PLATFORM_RECIPES: PlatformRecipe[] = [
     description: 'Full-service outsourced CFO combining accounting, consulting, and legal.',
   },
 
+  {
+    id: 'b2b_back_office',
+    name: 'B2B Back-Office Platform',
+    sectorId: 'b2bServices',
+    requiredSubTypes: ['Finance / Accounting Services', 'HR / Staffing', 'Marketing Operations'],
+    minSubTypes: 2,
+    baseEbitdaThreshold: 5000,
+    bonuses: { marginBoost: 0.03, growthBoost: 0.02, multipleExpansion: 1.0, recessionResistanceReduction: 0.85 },
+    integrationCostFraction: 0.18,
+    description: 'Integrated back-office outsourcing covering finance, HR, and marketing ops.',
+    realWorldExample: 'Paychex acquisitions, ADP bolt-ons',
+  },
+
   // ── Healthcare ──
   {
     id: 'healthcare_multi_specialty',
@@ -205,6 +218,18 @@ export const PLATFORM_RECIPES: PlatformRecipe[] = [
     integrationCostFraction: 0.18,
     description: 'B2C delivery + B2B catering from shared kitchen infrastructure.',
   },
+  {
+    id: 'restaurant_full_service_dining',
+    name: 'Full-Service Dining Group',
+    sectorId: 'restaurant',
+    requiredSubTypes: ['Casual Dining', 'QSR / Fast Casual Franchise', 'Specialty Food Concept'],
+    minSubTypes: 2,
+    baseEbitdaThreshold: 6000,
+    bonuses: { marginBoost: 0.03, growthBoost: 0.02, multipleExpansion: 1.0, recessionResistanceReduction: 0.85 },
+    integrationCostFraction: 0.20,
+    description: 'Full-spectrum dining from quick service to sit-down, shared supply chain and training.',
+    realWorldExample: 'Darden Restaurants, Bloomin Brands',
+  },
 
   // ── Real Estate ──
   {
@@ -218,6 +243,19 @@ export const PLATFORM_RECIPES: PlatformRecipe[] = [
     integrationCostFraction: 0.20,
     description: 'Shared property management across asset types with cross-selling.',
     realWorldExample: 'Prime Group Holdings, SROA Capital',
+  },
+
+  {
+    id: 'realestate_commercial',
+    name: 'Commercial RE Platform',
+    sectorId: 'realEstate',
+    requiredSubTypes: ['Small Commercial / Office', 'Industrial / Logistics Warehousing', 'Property Management'],
+    minSubTypes: 2,
+    baseEbitdaThreshold: 8000,
+    bonuses: { marginBoost: 0.04, growthBoost: 0.02, multipleExpansion: 1.5, recessionResistanceReduction: 0.8 },
+    integrationCostFraction: 0.22,
+    description: 'Commercial and industrial real estate with centralized property management.',
+    realWorldExample: 'Prologis (logistics), Brookfield Asset Management',
   },
 
   // ── Education ──

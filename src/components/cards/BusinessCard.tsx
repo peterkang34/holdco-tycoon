@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { Business, IntegratedPlatform, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { calculateExitValuation } from '../../engine/simulation';
+import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
 import { Tooltip } from '../ui/Tooltip';
 
 interface BusinessCardProps {
@@ -242,12 +243,20 @@ export function BusinessCard({
                   <span className="text-text-muted"> (paid on exit)</span>
                 </p>
               )}
-              {business.earnoutRemaining > 0 && (
-                <p className="text-text-secondary">
-                  Earn-out: {formatMoney(business.earnoutRemaining)}
-                  <span className="text-text-muted"> (if {Math.round(business.earnoutTarget * 100)}%+ EBITDA growth)</span>
-                </p>
-              )}
+              {business.earnoutRemaining > 0 && (() => {
+                const yearsLeft = EARNOUT_EXPIRATION_YEARS - (currentRound - business.acquisitionRound);
+                return (
+                  <p className="text-text-secondary">
+                    Earn-out: {formatMoney(business.earnoutRemaining)}
+                    <span className="text-text-muted"> (if {Math.round(business.earnoutTarget * 100)}%+ growth)</span>
+                    {yearsLeft > 0 && (
+                      <span className={`ml-1 ${yearsLeft <= 1 ? 'text-warning' : 'text-text-muted'}`}>
+                        ({yearsLeft}yr left)
+                      </span>
+                    )}
+                  </p>
+                );
+              })()}
             </div>
           )}
 

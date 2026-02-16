@@ -588,11 +588,11 @@ describe('calculateHeatPremium', () => {
     }
   });
 
-  it('should return 1.30-1.50 for contested', () => {
+  it('should return 1.20-1.35 for contested', () => {
     for (let i = 0; i < 20; i++) {
       const premium = calculateHeatPremium('contested');
-      expect(premium).toBeGreaterThanOrEqual(1.30);
-      expect(premium).toBeLessThanOrEqual(1.50);
+      expect(premium).toBeGreaterThanOrEqual(1.20);
+      expect(premium).toBeLessThanOrEqual(1.35);
     }
   });
 });

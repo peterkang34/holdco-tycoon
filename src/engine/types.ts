@@ -251,6 +251,7 @@ export type TurnaroundTier = 0 | 1 | 2 | 3;
 
 export interface TurnaroundProgram {
   id: string;
+  displayName: string;
   tierId: 1 | 2 | 3;
   sourceQuality: QualityRating;
   targetQuality: QualityRating;

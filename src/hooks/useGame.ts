@@ -87,7 +87,7 @@ import { buildChronicleContext } from '../services/chronicleContext';
 import { useToastStore } from './useToast';
 import { calculateIntegrationCost, forgePlatform, checkPlatformDissolution, calculateAddToPlatformCost } from '../engine/platforms';
 import { getRecipeById } from '../data/platformRecipes';
-import { PLATFORM_SALE_BONUS, COVENANT_BREACH_ROUNDS_THRESHOLD } from '../data/gameConfig';
+import { PLATFORM_SALE_BONUS, COVENANT_BREACH_ROUNDS_THRESHOLD, EARNOUT_EXPIRATION_YEARS } from '../data/gameConfig';
 import {
   canUnlockTier,
   calculateTurnaroundCost,
@@ -378,6 +378,7 @@ export const useGameStore = create<GameStore>()(
         let opcoDebtAdjustment = 0;
         let hadSkippedPayments = false;
         const earnoutPayments: { name: string; amount: number }[] = [];
+        const earnoutExpirations: { name: string; amount: number }[] = [];
         const updatedBusinesses = state.businesses.map(b => {
           // Active + integrated businesses have debt obligations (tuck-ins keep seller notes & earnouts)
           if (b.status !== 'active' && b.status !== 'integrated') return b;
@@ -406,8 +407,15 @@ export const useGameStore = create<GameStore>()(
             updated.sellerNoteBalance = updated.sellerNoteBalance - finalPayment;
           }
 
+          // Earn-out expiration: 4 years from acquisition
+          if (b.earnoutRemaining > 0 && state.round - b.acquisitionRound > EARNOUT_EXPIRATION_YEARS) {
+            earnoutExpirations.push({ name: b.name, amount: b.earnoutRemaining });
+            updated.earnoutRemaining = 0;
+            updated.earnoutTarget = 0;
+          }
+
           // Earnout payments (conditional on growth targets)
-          if (b.earnoutRemaining > 0 && b.earnoutTarget > 0) {
+          if (updated.earnoutRemaining > 0 && updated.earnoutTarget > 0) {
             // For integrated (tuck-in) businesses, use parent platform's EBITDA growth as proxy
             // since the tuck-in's own EBITDA is folded into the platform and doesn't grow independently
             let actualGrowth = 0;
@@ -462,13 +470,20 @@ export const useGameStore = create<GameStore>()(
 
         newCash = newCash + opcoDebtAdjustment;
 
-        // Fire earn-out payment toasts
+        // Fire earn-out toasts
         const addToast = useToastStore.getState().addToast;
         for (const ep of earnoutPayments) {
           addToast({
             message: `Earn-out paid: ${formatMoney(ep.amount)} for ${ep.name}`,
             detail: 'Growth target met — seller earn-out obligation fulfilled.',
             type: 'info',
+          });
+        }
+        for (const ex of earnoutExpirations) {
+          addToast({
+            message: `Earn-out expired: ${ex.name} — ${formatMoney(ex.amount)} obligation removed`,
+            detail: `Growth target not met within ${EARNOUT_EXPIRATION_YEARS} years. Earn-out window closed.`,
+            type: 'success',
           });
         }
 
@@ -662,7 +677,8 @@ export const useGameStore = create<GameStore>()(
           state.maSourcing.tier,
           state.maSourcing.active,
           lastEvt,
-          state.maxRounds
+          state.maxRounds,
+          state.creditTighteningRoundsRemaining > 0
         );
 
         set({
@@ -1164,7 +1180,7 @@ export const useGameStore = create<GameStore>()(
           peakEbitda: combinedEbitda,
           acquisitionEbitda: biz1.acquisitionEbitda + biz2.acquisitionEbitda,
           acquisitionPrice: combinedTotalCost,
-          acquisitionRound: Math.min(biz1.acquisitionRound, biz2.acquisitionRound),
+          acquisitionRound: Math.max(biz1.acquisitionRound, biz2.acquisitionRound),
           acquisitionMultiple: ((biz1.acquisitionMultiple + biz2.acquisitionMultiple) / 2) + multipleExpansion,
           organicGrowthRate: (biz1.organicGrowthRate + biz2.organicGrowthRate) / 2 + (subTypeAffinity === 'match' ? 0.015 : subTypeAffinity === 'related' ? 0.010 : 0.005) + mergeGrowthDrag,
           revenue: combinedRevenue,
@@ -2147,7 +2163,8 @@ export const useGameStore = create<GameStore>()(
           focusBonus?.focusGroup,
           totalPortfolioEbitda,
           state.maSourcing.active ? state.maSourcing.tier : 0,
-          state.maxRounds
+          state.maxRounds,
+          state.creditTighteningRoundsRemaining > 0
         );
 
         set({
@@ -2233,7 +2250,8 @@ export const useGameStore = create<GameStore>()(
           state.round,
           state.maFocus,
           totalPortfolioEbitda,
-          state.maxRounds
+          state.maxRounds,
+          state.creditTighteningRoundsRemaining > 0
         );
 
         set({

@@ -268,7 +268,7 @@ function AcquiringContent() {
           ['All Cash', '100%', '0%', 'Low', 'No leverage; requires full cash on hand'],
           ['Seller Note', '40%', '60% seller note', 'Medium', 'Seller financing at 5-6% interest'],
           ['Bank Debt', '35%', '65% bank debt', 'High', 'At current interest rate; not available during credit tightening'],
-          ['Earn-out', '55%', '45% contingent', 'Medium', 'Contingent on EBITDA growth targets; available for Q3+ deals'],
+          ['Earn-out', '55%', '45% contingent', 'Medium', 'Contingent on EBITDA growth targets; 4yr window; available for Q3+ deals'],
           ['LBO', '25%', '35% note + 40% bank', 'High', 'Maximum leverage; not available during credit tightening'],
         ]}
       />
@@ -405,7 +405,7 @@ function FinancialContent() {
         rows={[
           ['Seller Notes', 'Deal-level', '5-6%', 'Amortizes over 4-5 years; tied to individual acquisition'],
           ['Bank Debt', 'Per-business', '7% base', 'Amortizes over 5-10 years; can be paid down voluntarily in the Allocate phase; affected by events and distress penalties'],
-          ['Earn-outs', 'Deal-level', 'N/A', 'Contingent payments based on EBITDA growth targets; not traditional debt'],
+          ['Earn-outs', 'Deal-level', 'N/A', 'Contingent payments based on EBITDA growth targets; expire after 4 years if not triggered'],
         ]}
       />
 
@@ -526,7 +526,7 @@ function PlatformsContent() {
       <SubHeading>Integrated Platforms</SubHeading>
       <P>
         Integrated platforms are forged by combining 2 or more businesses with matching sub-types
-        that fit a specific &ldquo;recipe.&rdquo; The game includes 35 platform recipes (29 within a single
+        that fit a specific &ldquo;recipe.&rdquo; The game includes 38 platform recipes (32 within a single
         sector + 6 cross-sector). Forging a platform applies powerful one-time bonuses:
       </P>
 
@@ -616,13 +616,13 @@ function TurnaroundsContent() {
       <DataTable
         headers={['Program', 'Tier', 'From', 'To', 'Duration (Std/Quick)', 'Success', 'Partial', 'Fail']}
         rows={[
-          ['T1 Plan A', '1', 'Q1', 'Q2', '4yr / 2yr', '65%', '30%', '5%'],
-          ['T1 Plan B', '1', 'Q2', 'Q3', '4yr / 2yr', '60%', '35%', '5%'],
-          ['T2 Plan A', '2', 'Q1', 'Q3', '5yr / 3yr', '68%', '27%', '5%'],
-          ['T2 Plan B', '2', 'Q2', 'Q4', '5yr / 3yr', '65%', '30%', '5%'],
-          ['T3 Plan A', '3', 'Q1', 'Q4', '6yr / 3yr', '73%', '22%', '5%'],
-          ['T3 Plan B', '3', 'Q2', 'Q5', '6yr / 3yr', '70%', '25%', '5%'],
-          ['T3 Quick', '3', 'Q1', 'Q4', '3yr / 2yr', '63%', '32%', '5%'],
+          ['Operational Cleanup', '1', 'Q1', 'Q2', '4yr / 2yr', '65%', '30%', '5%'],
+          ['Performance Acceleration', '1', 'Q2', 'Q3', '4yr / 2yr', '60%', '35%', '5%'],
+          ['Full Restructuring', '2', 'Q1', 'Q3', '5yr / 3yr', '68%', '24%', '8%'],
+          ['Strategic Repositioning', '2', 'Q2', 'Q4', '5yr / 3yr', '65%', '25%', '10%'],
+          ['Enterprise Turnaround', '3', 'Q1', 'Q4', '6yr / 3yr', '73%', '15%', '12%'],
+          ['Total Transformation', '3', 'Q2', 'Q5', '6yr / 3yr', '70%', '20%', '10%'],
+          ['100-Day Blitz', '3', 'Q1', 'Q4', '3yr / 2yr', '63%', '22%', '15%'],
         ]}
       />
       <P>
@@ -650,6 +650,24 @@ function TurnaroundsContent() {
         Businesses that have improved by <strong>2 or more quality tiers</strong> (cumulative
         across all turnarounds and improvements) receive a <strong>+0.25x exit multiple
         premium</strong> at sale time, rewarding your transformation effort.
+      </P>
+
+      <SubHeading>Quality Ceilings by Sector</SubHeading>
+      <P>
+        Some sectors have structural limits on quality. Regulatory constraints, talent
+        concentration, and industry dynamics mean not every business can reach Q5:
+      </P>
+      <DataTable
+        headers={['Max Quality', 'Sectors']}
+        rows={[
+          ['Q3', 'Agency, Restaurant'],
+          ['Q4', 'SaaS, Industrial, Healthcare, Wealth Management'],
+          ['Q5', 'All other sectors (default)'],
+        ]}
+      />
+      <P>
+        Quality ceilings apply to turnaround programs and operational improvements alike.
+        Programs targeting a quality level above the sector ceiling will not be available.
       </P>
     </>
   );
@@ -730,6 +748,10 @@ function SellingContent() {
         <><strong>Market Conditions:</strong> +0.5x during bull markets, -0.5x during recessions</>,
       ]} />
       <HighlightBox>
+        <strong>Premium Cap:</strong> Total positive premiums are capped at the higher of <strong>10x</strong> or{' '}
+        <strong>1.5× the base multiple</strong>, preventing runaway exit valuations on stacked portfolios.
+      </HighlightBox>
+      <HighlightBox>
         <strong>Multiple Floor:</strong> The exit multiple can never drop below <strong>2.0x</strong>,
         ensuring even struggling businesses retain some value.
       </HighlightBox>
@@ -772,7 +794,7 @@ function EventsContent() {
           ['Interest Rate Hike', 'Base rate increases +0.5%; debt becomes more expensive'],
           ['Interest Rate Cut', 'Base rate decreases -0.5%; debt becomes cheaper'],
           ['Inflation', 'Margin compression across portfolio; costs rise faster than revenue'],
-          ['Credit Tightening', 'Bank debt unavailable for several rounds; LBO structures blocked'],
+          ['Credit Tightening', 'Bank debt unavailable for several rounds; LBO structures blocked; deal heat reduced by 1 tier (fewer competing buyers)'],
           ['Quiet Year', 'Nothing significant happens; a chance to execute your plan undisturbed'],
         ]}
       />
@@ -867,7 +889,7 @@ function ScoringContent() {
 
       <SubHeading>Difficulty Multiplier</SubHeading>
       <P>
-        On the Overall leaderboard, Normal mode runs receive a <strong>1.15x multiplier</strong> to
+        On the Overall leaderboard, Normal mode runs receive a <strong>1.35x multiplier</strong> to
         their FEV, compensating for the harder starting position ($5M vs $20M, debt from day one,
         100% ownership). Games that required restructuring receive a <strong>0.80x penalty</strong> (20%
         haircut). Within mode-specific tabs, raw FEV is used for fair comparison.
@@ -956,7 +978,7 @@ function StrategyContent() {
         <><strong>Hold period premium rewards patience.</strong> Holding a business 5+ years adds +0.5x to the exit multiple. Don&apos;t flip businesses too quickly unless the offer is exceptional.</>,
         <><strong>Sell during bull markets.</strong> The +0.5x market conditions bonus during bull markets can be the difference between a good exit and a great one.</>,
         <><strong>Accept unsolicited offers carefully.</strong> 20-50% premiums are tempting, but selling your best business might hurt more than the premium helps. Sell underperformers to these buyers, not your crown jewels.</>,
-        <><strong>Wind down lost causes.</strong> A business with collapsed EBITDA that you can&apos;t turnaround is a drag on your portfolio. Wind it down and redeploy the management attention.</>,
+        <><strong>Sell underperformers.</strong> A business with collapsed EBITDA that you can&apos;t turn around is a drag on your portfolio. Sell it and redeploy the capital into better opportunities.</>,
       ]} />
 
       <HighlightBox variant="tip">
@@ -1040,7 +1062,8 @@ function GlossaryContent() {
         <div>
           <strong className="text-white">Earn-out</strong> &mdash; A deal structure where part
           of the purchase price is contingent on the business hitting EBITDA growth targets.
-          You pay upfront (55%) and owe the rest only if targets are met.
+          You pay upfront (55%) and owe the rest only if targets are met within a 4-year window.
+          Unpaid earn-outs expire after 4 years.
         </div>
         <div>
           <strong className="text-white">Seller Note</strong> &mdash; Financing provided by the

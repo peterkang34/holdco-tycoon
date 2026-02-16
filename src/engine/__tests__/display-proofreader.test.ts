@@ -37,8 +37,9 @@ import {
   TURNAROUND_EXIT_PREMIUM_MIN_TIERS,
   RESTRUCTURING_FEV_PENALTY,
   COVENANT_BREACH_ROUNDS_THRESHOLD,
+  EARNOUT_EXPIRATION_YEARS,
 } from '../../data/gameConfig';
-import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG } from '../../data/turnaroundPrograms';
+import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
 
 // ── File reading helper ──
 const __filename = fileURLToPath(import.meta.url);
@@ -268,15 +269,20 @@ describe('Display Proofreader', () => {
       }
     });
 
-    it('Contested = 1.30-1.50x range', () => {
+    it('Contested = 1.20-1.35x range', () => {
       const results = new Set<number>();
       for (let i = 0; i < 100; i++) {
         results.add(calculateHeatPremium('contested'));
       }
       for (const r of results) {
-        expect(r).toBeGreaterThanOrEqual(1.30);
-        expect(r).toBeLessThanOrEqual(1.50);
+        expect(r).toBeGreaterThanOrEqual(1.20);
+        expect(r).toBeLessThanOrEqual(1.35);
       }
+    });
+    it('Credit tightening reduces deal heat by 1 tier (Strategy B)', () => {
+      const engine = readComponent('engine/businesses.ts');
+      expect(engine).toContain('creditTighteningActive');
+      expect(engine).toContain('if (creditTighteningActive) tierIndex -= 1');
     });
   });
 
@@ -390,7 +396,7 @@ describe('Display Proofreader', () => {
     it('AllocatePhase shows 4.5x covenant threshold in proximity bar (Strategy B)', () => {
       const allocate = readComponent('components/phases/AllocatePhase.tsx');
       expect(allocate).toContain('4.5x');
-      expect(allocate).toContain('before breach');
+      expect(allocate).toContain('covenant breach');
       expect(allocate).toContain('Leverage');
     });
 
@@ -566,6 +572,17 @@ describe('Display Proofreader', () => {
       }
     });
 
+    it('Scaled failure rates: T1=5%, T2A=8%, T2B=10%, T3A=12%, T3B=10%, T3Quick=15%', () => {
+      const byId = (id: string) => TURNAROUND_PROGRAMS.find(p => p.id === id)!;
+      expect(byId('t1_plan_a').failureRate).toBe(0.05);
+      expect(byId('t1_plan_b').failureRate).toBe(0.05);
+      expect(byId('t2_plan_a').failureRate).toBe(0.08);
+      expect(byId('t2_plan_b').failureRate).toBe(0.10);
+      expect(byId('t3_plan_a').failureRate).toBe(0.12);
+      expect(byId('t3_plan_b').failureRate).toBe(0.10);
+      expect(byId('t3_quick').failureRate).toBe(0.15);
+    });
+
     it('Fatigue threshold = 4 simultaneous turnarounds', () => {
       expect(TURNAROUND_FATIGUE_THRESHOLD).toBe(4);
     });
@@ -577,6 +594,46 @@ describe('Display Proofreader', () => {
     it('Exit premium = 0.25x for 2+ tiers improved', () => {
       expect(TURNAROUND_EXIT_PREMIUM).toBe(0.25);
       expect(TURNAROUND_EXIT_PREMIUM_MIN_TIERS).toBe(2);
+    });
+
+    it('Quality ceilings: agency=3, restaurant=3, saas/industrial/healthcare/wealthMgmt=4, default=5', () => {
+      expect(SECTOR_QUALITY_CEILINGS.agency).toBe(3);
+      expect(SECTOR_QUALITY_CEILINGS.restaurant).toBe(3);
+      expect(SECTOR_QUALITY_CEILINGS.saas).toBe(4);
+      expect(SECTOR_QUALITY_CEILINGS.industrial).toBe(4);
+      expect(SECTOR_QUALITY_CEILINGS.healthcare).toBe(4);
+      expect(SECTOR_QUALITY_CEILINGS.wealthManagement).toBe(4);
+      expect(DEFAULT_QUALITY_CEILING).toBe(5);
+    });
+
+    it('UserManualModal documents quality ceilings (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Quality Ceilings');
+      expect(manual).toContain('Agency, Restaurant');
+      expect(manual).toContain('SaaS, Industrial, Healthcare, Wealth Management');
+    });
+
+    it('All programs have displayName field', () => {
+      for (const p of TURNAROUND_PROGRAMS) {
+        expect(p.displayName).toBeDefined();
+        expect(p.displayName.length).toBeGreaterThan(0);
+      }
+    });
+
+    it('UserManualModal uses display names instead of T1/T2/T3 IDs (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Operational Cleanup');
+      expect(manual).toContain('100-Day Blitz');
+      expect(manual).not.toContain("'T1 Plan A'");
+      expect(manual).not.toContain("'T2 Plan A'");
+      expect(manual).not.toContain("'T3 Quick'");
+    });
+
+    it('UserManualModal does not reference removed wind-down feature (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).not.toContain('Wind down');
+      expect(manual).not.toContain('wind down');
+      expect(manual).not.toContain('Wind it down');
     });
 
     it('Tier unlock costs match config', () => {
@@ -638,8 +695,8 @@ describe('Display Proofreader', () => {
       expect(INTEGRATION_THRESHOLD_MULTIPLIER.normal.quick).toBe(0.5);
     });
 
-    it('Platform sale bonus = 0.5x', () => {
-      expect(PLATFORM_SALE_BONUS).toBe(0.5);
+    it('Platform sale bonus = 0.8x', () => {
+      expect(PLATFORM_SALE_BONUS).toBe(0.8);
     });
   });
 
@@ -654,6 +711,12 @@ describe('Display Proofreader', () => {
 
     it('Easy difficulty multiplier = 1.0x', () => {
       expect(DIFFICULTY_CONFIG.easy.leaderboardMultiplier).toBe(1.0);
+    });
+
+    it('UserManualModal shows correct Normal multiplier (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain(`${DIFFICULTY_CONFIG.normal.leaderboardMultiplier}x multiplier`);
+      expect(manual).not.toContain('1.15x multiplier');
     });
   });
 
@@ -721,6 +784,13 @@ describe('Display Proofreader', () => {
       expect(Math.min(1.0, 1 / 2)).toBe(0.5);
       expect(Math.min(1.0, 2 / 2)).toBe(1.0);
       expect(Math.min(1.0, 5 / 2)).toBe(1.0);
+    });
+
+    it('Aggregate premium cap: min(rawPremiums, max(10, base * 1.5)) (Strategy B)', () => {
+      // simulation.ts: premiumCap = Math.max(10, baseMultiple * 1.5)
+      const sim = readComponent('engine/simulation.ts');
+      expect(sim).toContain('Math.max(10, baseMultiple * 1.5)');
+      expect(sim).toContain('Math.min(rawTotalPremiums, premiumCap)');
     });
   });
 
@@ -889,6 +959,52 @@ describe('Display Proofreader', () => {
       expect(manual).toContain('Seamless');
       expect(manual).toContain('Rocky');
       expect(manual).toContain('Troubled');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // EARN-OUT EXPIRATION
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Earn-out Expiration', () => {
+    it('EARNOUT_EXPIRATION_YEARS = 4', () => {
+      expect(EARNOUT_EXPIRATION_YEARS).toBe(4);
+    });
+
+    it('useGame.ts uses EARNOUT_EXPIRATION_YEARS for expiration check (Strategy B)', () => {
+      const useGame = readComponent('hooks/useGame.ts');
+      expect(useGame).toContain('EARNOUT_EXPIRATION_YEARS');
+      expect(useGame).toContain('earnoutExpirations');
+    });
+
+    it('BusinessCard.tsx shows earn-out countdown (Strategy B)', () => {
+      const card = readComponent('components/cards/BusinessCard.tsx');
+      expect(card).toContain('EARNOUT_EXPIRATION_YEARS');
+      expect(card).toContain('yr left');
+    });
+
+    it('AllocatePhase.tsx shows 4yr window in deal review (Strategy B)', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('4yr window');
+    });
+
+    it('UserManualModal mentions earn-out 4yr window and expiration (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('4yr window');
+      expect(manual).toContain('expire after 4 years');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // PLATFORM RECIPE COUNTS
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Platform Recipe Counts', () => {
+    it('UserManualModal states 38 platform recipes (32 within + 6 cross) (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('38 platform recipes');
+      expect(manual).toContain('32 within');
+      expect(manual).toContain('6 cross-sector');
     });
   });
 });
