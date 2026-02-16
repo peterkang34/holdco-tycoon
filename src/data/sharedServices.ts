@@ -77,7 +77,7 @@ export const MA_SOURCING_CONFIG: Record<1 | 2 | 3, MASourcingTierConfig> = {
     upgradeCost: 800,
     annualCost: 350,
     requiredOpcos: 2,
-    description: 'A dedicated team to source proprietary deal flow',
+    description: 'Extra acquisition capacity and dedicated deal sourcing',
     effects: [
       '+2 focus-sector deals per round',
       'Source Deals costs $300k (was $500k)',
@@ -90,7 +90,7 @@ export const MA_SOURCING_CONFIG: Record<1 | 2 | 3, MASourcingTierConfig> = {
     upgradeCost: 1200,
     annualCost: 550,
     requiredOpcos: 3,
-    description: 'Sector-specific deal sourcing with sub-type targeting',
+    description: 'More acquisition capacity and sector-specific deal targeting',
     effects: [
       'Sub-type targeting unlocked',
       '1-2 sub-type matched deals per round',
@@ -103,7 +103,7 @@ export const MA_SOURCING_CONFIG: Record<1 | 2 | 3, MASourcingTierConfig> = {
     upgradeCost: 1500,
     annualCost: 800,
     requiredOpcos: 4,
-    description: 'Off-market deal access and proactive outreach',
+    description: 'Off-market deal access, proactive outreach, and max acquisition capacity',
     effects: [
       '2 off-market deals per round (15% discount)',
       '2-3 sub-type matched deals per round',

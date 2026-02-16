@@ -1492,7 +1492,7 @@ export function AllocatePhase({
                     <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded">Separate from Shared Services</span>
                   </h3>
                   <p className="text-sm text-text-muted">
-                    Build a dedicated deal sourcing capability for your holdco
+                    Unlock extra acquisitions per round and build proprietary deal flow
                   </p>
                 </div>
                 {maSourcing.tier > 0 && (

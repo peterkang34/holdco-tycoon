@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 15, 2025',
+    title: 'M&A Infrastructure Copy Update',
+    sections: [
+      {
+        heading: 'Clearer M&A Descriptions',
+        items: [
+          'M&A Infrastructure descriptions now highlight acquisition capacity unlocks alongside deal sourcing — no longer misleadingly sourcing-only.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 15, 2025',
     title: 'Integration Outcome Labels',
     sections: [
       {
