@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 15, 2025',
+    title: 'Credit Tightening Balance',
+    sections: [
+      {
+        heading: 'Game Balance',
+        items: [
+          'Credit tightening now lasts 1 round in Quick Play (10-year) games instead of 2 — a full credit freeze was too punishing for shorter games.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 15, 2025',
     title: 'Platform Sale Celebration',
     sections: [
       {

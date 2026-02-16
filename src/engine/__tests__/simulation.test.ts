@@ -531,8 +531,8 @@ describe('applyEventEffects', () => {
     expect(newState.inflationRoundsRemaining).toBe(2);
   });
 
-  it('should set credit tightening rounds', () => {
-    const state = createMockGameState();
+  it('should set credit tightening to 2 rounds for standard game', () => {
+    const state = createMockGameState({ maxRounds: 20 });
     const event = {
       id: 'test_credit',
       type: 'global_credit_tightening' as const,
@@ -543,6 +543,20 @@ describe('applyEventEffects', () => {
 
     const newState = applyEventEffects(state, event);
     expect(newState.creditTighteningRoundsRemaining).toBe(2);
+  });
+
+  it('should set credit tightening to 1 round for quick game', () => {
+    const state = createMockGameState({ maxRounds: 10 });
+    const event = {
+      id: 'test_credit',
+      type: 'global_credit_tightening' as const,
+      title: 'Credit Tightening',
+      description: 'Lending contracts',
+      effect: 'Credit tight',
+    };
+
+    const newState = applyEventEffects(state, event);
+    expect(newState.creditTighteningRoundsRemaining).toBe(1);
   });
 
   it('should handle portfolio_compliance event with cash cost', () => {

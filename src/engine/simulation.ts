@@ -576,12 +576,18 @@ export function generateEvent(state: GameState): GameEvent | null {
   for (const eventDef of GLOBAL_EVENTS) {
     cumulativeProb += eventDef.probability;
     if (globalRoll < cumulativeProb) {
+      const isQuickGame = state.maxRounds <= 10;
+      let effect = eventDef.effectDescription;
+      if (eventDef.type === 'global_credit_tightening') {
+        const rounds = isQuickGame ? 1 : 2;
+        effect = `No debt-financed acquisitions for ${rounds} round${rounds === 1 ? '' : 's'}`;
+      }
       return {
         id: `event_${state.round}_${eventDef.type}`,
         type: eventDef.type,
         title: eventDef.title,
         description: eventDef.description,
-        effect: eventDef.effectDescription,
+        effect,
         tip: eventDef.tip,
         tipSource: eventDef.tipSource,
       };
@@ -861,7 +867,8 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
     }
 
     case 'global_credit_tightening': {
-      newState.creditTighteningRoundsRemaining = 2;
+      const isQuickGame = state.maxRounds <= 10;
+      newState.creditTighteningRoundsRemaining = isQuickGame ? 1 : 2;
       break;
     }
 
