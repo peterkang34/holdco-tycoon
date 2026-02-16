@@ -137,9 +137,9 @@ describe('Display Proofreader', () => {
       // Strategic Discipline should be 15
       expect(scoringSection).toMatch(/Strategic Discipline.*15/);
 
-      // Must NOT contain old wrong values (25 for FCF, 20 for ROIC/Capital/Strategic)
-      expect(scoringSection).not.toMatch(/FCF\/Share Growth.*25/);
-      expect(scoringSection).not.toMatch(/Portfolio ROIC.*20/);
+      // Must NOT contain old wrong max points (25 for FCF, 20 for ROIC/Capital/Strategic)
+      expect(scoringSection).not.toMatch(/FCF\/Share Growth.*'25'/);
+      expect(scoringSection).not.toMatch(/Portfolio ROIC.*'20'/);
     });
   });
 
@@ -155,11 +155,11 @@ describe('Display Proofreader', () => {
       expect(DIFFICULTY_CONFIG.easy.leaderboardMultiplier).toBe(1.0);
     });
 
-    it('Normal: $5M cash, 100% ownership, $3M debt, 1.15x multiplier', () => {
+    it('Normal: $5M cash, 100% ownership, $3M debt, 1.35x multiplier', () => {
       expect(DIFFICULTY_CONFIG.normal.initialCash).toBe(5000);
       expect(DIFFICULTY_CONFIG.normal.founderShares / DIFFICULTY_CONFIG.normal.totalShares).toBe(1.0);
       expect(DIFFICULTY_CONFIG.normal.startingDebt).toBe(3000);
-      expect(DIFFICULTY_CONFIG.normal.leaderboardMultiplier).toBe(1.15);
+      expect(DIFFICULTY_CONFIG.normal.leaderboardMultiplier).toBe(1.35);
     });
 
     it('Duration: standard=20, quick=10 rounds', () => {
@@ -648,8 +648,8 @@ describe('Display Proofreader', () => {
   // ══════════════════════════════════════════════════════════════════
 
   describe('Leaderboard', () => {
-    it('Normal difficulty multiplier = 1.15x', () => {
-      expect(DIFFICULTY_CONFIG.normal.leaderboardMultiplier).toBe(1.15);
+    it('Normal difficulty multiplier = 1.35x', () => {
+      expect(DIFFICULTY_CONFIG.normal.leaderboardMultiplier).toBe(1.35);
     });
 
     it('Easy difficulty multiplier = 1.0x', () => {

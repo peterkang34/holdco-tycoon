@@ -125,7 +125,7 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
 
   // 2. FCF/Share Growth (20 points max)
   let fcfShareGrowth = 0;
-  const fcfGrowthTarget = maxRounds >= 20 ? 3.0 : 1.5; // 300% for 20yr, 150% for 10yr
+  const fcfGrowthTarget = maxRounds >= 20 ? 4.0 : 2.0; // 400% for 20yr, 200% for 10yr
   if (state.metricsHistory.length > 1) {
     const startFcfPerShare = state.metricsHistory[0]?.metrics.fcfPerShare ?? 0;
     const endFcfPerShare = metrics.fcfPerShare;
@@ -139,12 +139,14 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
 
   // 3. Portfolio ROIC (15 points max)
   let portfolioRoic = 0;
-  if (metrics.portfolioRoic >= 0.25) {
+  const roicTarget = maxRounds >= 20 ? 0.25 : 0.20; // 25% for Standard, 20% for Quick
+  if (metrics.portfolioRoic >= roicTarget) {
     portfolioRoic = 15;
-  } else if (metrics.portfolioRoic >= 0.15) {
-    portfolioRoic = 11.25 + ((metrics.portfolioRoic - 0.15) / 0.10) * 3.75;
+  } else if (metrics.portfolioRoic >= roicTarget - 0.10) {
+    portfolioRoic = 11.25 + ((metrics.portfolioRoic - (roicTarget - 0.10)) / 0.10) * 3.75;
   } else if (metrics.portfolioRoic >= 0.08) {
-    portfolioRoic = 6 + ((metrics.portfolioRoic - 0.08) / 0.07) * 5.25;
+    const midFloor = roicTarget - 0.10;
+    portfolioRoic = 6 + ((metrics.portfolioRoic - 0.08) / (midFloor - 0.08)) * 5.25;
   } else {
     portfolioRoic = Math.max(0, (metrics.portfolioRoic / 0.08) * 6);
   }

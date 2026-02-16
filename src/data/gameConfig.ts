@@ -23,7 +23,7 @@ export const DIFFICULTY_CONFIG = {
     startingMultipleCap: 4.0 as number | undefined,    // Cap at 4x to prevent cash trap in premium sectors
     startingQuality: 3 as const,
     holdcoDebtStartRound: 1,
-    leaderboardMultiplier: 1.15, // Compensates for harder start without double-rewarding 100% ownership
+    leaderboardMultiplier: 1.35, // Compensates for 4x capital disadvantage; aligns with 30-50% PE skill premium
     label: 'Hard — Self-Funded',
     description: '$2M personal equity + $3M bank debt. 100% ownership. Real leverage from day one.',
   },

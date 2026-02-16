@@ -100,7 +100,7 @@ interface AllocatePhaseProps {
   integratedPlatforms: IntegratedPlatform[];
   difficulty: GameDifficulty;
   duration: GameDuration;
-  covenantBreachRounds?: number;
+  covenantBreachRounds?: number; // kept for caller compat, not used internally
   acquisitionsThisRound: number;
   maxAcquisitionsPerRound: number;
   lastAcquisitionResult: 'success' | 'snatched' | null;
@@ -166,7 +166,7 @@ export function AllocatePhase({
   integratedPlatforms,
   difficulty,
   duration,
-  covenantBreachRounds,
+  covenantBreachRounds: _covenantBreachRounds,
   acquisitionsThisRound,
   maxAcquisitionsPerRound,
   lastAcquisitionResult,

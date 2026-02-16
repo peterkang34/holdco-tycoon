@@ -344,10 +344,10 @@ describe('FEV restructuring penalty', () => {
 
   it('penalty stacks with difficulty multiplier', () => {
     const rawFEV = 50000;
-    const difficultyMultiplier = DIFFICULTY_CONFIG['normal'].leaderboardMultiplier; // 1.15
+    const difficultyMultiplier = DIFFICULTY_CONFIG['normal'].leaderboardMultiplier;
     const restructuringPenalty = RESTRUCTURING_FEV_PENALTY; // 0.80
     const adjustedFEV = Math.round(rawFEV * difficultyMultiplier * restructuringPenalty);
-    expect(adjustedFEV).toBe(Math.round(50000 * 1.15 * 0.80));
+    expect(adjustedFEV).toBe(Math.round(50000 * difficultyMultiplier * 0.80));
   });
 
   it('leaderboard entry with hasRestructured gets penalized FEV', () => {
@@ -369,7 +369,7 @@ describe('FEV restructuring penalty', () => {
     const diffMult = DIFFICULTY_CONFIG[entry.difficulty ?? 'easy']?.leaderboardMultiplier ?? 1.0;
     const restrPenalty = entry.hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0;
     const adjusted = Math.round(raw * diffMult * restrPenalty);
-    expect(adjusted).toBe(Math.round(50000 * 1.15 * 0.80));
+    expect(adjusted).toBe(Math.round(50000 * diffMult * 0.80));
   });
 
   it('leaderboard entry without hasRestructured gets no penalty', () => {
@@ -389,7 +389,7 @@ describe('FEV restructuring penalty', () => {
     const diffMult = DIFFICULTY_CONFIG[entry.difficulty ?? 'easy']?.leaderboardMultiplier ?? 1.0;
     const restrPenalty = entry.hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0;
     const adjusted = Math.round(raw * diffMult * restrPenalty);
-    expect(adjusted).toBe(Math.round(50000 * 1.15));
+    expect(adjusted).toBe(Math.round(50000 * diffMult));
   });
 });
 

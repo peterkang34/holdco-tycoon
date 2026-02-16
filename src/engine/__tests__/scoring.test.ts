@@ -422,7 +422,7 @@ describe('calculateFinalScore with 10-year mode', () => {
     });
   }
 
-  it('should use 150% FCF growth target for 10-year mode', () => {
+  it('should use 200% FCF growth target for 10-year mode', () => {
     const state = createScoringState10yr();
     const score = calculateFinalScore(state);
     // Should still produce valid scores
@@ -553,13 +553,13 @@ describe('leaderboard rank functions', () => {
 
   it('getLeaderboardRankFromList accounts for difficulty multiplier', () => {
     const entries = [
-      makeEntry({ founderEquityValue: 40000, difficulty: 'normal' }), // adjusted: 46000
+      makeEntry({ founderEquityValue: 40000, difficulty: 'normal' }), // adjusted: 54000
       makeEntry({ founderEquityValue: 45000, difficulty: 'easy' }),   // adjusted: 45000
     ];
-    // Normal entry (40000 * 1.15 = 46000) should rank above Easy entry (45000 * 1.0 = 45000)
+    // Normal entry (40000 * 1.35 = 54000) should rank above Easy entry (45000 * 1.0 = 45000)
     // A player with adjustedFEV = 45500 should rank 2nd
     const rank = getLeaderboardRankFromList(entries, 45500);
-    expect(rank).toBe(2); // 46000 > 45500, so 1 entry above
+    expect(rank).toBe(2); // 54000 > 45500, so 1 entry above
   });
 
   it('getLeaderboardRankFromList handles legacy entries without difficulty', () => {

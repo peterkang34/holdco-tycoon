@@ -139,7 +139,7 @@ function GettingStartedContent() {
           ['Founder Ownership', '80%', '100%'],
           ['Starting Debt', 'None', '$3M bank debt'],
           ['First Business EBITDA', '~$1M', '~$800K'],
-          ['Leaderboard Multiplier', '1.0x', '1.15x (rewards harder start)'],
+          ['Leaderboard Multiplier', '1.0x', '1.35x (rewards harder start)'],
         ]}
       />
 
@@ -822,8 +822,8 @@ function ScoringContent() {
         headers={['Category', 'Max Points', 'What It Measures']}
         rows={[
           ['Value Creation', '20', 'FEV as a multiple of initial raise (target: 10x for 20yr, 5x for 10yr)'],
-          ['FCF/Share Growth', '20', 'How much free cash flow per share grew over the game (target: 3x for 20yr, 1.5x for 10yr)'],
-          ['Portfolio ROIC', '15', 'Return on invested capital — are you earning above your cost of capital? (target: 25%+)'],
+          ['FCF/Share Growth', '20', 'How much free cash flow per share grew over the game (target: 4x for 20yr, 2x for 10yr)'],
+          ['Portfolio ROIC', '15', 'Return on invested capital — are you earning above your cost of capital? (target: 25%+ for 20yr, 20%+ for 10yr)'],
           ['Capital Deployment', '15', 'Average MOIC across investments + Return on Incremental Invested Capital (ROIIC)'],
           ['Balance Sheet Health', '15', 'Ending leverage ratio, with penalties for over-leveraging, covenant breaches, and restructuring'],
           ['Strategic Discipline', '15', 'Sector focus, shared services usage, capital return discipline, deal quality'],

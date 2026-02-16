@@ -7,7 +7,7 @@ import {
   calculateSharedServicesBenefits,
   TAX_RATE,
 } from '../../engine/simulation';
-import { getDistressLabel, getDistressDescription, calculateCovenantHeadroom, getDistressRestrictions } from '../../engine/distress';
+import { getDistressLabel, getDistressDescription, calculateCovenantHeadroom, getDistressRestrictions, calculateDistressLevel } from '../../engine/distress';
 import { getMASourcingAnnualCost } from '../../data/sharedServices';
 
 interface MetricDrilldownModalProps {
@@ -522,7 +522,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
     const netDebt = totalDebt - state.cash;
     const leverage = totalEbitda > 0 ? netDebt / totalEbitda : 0;
 
-    const distressLevel = state.distressLevel;
+    const distressLevel = calculateDistressLevel(leverage, totalDebt, totalEbitda);
     const distressRestrictions = getDistressRestrictions(distressLevel);
     const covenantHeadroom = calculateCovenantHeadroom(
       state.cash,

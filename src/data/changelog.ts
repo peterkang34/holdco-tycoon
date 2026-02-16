@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 16, 2025',
+    title: 'Scoring Rebalance',
+    sections: [
+      {
+        heading: 'Balance Changes',
+        items: [
+          'Hard mode leaderboard multiplier increased from 1.15x to 1.35x — better rewards the 4x capital disadvantage.',
+          'FCF/Share Growth target raised from 300% to 400% (Standard) and 150% to 200% (Quick) — now requires real margin improvement, not just portfolio building.',
+          'Quick Play ROIC target lowered from 25% to 20% — accounts for half the compounding runway.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 16, 2025',
     title: 'User Manual on Start Screen',
     sections: [
       {
