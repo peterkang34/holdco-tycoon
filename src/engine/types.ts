@@ -486,6 +486,7 @@ export interface GameState {
   acquisitionsThisRound: number;
   maxAcquisitionsPerRound: number;
   lastAcquisitionResult: 'success' | 'snatched' | null;
+  lastIntegrationOutcome: IntegrationOutcome | null;
 
   // Founder tracking
   founderDistributionsReceived: number; // cumulative founder's share of distributions

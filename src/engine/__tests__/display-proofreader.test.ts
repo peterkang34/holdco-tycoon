@@ -813,4 +813,27 @@ describe('Display Proofreader', () => {
       expect(manual).toContain('acquisition capacity: 4/year');
     });
   });
+
+  // ══════════════════════════════════════════════════════════════════
+  // INTEGRATION OUTCOME LABELS
+  // ══════════════════════════════════════════════════════════════════
+  describe('Integration Outcome Labels', () => {
+    it('AllocatePhase shows "Troubled Integration" (not "Integration Failed")', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('Troubled Integration');
+      expect(allocate).not.toContain('Integration Failed');
+    });
+
+    it('AllocatePhase shows "Rocky Integration"', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('Rocky Integration');
+    });
+
+    it('UserManualModal mentions all three integration tiers: Seamless, Rocky, Troubled', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Seamless');
+      expect(manual).toContain('Rocky');
+      expect(manual).toContain('Troubled');
+    });
+  });
 });

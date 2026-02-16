@@ -233,6 +233,7 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   acquisitionsThisRound: 0,
   maxAcquisitionsPerRound: 2,
   lastAcquisitionResult: null,
+  lastIntegrationOutcome: null,
   founderDistributionsReceived: 0,
 };
 
@@ -670,6 +671,7 @@ export const useGameStore = create<GameStore>()(
           actionsThisRound: [],
           focusBonus,
           lastAcquisitionResult: null,
+          lastIntegrationOutcome: null,
         });
       },
 
@@ -791,6 +793,7 @@ export const useGameStore = create<GameStore>()(
             holdcoAmortizationThisRound: 0,
             acquisitionsThisRound: 0,
             lastAcquisitionResult: null,
+            lastIntegrationOutcome: null,
           });
         } else {
           // Game over — all debt P&I already settled in last advanceToEvent
@@ -1039,6 +1042,7 @@ export const useGameStore = create<GameStore>()(
           dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
           acquisitionsThisRound: state.acquisitionsThisRound + 1,
           lastAcquisitionResult: 'success',
+          lastIntegrationOutcome: outcome,
           integratedPlatforms: updatedIntegratedPlatforms,
           actionsThisRound: [
             ...state.actionsThisRound,
@@ -1257,6 +1261,7 @@ export const useGameStore = create<GameStore>()(
           totalInvestedCapital: state.totalInvestedCapital + totalMergeCost,
           businesses: [...updatedBusinesses, mergedBusiness],
           integratedPlatforms: updatedIntegratedPlatforms,
+          lastIntegrationOutcome: outcome,
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...biz1, status: 'merged' as const, exitRound: state.round },
@@ -2732,6 +2737,7 @@ export const useGameStore = create<GameStore>()(
         acquisitionsThisRound: state.acquisitionsThisRound,
         maxAcquisitionsPerRound: state.maxAcquisitionsPerRound,
         lastAcquisitionResult: state.lastAcquisitionResult,
+        lastIntegrationOutcome: state.lastIntegrationOutcome,
         founderDistributionsReceived: state.founderDistributionsReceived,
       }),
       onRehydrateStorage: () => (state) => {
@@ -2773,6 +2779,9 @@ export const useGameStore = create<GameStore>()(
             }
             if (state.lastAcquisitionResult === undefined) {
               (state as any).lastAcquisitionResult = null;
+            }
+            if ((state as any).lastIntegrationOutcome === undefined) {
+              (state as any).lastIntegrationOutcome = null;
             }
             // Ensure pipeline deals have heat fields
             if (Array.isArray(state.dealPipeline)) {

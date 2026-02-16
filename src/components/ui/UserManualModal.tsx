@@ -305,6 +305,14 @@ function AcquiringContent() {
         lower quality = deeper discount) and integrate into the parent platform, sharing overhead
         and scaling the platform. Integration period depends on operator quality (1-3 years).
       </P>
+
+      <SubHeading>Integration Quality</SubHeading>
+      <P>
+        Integration outcomes range from <strong>Seamless</strong> (full synergies) to{' '}
+        <strong>Rocky</strong> (reduced synergies) to <strong>Troubled</strong> (restructuring
+        costs and growth penalties). Factors include operator quality, sub-type compatibility,
+        size ratio, and shared services support.
+      </P>
     </>
   );
 }

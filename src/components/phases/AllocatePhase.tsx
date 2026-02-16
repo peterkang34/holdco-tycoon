@@ -824,32 +824,45 @@ export function AllocatePhase({
               </div>
             )}
 
-            {/* Failed integration warnings */}
+            {/* Integration outcome warnings (partial = rocky, failure = troubled) */}
             {actionsThisRound
               .filter(a =>
                 (a.type === 'acquire_tuck_in' || a.type === 'merge_businesses') &&
-                a.details?.integrationOutcome === 'failure' &&
+                (a.details?.integrationOutcome === 'failure' || a.details?.integrationOutcome === 'partial') &&
                 !dismissedWarnings.has(`${a.type}-${a.details?.businessId ?? a.details?.newName}`)
               )
               .map((a, i) => {
                 const d = a.details;
-                const cost = d.restructuringCost as number;
-                const drag = Math.abs(d.growthDragPenalty as number) * 100;
+                const outcome = d.integrationOutcome as string;
                 const dismissKey = `${a.type}-${d.businessId ?? d.newName}`;
+                const isTroubled = outcome === 'failure';
                 let description: string;
-                if (a.type === 'acquire_tuck_in') {
-                  const platform = businesses.find(b => b.id === d.platformId);
-                  const boltOn = businesses.find(b => b.id === d.businessId);
-                  description = `Tuck-in of ${boltOn?.name ?? 'bolt-on'} into ${platform?.name ?? 'platform'} failed. ${formatMoney(cost)} restructuring cost deducted and ${platform?.name ?? 'platform'}'s growth permanently reduced by ${drag.toFixed(1)}%.`;
+                if (isTroubled) {
+                  const cost = d.restructuringCost as number;
+                  const drag = Math.abs(d.growthDragPenalty as number) * 100;
+                  if (a.type === 'acquire_tuck_in') {
+                    const platform = businesses.find(b => b.id === d.platformId);
+                    const boltOn = businesses.find(b => b.id === d.businessId);
+                    description = `Tuck-in of ${boltOn?.name ?? 'bolt-on'} into ${platform?.name ?? 'platform'} was troubled. ${formatMoney(cost)} restructuring cost deducted and ${platform?.name ?? 'platform'}'s growth permanently reduced by ${drag.toFixed(1)}%.`;
+                  } else {
+                    description = `Merger into ${d.newName as string} was troubled. ${formatMoney(cost)} restructuring cost deducted and growth permanently reduced by ${drag.toFixed(1)}%.`;
+                  }
                 } else {
-                  description = `Merger into ${d.newName as string} failed. ${formatMoney(cost)} restructuring cost deducted and growth permanently reduced by ${drag.toFixed(1)}%.`;
+                  // partial = rocky
+                  if (a.type === 'acquire_tuck_in') {
+                    const platform = businesses.find(b => b.id === d.platformId);
+                    const boltOn = businesses.find(b => b.id === d.businessId);
+                    description = `Tuck-in of ${boltOn?.name ?? 'bolt-on'} into ${platform?.name ?? 'platform'} hit integration friction. Synergies reduced.`;
+                  } else {
+                    description = `Merger into ${d.newName as string} hit integration friction. Synergies reduced.`;
+                  }
                 }
                 return (
-                  <div key={i} className="bg-red-900/20 border border-red-500/30 rounded-xl p-4 mb-4">
+                  <div key={i} className={`${isTroubled ? 'bg-red-900/20 border-red-500/30' : 'bg-amber-900/20 border-amber-500/30'} border rounded-xl p-4 mb-4`}>
                     <div className="flex items-start gap-3">
-                      <span className="text-lg">⚠️</span>
+                      <span className="text-lg">{isTroubled ? '⚠️' : '⚡'}</span>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-bold text-red-400 text-sm">Integration Failed</h4>
+                        <h4 className={`font-bold text-sm ${isTroubled ? 'text-red-400' : 'text-amber-400'}`}>{isTroubled ? 'Troubled Integration' : 'Rocky Integration'}</h4>
                         <p className="text-xs text-text-secondary mt-1">{description}</p>
                       </div>
                       <button

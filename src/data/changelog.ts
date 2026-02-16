@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 15, 2025',
+    title: 'Integration Outcome Labels',
+    sections: [
+      {
+        heading: 'Clearer Integration Feedback',
+        items: [
+          'Integration outcomes reworked — "Seamless," "Rocky," and "Troubled" replace the old binary pass/fail labels.',
+          'Rocky integrations (partial outcomes) now surface with an amber notification card and toast — no longer invisible.',
+          'Troubled integrations use the new label instead of the misleading "Integration Failed" text.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 15, 2025',
     title: 'Contested Deal Notification Fix',
     sections: [
       {

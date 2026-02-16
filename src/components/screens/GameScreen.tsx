@@ -4,7 +4,7 @@ import { useToastStore } from '../../hooks/useToast';
 import { getDistressRestrictions } from '../../engine/distress';
 import { getMASourcingAnnualCost, MA_SOURCING_CONFIG } from '../../data/sharedServices';
 import { SECTORS } from '../../data/sectors';
-import { Deal, DealStructure, SharedServiceType, OperationalImprovementType, formatMoney } from '../../engine/types';
+import { Deal, DealStructure, SharedServiceType, OperationalImprovementType, formatMoney, IntegrationOutcome } from '../../engine/types';
 import { getStructureLabel } from '../../engine/deals';
 import { Dashboard } from '../dashboard/Dashboard';
 import { CollectPhase } from '../phases/CollectPhase';
@@ -176,7 +176,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
   const handleAcquireTuckIn = useCallback((deal: Deal, structure: DealStructure, platformId: string) => {
     const platform = businesses.find(b => b.id === platformId);
     acquireTuckIn(deal, structure, platformId);
-    const result = useGameStore.getState().lastAcquisitionResult;
+    const state = useGameStore.getState();
+    const result = state.lastAcquisitionResult;
+    const integrationOutcome = state.lastIntegrationOutcome;
     if (result === 'snatched') {
       addToast({
         message: `Outbid on ${deal.business.name}`,
@@ -184,10 +186,15 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
         type: 'error',
       });
     } else {
+      const structureLabel = `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`;
+      const toastType = integrationOutcome === 'failure' ? 'error' : integrationOutcome === 'partial' ? 'info' : 'success';
+      const suffix = integrationOutcome === 'failure' ? ' — troubled integration'
+        : integrationOutcome === 'partial' ? ' — rocky integration, reduced synergies'
+        : ' — seamless integration';
       addToast({
         message: `Tucked ${deal.business.name} into ${platform?.name ?? 'platform'}`,
-        detail: `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`,
-        type: 'success',
+        detail: structureLabel + suffix,
+        type: toastType,
       });
     }
   }, [acquireTuckIn, businesses, addToast]);
@@ -196,10 +203,16 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     const b1 = businesses.find(b => b.id === id1);
     const b2 = businesses.find(b => b.id === id2);
     mergeBusinesses(id1, id2, newName);
+    const integrationOutcome = useGameStore.getState().lastIntegrationOutcome;
+    const names = b1 && b2 ? `${b1.name} + ${b2.name}` : undefined;
+    const toastType = integrationOutcome === 'failure' ? 'error' : integrationOutcome === 'partial' ? 'info' : 'success';
+    const suffix = integrationOutcome === 'failure' ? ' — troubled integration'
+      : integrationOutcome === 'partial' ? ' — rocky integration, reduced synergies'
+      : ' — seamless integration';
     addToast({
       message: `Merged into ${newName}`,
-      detail: b1 && b2 ? `${b1.name} + ${b2.name} combined` : undefined,
-      type: 'success',
+      detail: names ? names + suffix : undefined,
+      type: toastType,
     });
   }, [mergeBusinesses, businesses, addToast]);
 
