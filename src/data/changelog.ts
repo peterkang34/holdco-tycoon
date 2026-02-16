@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 16, 2025',
+    title: 'Covenant Proximity Warnings',
+    sections: [
+      {
+        heading: 'Financial Visibility',
+        items: [
+          'New leverage gauge bar during Capital Allocation — see exactly how close you are to the 4.5x covenant breach threshold before spending cash.',
+          'Cash headroom indicator shows how much you can safely spend before breaching covenants.',
+          'Next-year debt service estimate (holdco + bank debt P&I) visible at a glance.',
+          'End Year confirmation now includes a Year-End Forecast with leverage, debt service, and projected cash — with warnings if cash may go negative or you\'re near breach.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 16, 2025',
     title: 'Bankruptcy Detection Overhaul',
     sections: [
       {

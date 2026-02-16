@@ -14,7 +14,7 @@
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
 - **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v19`
-- **Tests**: Vitest in `src/engine/__tests__/` — 674 tests across 13 suites (incl. display-proofreader)
+- **Tests**: Vitest in `src/engine/__tests__/` — 679 tests across 13 suites (incl. display-proofreader)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Game loop**: 10 or 20 annual rounds — Collect → [Restructure] → Event → Allocate → End Year

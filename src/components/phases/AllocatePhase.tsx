@@ -20,7 +20,7 @@ import {
   formatMoney,
   formatPercent,
 } from '../../engine/types';
-import { getDistressRestrictions, getDistressLabel, getDistressDescription } from '../../engine/distress';
+import { getDistressRestrictions, getDistressLabel, getDistressDescription, calculateCovenantHeadroom } from '../../engine/distress';
 import { EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN } from '../../data/gameConfig';
 import { SECTOR_LIST } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
@@ -54,6 +54,10 @@ interface AllocatePhaseProps {
   interestRate: number;
   creditTightening: boolean;
   distressLevel: DistressLevel;
+  totalDebt: number;
+  totalEbitda: number;
+  holdcoLoanRate: number;
+  holdcoLoanRoundsRemaining: number;
   dealPipeline: Deal[];
   sharedServices: SharedService[];
   round: number;
@@ -116,6 +120,10 @@ export function AllocatePhase({
   interestRate,
   creditTightening,
   distressLevel,
+  totalDebt,
+  totalEbitda,
+  holdcoLoanRate,
+  holdcoLoanRoundsRemaining,
   dealPipeline,
   sharedServices,
   round,
@@ -220,6 +228,19 @@ export function AllocatePhase({
   const canUnlockSharedService =
     activeBusinesses.length >= MIN_OPCOS_FOR_SHARED_SERVICES &&
     activeServicesCount < MAX_ACTIVE_SHARED_SERVICES;
+
+  // Covenant headroom — updates in real-time as cash changes
+  const covenantHeadroom = useMemo(() => calculateCovenantHeadroom(
+    cash,
+    totalDebt,
+    totalEbitda,
+    holdcoLoanBalance,
+    holdcoLoanRate,
+    holdcoLoanRoundsRemaining,
+    allBusinesses,
+    interestRate,
+    distressRestrictions.interestPenalty,
+  ), [cash, totalDebt, totalEbitda, holdcoLoanBalance, holdcoLoanRate, holdcoLoanRoundsRemaining, allBusinesses, interestRate, distressRestrictions.interestPenalty]);
 
   // Platform and tuck-in helpers
   const platforms = activeBusinesses.filter(b => b.isPlatform);
@@ -734,6 +755,71 @@ export function AllocatePhase({
                   {covenantBreachRounds >= 1 && ' If leverage stays above 4.5x, restructuring will be forced next year.'}
                 </p>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Covenant Proximity Bar — shown when there's debt and not in breach (breach has its own banner) */}
+      {totalDebt > 0 && distressLevel !== 'breach' && (
+        <div className={`rounded-xl p-4 mb-6 ${
+          distressLevel === 'stressed' ? 'bg-orange-900/20 border border-orange-500/30' :
+          distressLevel === 'elevated' ? 'bg-yellow-900/20 border border-yellow-500/30' :
+          'bg-white/5 border border-white/10'
+        }`}>
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-text-secondary">Leverage</span>
+            <span className={`text-sm font-mono font-bold ${
+              covenantHeadroom.currentLeverage >= 4.0 ? 'text-red-400' :
+              covenantHeadroom.currentLeverage >= 3.5 ? 'text-orange-400' :
+              covenantHeadroom.currentLeverage >= 2.5 ? 'text-yellow-400' :
+              'text-green-400'
+            }`}>
+              {covenantHeadroom.currentLeverage === Infinity ? '∞' : covenantHeadroom.currentLeverage.toFixed(1)}x / 4.5x
+            </span>
+          </div>
+          {/* Visual gauge bar: 0x to 5x */}
+          <div className="relative h-3 bg-white/10 rounded-full overflow-hidden mb-3">
+            {/* Color zones */}
+            <div className="absolute inset-0 flex">
+              <div className="h-full bg-green-500/30" style={{ width: '50%' }} />
+              <div className="h-full bg-yellow-500/30" style={{ width: '20%' }} />
+              <div className="h-full bg-orange-500/30" style={{ width: '20%' }} />
+              <div className="h-full bg-red-500/30" style={{ width: '10%' }} />
+            </div>
+            {/* Breach threshold line at 4.5/5 = 90% */}
+            <div className="absolute top-0 bottom-0 w-0.5 bg-red-500" style={{ left: '90%' }} />
+            {/* Current position marker */}
+            {covenantHeadroom.currentLeverage !== Infinity && (
+              <div
+                className={`absolute top-0 bottom-0 w-2 rounded-full ${
+                  covenantHeadroom.currentLeverage >= 4.0 ? 'bg-red-400' :
+                  covenantHeadroom.currentLeverage >= 3.5 ? 'bg-orange-400' :
+                  covenantHeadroom.currentLeverage >= 2.5 ? 'bg-yellow-400' :
+                  'bg-green-400'
+                }`}
+                style={{ left: `${Math.min(100, Math.max(0, (covenantHeadroom.currentLeverage / 5) * 100))}%`, transform: 'translateX(-50%)' }}
+              />
+            )}
+          </div>
+          {/* Stats row */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+            <div>
+              <span className="text-text-muted">Cash headroom</span>
+              <p className={`font-mono font-medium ${covenantHeadroom.headroomCash <= 0 ? 'text-red-400' : covenantHeadroom.headroomCash < 2000 ? 'text-yellow-400' : 'text-text-primary'}`}>
+                {covenantHeadroom.headroomCash <= 0 ? 'None' : `~${formatMoney(Math.round(covenantHeadroom.headroomCash))} before breach`}
+              </p>
+            </div>
+            <div>
+              <span className="text-text-muted">Next year debt service</span>
+              <p className="font-mono font-medium text-text-primary">~{formatMoney(covenantHeadroom.nextYearDebtService)}</p>
+            </div>
+            <div className="col-span-2 sm:col-span-1">
+              <span className="text-text-muted">Projected cash after debt</span>
+              <p className={`font-mono font-medium ${covenantHeadroom.cashWillGoNegative ? 'text-red-400' : 'text-text-primary'}`}>
+                ~{formatMoney(covenantHeadroom.projectedCashAfterDebt)}
+                {covenantHeadroom.cashWillGoNegative && <span className="text-red-400 ml-1">(negative!)</span>}
+              </p>
             </div>
           </div>
         </div>
@@ -2702,7 +2788,7 @@ export function AllocatePhase({
             <p className="text-text-secondary mb-2">
               Are you sure you want to end Year {round}?
             </p>
-            <p className="text-sm text-text-muted mb-6">
+            <p className="text-sm text-text-muted mb-4">
               You have <span className="text-accent font-mono">{formatMoney(cash)}</span> unallocated cash.
               {(() => {
                 const expiring = dealPipeline.filter(d => d.freshness === 1).length;
@@ -2715,6 +2801,46 @@ export function AllocatePhase({
                 );
               })()}
             </p>
+            {/* Year-End Forecast */}
+            {totalDebt > 0 && (
+              <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-4">
+                <h4 className="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Year-End Forecast</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-text-muted text-xs">Leverage</span>
+                    <p className={`font-mono font-medium ${
+                      covenantHeadroom.currentLeverage >= 4.0 ? 'text-red-400' :
+                      covenantHeadroom.currentLeverage >= 3.5 ? 'text-orange-400' :
+                      covenantHeadroom.currentLeverage >= 2.5 ? 'text-yellow-400' :
+                      'text-green-400'
+                    }`}>
+                      {covenantHeadroom.currentLeverage === Infinity ? '∞' : covenantHeadroom.currentLeverage.toFixed(1)}x / 4.5x
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-text-muted text-xs">Debt service (next yr)</span>
+                    <p className="font-mono font-medium text-text-primary">~{formatMoney(covenantHeadroom.nextYearDebtService)}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-text-muted text-xs">Projected cash after debt service</span>
+                    <p className={`font-mono font-medium ${covenantHeadroom.cashWillGoNegative ? 'text-red-400' : 'text-text-primary'}`}>
+                      ~{formatMoney(covenantHeadroom.projectedCashAfterDebt)}
+                    </p>
+                  </div>
+                </div>
+                {/* Warnings */}
+                {(covenantHeadroom.currentLeverage >= 4.0 || covenantHeadroom.cashWillGoNegative) && (
+                  <div className="mt-2 space-y-1">
+                    {covenantHeadroom.currentLeverage >= 4.0 && covenantHeadroom.currentLeverage < 4.5 && (
+                      <p className="text-xs text-yellow-400">⚠ Close to 4.5x covenant breach</p>
+                    )}
+                    {covenantHeadroom.cashWillGoNegative && (
+                      <p className="text-xs text-red-400">⚠ Cash may go negative after debt service</p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="flex gap-3 justify-end">
               <button
                 onClick={() => setShowEndTurnConfirm(false)}

@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 // ── Engine Imports ──
 import { TAX_RATE, calculateAnnualFcf, calculatePortfolioTax } from '../simulation';
 import { createMockBusiness } from './helpers';
-import { calculateDistressLevel, getDistressRestrictions, getDistressDescription } from '../distress';
+import { calculateDistressLevel, getDistressRestrictions, getDistressDescription, calculateCovenantHeadroom } from '../distress';
 import { calculateHeatPremium, getMaxAcquisitions } from '../businesses';
 import { MA_SOURCING_CONFIG } from '../../data/sharedServices';
 import { SECTORS, SECTOR_LIST } from '../../data/sectors';
@@ -364,6 +364,41 @@ describe('Display Proofreader', () => {
     it('useGame.ts uses COVENANT_BREACH_ROUNDS_THRESHOLD constant (Strategy B)', () => {
       const useGame = readComponent('hooks/useGame.ts');
       expect(useGame).toContain('COVENANT_BREACH_ROUNDS_THRESHOLD');
+    });
+
+    it('Covenant headroom uses 4.5x breach threshold', () => {
+      const headroom = calculateCovenantHeadroom(5000, 10000, 3000, 5000, 0.06, 5, [], 0.06, 0);
+      expect(headroom.breachThreshold).toBe(4.5);
+    });
+
+    it('Covenant headroom calculates correct headroomCash', () => {
+      // cash=5000, totalDebt=10000, totalEbitda=3000
+      // headroomCash = cash - (totalDebt - 4.5 * totalEbitda) = 5000 - (10000 - 13500) = 5000 + 3500 = 8500
+      const headroom = calculateCovenantHeadroom(5000, 10000, 3000, 5000, 0.06, 5, [], 0.06, 0);
+      expect(headroom.headroomCash).toBe(8500);
+    });
+
+    it('Covenant headroom detects negative projected cash', () => {
+      // cash=1000, huge debt service
+      const headroom = calculateCovenantHeadroom(1000, 10000, 3000, 10000, 0.06, 2, [], 0.06, 0);
+      // holdcoInterest = round(10000 * 0.06) = 600, holdcoPrincipal = round(10000 / 2) = 5000
+      // debtService = 5600, projected = 1000 - 5600 = -4600
+      expect(headroom.cashWillGoNegative).toBe(true);
+      expect(headroom.projectedCashAfterDebt).toBe(-4600);
+    });
+
+    it('AllocatePhase shows 4.5x covenant threshold in proximity bar (Strategy B)', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('4.5x');
+      expect(allocate).toContain('before breach');
+      expect(allocate).toContain('Leverage');
+    });
+
+    it('AllocatePhase end-turn modal shows year-end forecast (Strategy B)', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('Year-End Forecast');
+      expect(allocate).toContain('Debt service (next yr)');
+      expect(allocate).toContain('Projected cash after debt service');
     });
   });
 
