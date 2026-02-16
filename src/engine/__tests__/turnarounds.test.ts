@@ -13,7 +13,6 @@ import {
   getAvailablePrograms,
   getProgramById,
   getQualityCeiling,
-  DEFAULT_QUALITY_CEILING,
   TURNAROUND_TIER_CONFIG,
   getTurnaroundTierAnnualCost,
 } from '../../data/turnaroundPrograms';
