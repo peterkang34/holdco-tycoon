@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 16, 2025',
+    title: 'Cleaner Allocate Screen',
+    sections: [
+      {
+        heading: 'UI Cleanup',
+        items: [
+          'Moved leverage warning banners and covenant proximity gauge into the Leverage drilldown modal — tap the Leverage metric card to see all debt details, warnings, and covenant status in one place.',
+          'Allocate phase is now less cluttered with more room for portfolio management.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 16, 2025',
     title: 'Covenant Proximity Warnings',
     sections: [
       {

@@ -7,6 +7,7 @@ import {
   calculateSharedServicesBenefits,
   TAX_RATE,
 } from '../../engine/simulation';
+import { getDistressLabel, getDistressDescription, calculateCovenantHeadroom, getDistressRestrictions } from '../../engine/distress';
 import { getMASourcingAnnualCost } from '../../data/sharedServices';
 
 interface MetricDrilldownModalProps {
@@ -521,6 +522,20 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
     const netDebt = totalDebt - state.cash;
     const leverage = totalEbitda > 0 ? netDebt / totalEbitda : 0;
 
+    const distressLevel = state.distressLevel;
+    const distressRestrictions = getDistressRestrictions(distressLevel);
+    const covenantHeadroom = calculateCovenantHeadroom(
+      state.cash,
+      state.totalDebt,
+      totalEbitda,
+      state.holdcoLoanBalance,
+      state.holdcoLoanRate,
+      state.holdcoLoanRoundsRemaining,
+      state.businesses,
+      state.interestRate,
+      distressRestrictions.interestPenalty,
+    );
+
     const getLeverageColor = (ratio: number) => {
       if (ratio < 2.5) return 'text-accent';
       if (ratio < 3.5) return 'text-warning';
@@ -531,6 +546,37 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
     return (
       <>
         <SectionHeader title="Leverage" formula="(Total Debt − Cash) ÷ EBITDA" />
+
+        {/* Distress Warning Banners */}
+        {distressLevel === 'stressed' && (
+          <div className="bg-orange-900/30 border border-orange-500/40 rounded-lg p-3 mb-4">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">⚠️</span>
+              <div>
+                <h3 className="font-bold text-orange-400 text-sm">{getDistressLabel(distressLevel)}</h3>
+                <p className="text-xs text-text-secondary">{getDistressDescription(distressLevel)}</p>
+              </div>
+            </div>
+          </div>
+        )}
+        {distressLevel === 'breach' && (
+          <div className="bg-red-900/30 border-2 border-red-500/50 rounded-lg p-3 mb-4 animate-pulse">
+            <div className="flex items-start gap-3">
+              <span className="text-xl">🚨</span>
+              <div>
+                <h3 className="font-bold text-red-400 text-sm">{getDistressLabel(distressLevel)}</h3>
+                <p className="text-xs text-red-300">{getDistressDescription(distressLevel)}</p>
+                {state.covenantBreachRounds !== undefined && state.covenantBreachRounds > 0 && (
+                  <p className="text-xs text-red-300 mt-1 font-bold">
+                    This is year {state.covenantBreachRounds} of 2 consecutive breach years.
+                    {state.covenantBreachRounds >= 1 && ' If leverage stays above 4.5x, restructuring will be forced next year.'}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="bg-white/5 rounded-lg p-3 mb-4 text-center">
           <p className={`text-3xl font-bold font-mono ${getLeverageColor(leverage)}`}>
             {leverage <= 0 ? 'Net Cash' : formatMultiple(leverage)}
@@ -539,6 +585,62 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
             {formatMoney(netDebt)} net debt ÷ {formatMoney(totalEbitda)} EBITDA
           </p>
         </div>
+
+        {/* Covenant Proximity Gauge — shown when there's debt */}
+        {state.totalDebt > 0 && (
+          <div className="bg-white/5 rounded-lg p-3 mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-text-secondary">Covenant Gauge</span>
+              <span className={`text-xs font-mono font-bold ${
+                covenantHeadroom.currentLeverage >= 4.0 ? 'text-red-400' :
+                covenantHeadroom.currentLeverage >= 3.5 ? 'text-orange-400' :
+                covenantHeadroom.currentLeverage >= 2.5 ? 'text-yellow-400' :
+                'text-green-400'
+              }`}>
+                {covenantHeadroom.currentLeverage === Infinity ? '∞' : covenantHeadroom.currentLeverage.toFixed(1)}x / 4.5x
+              </span>
+            </div>
+            <div className="relative h-3 bg-white/10 rounded-full overflow-hidden mb-3">
+              <div className="absolute inset-0 flex">
+                <div className="h-full bg-green-500/30" style={{ width: '50%' }} />
+                <div className="h-full bg-yellow-500/30" style={{ width: '20%' }} />
+                <div className="h-full bg-orange-500/30" style={{ width: '20%' }} />
+                <div className="h-full bg-red-500/30" style={{ width: '10%' }} />
+              </div>
+              <div className="absolute top-0 bottom-0 w-0.5 bg-red-500" style={{ left: '90%' }} />
+              {covenantHeadroom.currentLeverage !== Infinity && (
+                <div
+                  className={`absolute top-0 bottom-0 w-2 rounded-full ${
+                    covenantHeadroom.currentLeverage >= 4.0 ? 'bg-red-400' :
+                    covenantHeadroom.currentLeverage >= 3.5 ? 'bg-orange-400' :
+                    covenantHeadroom.currentLeverage >= 2.5 ? 'bg-yellow-400' :
+                    'bg-green-400'
+                  }`}
+                  style={{ left: `${Math.min(100, Math.max(0, (covenantHeadroom.currentLeverage / 5) * 100))}%`, transform: 'translateX(-50%)' }}
+                />
+              )}
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-xs">
+              <div>
+                <span className="text-text-muted">Cash headroom</span>
+                <p className={`font-mono font-medium ${covenantHeadroom.headroomCash <= 0 ? 'text-red-400' : covenantHeadroom.headroomCash < 2000 ? 'text-yellow-400' : 'text-text-primary'}`}>
+                  {covenantHeadroom.headroomCash <= 0 ? 'None' : `~${formatMoney(Math.round(covenantHeadroom.headroomCash))}`}
+                </p>
+              </div>
+              <div>
+                <span className="text-text-muted">Next yr debt svc</span>
+                <p className="font-mono font-medium text-text-primary">~{formatMoney(covenantHeadroom.nextYearDebtService)}</p>
+              </div>
+              <div>
+                <span className="text-text-muted">Cash after debt</span>
+                <p className={`font-mono font-medium ${covenantHeadroom.cashWillGoNegative ? 'text-red-400' : 'text-text-primary'}`}>
+                  ~{formatMoney(covenantHeadroom.projectedCashAfterDebt)}
+                  {covenantHeadroom.cashWillGoNegative && <span className="text-red-400 ml-1">(!)</span>}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">Debt Composition</p>
         <div className="bg-white/5 rounded-lg p-3 space-y-0 mb-4">

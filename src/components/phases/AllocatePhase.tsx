@@ -20,7 +20,7 @@ import {
   formatMoney,
   formatPercent,
 } from '../../engine/types';
-import { getDistressRestrictions, getDistressLabel, getDistressDescription, calculateCovenantHeadroom } from '../../engine/distress';
+import { getDistressRestrictions, calculateCovenantHeadroom } from '../../engine/distress';
 import { EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN } from '../../data/gameConfig';
 import { SECTOR_LIST } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
@@ -730,101 +730,6 @@ export function AllocatePhase({
 
   return (
     <div className="px-4 sm:px-6 py-6 pb-8">
-      {/* Distress Warning Banner */}
-      {distressLevel === 'stressed' && (
-        <div className="bg-orange-900/30 border border-orange-500/40 rounded-xl p-4 mb-6">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">⚠️</span>
-            <div>
-              <h3 className="font-bold text-orange-400">{getDistressLabel(distressLevel)}</h3>
-              <p className="text-sm text-text-secondary">{getDistressDescription(distressLevel)}</p>
-            </div>
-          </div>
-        </div>
-      )}
-      {distressLevel === 'breach' && (
-        <div className="bg-red-900/30 border-2 border-red-500/50 rounded-xl p-4 mb-6 animate-pulse">
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">🚨</span>
-            <div>
-              <h3 className="font-bold text-red-400">{getDistressLabel(distressLevel)}</h3>
-              <p className="text-sm text-red-300">{getDistressDescription(distressLevel)}</p>
-              {covenantBreachRounds !== undefined && covenantBreachRounds > 0 && (
-                <p className="text-sm text-red-300 mt-1 font-bold">
-                  This is year {covenantBreachRounds} of 2 consecutive breach years.
-                  {covenantBreachRounds >= 1 && ' If leverage stays above 4.5x, restructuring will be forced next year.'}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Covenant Proximity Bar — shown when there's debt and not in breach (breach has its own banner) */}
-      {totalDebt > 0 && distressLevel !== 'breach' && (
-        <div className={`rounded-xl p-4 mb-6 ${
-          distressLevel === 'stressed' ? 'bg-orange-900/20 border border-orange-500/30' :
-          distressLevel === 'elevated' ? 'bg-yellow-900/20 border border-yellow-500/30' :
-          'bg-white/5 border border-white/10'
-        }`}>
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-text-secondary">Leverage</span>
-            <span className={`text-sm font-mono font-bold ${
-              covenantHeadroom.currentLeverage >= 4.0 ? 'text-red-400' :
-              covenantHeadroom.currentLeverage >= 3.5 ? 'text-orange-400' :
-              covenantHeadroom.currentLeverage >= 2.5 ? 'text-yellow-400' :
-              'text-green-400'
-            }`}>
-              {covenantHeadroom.currentLeverage === Infinity ? '∞' : covenantHeadroom.currentLeverage.toFixed(1)}x / 4.5x
-            </span>
-          </div>
-          {/* Visual gauge bar: 0x to 5x */}
-          <div className="relative h-3 bg-white/10 rounded-full overflow-hidden mb-3">
-            {/* Color zones */}
-            <div className="absolute inset-0 flex">
-              <div className="h-full bg-green-500/30" style={{ width: '50%' }} />
-              <div className="h-full bg-yellow-500/30" style={{ width: '20%' }} />
-              <div className="h-full bg-orange-500/30" style={{ width: '20%' }} />
-              <div className="h-full bg-red-500/30" style={{ width: '10%' }} />
-            </div>
-            {/* Breach threshold line at 4.5/5 = 90% */}
-            <div className="absolute top-0 bottom-0 w-0.5 bg-red-500" style={{ left: '90%' }} />
-            {/* Current position marker */}
-            {covenantHeadroom.currentLeverage !== Infinity && (
-              <div
-                className={`absolute top-0 bottom-0 w-2 rounded-full ${
-                  covenantHeadroom.currentLeverage >= 4.0 ? 'bg-red-400' :
-                  covenantHeadroom.currentLeverage >= 3.5 ? 'bg-orange-400' :
-                  covenantHeadroom.currentLeverage >= 2.5 ? 'bg-yellow-400' :
-                  'bg-green-400'
-                }`}
-                style={{ left: `${Math.min(100, Math.max(0, (covenantHeadroom.currentLeverage / 5) * 100))}%`, transform: 'translateX(-50%)' }}
-              />
-            )}
-          </div>
-          {/* Stats row */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-            <div>
-              <span className="text-text-muted">Cash headroom</span>
-              <p className={`font-mono font-medium ${covenantHeadroom.headroomCash <= 0 ? 'text-red-400' : covenantHeadroom.headroomCash < 2000 ? 'text-yellow-400' : 'text-text-primary'}`}>
-                {covenantHeadroom.headroomCash <= 0 ? 'None' : `~${formatMoney(Math.round(covenantHeadroom.headroomCash))} before breach`}
-              </p>
-            </div>
-            <div>
-              <span className="text-text-muted">Next year debt service</span>
-              <p className="font-mono font-medium text-text-primary">~{formatMoney(covenantHeadroom.nextYearDebtService)}</p>
-            </div>
-            <div className="col-span-2 sm:col-span-1">
-              <span className="text-text-muted">Projected cash after debt</span>
-              <p className={`font-mono font-medium ${covenantHeadroom.cashWillGoNegative ? 'text-red-400' : 'text-text-primary'}`}>
-                ~{formatMoney(covenantHeadroom.projectedCashAfterDebt)}
-                {covenantHeadroom.cashWillGoNegative && <span className="text-red-400 ml-1">(negative!)</span>}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
         <div>
