@@ -1130,14 +1130,23 @@ export const useGameStore = create<GameStore>()(
         const biz1 = state.businesses.find(b => b.id === businessId1 && b.status === 'active');
         const biz2 = state.businesses.find(b => b.id === businessId2 && b.status === 'active');
 
-        if (!biz1 || !biz2) return;
+        if (!biz1 || !biz2) {
+          useToastStore.getState().addToast({ message: 'Merge failed: one or both businesses not found', type: 'danger' });
+          return;
+        }
 
         // Must be same sector
-        if (biz1.sectorId !== biz2.sectorId) return;
+        if (biz1.sectorId !== biz2.sectorId) {
+          useToastStore.getState().addToast({ message: 'Merge failed: businesses must be in the same sector', type: 'danger' });
+          return;
+        }
 
         // Merge cost (restructuring, legal, integration) — 15% of smaller business (abs to prevent negative costs)
         const mergeCost = Math.max(100, Math.round(Math.min(Math.abs(biz1.ebitda), Math.abs(biz2.ebitda)) * 0.15));
-        if (state.cash < mergeCost) return;
+        if (state.cash < mergeCost) {
+          useToastStore.getState().addToast({ message: `Merge failed: need ${formatMoney(mergeCost)} but only have ${formatMoney(state.cash)}`, type: 'danger' });
+          return;
+        }
 
         // Check if shared services help
         const hasSharedServices = state.sharedServices.filter(s => s.active).length > 0;
@@ -1174,7 +1183,10 @@ export const useGameStore = create<GameStore>()(
         const multipleExpansion = calculateMultipleExpansion(newPlatformScale, combinedEbitda)
           - calculateMultipleExpansion(prevScale, prevEbitda);
 
-        if (state.cash < totalMergeCost) return;
+        if (state.cash < totalMergeCost) {
+          useToastStore.getState().addToast({ message: `Merge failed: need ${formatMoney(totalMergeCost)} (incl. restructuring) but only have ${formatMoney(state.cash)}`, type: 'danger' });
+          return;
+        }
 
         // Use higher quality rating
         const bestQuality = Math.max(biz1.qualityRating, biz2.qualityRating) as 1 | 2 | 3 | 4 | 5;
@@ -1447,7 +1459,10 @@ export const useGameStore = create<GameStore>()(
         // Cost floor: prevents mashing improvements on tiny businesses
         cost = Math.max(IMPROVEMENT_COST_FLOOR, cost);
 
-        if (state.cash < cost) return;
+        if (state.cash < cost) {
+          useToastStore.getState().addToast({ message: `Improvement failed: need ${formatMoney(cost)} but only have ${formatMoney(state.cash)}`, type: 'danger' });
+          return;
+        }
 
         // Quality multiplier: higher quality businesses get more from improvements
         const qualityMult = QUALITY_IMPROVEMENT_MULTIPLIER[business.qualityRating as 1|2|3|4|5] ?? 1.0;
@@ -2462,7 +2477,10 @@ export const useGameStore = create<GameStore>()(
         if (recipe.crossSectorIds && !recipe.crossSectorIds.includes(business.sectorId)) return;
 
         const integrationCost = calculateAddToPlatformCost(platform, business);
-        if (state.cash < integrationCost) return;
+        if (state.cash < integrationCost) {
+          useToastStore.getState().addToast({ message: `Integration failed: need ${formatMoney(integrationCost)} but only have ${formatMoney(state.cash)}`, type: 'danger' });
+          return;
+        }
 
         // Apply one-time bonuses (same as forge)
         const updatedBusinesses = state.businesses.map(b => {
@@ -2854,7 +2872,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v21', // v21: Financial Crisis event + exitMultiplePenalty
+      name: 'holdco-tycoon-save-v22', // v22: persist holdco loan fields + action failure toasts
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -2902,6 +2920,9 @@ export const useGameStore = create<GameStore>()(
         hasRestructured: state.hasRestructured,
         bankruptRound: state.bankruptRound,
         exitMultiplePenalty: state.exitMultiplePenalty,
+        holdcoLoanBalance: state.holdcoLoanBalance,
+        holdcoLoanRate: state.holdcoLoanRate,
+        holdcoLoanRoundsRemaining: state.holdcoLoanRoundsRemaining,
         acquisitionsThisRound: state.acquisitionsThisRound,
         maxAcquisitionsPerRound: state.maxAcquisitionsPerRound,
         lastAcquisitionResult: state.lastAcquisitionResult,

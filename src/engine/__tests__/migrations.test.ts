@@ -422,8 +422,8 @@ describe('runAllMigrations', () => {
 
     // v9 should be consumed
     expect(localStorageMock.getItem('holdco-tycoon-save-v9')).toBeNull();
-    // Final v21 should exist (chain goes through all migrations including v20→v21)
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v21')!);
+    // Final v22 should exist (chain goes through all migrations including v21→v22)
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v22')!);
     expect(result.state.difficulty).toBe('easy');
     expect(result.state.maxRounds).toBe(20);
     expect(result.state.founderDistributionsReceived).toBeDefined();
@@ -447,6 +447,10 @@ describe('runAllMigrations', () => {
     expect(result.state.businesses[0].bankDebtRoundsRemaining).toBe(0);
     // v20→v21 fields
     expect(result.state.exitMultiplePenalty).toBe(0);
+    // v21→v22 fields (holdco loan persistence fix — values set by v18→v19, preserved through chain)
+    expect(result.state.holdcoLoanBalance).toBeDefined();
+    expect(result.state.holdcoLoanRate).toBeDefined();
+    expect(result.state.holdcoLoanRoundsRemaining).toBeDefined();
   });
 
   it('should be safe to call multiple times (idempotent)', () => {
@@ -460,10 +464,10 @@ describe('runAllMigrations', () => {
     localStorageMock.setItem('holdco-tycoon-save-v14', JSON.stringify(v14Data));
 
     runAllMigrations();
-    const first = localStorageMock.getItem('holdco-tycoon-save-v19');
+    const first = localStorageMock.getItem('holdco-tycoon-save-v22');
 
     runAllMigrations();
-    const second = localStorageMock.getItem('holdco-tycoon-save-v19');
+    const second = localStorageMock.getItem('holdco-tycoon-save-v22');
 
     expect(first).toBe(second);
   });

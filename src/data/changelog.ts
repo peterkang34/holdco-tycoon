@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 16, 2025',
+    title: 'Bug Fixes & Action Feedback',
+    sections: [
+      {
+        heading: 'Fixes',
+        items: [
+          'Fixed holdco loan state (balance, rate, rounds remaining) not persisting across page refreshes — loan payments could silently stop after reloading.',
+          'Merge, improvement, and platform integration actions now show specific error toasts when they fail instead of silently doing nothing.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 16, 2025',
     title: 'Financial Crisis Event',
     sections: [
       {

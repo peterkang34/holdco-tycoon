@@ -410,6 +410,36 @@ export function migrateV20ToV21(): void {
   }
 }
 
+// --- v21 → v22: persist holdco loan fields (were missing from partialize) ---
+
+export function migrateV21ToV22(): void {
+  try {
+    const v22Key = 'holdco-tycoon-save-v22';
+    const v21Key = 'holdco-tycoon-save-v21';
+    if (localStorage.getItem(v22Key)) return;
+    const v21Raw = localStorage.getItem(v21Key);
+    if (!v21Raw) return;
+    const v21Data = JSON.parse(v21Raw);
+    if (!v21Data?.state) return;
+
+    // Holdco loan fields were missing from partialize — backfill defaults
+    if (v21Data.state.holdcoLoanBalance === undefined) {
+      v21Data.state.holdcoLoanBalance = 0;
+    }
+    if (v21Data.state.holdcoLoanRate === undefined) {
+      v21Data.state.holdcoLoanRate = v21Data.state.interestRate ?? 0.07;
+    }
+    if (v21Data.state.holdcoLoanRoundsRemaining === undefined) {
+      v21Data.state.holdcoLoanRoundsRemaining = 0;
+    }
+
+    localStorage.setItem(v22Key, JSON.stringify(v21Data));
+    localStorage.removeItem(v21Key);
+  } catch (e) {
+    console.error('v21→v22 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -427,4 +457,5 @@ export function runAllMigrations(): void {
   migrateV18ToV19();
   migrateV19ToV20();
   migrateV20ToV21();
+  migrateV21ToV22();
 }
