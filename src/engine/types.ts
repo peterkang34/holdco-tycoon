@@ -312,6 +312,7 @@ export type EventType =
   | 'global_interest_cut'
   | 'global_inflation'
   | 'global_credit_tightening'
+  | 'global_financial_crisis'
   | 'global_quiet'
   | 'portfolio_star_joins'
   | 'portfolio_talent_leaves'
@@ -337,7 +338,7 @@ export interface EventChoice {
 export interface EventImpact {
   businessId?: string;
   businessName?: string;
-  metric: 'ebitda' | 'revenue' | 'margin' | 'interestRate' | 'cash' | 'growthRate';
+  metric: 'ebitda' | 'revenue' | 'margin' | 'interestRate' | 'cash' | 'growthRate' | 'bankDebtRate';
   before: number;
   after: number;
   delta: number;
@@ -483,6 +484,9 @@ export interface GameState {
   covenantBreachRounds: number; // consecutive rounds in breach
   hasRestructured: boolean; // one-time flag — second insolvency = game over
   bankruptRound?: number; // if set, game ended via bankruptcy
+
+  // Exit multiple penalty (Financial Crisis)
+  exitMultiplePenalty: number;
 
   // Deal heat / acquisition limits
   acquisitionsThisRound: number;

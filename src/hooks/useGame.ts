@@ -34,6 +34,7 @@ import {
   getMaxAcquisitions,
   generateDealWithSize,
   pickWeightedSector,
+  generateDistressedDeals,
 } from '../engine/businesses';
 import { generateBuyerProfile } from '../engine/buyers';
 import {
@@ -232,6 +233,7 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   requiresRestructuring: false,
   covenantBreachRounds: 0,
   hasRestructured: false,
+  exitMultiplePenalty: 0,
   acquisitionsThisRound: 0,
   maxAcquisitionsPerRound: 2,
   lastAcquisitionResult: null,
@@ -683,9 +685,16 @@ export const useGameStore = create<GameStore>()(
           state.creditTighteningRoundsRemaining > 0
         );
 
+        // Inject distressed deals during Financial Crisis (bypass MAX_DEALS cap)
+        let finalPipeline = newPipeline;
+        if (state.currentEvent?.type === 'global_financial_crisis') {
+          const distressedDeals = generateDistressedDeals(state.round, state.maxRounds);
+          finalPipeline = [...newPipeline, ...distressedDeals];
+        }
+
         set({
           phase: 'allocate',
-          dealPipeline: newPipeline,
+          dealPipeline: finalPipeline,
           actionsThisRound: [],
           focusBonus,
           lastAcquisitionResult: null,
@@ -828,6 +837,7 @@ export const useGameStore = create<GameStore>()(
             cashBeforeDebtPayments: state.cash,
             debtPaymentThisRound: 0,
             holdcoAmortizationThisRound: 0,
+            exitMultiplePenalty: 0,
             acquisitionsThisRound: 0,
             lastAcquisitionResult: null,
             lastIntegrationOutcome: null,
@@ -1764,6 +1774,9 @@ export const useGameStore = create<GameStore>()(
         if (buyerProfile.isStrategic) {
           effectiveMultiple += buyerProfile.strategicPremium;
         }
+
+        // Financial Crisis exit multiple penalty
+        effectiveMultiple -= (state.exitMultiplePenalty || 0);
 
         // Add small random variance for actual sale (market conditions variation)
         const marketVariance = lastEvent?.type === 'global_bull_market' ? Math.random() * 0.3
@@ -2841,7 +2854,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v20', // v20: shared services cost increase + easy multiplier 0.9x
+      name: 'holdco-tycoon-save-v21', // v21: Financial Crisis event + exitMultiplePenalty
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -2888,6 +2901,7 @@ export const useGameStore = create<GameStore>()(
         covenantBreachRounds: state.covenantBreachRounds,
         hasRestructured: state.hasRestructured,
         bankruptRound: state.bankruptRound,
+        exitMultiplePenalty: state.exitMultiplePenalty,
         acquisitionsThisRound: state.acquisitionsThisRound,
         maxAcquisitionsPerRound: state.maxAcquisitionsPerRound,
         lastAcquisitionResult: state.lastAcquisitionResult,

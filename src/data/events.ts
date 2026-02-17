@@ -65,6 +65,15 @@ export const GLOBAL_EVENTS: EventDefinition[] = [
     tipSource: 'Ch. VI',
   },
   {
+    type: 'global_financial_crisis',
+    title: 'Financial Crisis',
+    description: 'A systemic financial crisis engulfs the markets. Credit freezes, valuations collapse — but distressed assets flood the market at fire-sale prices.',
+    probability: 0.02,
+    effectDescription: 'Exit multiples -1.0x. Interest rate +2%. Existing bank debt rates +1.5%. Credit tightening for 2 rounds. But: 3-4 distressed deals appear at 30-50% off.',
+    tip: 'The 2008 crisis was the best buying opportunity in a generation. Blackstone, Brookfield, and Oaktree all made their best investments during the depths.',
+    tipSource: 'Ch. VI',
+  },
+  {
     type: 'global_quiet',
     title: 'Quiet Year',
     description: 'Markets are stable. Business as usual.',

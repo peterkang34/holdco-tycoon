@@ -169,6 +169,7 @@ export function createMockGameState(overrides: Partial<GameState> = {}): GameSta
     maxAcquisitionsPerRound: 2,
     lastAcquisitionResult: null,
     lastIntegrationOutcome: null,
+    exitMultiplePenalty: 0,
     difficulty: 'easy',
     duration: 'standard',
     maxRounds: 20,

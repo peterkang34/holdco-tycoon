@@ -1085,6 +1085,44 @@ export function generateDealPipeline(
   return pipeline;
 }
 
+// Generate distressed deals during Financial Crisis (3-4 deals at 30-50% off, Q2-3)
+export function generateDistressedDeals(
+  round: number,
+  maxRounds: number = 20,
+): Deal[] {
+  const deals: Deal[] = [];
+  const count = randomInt(3, 4);
+
+  for (let i = 0; i < count; i++) {
+    const sectorId = pickWeightedSector(round, maxRounds);
+    const multipleDiscount = 0.30 + Math.random() * 0.20; // 30-50% off
+
+    deals.push(generateDealWithSize(
+      sectorId,
+      round,
+      'any',
+      0,
+      {
+        qualityFloor: 2 as QualityRating,
+        source: 'brokered',
+        freshnessBonus: 1,
+        multipleDiscount,
+        maxRounds,
+        creditTighteningActive: true,
+      }
+    ));
+  }
+
+  // Cap quality at 3 (fixable problems, not gems)
+  return deals.map(deal => ({
+    ...deal,
+    business: {
+      ...deal.business,
+      qualityRating: Math.min(3, deal.business.qualityRating) as QualityRating,
+    },
+  }));
+}
+
 // Generate additional deals through investment banker sourcing
 // More expensive but higher chance of getting deals in your focus sector
 export function generateSourcedDeals(

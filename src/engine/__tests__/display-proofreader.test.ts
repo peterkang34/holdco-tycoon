@@ -1031,6 +1031,29 @@ describe('Display Proofreader', () => {
   });
 
   // ══════════════════════════════════════════════════════════════════
+  // FINANCIAL CRISIS EVENT
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Financial Crisis Event', () => {
+    it('Financial Crisis probability = 0.02 in GLOBAL_EVENTS (Strategy A)', () => {
+      const events = readComponent('data/events.ts');
+      expect(events).toContain("type: 'global_financial_crisis'");
+      expect(events).toContain('probability: 0.02');
+    });
+
+    it('UserManualModal contains Financial Crisis (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Financial Crisis');
+    });
+
+    it('events.ts contains global_financial_crisis event definition (Strategy B)', () => {
+      const events = readComponent('data/events.ts');
+      expect(events).toContain('global_financial_crisis');
+      expect(events).toContain('distressed assets flood the market');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
   // SHARED SERVICES COSTS
   // ══════════════════════════════════════════════════════════════════
 

@@ -70,8 +70,8 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
-- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v20`
-- **Tests**: Vitest in `src/engine/__tests__/` — 703 tests across 13 suites (incl. display-proofreader)
+- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v21`
+- **Tests**: Vitest in `src/engine/__tests__/` — 714 tests across 13 suites (incl. display-proofreader)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Game loop**: 10 or 20 annual rounds — Collect → [Restructure] → Event → Allocate → End Year
@@ -81,10 +81,10 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 
 ## Key Files
 - `src/hooks/useGame.ts` — Zustand store (game actions, state transitions)
-- `src/hooks/migrations.ts` — Save migration logic (current: v20)
+- `src/hooks/migrations.ts` — Save migration logic (current: v21)
 - `src/hooks/chronicleContext.ts` — AI chronicle context builder
 - `src/engine/helpers.ts` — Shared helpers (clampMargin, capGrowthRate, applyEbitdaFloor)
-- `src/engine/__tests__/display-proofreader.test.ts` — 137 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
+- `src/engine/__tests__/display-proofreader.test.ts` — 140 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
 - `src/data/gameConfig.ts` — Game constants and configuration
 - `src/components/screens/GameScreen.tsx` — Main game screen (phase routing, toast handlers)
 - `src/components/phases/CollectPhase.tsx` — Cash flow waterfall display

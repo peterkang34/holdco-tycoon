@@ -795,6 +795,7 @@ function EventsContent() {
           ['Interest Rate Cut', 'Base rate decreases -0.5%; debt becomes cheaper'],
           ['Inflation', 'Margin compression across portfolio; costs rise faster than revenue'],
           ['Credit Tightening', 'Bank debt unavailable for several rounds; LBO structures blocked; deal heat reduced by 1 tier (fewer competing buyers)'],
+          ['Financial Crisis', 'Exit multiples -1.0x. Interest rate +2%. Existing bank debt rates +1.5%. Credit tightening for 2 rounds. 3-4 distressed deals appear at 30-50% off. ~2% probability — devastating for leveraged players, but a gift for cash-rich allocators.'],
           ['Quiet Year', 'Nothing significant happens; a chance to execute your plan undisturbed'],
         ]}
       />

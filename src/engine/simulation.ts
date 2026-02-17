@@ -590,6 +590,10 @@ export function generateEvent(state: GameState): GameEvent | null {
         const rounds = isQuickGame ? 1 : 2;
         effect = `No debt-financed acquisitions for ${rounds} round${rounds === 1 ? '' : 's'}`;
       }
+      if (eventDef.type === 'global_financial_crisis') {
+        const ctRounds = isQuickGame ? 1 : 2;
+        effect = `Exit multiples -1.0x. Interest rate +2%. Existing bank debt rates +1.5%. Credit tightening for ${ctRounds} round${ctRounds === 1 ? '' : 's'}. But: 3-4 distressed deals appear at 30-50% off.`;
+      }
       return {
         id: `event_${state.round}_${eventDef.type}`,
         type: eventDef.type,
@@ -905,6 +909,46 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
     case 'global_credit_tightening': {
       const isQuickGame = state.maxRounds <= 10;
       newState.creditTighteningRoundsRemaining = isQuickGame ? 1 : 2;
+      break;
+    }
+
+    case 'global_financial_crisis': {
+      // 1. Interest rate +2% (future debt)
+      const irBefore = state.interestRate;
+      const irAfter = Math.min(0.15, state.interestRate + 0.02);
+      newState.interestRate = irAfter;
+      impacts.push({
+        metric: 'interestRate',
+        before: irBefore,
+        after: irAfter,
+        delta: irAfter - irBefore,
+        deltaPercent: irBefore > 0 ? (irAfter - irBefore) / irBefore : 0,
+      });
+
+      // 2. Existing bank debt +1.5% (mutate bankDebtRate on all businesses with bank debt)
+      newState.businesses = newState.businesses.map(b => {
+        if (b.status !== 'active' || b.bankDebtBalance <= 0) return b;
+        const oldRate = b.bankDebtRate || 0;
+        const newRate = Math.min(0.15, oldRate + 0.015);
+        impacts.push({
+          businessId: b.id,
+          businessName: b.name,
+          metric: 'bankDebtRate',
+          before: oldRate,
+          after: newRate,
+          delta: newRate - oldRate,
+        });
+        return { ...b, bankDebtRate: newRate };
+      });
+
+      // 3. Credit tightening (additive with existing)
+      const crisisIsQuick = state.maxRounds <= 10;
+      const crisisCTRounds = crisisIsQuick ? 1 : 2;
+      newState.creditTighteningRoundsRemaining = (newState.creditTighteningRoundsRemaining || 0) + crisisCTRounds;
+
+      // 4. Exit multiple penalty
+      newState.exitMultiplePenalty = 1.0;
+
       break;
     }
 

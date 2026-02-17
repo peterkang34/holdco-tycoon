@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 16, 2025',
+    title: 'Financial Crisis Event',
+    sections: [
+      {
+        heading: 'New Global Event',
+        items: [
+          'Financial Crisis (~2% probability) — a rare, devastating event modeled after the 2008 GFC. Five simultaneous effects: exit multiples -1.0x, interest rate +2%, existing bank debt rates +1.5%, credit tightening for 2 rounds, and 3-4 distressed deals at 30-50% off.',
+          'Distressed deals bypass the normal pipeline cap — the crisis floods the market with fire-sale opportunities for cash-rich allocators.',
+          'The ultimate "did you keep powder dry?" test. Devastating for leveraged players, but a gift for disciplined capital allocators.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 16, 2025',
     title: 'Balance Tuning: Difficulty & Shared Services',
     sections: [
       {

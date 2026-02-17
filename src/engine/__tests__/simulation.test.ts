@@ -1203,3 +1203,122 @@ describe('merger exit premium', () => {
     expect(valuation.mergerPremium).toBe(0);
   });
 });
+
+// ══════════════════════════════════════════════════════════════════
+// FINANCIAL CRISIS EVENT
+// ══════════════════════════════════════════════════════════════════
+
+describe('Financial Crisis Event', () => {
+  it('should increase interest rate by +2%, capped at 15%', () => {
+    const state = createMockGameState({ interestRate: 0.07 });
+    const event = {
+      id: 'event_1_global_financial_crisis',
+      type: 'global_financial_crisis' as const,
+      title: 'Financial Crisis',
+      description: 'Test',
+      effect: 'Test',
+    };
+    const result = applyEventEffects(state, event);
+    expect(result.interestRate).toBeCloseTo(0.09, 5);
+  });
+
+  it('should cap interest rate at 15%', () => {
+    const state = createMockGameState({ interestRate: 0.14 });
+    const event = {
+      id: 'event_1_global_financial_crisis',
+      type: 'global_financial_crisis' as const,
+      title: 'Financial Crisis',
+      description: 'Test',
+      effect: 'Test',
+    };
+    const result = applyEventEffects(state, event);
+    expect(result.interestRate).toBe(0.15);
+  });
+
+  it('should increase existing bank debt rates by +1.5%, capped at 15%', () => {
+    const biz1 = createMockBusiness({ id: 'biz_1', bankDebtBalance: 1000, bankDebtRate: 0.07 });
+    const biz2 = createMockBusiness({ id: 'biz_2', bankDebtBalance: 0, bankDebtRate: 0.06 }); // no bank debt
+    const state = createMockGameState({ businesses: [biz1, biz2] });
+    const event = {
+      id: 'event_1_global_financial_crisis',
+      type: 'global_financial_crisis' as const,
+      title: 'Financial Crisis',
+      description: 'Test',
+      effect: 'Test',
+    };
+    const result = applyEventEffects(state, event);
+    const updatedBiz1 = result.businesses.find(b => b.id === 'biz_1')!;
+    const updatedBiz2 = result.businesses.find(b => b.id === 'biz_2')!;
+    expect(updatedBiz1.bankDebtRate).toBeCloseTo(0.085, 5); // 0.07 + 0.015
+    expect(updatedBiz2.bankDebtRate).toBe(0.06); // unchanged — no bank debt balance
+  });
+
+  it('should cap bank debt rate at 15%', () => {
+    const biz = createMockBusiness({ bankDebtBalance: 1000, bankDebtRate: 0.14 });
+    const state = createMockGameState({ businesses: [biz] });
+    const event = {
+      id: 'event_1_global_financial_crisis',
+      type: 'global_financial_crisis' as const,
+      title: 'Financial Crisis',
+      description: 'Test',
+      effect: 'Test',
+    };
+    const result = applyEventEffects(state, event);
+    expect(result.businesses[0].bankDebtRate).toBe(0.15);
+  });
+
+  it('should set credit tightening rounds (standard mode: 2, additive)', () => {
+    const state = createMockGameState({ creditTighteningRoundsRemaining: 1, maxRounds: 20 });
+    const event = {
+      id: 'event_1_global_financial_crisis',
+      type: 'global_financial_crisis' as const,
+      title: 'Financial Crisis',
+      description: 'Test',
+      effect: 'Test',
+    };
+    const result = applyEventEffects(state, event);
+    expect(result.creditTighteningRoundsRemaining).toBe(3); // 1 existing + 2
+  });
+
+  it('should set credit tightening rounds (quick mode: 1, additive)', () => {
+    const state = createMockGameState({ creditTighteningRoundsRemaining: 0, maxRounds: 10 });
+    const event = {
+      id: 'event_1_global_financial_crisis',
+      type: 'global_financial_crisis' as const,
+      title: 'Financial Crisis',
+      description: 'Test',
+      effect: 'Test',
+    };
+    const result = applyEventEffects(state, event);
+    expect(result.creditTighteningRoundsRemaining).toBe(1);
+  });
+
+  it('should set exitMultiplePenalty to 1.0', () => {
+    const state = createMockGameState({ exitMultiplePenalty: 0 });
+    const event = {
+      id: 'event_1_global_financial_crisis',
+      type: 'global_financial_crisis' as const,
+      title: 'Financial Crisis',
+      description: 'Test',
+      effect: 'Test',
+    };
+    const result = applyEventEffects(state, event);
+    expect(result.exitMultiplePenalty).toBe(1.0);
+  });
+});
+
+describe('Distressed Deals', () => {
+  it('should generate 3-4 distressed deals with 30-50% discount and quality 2-3', async () => {
+    // Import here to avoid top-level import issues
+    const { generateDistressedDeals } = await import('../../engine/businesses');
+    const deals = generateDistressedDeals(5, 20);
+    expect(deals.length).toBeGreaterThanOrEqual(3);
+    expect(deals.length).toBeLessThanOrEqual(4);
+    for (const deal of deals) {
+      expect(deal.business.qualityRating).toBeGreaterThanOrEqual(2);
+      expect(deal.business.qualityRating).toBeLessThanOrEqual(3);
+      expect(deal.freshness).toBe(3); // 2 base + 1 freshnessBonus
+      expect(deal.source).toBe('brokered');
+    }
+  });
+});

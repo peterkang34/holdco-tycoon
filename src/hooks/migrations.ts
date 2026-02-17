@@ -386,6 +386,30 @@ export function migrateV19ToV20(): void {
   }
 }
 
+// --- v20 → v21: Financial Crisis event + exitMultiplePenalty ---
+
+export function migrateV20ToV21(): void {
+  try {
+    const v21Key = 'holdco-tycoon-save-v21';
+    const v20Key = 'holdco-tycoon-save-v20';
+    if (localStorage.getItem(v21Key)) return;
+    const v20Raw = localStorage.getItem(v20Key);
+    if (!v20Raw) return;
+    const v20Data = JSON.parse(v20Raw);
+    if (!v20Data?.state) return;
+
+    // Backfill exitMultiplePenalty
+    if (v20Data.state.exitMultiplePenalty === undefined) {
+      v20Data.state.exitMultiplePenalty = 0;
+    }
+
+    localStorage.setItem(v21Key, JSON.stringify(v20Data));
+    localStorage.removeItem(v20Key);
+  } catch (e) {
+    console.error('v20→v21 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -402,4 +426,5 @@ export function runAllMigrations(): void {
   migrateV17ToV18();
   migrateV18ToV19();
   migrateV19ToV20();
+  migrateV20ToV21();
 }
