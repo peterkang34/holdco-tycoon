@@ -11,6 +11,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'February 17, 2025',
+    title: 'Leverage & Debt Display Fixes',
+    sections: [
+      {
+        heading: 'Fixes',
+        items: [
+          'Fixed holdco name from a previous game bleeding into the inter-year chronicle card when starting a new game.',
+          'Leverage modal now correctly breaks out Holdco Loan vs Opco Bank Debt instead of lumping all bank debt under one misleading label.',
+          'Debt totals in the Leverage modal now include tuck-in (integrated) business obligations — previously only counted standalone businesses.',
+          'Cash headroom calculation now accounts for all debt types including seller notes, preventing inflated headroom numbers.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 16, 2025',
     title: 'Better Cash Projections',
     sections: [

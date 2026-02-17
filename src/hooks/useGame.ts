@@ -299,6 +299,7 @@ export const useGameStore = create<GameStore>()(
           ...newState,
           metrics: calculateMetrics(newState),
           focusBonus: calculateSectorFocusBonus(newState.businesses),
+          yearChronicle: null,
         });
 
         // Fire telemetry (fire-and-forget)
@@ -319,6 +320,7 @@ export const useGameStore = create<GameStore>()(
           sharedServices: initializeSharedServices(),
           metrics: calculateMetrics(initialState as GameState),
           focusBonus: null,
+          yearChronicle: null,
         });
       },
 

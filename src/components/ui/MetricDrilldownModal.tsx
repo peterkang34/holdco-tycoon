@@ -516,8 +516,11 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
   }
 
   function renderLeverage() {
-    const opcoDebt = activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
-    const totalDebt = state.totalDebt + opcoDebt;
+    // Include integrated (tuck-in) businesses for complete debt picture
+    const allDebtBusinesses = state.businesses.filter(b => b.status === 'active' || b.status === 'integrated');
+    const opcoDebt = allDebtBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+    const opcoBankDebt = allDebtBusinesses.reduce((sum, b) => sum + b.bankDebtBalance, 0);
+    const totalDebt = state.holdcoLoanBalance + opcoBankDebt + opcoDebt;
     const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
     const netDebt = totalDebt - state.cash;
     const leverage = totalEbitda > 0 ? netDebt / totalEbitda : 0;
@@ -527,7 +530,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
 
     // Estimate net FCF for cash projection
     const holdcoInterestEst = Math.round(state.holdcoLoanBalance * (state.holdcoLoanRate + distressRestrictions.interestPenalty));
-    const opcoInterestEst = activeBusinesses.reduce(
+    const opcoInterestEst = allDebtBusinesses.reduce(
       (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate), 0
     );
     const preTaxFcfEst = activeBusinesses.reduce(
@@ -537,7 +540,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
 
     const covenantHeadroom = calculateCovenantHeadroom(
       state.cash,
-      state.totalDebt,
+      totalDebt,
       totalEbitda,
       state.holdcoLoanBalance,
       state.holdcoLoanRate,
@@ -599,7 +602,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
         </div>
 
         {/* Covenant Proximity Gauge — shown when there's debt */}
-        {state.totalDebt > 0 && (
+        {totalDebt > 0 && (
           <div className="bg-white/5 rounded-lg p-3 mb-4">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-medium text-text-secondary">Covenant Gauge</span>
@@ -662,13 +665,19 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
 
         <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">Debt Composition</p>
         <div className="bg-white/5 rounded-lg p-3 space-y-0 mb-4">
-          {state.totalDebt > 0 && (
+          {state.holdcoLoanBalance > 0 && (
             <div className="flex justify-between py-1.5 text-sm">
-              <span className="text-text-secondary">Holdco Bank Debt</span>
-              <span className="font-mono">{formatMoney(state.totalDebt)} @ {(state.interestRate * 100).toFixed(1)}%</span>
+              <span className="text-text-secondary">Holdco Loan</span>
+              <span className="font-mono">{formatMoney(state.holdcoLoanBalance)} @ {(state.holdcoLoanRate * 100).toFixed(1)}% ({state.holdcoLoanRoundsRemaining}yr left)</span>
             </div>
           )}
-          {activeBusinesses.filter(b => b.sellerNoteBalance > 0).map(b => (
+          {opcoBankDebt > 0 && (
+            <div className="flex justify-between py-1.5 text-sm">
+              <span className="text-text-secondary">Opco Bank Debt</span>
+              <span className="font-mono">{formatMoney(opcoBankDebt)}</span>
+            </div>
+          )}
+          {allDebtBusinesses.filter(b => b.sellerNoteBalance > 0).map(b => (
             <div key={b.id} className="flex justify-between py-1.5 text-sm">
               <span className="text-text-secondary pl-2">{b.name} seller note</span>
               <span className="font-mono text-xs">
