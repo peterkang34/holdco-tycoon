@@ -79,6 +79,7 @@ export interface CovenantHeadroom {
   headroomRatio: number;
   headroomCash: number;
   nextYearDebtService: number;
+  estimatedNetFcf: number;
   projectedCashAfterDebt: number;
   cashWillGoNegative: boolean;
 }
@@ -102,6 +103,7 @@ export function calculateCovenantHeadroom(
   businesses: Business[],
   interestRate: number,
   interestPenalty: number,
+  estimatedNetFcf: number = 0,
 ): CovenantHeadroom {
   const breachThreshold = 4.5;
 
@@ -140,7 +142,7 @@ export function calculateCovenantHeadroom(
     }
   }
 
-  const projectedCashAfterDebt = cash - debtService;
+  const projectedCashAfterDebt = cash + estimatedNetFcf - debtService;
 
   return {
     currentLeverage,
@@ -148,6 +150,7 @@ export function calculateCovenantHeadroom(
     headroomRatio,
     headroomCash,
     nextYearDebtService: debtService,
+    estimatedNetFcf,
     projectedCashAfterDebt,
     cashWillGoNegative: projectedCashAfterDebt < 0,
   };

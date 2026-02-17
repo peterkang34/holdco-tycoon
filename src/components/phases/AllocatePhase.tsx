@@ -26,7 +26,7 @@ import { SECTOR_LIST } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
 import { generateDealStructures, getStructureLabel, getStructureDescription } from '../../engine/deals';
-import { calculateExitValuation } from '../../engine/simulation';
+import { calculateExitValuation, calculateAnnualFcf, calculatePortfolioTax } from '../../engine/simulation';
 import { getSubTypeAffinity, getSizeRatioTier } from '../../engine/businesses';
 import { SECTORS } from '../../data/sectors';
 import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES, MA_SOURCING_CONFIG, getMASourcingUpgradeCost, getMASourcingAnnualCost } from '../../data/sharedServices';
@@ -229,18 +229,38 @@ export function AllocatePhase({
     activeBusinesses.length >= MIN_OPCOS_FOR_SHARED_SERVICES &&
     activeServicesCount < MAX_ACTIVE_SHARED_SERVICES;
 
+  // Estimate net FCF for covenant headroom projection
+  const sharedServicesCostAnnual = sharedServices.filter(s => s.active).reduce((sum, s) => sum + s.annualCost, 0);
+  const hasProcurement = sharedServices.some(s => s.type === 'procurement' && s.active);
+  const hasFinance = sharedServices.some(s => s.type === 'finance_reporting' && s.active);
+  const ssCapexReduction = hasProcurement ? 0.15 : 0;
+  const ssCashConversionBonus = hasFinance ? 0.05 : 0;
+
   // Covenant headroom — updates in real-time as cash changes
-  const covenantHeadroom = useMemo(() => calculateCovenantHeadroom(
-    cash,
-    totalDebt,
-    totalEbitda,
-    holdcoLoanBalance,
-    holdcoLoanRate,
-    holdcoLoanRoundsRemaining,
-    allBusinesses,
-    interestRate,
-    distressRestrictions.interestPenalty,
-  ), [cash, totalDebt, totalEbitda, holdcoLoanBalance, holdcoLoanRate, holdcoLoanRoundsRemaining, allBusinesses, interestRate, distressRestrictions.interestPenalty]);
+  const covenantHeadroom = useMemo(() => {
+    const preTaxFcf = activeBusinesses.reduce(
+      (sum, b) => sum + calculateAnnualFcf(b, ssCapexReduction, ssCashConversionBonus), 0
+    );
+    const holdcoInterestEst = Math.round(holdcoLoanBalance * (holdcoLoanRate + distressRestrictions.interestPenalty));
+    const opcoInterestEst = allBusinesses.reduce(
+      (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate), 0
+    );
+    const taxEst = calculatePortfolioTax(activeBusinesses, holdcoLoanBalance, holdcoLoanRate, sharedServicesCostAnnual);
+    const estimatedNetFcf = preTaxFcf - taxEst.taxAmount - holdcoInterestEst - opcoInterestEst - sharedServicesCostAnnual;
+
+    return calculateCovenantHeadroom(
+      cash,
+      totalDebt,
+      totalEbitda,
+      holdcoLoanBalance,
+      holdcoLoanRate,
+      holdcoLoanRoundsRemaining,
+      allBusinesses,
+      interestRate,
+      distressRestrictions.interestPenalty,
+      estimatedNetFcf,
+    );
+  }, [cash, totalDebt, totalEbitda, holdcoLoanBalance, holdcoLoanRate, holdcoLoanRoundsRemaining, allBusinesses, interestRate, distressRestrictions.interestPenalty, activeBusinesses, ssCapexReduction, ssCashConversionBonus, sharedServicesCostAnnual]);
 
   // Platform and tuck-in helpers
   const platforms = activeBusinesses.filter(b => b.isPlatform);
@@ -2740,7 +2760,7 @@ export function AllocatePhase({
                     <p className="font-mono font-medium text-text-primary">~{formatMoney(covenantHeadroom.nextYearDebtService)}</p>
                   </div>
                   <div className="col-span-2">
-                    <span className="text-text-muted text-xs">Projected cash after debt service</span>
+                    <span className="text-text-muted text-xs">Projected yr-end cash (incl. FCF)</span>
                     <p className={`font-mono font-medium ${covenantHeadroom.cashWillGoNegative ? 'text-red-400' : 'text-text-primary'}`}>
                       ~{formatMoney(covenantHeadroom.projectedCashAfterDebt)}
                     </p>

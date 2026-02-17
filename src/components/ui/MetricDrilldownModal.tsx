@@ -524,6 +524,17 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
 
     const distressLevel = calculateDistressLevel(leverage, totalDebt, totalEbitda);
     const distressRestrictions = getDistressRestrictions(distressLevel);
+
+    // Estimate net FCF for cash projection
+    const holdcoInterestEst = Math.round(state.holdcoLoanBalance * (state.holdcoLoanRate + distressRestrictions.interestPenalty));
+    const opcoInterestEst = activeBusinesses.reduce(
+      (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate), 0
+    );
+    const preTaxFcfEst = activeBusinesses.reduce(
+      (sum, b) => sum + calculateAnnualFcf(b, ssBenefits.capexReduction, ssBenefits.cashConversionBonus), 0
+    );
+    const estimatedNetFcf = preTaxFcfEst - taxBreakdown.taxAmount - holdcoInterestEst - opcoInterestEst - sharedServicesCost;
+
     const covenantHeadroom = calculateCovenantHeadroom(
       state.cash,
       state.totalDebt,
@@ -534,6 +545,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
       state.businesses,
       state.interestRate,
       distressRestrictions.interestPenalty,
+      estimatedNetFcf,
     );
 
     const getLeverageColor = (ratio: number) => {
@@ -620,7 +632,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
                 />
               )}
             </div>
-            <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="grid grid-cols-2 gap-2 text-xs">
               <div>
                 <span className="text-text-muted">Cash headroom</span>
                 <p className={`font-mono font-medium ${covenantHeadroom.headroomCash <= 0 ? 'text-red-400' : covenantHeadroom.headroomCash < 2000 ? 'text-yellow-400' : 'text-text-primary'}`}>
@@ -628,11 +640,17 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
                 </p>
               </div>
               <div>
+                <span className="text-text-muted">Est. net FCF</span>
+                <p className={`font-mono font-medium ${covenantHeadroom.estimatedNetFcf < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                  ~{formatMoney(covenantHeadroom.estimatedNetFcf)}
+                </p>
+              </div>
+              <div>
                 <span className="text-text-muted">Next yr debt svc</span>
                 <p className="font-mono font-medium text-text-primary">~{formatMoney(covenantHeadroom.nextYearDebtService)}</p>
               </div>
               <div>
-                <span className="text-text-muted">Cash after debt</span>
+                <span className="text-text-muted">Projected yr-end cash</span>
                 <p className={`font-mono font-medium ${covenantHeadroom.cashWillGoNegative ? 'text-red-400' : 'text-text-primary'}`}>
                   ~{formatMoney(covenantHeadroom.projectedCashAfterDebt)}
                   {covenantHeadroom.cashWillGoNegative && <span className="text-red-400 ml-1">(!)</span>}

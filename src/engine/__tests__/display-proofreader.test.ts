@@ -407,7 +407,7 @@ describe('Display Proofreader', () => {
       const allocate = readComponent('components/phases/AllocatePhase.tsx');
       expect(allocate).toContain('Year-End Forecast');
       expect(allocate).toContain('Debt service (next yr)');
-      expect(allocate).toContain('Projected cash after debt service');
+      expect(allocate).toContain('Projected yr-end cash (incl. FCF)');
     });
   });
 

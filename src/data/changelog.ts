@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 16, 2025',
+    title: 'Better Cash Projections',
+    sections: [
+      {
+        heading: 'UX Improvement',
+        items: [
+          'Year-end cash projections now include estimated net free cash flow from your portfolio — no longer shows misleadingly negative numbers when you have profitable businesses.',
+          'Covenant headroom modal and Allocate Phase both show projected yr-end cash that accounts for business FCF minus taxes, interest, and shared services.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 16, 2025',
     title: 'Rollover Equity',
     sections: [
       {
