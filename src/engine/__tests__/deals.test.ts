@@ -298,3 +298,139 @@ describe('getStructureDescription', () => {
     }
   });
 });
+
+// ── Rollover Equity Tests ──
+
+describe('Rollover Equity', () => {
+  // Use a deal ID whose seed % 10 >= 5 to pass the rollover check
+  const rolloverDealId = 'deal_rollover_test'; // seed = sum of char codes, check passes
+
+  it('should generate rollover when all gates pass (tier 2+, Q3+, valid archetype, seed hits)', () => {
+    const deal = createMockDeal({ id: rolloverDealId, sellerArchetype: 'retiring_founder' });
+    deal.business.qualityRating = 4;
+    const structs = generateDealStructures(deal, 20000, 0.07, false, 20, false, 2, 'standard', 'retiring_founder');
+    const rollover = structs.find(s => s.type === 'rollover_equity');
+    expect(rollover).toBeDefined();
+    expect(rollover!.rolloverEquityPct).toBe(0.25);
+  });
+
+  it('should NOT generate when MA tier < 2', () => {
+    const deal = createMockDeal({ id: rolloverDealId, sellerArchetype: 'retiring_founder' });
+    deal.business.qualityRating = 4;
+    const structs = generateDealStructures(deal, 20000, 0.07, false, 20, false, 1, 'standard', 'retiring_founder');
+    expect(structs.find(s => s.type === 'rollover_equity')).toBeUndefined();
+  });
+
+  it('should NOT generate for distressed_seller', () => {
+    const deal = createMockDeal({ id: rolloverDealId, sellerArchetype: 'distressed_seller' });
+    deal.business.qualityRating = 4;
+    const structs = generateDealStructures(deal, 20000, 0.07, false, 20, false, 2, 'standard', 'distressed_seller');
+    expect(structs.find(s => s.type === 'rollover_equity')).toBeUndefined();
+  });
+
+  it('should NOT generate for burnt_out_operator', () => {
+    const deal = createMockDeal({ id: rolloverDealId, sellerArchetype: 'burnt_out_operator' });
+    deal.business.qualityRating = 4;
+    const structs = generateDealStructures(deal, 20000, 0.07, false, 20, false, 2, 'standard', 'burnt_out_operator');
+    expect(structs.find(s => s.type === 'rollover_equity')).toBeUndefined();
+  });
+
+  it('should NOT generate for quality 1-2', () => {
+    const deal = createMockDeal({ id: rolloverDealId });
+    deal.business.qualityRating = 2;
+    const structs = generateDealStructures(deal, 20000, 0.07, false, 20, false, 2, 'standard', undefined);
+    expect(structs.find(s => s.type === 'rollover_equity')).toBeUndefined();
+  });
+
+  it('should use standard config: 65/25/10 split', () => {
+    const deal = createMockDeal({ id: rolloverDealId });
+    deal.business.qualityRating = 4;
+    const structs = generateDealStructures(deal, 20000, 0.07, false, 20, false, 2, 'standard', undefined);
+    const rollover = structs.find(s => s.type === 'rollover_equity');
+    if (!rollover) { expect(rollover).toBeDefined(); return; }
+    const totalPrice = deal.effectivePrice;
+    expect(rollover.cashRequired).toBe(Math.round(totalPrice * 0.65));
+    expect(rollover.sellerNote!.amount).toBe(Math.round(totalPrice * 0.10));
+    expect(rollover.rolloverEquityPct).toBe(0.25);
+  });
+
+  it('should use quick config: 70/20/10 split', () => {
+    const deal = createMockDeal({ id: rolloverDealId });
+    deal.business.qualityRating = 4;
+    const structs = generateDealStructures(deal, 20000, 0.07, false, 10, false, 2, 'quick', undefined);
+    const rollover = structs.find(s => s.type === 'rollover_equity');
+    if (!rollover) { expect(rollover).toBeDefined(); return; }
+    const totalPrice = deal.effectivePrice;
+    expect(rollover.cashRequired).toBe(Math.round(totalPrice * 0.70));
+    expect(rollover.sellerNote!.amount).toBe(Math.round(totalPrice * 0.10));
+    expect(rollover.rolloverEquityPct).toBe(0.20);
+  });
+
+  it('executeDealStructure sets rolloverEquityPct correctly', () => {
+    const deal = createMockDeal({ id: rolloverDealId });
+    deal.business.qualityRating = 4;
+    const structure = createMockDealStructure({
+      type: 'rollover_equity',
+      cashRequired: 2600,
+      rolloverEquityPct: 0.25,
+      sellerNote: { amount: 400, rate: 0.04, termRounds: 5 },
+    });
+    const biz = executeDealStructure(deal, structure, 1, 20);
+    expect(biz.rolloverEquityPct).toBe(0.25);
+  });
+
+  it('executeDealStructure applies growth/margin bonuses for rollover', () => {
+    const deal = createMockDeal({ id: rolloverDealId });
+    deal.business.qualityRating = 4;
+    const baseGrowth = deal.business.organicGrowthRate;
+    const baseMargin = deal.business.ebitdaMargin;
+    const structure = createMockDealStructure({
+      type: 'rollover_equity',
+      cashRequired: 2600,
+      rolloverEquityPct: 0.25,
+      sellerNote: { amount: 400, rate: 0.04, termRounds: 5 },
+    });
+    const biz = executeDealStructure(deal, structure, 1, 20);
+    expect(biz.organicGrowthRate).toBeCloseTo(baseGrowth + 0.015);
+    expect(biz.revenueGrowthRate).toBeCloseTo(baseGrowth + 0.015);
+    expect(biz.ebitdaMargin).toBeCloseTo(baseMargin + 0.005);
+  });
+
+  it('getStructureLabel returns Rollover Equity', () => {
+    expect(getStructureLabel('rollover_equity')).toBe('Rollover Equity');
+  });
+
+  it('getStructureDescription includes exit share info', () => {
+    const structure: DealStructure = {
+      type: 'rollover_equity',
+      cashRequired: 2600,
+      rolloverEquityPct: 0.25,
+      sellerNote: { amount: 400, rate: 0.04, termRounds: 5 },
+      leverage: 0.4,
+      risk: 'low',
+    };
+    const desc = getStructureDescription(structure);
+    expect(desc).toContain('25%');
+    expect(desc).toContain('rolls over');
+  });
+
+  it('should NOT generate when seed misses (~50% check)', () => {
+    // Find a deal ID whose seed % 10 < 5
+    const lowSeedDeal = createMockDeal({ id: 'deal_a' }); // 'deal_a' has low seed
+    lowSeedDeal.business.qualityRating = 4;
+    // Try multiple seeds — at least one should miss
+    const ids = ['deal_a', 'deal_b', 'deal_c', 'deal_d', 'deal_e'];
+    let someHit = false;
+    let someMiss = false;
+    for (const id of ids) {
+      const d = createMockDeal({ id });
+      d.business.qualityRating = 4;
+      const structs = generateDealStructures(d, 20000, 0.07, false, 20, false, 2, 'standard', undefined);
+      if (structs.find(s => s.type === 'rollover_equity')) someHit = true;
+      else someMiss = true;
+    }
+    // The seed-based check should result in roughly 50% — at least one hit and one miss across 5 deals
+    expect(someHit).toBe(true);
+    expect(someMiss).toBe(true);
+  });
+});

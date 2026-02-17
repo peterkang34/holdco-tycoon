@@ -142,6 +142,7 @@ export interface Business {
   integratedPlatformId?: string; // ID of the integrated platform this business belongs to
 
   qualityImprovedTiers?: number; // tracks total quality improvement for exit premium
+  rolloverEquityPct: number; // 0-1 — seller's retained equity share (0 = no rollover)
 
   // Dynamic narratives
   storyBeats?: StoryBeat[]; // Narrative events that happened to this business
@@ -204,7 +205,7 @@ export interface Deal {
 export type SellerArchetype = 'retiring_founder' | 'burnt_out_operator' | 'accidental_holdco'
   | 'distressed_seller' | 'mbo_candidate' | 'franchise_breakaway';
 
-export type DealStructureType = 'all_cash' | 'seller_note' | 'bank_debt' | 'earnout' | 'seller_note_bank_debt';
+export type DealStructureType = 'all_cash' | 'seller_note' | 'bank_debt' | 'earnout' | 'seller_note_bank_debt' | 'rollover_equity';
 
 export interface DealStructure {
   type: DealStructureType;
@@ -223,6 +224,7 @@ export interface DealStructure {
     amount: number;
     targetEbitdaGrowth: number;
   };
+  rolloverEquityPct?: number;
   leverage: number;
   risk: 'low' | 'medium' | 'high';
 }

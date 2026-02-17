@@ -156,6 +156,15 @@ export function BusinessCard({
               <p className="text-sm text-text-secondary font-normal">Recently acquired — organic growth is dampened during integration. {business.integrationRoundsRemaining} year{business.integrationRoundsRemaining !== 1 ? 's' : ''} remaining until fully integrated.</p>
             </Tooltip>
           )}
+          {business.rolloverEquityPct > 0 && (
+            <Tooltip
+              trigger={<span className="text-xs bg-accent/20 text-accent px-1.5 py-0.5 rounded">{Math.round(business.rolloverEquityPct * 100)}% Rollover</span>}
+              align="right"
+              width="w-48 md:w-56"
+            >
+              <p className="text-sm text-text-secondary font-normal">Seller retains {Math.round(business.rolloverEquityPct * 100)}% equity. At exit, they receive that share of net proceeds.</p>
+            </Tooltip>
+          )}
         </div>
       </div>
 

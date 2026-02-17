@@ -57,6 +57,16 @@ export const EQUITY_BUYBACK_COOLDOWN = 2;   // rounds between raise↔buyback
 
 export const EARNOUT_EXPIRATION_YEARS = 4; // earn-outs expire after 4 years
 
+// ── Rollover Equity Constants ──
+
+export const ROLLOVER_EQUITY_CONFIG = {
+  standard: { cashPct: 0.65, rolloverPct: 0.25, notePct: 0.10, growthBonus: 0.015, marginBonus: 0.005, noteRate: 0.05 },
+  quick:    { cashPct: 0.70, rolloverPct: 0.20, notePct: 0.10, growthBonus: 0.020, marginBonus: 0.005, noteRate: 0.05 },
+} as const;
+export const ROLLOVER_MIN_QUALITY = 3;
+export const ROLLOVER_MIN_MA_TIER = 2;
+export const ROLLOVER_EXCLUDED_ARCHETYPES: string[] = ['distressed_seller', 'burnt_out_operator'];
+
 // ── Platform Sale Constants ──
 
 export const PLATFORM_SALE_BONUS = 0.8;  // +0.8x multiple for selling entire platform as a unit

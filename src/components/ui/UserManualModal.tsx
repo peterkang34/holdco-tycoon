@@ -261,7 +261,7 @@ function AcquiringContent() {
       </P>
 
       <SubHeading>Deal Structures</SubHeading>
-      <P>Five deal structures are available depending on the deal and your financial position:</P>
+      <P>Six deal structures are available depending on the deal and your financial position:</P>
       <DataTable
         headers={['Structure', 'Equity %', 'Debt/Other %', 'Risk', 'Notes']}
         rows={[
@@ -270,8 +270,22 @@ function AcquiringContent() {
           ['Bank Debt', '35%', '65% bank debt', 'High', 'At current interest rate; not available during credit tightening'],
           ['Earn-out', '55%', '45% contingent', 'Medium', 'Contingent on EBITDA growth targets; 4yr window; available for Q3+ deals'],
           ['LBO', '25%', '35% note + 40% bank', 'High', 'Maximum leverage; not available during credit tightening'],
+          ['Rollover Equity', '65%', '25% rollover + 10% note', 'Low', 'Seller reinvests equity at 5% note rate; requires M&A Sourcing Tier 2+, Q3+; not available during financial stress'],
         ]}
       />
+
+      <SubHeading>Rollover Equity</SubHeading>
+      <P>
+        The most common PE acquisition structure in the lower-middle-market. The seller &ldquo;sells&rdquo; 100%
+        but immediately reinvests ~25% of proceeds back as equity, keeping them aligned with your success.
+      </P>
+      <BulletList items={[
+        'Standard mode: 65% cash / 25% rollover / 10% seller note. Quick mode: 70% / 20% / 10%',
+        'Requires M&A Sourcing Tier 2+ and Quality 3+. Not available for distressed sellers, burnt-out operators, or during financial stress',
+        'Growth bonus: +1.5% (standard) or +2.0% (quick) revenue and organic growth. Margin bonus: +0.5%',
+        'At exit, seller receives their rollover % of net proceeds (after debt payoff)',
+        'Best for capital-efficient strategies — deploy less cash per deal while keeping the seller motivated',
+      ]} />
 
       <SubHeading>Quality Ratings</SubHeading>
       <P>
@@ -769,8 +783,15 @@ function SellingContent() {
         When you sell a business, the net proceeds are calculated as:
       </P>
       <HighlightBox>
-        Net Proceeds = Exit Price - Outstanding Seller Notes - Outstanding Earn-outs
+        Net Proceeds = Exit Price - Outstanding Debt - Outstanding Earn-outs
+        <br />
+        Your Share = Net Proceeds &times; (1 - Seller Rollover %)
       </HighlightBox>
+      <P>
+        If the business was acquired with rollover equity, the seller receives their rollover percentage
+        of net proceeds at exit. This applies to all exit paths including direct sales, unsolicited offers,
+        and distressed sales.
+      </P>
 
     </>
   );
@@ -1082,6 +1103,12 @@ function GlossaryContent() {
           <strong className="text-white">LBO (Leveraged Buyout)</strong> &mdash; An acquisition
           structure using maximum leverage: 25% cash equity + 35% seller note + 40% bank debt.
           High risk, high potential return if the business performs well.
+        </div>
+        <div>
+          <strong className="text-white">Rollover Equity</strong> &mdash; A deal structure where
+          the seller reinvests ~25% (standard) or ~20% (quick) of their proceeds as equity in the acquired business. Reduces
+          your cash outlay and keeps the seller aligned. Seller note at 5%. At exit, the seller receives their
+          rollover percentage of net proceeds. Requires M&amp;A Sourcing Tier 2+, Quality 3+, and no financial stress.
         </div>
         <div>
           <strong className="text-white">Rule of 40</strong> &mdash; A SaaS/tech metric where

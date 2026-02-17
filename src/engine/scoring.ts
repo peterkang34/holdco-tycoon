@@ -42,11 +42,20 @@ export function calculateEnterpriseValue(state: GameState): number {
   // Calculate total EBITDA and blended exit multiple using full valuation engine
   let totalEbitda = 0;
   let weightedMultiple = 0;
+  let rolloverClaims = 0;
 
   for (const business of activeBusinesses) {
     const valuation = calculateExitValuation(business, maxRounds, undefined, undefined, state.integratedPlatforms);
     totalEbitda += business.ebitda;
     weightedMultiple += business.ebitda * valuation.totalMultiple;
+
+    // Deduct rollover equity claims — seller's share of each business's net value
+    if (business.rolloverEquityPct && business.rolloverEquityPct > 0) {
+      const bizGrossValue = business.ebitda * valuation.totalMultiple;
+      const bizDebt = business.sellerNoteBalance + business.bankDebtBalance;
+      const bizNetValue = Math.max(0, bizGrossValue - bizDebt);
+      rolloverClaims += bizNetValue * business.rolloverEquityPct;
+    }
   }
 
   const blendedMultiple = totalEbitda > 0 ? weightedMultiple / totalEbitda : 0;
@@ -59,8 +68,8 @@ export function calculateEnterpriseValue(state: GameState): number {
   );
   const totalDebt = state.totalDebt + opcoSellerNotes;
 
-  // EV = Portfolio Value + Cash - All Debt (no distribution add-back)
-  const ev = portfolioValue + state.cash - totalDebt;
+  // EV = Portfolio Value + Cash - All Debt - Rollover Claims (no distribution add-back)
+  const ev = portfolioValue + state.cash - totalDebt - rolloverClaims;
 
   return Math.round(Math.max(0, ev));
 }

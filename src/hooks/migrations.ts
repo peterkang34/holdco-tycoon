@@ -440,6 +440,38 @@ export function migrateV21ToV22(): void {
   }
 }
 
+// --- v22 → v23: rollover equity ---
+
+export function migrateV22ToV23(): void {
+  try {
+    const v23Key = 'holdco-tycoon-save-v23';
+    const v22Key = 'holdco-tycoon-save-v22';
+    if (localStorage.getItem(v23Key)) return;
+    const v22Raw = localStorage.getItem(v22Key);
+    if (!v22Raw) return;
+    const v22Data = JSON.parse(v22Raw);
+    if (!v22Data?.state) return;
+
+    // Backfill rolloverEquityPct on all businesses
+    const backfillBusiness = (b: any) => ({
+      ...b,
+      rolloverEquityPct: b.rolloverEquityPct ?? 0,
+    });
+
+    if (Array.isArray(v22Data.state.businesses)) {
+      v22Data.state.businesses = v22Data.state.businesses.map(backfillBusiness);
+    }
+    if (Array.isArray(v22Data.state.exitedBusinesses)) {
+      v22Data.state.exitedBusinesses = v22Data.state.exitedBusinesses.map(backfillBusiness);
+    }
+
+    localStorage.setItem(v23Key, JSON.stringify(v22Data));
+    localStorage.removeItem(v22Key);
+  } catch (e) {
+    console.error('v22→v23 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -458,4 +490,5 @@ export function runAllMigrations(): void {
   migrateV19ToV20();
   migrateV20ToV21();
   migrateV21ToV22();
+  migrateV22ToV23();
 }

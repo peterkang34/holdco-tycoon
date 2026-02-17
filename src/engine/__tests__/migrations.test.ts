@@ -8,6 +8,7 @@ import {
   migrateV14ToV15,
   migrateV16ToV17,
   migrateV17ToV18,
+  migrateV22ToV23,
   runAllMigrations,
 } from '../../hooks/migrations';
 
@@ -423,7 +424,7 @@ describe('runAllMigrations', () => {
     // v9 should be consumed
     expect(localStorageMock.getItem('holdco-tycoon-save-v9')).toBeNull();
     // Final v22 should exist (chain goes through all migrations including v21→v22)
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v22')!);
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v23')!);
     expect(result.state.difficulty).toBe('easy');
     expect(result.state.maxRounds).toBe(20);
     expect(result.state.founderDistributionsReceived).toBeDefined();
@@ -451,6 +452,8 @@ describe('runAllMigrations', () => {
     expect(result.state.holdcoLoanBalance).toBeDefined();
     expect(result.state.holdcoLoanRate).toBeDefined();
     expect(result.state.holdcoLoanRoundsRemaining).toBeDefined();
+    // v22→v23 fields (rollover equity)
+    expect(result.state.businesses[0].rolloverEquityPct).toBe(0);
   });
 
   it('should be safe to call multiple times (idempotent)', () => {
@@ -464,10 +467,10 @@ describe('runAllMigrations', () => {
     localStorageMock.setItem('holdco-tycoon-save-v14', JSON.stringify(v14Data));
 
     runAllMigrations();
-    const first = localStorageMock.getItem('holdco-tycoon-save-v22');
+    const first = localStorageMock.getItem('holdco-tycoon-save-v23');
 
     runAllMigrations();
-    const second = localStorageMock.getItem('holdco-tycoon-save-v22');
+    const second = localStorageMock.getItem('holdco-tycoon-save-v23');
 
     expect(first).toBe(second);
   });
@@ -534,5 +537,39 @@ describe('v17 → v18 migration (escalating dilution + cooldown)', () => {
 
     expect(localStorageMock.getItem('holdco-tycoon-save-v17')).toBeNull();
     expect(localStorageMock.getItem('holdco-tycoon-save-v18')).not.toBeNull();
+  });
+});
+
+describe('v22 → v23 migration (rollover equity)', () => {
+  it('should backfill rolloverEquityPct: 0 on all businesses', () => {
+    const v22Data = {
+      state: {
+        businesses: [{ id: 'biz_1', ebitda: 1000 }, { id: 'biz_2', ebitda: 2000 }],
+        exitedBusinesses: [{ id: 'biz_3', ebitda: 500 }],
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v22', JSON.stringify(v22Data));
+
+    migrateV22ToV23();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v23')!);
+    expect(result.state.businesses[0].rolloverEquityPct).toBe(0);
+    expect(result.state.businesses[1].rolloverEquityPct).toBe(0);
+    expect(result.state.exitedBusinesses[0].rolloverEquityPct).toBe(0);
+  });
+
+  it('should not overwrite existing rolloverEquityPct', () => {
+    const v22Data = {
+      state: {
+        businesses: [{ id: 'biz_1', rolloverEquityPct: 0.25 }],
+        exitedBusinesses: [],
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v22', JSON.stringify(v22Data));
+
+    migrateV22ToV23();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v23')!);
+    expect(result.state.businesses[0].rolloverEquityPct).toBe(0.25);
   });
 });

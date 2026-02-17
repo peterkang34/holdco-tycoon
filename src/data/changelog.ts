@@ -12,6 +12,22 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 16, 2025',
+    title: 'Rollover Equity',
+    sections: [
+      {
+        heading: 'New Deal Structure',
+        items: [
+          'Rollover Equity — the most common PE acquisition structure in the lower-middle-market. The seller reinvests ~25% as equity, reducing your cash outlay and keeping them aligned.',
+          'Standard mode: 65% cash / 25% rollover / 10% seller note. Quick mode: 70% / 20% / 10%. Both include growth and margin bonuses from an aligned seller.',
+          'Requires M&A Sourcing Tier 2+ and Quality 3+. Not available for distressed sellers or burnt-out operators.',
+          'At exit, seller receives their rollover share of net proceeds. Merging two businesses with different rollover creates a weighted average.',
+          'Game-end FEV correctly deducts rollover claims from portfolio value. MOIC uses gross proceeds — measures deal quality, not ownership structure.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 16, 2025',
     title: 'Bug Fixes & Action Feedback',
     sections: [
       {

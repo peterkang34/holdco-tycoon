@@ -1,4 +1,11 @@
-import { Deal, DealStructure, DealStructureType, Business } from './types';
+import { Deal, DealStructure, DealStructureType, Business, GameDuration } from './types';
+import { clampMargin } from './helpers';
+import {
+  ROLLOVER_EQUITY_CONFIG,
+  ROLLOVER_MIN_QUALITY,
+  ROLLOVER_MIN_MA_TIER,
+  ROLLOVER_EXCLUDED_ARCHETYPES,
+} from '../data/gameConfig';
 
 export function generateDealStructures(
   deal: Deal,
@@ -7,6 +14,9 @@ export function generateDealStructures(
   creditTightening: boolean,
   maxRounds: number = 20,
   noNewDebt: boolean = false,
+  maSourcingTier: number = 0,
+  duration: GameDuration = 'standard',
+  sellerArchetype?: string,
 ): DealStructure[] {
   const askingPrice = deal.effectivePrice;
   const structures: DealStructure[] = [];
@@ -123,13 +133,42 @@ export function generateDealStructures(
     }
   }
 
+  // Option F: Rollover Equity — seller reinvests ~25% (standard) or ~20% (quick) as equity
+  if (
+    !noNewDebt &&
+    maSourcingTier >= ROLLOVER_MIN_MA_TIER &&
+    deal.business.qualityRating >= ROLLOVER_MIN_QUALITY &&
+    (!sellerArchetype || !ROLLOVER_EXCLUDED_ARCHETYPES.includes(sellerArchetype)) &&
+    (seed % 10) >= 5
+  ) {
+    const config = ROLLOVER_EQUITY_CONFIG[duration === 'quick' ? 'quick' : 'standard'];
+    const rolloverCash = Math.round(askingPrice * config.cashPct);
+    const noteAmount = Math.round(askingPrice * config.notePct);
+
+    if (playerCash >= rolloverCash) {
+      structures.push({
+        type: 'rollover_equity',
+        cashRequired: rolloverCash,
+        sellerNote: {
+          amount: noteAmount,
+          rate: config.noteRate,
+          termRounds: sellerNoteTerms,
+        },
+        rolloverEquityPct: config.rolloverPct,
+        leverage: Math.round((noteAmount / deal.business.ebitda) * 10) / 10,
+        risk: 'low',
+      });
+    }
+  }
+
   return structures;
 }
 
 export function executeDealStructure(
   deal: Deal,
   structure: DealStructure,
-  round: number
+  round: number,
+  maxRounds: number = 20,
 ): Business {
   const business: Business = {
     ...deal.business,
@@ -146,7 +185,17 @@ export function executeDealStructure(
     bankDebtRoundsRemaining: structure.bankDebt?.termRounds ?? 0,
     earnoutRemaining: structure.earnout?.amount ?? 0,
     earnoutTarget: structure.earnout?.targetEbitdaGrowth ?? 0,
+    rolloverEquityPct: structure.rolloverEquityPct ?? 0,
   };
+
+  // Rollover equity bonuses — aligned seller drives better operations
+  if (structure.type === 'rollover_equity' && structure.rolloverEquityPct && structure.rolloverEquityPct > 0) {
+    const isQuick = maxRounds <= 10;
+    const config = ROLLOVER_EQUITY_CONFIG[isQuick ? 'quick' : 'standard'];
+    business.organicGrowthRate += config.growthBonus;
+    business.revenueGrowthRate += config.growthBonus;
+    business.ebitdaMargin = clampMargin(business.ebitdaMargin + config.marginBonus);
+  }
 
   // Adjust for operator quality - weak operators mean longer integration
   if (deal.business.dueDiligence.operatorQuality === 'weak') {
@@ -170,6 +219,8 @@ export function getStructureLabel(type: DealStructureType): string {
       return 'Earn-out';
     case 'seller_note_bank_debt':
       return 'LBO (Note + Debt)';
+    case 'rollover_equity':
+      return 'Rollover Equity';
   }
 }
 
@@ -189,6 +240,12 @@ export function getStructureDescription(structure: DealStructure): string {
       const notePct = Math.round(((structure.sellerNote?.amount ?? 0) / total) * 100);
       const debtPct = 100 - equityPct - notePct;
       return `${equityPct}% equity, ${notePct}% seller note at ${((structure.sellerNote?.rate ?? 0) * 100).toFixed(1)}%, ${debtPct}% bank debt. Classic LBO structure — maximum leverage, holdco guarantees bank debt.`;
+    }
+    case 'rollover_equity': {
+      const rolloverPct = Math.round((structure.rolloverEquityPct ?? 0) * 100);
+      const totalPrice = structure.cashRequired + (structure.sellerNote?.amount ?? 0) + Math.round((structure.cashRequired + (structure.sellerNote?.amount ?? 0)) * (structure.rolloverEquityPct ?? 0) / (1 - (structure.rolloverEquityPct ?? 0)));
+      const cashPct = Math.round((structure.cashRequired / totalPrice) * 100);
+      return `Seller rolls over ${rolloverPct}% as equity, reducing your cash outlay to ${cashPct}% of price. Seller stays aligned post-close — growth and margin bonuses. At exit, seller receives ${rolloverPct}% of net proceeds.`;
     }
   }
 }

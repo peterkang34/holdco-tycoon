@@ -892,7 +892,7 @@ export const useGameStore = create<GameStore>()(
           return;
         }
 
-        const newBusiness = executeDealStructure(deal, structure, state.round);
+        const newBusiness = executeDealStructure(deal, structure, state.round, state.maxRounds);
 
         // Add platform fields to new business
         // Note: acquisitionType === 'platform' is just a deal label suggesting platform potential.
@@ -1024,6 +1024,7 @@ export const useGameStore = create<GameStore>()(
           synergiesRealized: synergies,
           totalAcquisitionCost: deal.effectivePrice,
           acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0,
+          rolloverEquityPct: 0, // Tuck-ins: bolt-on has 0 rollover; parent's pct applies at exit
           // Propagate integratedPlatformId if the target platform belongs to a forged integrated platform
           integratedPlatformId: platform.integratedPlatformId,
         };
@@ -1252,6 +1253,10 @@ export const useGameStore = create<GameStore>()(
             : 0,
           earnoutRemaining: biz1.earnoutRemaining + biz2.earnoutRemaining,
           earnoutTarget: Math.max(biz1.earnoutTarget, biz2.earnoutTarget),
+          rolloverEquityPct: (Math.abs(biz1.ebitda) + Math.abs(biz2.ebitda)) > 0
+            ? (Math.abs(biz1.ebitda) * (biz1.rolloverEquityPct || 0) + Math.abs(biz2.ebitda) * (biz2.rolloverEquityPct || 0))
+              / (Math.abs(biz1.ebitda) + Math.abs(biz2.ebitda))
+            : 0,
           status: 'active',
           isPlatform: true,
           platformScale: newPlatformScale,
@@ -1808,6 +1813,10 @@ export const useGameStore = create<GameStore>()(
         const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
         const netProceeds = Math.max(0, exitPrice - debtPayoff);
 
+        // Rollover equity split — seller receives their share of net proceeds
+        const rolloverPct = business.rolloverEquityPct || 0;
+        const playerProceeds = rolloverPct > 0 ? Math.round(netProceeds * (1 - rolloverPct)) : netProceeds;
+
         let updatedBusinesses = state.businesses.map(b => {
           if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round };
           if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
@@ -1852,9 +1861,9 @@ export const useGameStore = create<GameStore>()(
 
         const sellState = {
           ...state,
-          cash: state.cash + netProceeds,
+          cash: state.cash + playerProceeds,
           totalDebt: newTotalDebt,
-          totalExitProceeds: state.totalExitProceeds + netProceeds,
+          totalExitProceeds: state.totalExitProceeds + playerProceeds,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
           integratedPlatforms: updatedPlatforms,
@@ -1870,7 +1879,7 @@ export const useGameStore = create<GameStore>()(
             ...state.actionsThisRound,
             {
               type: 'sell', round: state.round,
-              details: { businessId, exitPrice, netProceeds, buyerName: buyerProfile.name, buyerType: buyerProfile.type },
+              details: { businessId, exitPrice, netProceeds: playerProceeds, rolloverDeduction: netProceeds - playerProceeds, buyerName: buyerProfile.name, buyerType: buyerProfile.type },
             },
           ],
           metrics: calculateMetrics(sellState),
@@ -1894,6 +1903,11 @@ export const useGameStore = create<GameStore>()(
           .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0);
         const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
         const netProceeds = Math.max(0, event.offerAmount - debtPayoff);
+
+        // Rollover equity split
+        const rolloverPctOffer = business.rolloverEquityPct || 0;
+        const playerProceedsOffer = rolloverPctOffer > 0 ? Math.round(netProceeds * (1 - rolloverPctOffer)) : netProceeds;
+
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id === event.affectedBusinessId) return { ...b, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round };
           if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
@@ -1914,9 +1928,9 @@ export const useGameStore = create<GameStore>()(
 
         const acceptState = {
           ...state,
-          cash: state.cash + netProceeds,
+          cash: state.cash + playerProceedsOffer,
           totalDebt: newTotalDebt,
-          totalExitProceeds: state.totalExitProceeds + netProceeds,
+          totalExitProceeds: state.totalExitProceeds + playerProceedsOffer,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
         };
@@ -1964,6 +1978,10 @@ export const useGameStore = create<GameStore>()(
         const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
         const netProceeds = Math.max(0, event.offerAmount - debtPayoff);
 
+        // Rollover equity split
+        const rolloverPctMBO = business.rolloverEquityPct || 0;
+        const playerProceedsMBO = rolloverPctMBO > 0 ? Math.round(netProceeds * (1 - rolloverPctMBO)) : netProceeds;
+
         let updatedBusinesses = state.businesses.map(b => {
           if (b.id === event.affectedBusinessId) return { ...b, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round };
           if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
@@ -2006,9 +2024,9 @@ export const useGameStore = create<GameStore>()(
 
         const acceptState = {
           ...state,
-          cash: state.cash + netProceeds,
+          cash: state.cash + playerProceedsMBO,
           totalDebt: newTotalDebt,
-          totalExitProceeds: state.totalExitProceeds + netProceeds,
+          totalExitProceeds: state.totalExitProceeds + playerProceedsMBO,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
           integratedPlatforms: updatedPlatforms,
@@ -2176,6 +2194,11 @@ export const useGameStore = create<GameStore>()(
           .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0);
         const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
         const netProceeds = Math.max(0, exitPrice - debtPayoff);
+
+        // Rollover equity split — seller takes haircut too (realistic — they own equity)
+        const rolloverPctDistress = business.rolloverEquityPct || 0;
+        const playerProceedsDistress = rolloverPctDistress > 0 ? Math.round(netProceeds * (1 - rolloverPctDistress)) : netProceeds;
+
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round };
           if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
@@ -2196,9 +2219,9 @@ export const useGameStore = create<GameStore>()(
 
         const distressState = {
           ...state,
-          cash: state.cash + netProceeds,
+          cash: state.cash + playerProceedsDistress,
           totalDebt: newTotalDebt,
-          totalExitProceeds: state.totalExitProceeds + netProceeds,
+          totalExitProceeds: state.totalExitProceeds + playerProceedsDistress,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
         };
@@ -2549,6 +2572,7 @@ export const useGameStore = create<GameStore>()(
         // Calculate total exit across all constituents with platform sale bonus
         let totalExitPrice = 0;
         let totalDebtPayoff = 0;
+        let totalRolloverDeduction = 0;
         const allSoldIds = new Set<string>();
 
         for (const biz of constituents) {
@@ -2567,13 +2591,19 @@ export const useGameStore = create<GameStore>()(
           const boltOnDebt = state.businesses
             .filter(b => boltOnIds.has(b.id))
             .reduce((sum, b) => sum + b.sellerNoteBalance + b.earnoutRemaining, 0);
-          totalDebtPayoff += biz.sellerNoteBalance + biz.bankDebtBalance + biz.earnoutRemaining + boltOnDebt;
+          const bizDebt = biz.sellerNoteBalance + biz.bankDebtBalance + biz.earnoutRemaining + boltOnDebt;
+          totalDebtPayoff += bizDebt;
+
+          // Per-constituent rollover split
+          const bizNetProceeds = Math.max(0, exitPrice - bizDebt);
+          totalRolloverDeduction += Math.round(bizNetProceeds * (biz.rolloverEquityPct || 0));
 
           allSoldIds.add(biz.id);
           for (const boltOnId of biz.boltOnIds || []) allSoldIds.add(boltOnId);
         }
 
         const totalNetProceeds = Math.max(0, totalExitPrice - totalDebtPayoff);
+        const totalPlayerProceeds = Math.max(0, totalNetProceeds - totalRolloverDeduction);
 
         // Mark all constituents + bolt-ons as sold
         const updatedBusinesses = state.businesses.map(b => {
@@ -2599,10 +2629,12 @@ export const useGameStore = create<GameStore>()(
           .filter(b => allSoldIds.has(b.id))
           .map(b => ({ ...b, status: 'sold' as const, exitPrice: constituents.find(c => c.id === b.id) ? Math.round(totalExitPrice / constituents.length) : 0, exitRound: state.round }));
 
+        const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
         const sellState = {
           ...state,
-          cash: state.cash + totalNetProceeds,
-          totalExitProceeds: state.totalExitProceeds + totalNetProceeds,
+          cash: state.cash + totalPlayerProceeds,
+          totalExitProceeds: state.totalExitProceeds + totalPlayerProceeds,
+          totalDebt: newTotalDebt,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
           integratedPlatforms: updatedPlatforms,
@@ -2619,8 +2651,9 @@ export const useGameStore = create<GameStore>()(
                 platformId,
                 platformName: platform.name,
                 totalExitPrice,
-                totalNetProceeds,
+                totalNetProceeds: totalPlayerProceeds,
                 totalDebtPayoff,
+                totalRolloverDeduction,
                 businessCount: constituents.length,
                 platformSaleBonus: PLATFORM_SALE_BONUS,
                 buyerName: buyerProfile.name,
@@ -2872,7 +2905,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v22', // v22: persist holdco loan fields + action failure toasts
+      name: 'holdco-tycoon-save-v23', // v23: rollover equity deal structure
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

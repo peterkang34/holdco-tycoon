@@ -307,7 +307,7 @@ export function AllocatePhase({
   const renderDealStructuring = () => {
     if (!selectedDeal) return null;
 
-    const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening, maxRoundsFromStore ?? 20, !distressRestrictions.canTakeDebt);
+    const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening, maxRoundsFromStore ?? 20, !distressRestrictions.canTakeDebt, maSourcing?.tier ?? 0, duration ?? 'standard', selectedDeal.sellerArchetype);
     const availablePlatformsForDeal = getPlatformsForSector(selectedDeal.business.sectorId);
     const canTuckIn = availablePlatformsForDeal.length > 0;
 
@@ -611,6 +611,18 @@ export function AllocatePhase({
                         <span className="text-text-muted">Earnout (if {Math.round(structure.earnout.targetEbitdaGrowth * 100)}%+ growth, 4yr window)</span>
                         <span className="font-mono">{formatMoney(structure.earnout.amount)}</span>
                       </div>
+                    )}
+                    {structure.rolloverEquityPct != null && structure.rolloverEquityPct > 0 && (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-text-muted">Seller Rollover</span>
+                          <span className="font-mono text-accent">{Math.round(structure.rolloverEquityPct * 100)}% of proceeds</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-text-muted">Your Exit Share</span>
+                          <span className="font-mono text-green-400">{Math.round((1 - structure.rolloverEquityPct) * 100)}%</span>
+                        </div>
+                      </>
                     )}
                     <div className="flex justify-between pt-2 border-t border-white/10">
                       <span className="text-text-muted">Leverage</span>

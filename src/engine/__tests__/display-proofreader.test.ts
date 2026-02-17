@@ -38,6 +38,9 @@ import {
   RESTRUCTURING_FEV_PENALTY,
   COVENANT_BREACH_ROUNDS_THRESHOLD,
   EARNOUT_EXPIRATION_YEARS,
+  ROLLOVER_EQUITY_CONFIG,
+  ROLLOVER_MIN_QUALITY,
+  ROLLOVER_MIN_MA_TIER,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
 
@@ -1094,6 +1097,33 @@ describe('Display Proofreader', () => {
       expect(manual).toContain('$800K');
       expect(manual).toContain('$1,060K');
       expect(manual).toContain('$450K/yr');
+    });
+  });
+
+  // ── Rollover Equity Proofreader ──
+
+  describe('Rollover Equity', () => {
+    it('Strategy A: standard rolloverPct is 0.25', () => {
+      expect(ROLLOVER_EQUITY_CONFIG.standard.rolloverPct).toBe(0.25);
+    });
+
+    it('Strategy A: quick rolloverPct is 0.20', () => {
+      expect(ROLLOVER_EQUITY_CONFIG.quick.rolloverPct).toBe(0.20);
+    });
+
+    it('Strategy A: ROLLOVER_MIN_QUALITY is 3 and ROLLOVER_MIN_MA_TIER is 2', () => {
+      expect(ROLLOVER_MIN_QUALITY).toBe(3);
+      expect(ROLLOVER_MIN_MA_TIER).toBe(2);
+    });
+
+    it('Strategy B: UserManualModal contains Rollover Equity', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Rollover Equity');
+    });
+
+    it('Strategy B: deals.ts contains rollover_equity', () => {
+      const deals = readComponent('engine/deals.ts');
+      expect(deals).toContain('rollover_equity');
     });
   });
 });
