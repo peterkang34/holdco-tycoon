@@ -2963,6 +2963,8 @@ export const useGameStore = create<GameStore>()(
         lastAcquisitionResult: state.lastAcquisitionResult,
         lastIntegrationOutcome: state.lastIntegrationOutcome,
         founderDistributionsReceived: state.founderDistributionsReceived,
+        metrics: state.metrics,
+        focusBonus: state.focusBonus,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.holdcoName) {

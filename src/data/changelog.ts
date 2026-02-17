@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 17, 2025',
+    title: 'Dashboard Stats Fix',
+    sections: [
+      {
+        heading: 'Fix',
+        items: [
+          'Fixed a bug where refreshing the browser would momentarily zero out all dashboard stats (EBITDA, Net FCF, ROIC, ROIIC, etc.) before restoring them.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 17, 2025',
     title: 'Turnaround UI Redesign',
     sections: [
       {
