@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
-import { Business, IntegratedPlatform, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
+import { Business, IntegratedPlatform, ActiveTurnaround, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
+import { getProgramById } from '../../data/turnaroundPrograms';
 import { SECTORS } from '../../data/sectors';
 import { calculateExitValuation } from '../../engine/simulation';
 import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
@@ -21,6 +22,9 @@ interface BusinessCardProps {
   currentRound?: number;
   lastEventType?: string;
   integratedPlatforms?: IntegratedPlatform[];
+  activeTurnaround?: ActiveTurnaround | null;
+  onStartTurnaround?: () => void;
+  turnaroundEligible?: boolean;
 }
 
 export function BusinessCard({
@@ -39,6 +43,9 @@ export function BusinessCard({
   currentRound = 1,
   lastEventType,
   integratedPlatforms = [],
+  activeTurnaround = null,
+  onStartTurnaround,
+  turnaroundEligible = false,
 }: BusinessCardProps) {
   const [showValuation, setShowValuation] = useState(false);
   const sector = SECTORS[business.sectorId];
@@ -93,9 +100,9 @@ export function BusinessCard({
       style={{ borderTopColor: sector.color, borderTopWidth: '3px' }}
     >
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <span className="text-2xl">{sector.emoji}</span>
-          <div>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-2xl shrink-0">{sector.emoji}</span>
+          <div className="min-w-0">
             <h3 className="font-bold truncate">{business.name}</h3>
             <p className="text-xs text-text-muted truncate">{business.subType}</p>
           </div>
@@ -165,6 +172,36 @@ export function BusinessCard({
               <p className="text-sm text-text-secondary font-normal">Seller retains {Math.round(business.rolloverEquityPct * 100)}% equity. At exit, they receive that share of net proceeds.</p>
             </Tooltip>
           )}
+          {activeTurnaround && activeTurnaround.status === 'active' && (() => {
+            const prog = getProgramById(activeTurnaround.programId);
+            if (!prog) return null;
+            const roundsLeft = activeTurnaround.endRound - (currentRound || 1);
+            const totalDuration = activeTurnaround.endRound - activeTurnaround.startRound;
+            const progress = totalDuration > 0 ? Math.round(((totalDuration - roundsLeft) / totalDuration) * 100) : 100;
+            return (
+              <div className="w-full mt-1">
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded p-1.5">
+                  <div className="flex items-center justify-between gap-1 mb-1">
+                    <span className="text-xs text-amber-400 font-medium truncate">{prog.displayName}</span>
+                    <span className="text-xs text-text-muted whitespace-nowrap hidden sm:inline">
+                      Q{prog.sourceQuality}→Q{prog.targetQuality}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`Turnaround progress: ${progress}%`}>
+                      <div
+                        className="h-full bg-amber-400 rounded-full transition-all"
+                        style={{ width: `${progress}%` }}
+                      />
+                    </div>
+                    <span className="text-xs text-text-muted whitespace-nowrap">
+                      {roundsLeft > 0 ? `${roundsLeft}yr` : 'Done'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -399,9 +436,14 @@ export function BusinessCard({
             )}
           </div>
 
-          {(onSell || onImprove || onDesignatePlatform) && (
+          {(onSell || onImprove || onDesignatePlatform || onStartTurnaround) && (
             <div className="flex flex-col gap-2 mt-3">
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2">
+                {onStartTurnaround && turnaroundEligible && !activeTurnaround && (
+                  <button onClick={onStartTurnaround} className="btn-secondary text-xs flex-1 min-h-[44px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10">
+                    Turnaround
+                  </button>
+                )}
                 {onImprove && (
                   <button onClick={onImprove} className="btn-secondary text-xs flex-1">
                     Improve

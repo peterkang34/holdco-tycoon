@@ -611,6 +611,16 @@ function TurnaroundsContent() {
         businesses.
       </P>
 
+      <SubHeading>Where to Find Turnarounds</SubHeading>
+      <P>
+        Turnaround features are split across three locations:
+      </P>
+      <BulletList items={[
+        <><strong>Tier unlock &amp; upgrade:</strong> Head to the <strong>Shared Services tab</strong> — Turnaround Operations sits alongside M&amp;A Infrastructure as an amber-themed card.</>,
+        <><strong>Start a turnaround:</strong> Open a business card in the <strong>Portfolio tab</strong> and click the <strong>&ldquo;Turnaround&rdquo; button</strong> (visible when the business is eligible).</>,
+        <><strong>Monitor active turnarounds:</strong> Progress badges appear on each business card, and a collapsible <strong>summary card at the top of the Portfolio tab</strong> shows all active turnarounds at a glance.</>,
+      ]} />
+
       <SubHeading>Turnaround Tiers</SubHeading>
       <DataTable
         headers={['Tier', 'Name', 'Unlock Cost', 'Annual Cost', 'Required Businesses']}
@@ -692,7 +702,13 @@ function SharedServicesContent() {
     <>
       <SectionTitle>Shared Services</SectionTitle>
       <P>
-        Shared services centralize functions across your portfolio. They require a minimum of
+        The Shared Services tab is your central hub for portfolio-wide infrastructure. It houses
+        three categories: <strong>operational shared services</strong> (below), <strong>M&amp;A
+        Infrastructure</strong> (deal sourcing tiers), and <strong>Turnaround Operations</strong> (turnaround
+        tier unlock and upgrade — see the Turnaround Programs section for details).
+      </P>
+      <P>
+        Operational shared services centralize functions across your portfolio. They require a minimum of
         <strong> 3 businesses</strong> to unlock, and you can have a maximum of <strong>3
         active</strong> at any time.
       </P>

@@ -12,6 +12,22 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 17, 2025',
+    title: 'Turnaround UI Redesign',
+    sections: [
+      {
+        heading: 'UX Overhaul',
+        items: [
+          'Turnaround tier unlock and upgrade moved to the Shared Services tab — an amber-themed card alongside M&A Infrastructure, so all capability investments live in one place.',
+          'Start turnarounds directly from business cards — each eligible business now shows a "Turnaround" button that opens a dedicated program selection modal.',
+          'Active turnaround progress badges appear on each business card, showing program name, quality target, and a progress bar.',
+          'Collapsible "Active Turnarounds" summary card at the top of the Portfolio tab gives you a quick portfolio-wide view without the clutter.',
+          'Portfolio tab is significantly decluttered — turnaround numbers only appear where they\'re relevant.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 17, 2025',
     title: 'Leverage & Debt Display Fixes',
     sections: [
       {

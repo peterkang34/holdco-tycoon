@@ -89,7 +89,8 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/data/gameConfig.ts` — Game constants and configuration
 - `src/components/screens/GameScreen.tsx` — Main game screen (phase routing, toast handlers)
 - `src/components/phases/CollectPhase.tsx` — Cash flow waterfall display
-- `src/components/phases/AllocatePhase.tsx` — Capital allocation (acquire, improve, debt, equity, forge platforms, turnarounds)
+- `src/components/phases/AllocatePhase.tsx` — Capital allocation (acquire, improve, debt, equity, forge platforms, turnarounds); turnaround tier mgmt in Shared Services tab
+- `src/components/modals/TurnaroundModal.tsx` — Turnaround program selection modal (per-business, opened from BusinessCard)
 - `src/data/turnaroundPrograms.ts` — 7 turnaround programs across 3 tiers, sector quality ceilings
 - `src/engine/turnarounds.ts` — Turnaround eligibility, cost, resolution, quality improvement, exit premium
 - `src/data/platformRecipes.ts` — 38 integrated platform recipes (32 within-sector + 6 cross-sector)

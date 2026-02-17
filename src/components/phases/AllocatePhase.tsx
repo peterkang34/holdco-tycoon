@@ -33,10 +33,11 @@ import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES, MA_SOURCING_
 import { MarketGuideModal } from '../ui/MarketGuideModal';
 import { RollUpGuideModal } from '../ui/RollUpGuideModal';
 import { ImprovementModal } from '../modals/ImprovementModal';
+import { TurnaroundModal } from '../modals/TurnaroundModal';
 import { isAIEnabled } from '../../services/aiGeneration';
 import { checkPlatformEligibility, calculateIntegrationCost, getEligibleBusinessesForExistingPlatform, calculateAddToPlatformCost } from '../../engine/platforms';
 import { PLATFORM_SALE_BONUS } from '../../data/gameConfig';
-import { getEligiblePrograms, calculateTurnaroundCost, canUnlockTier } from '../../engine/turnarounds';
+import { getEligiblePrograms, canUnlockTier } from '../../engine/turnarounds';
 import { TURNAROUND_TIER_CONFIG, getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
 import { TURNAROUND_FATIGUE_THRESHOLD } from '../../data/gameConfig';
 
@@ -209,7 +210,8 @@ export function AllocatePhase({
   const [dismissedWarnings, setDismissedWarnings] = useState<Set<string>>(new Set());
   const [forgeConfirm, setForgeConfirm] = useState<{ recipeId: string; businessIds: string[] } | null>(null);
   const [sellPlatformConfirm, setSellPlatformConfirm] = useState<IntegratedPlatform | null>(null);
-  const [turnaroundConfirm, setTurnaroundConfirm] = useState<{ businessId: string; programId: string } | null>(null);
+  const [turnaroundBusiness, setTurnaroundBusiness] = useState<Business | null>(null);
+  const [showTurnaroundSummary, setShowTurnaroundSummary] = useState(false);
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const distressRestrictions = getDistressRestrictions(distressLevel);
@@ -800,6 +802,72 @@ export function AllocatePhase({
       <div className="mb-6">
         {activeTab === 'portfolio' && (
           <div>
+            {/* Active Turnarounds Summary */}
+            {activeTurnarounds.filter(t => t.status === 'active').length > 0 && (
+              <div className="card bg-amber-500/5 border-amber-500/30 mb-6">
+                <button
+                  onClick={() => setShowTurnaroundSummary(!showTurnaroundSummary)}
+                  className="flex items-center justify-between w-full text-left min-h-[44px]"
+                >
+                  <span className="font-bold text-amber-400">
+                    Active Turnarounds ({activeTurnarounds.filter(t => t.status === 'active').length})
+                  </span>
+                  <span className="text-text-muted text-sm">{showTurnaroundSummary ? '▲' : '▼'}</span>
+                </button>
+                {showTurnaroundSummary && (
+                  <div className="mt-3 space-y-2">
+                    {activeTurnarounds.filter(t => t.status === 'active').length >= TURNAROUND_FATIGUE_THRESHOLD && (
+                      <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 text-xs text-amber-400">
+                        Portfolio fatigue: {activeTurnarounds.filter(t => t.status === 'active').length} active turnarounds. Success rates reduced by 10ppt.
+                      </div>
+                    )}
+                    {activeTurnarounds.filter(t => t.status === 'active').map(ta => {
+                      const prog = getProgramById(ta.programId);
+                      const biz = activeBusinesses.find(b => b.id === ta.businessId);
+                      if (!prog || !biz) return null;
+                      const roundsLeft = ta.endRound - round;
+                      const totalDuration = ta.endRound - ta.startRound;
+                      const progress = totalDuration > 0 ? Math.round(((totalDuration - roundsLeft) / totalDuration) * 100) : 100;
+                      return (
+                        <div key={ta.id} className="flex items-center gap-3 bg-white/5 rounded-lg p-2">
+                          <span className="text-sm">{SECTORS[biz.sectorId]?.emoji}</span>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2 mb-1">
+                              <span className="text-xs font-medium truncate">{biz.name}</span>
+                              <span className="text-xs text-amber-400 whitespace-nowrap">{prog.displayName}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden" role="progressbar" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100} aria-label={`Turnaround progress: ${progress}%`}>
+                                <div className="h-full bg-amber-400 rounded-full transition-all" style={{ width: `${progress}%` }} />
+                              </div>
+                              <span className="text-xs text-text-muted whitespace-nowrap">{roundsLeft > 0 ? `${roundsLeft}yr left` : 'Resolving...'}</span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {/* Completed turnarounds badges */}
+                    {activeTurnarounds.filter(t => t.status !== 'active').length > 0 && (
+                      <div className="flex flex-wrap gap-1 pt-2">
+                        {activeTurnarounds.filter(t => t.status !== 'active').map(ta => {
+                          const biz = [...activeBusinesses, ...(allBusinesses || [])].find(b => b.id === ta.businessId);
+                          return (
+                            <span key={ta.id} className={`text-xs px-2 py-1 rounded ${
+                              ta.status === 'completed' ? 'bg-green-500/15 text-green-400' :
+                              ta.status === 'partial' ? 'bg-yellow-500/15 text-yellow-400' :
+                              'bg-red-500/15 text-red-400'
+                            }`}>
+                              {biz?.name ?? 'Unknown'}: {ta.status}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Roll-up Strategy Actions */}
             {activeBusinesses.length >= 2 && (
               <div className="card bg-accent/5 border-accent/30 mb-6">
@@ -1051,194 +1119,6 @@ export function AllocatePhase({
               </div>
             )}
 
-            {/* Turnaround Operations */}
-            {(() => {
-              const activeCount = activeTurnarounds.filter(t => t.status === 'active').length;
-              const tierCheck = canUnlockTier(turnaroundTier, cash, activeBusinesses.length);
-              const nextTier = (turnaroundTier + 1) as 1 | 2 | 3;
-              const nextTierConfig = nextTier <= 3 ? TURNAROUND_TIER_CONFIG[nextTier] : null;
-              const tierAnnualCost = getTurnaroundTierAnnualCost(turnaroundTier);
-
-              // Get eligible businesses and their programs
-              const eligibleForTurnaround = turnaroundTier > 0
-                ? activeBusinesses
-                    .filter(b => !activeTurnarounds.some(t => t.businessId === b.id && t.status === 'active'))
-                    .filter(b => {
-                      const programs = getEligiblePrograms(b, turnaroundTier, activeTurnarounds);
-                      return programs.length > 0;
-                    })
-                : [];
-
-              const showSection = turnaroundTier > 0 || (activeBusinesses.length >= 2 && nextTierConfig);
-
-              if (!showSection) return null;
-
-              return (
-                <div className="card bg-amber-500/5 border-amber-500/30 mb-6">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 mb-3">
-                    <div>
-                      <h3 className="font-bold text-amber-400">Turnaround Operations</h3>
-                      {turnaroundTier > 0 && (
-                        <p className="text-xs text-text-muted mt-0.5">
-                          Tier {turnaroundTier}: {TURNAROUND_TIER_CONFIG[turnaroundTier as 1 | 2 | 3].name}
-                          {tierAnnualCost > 0 && <span className="ml-1">({formatMoney(tierAnnualCost)}/yr)</span>}
-                        </p>
-                      )}
-                    </div>
-                    {turnaroundTier < 3 && nextTierConfig && (
-                      <button
-                        onClick={onUnlockTurnaroundTier}
-                        disabled={!tierCheck.canUnlock}
-                        className={`btn-primary text-sm px-4 py-3 min-h-[44px] whitespace-nowrap ${!tierCheck.canUnlock ? 'opacity-50 cursor-not-allowed' : ''}`}
-                        title={tierCheck.reason ?? ''}
-                      >
-                        {turnaroundTier === 0 ? 'Unlock' : 'Upgrade to'} T{nextTier} ({formatMoney(nextTierConfig.unlockCost)})
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Tier unlock info for tier 0 */}
-                  {turnaroundTier === 0 && nextTierConfig && (
-                    <div className="bg-white/5 rounded-lg p-3 text-sm">
-                      <p className="text-text-secondary mb-2">{nextTierConfig.description}</p>
-                      <ul className="text-xs text-text-muted space-y-1">
-                        {nextTierConfig.effects.map((e, i) => (
-                          <li key={i}>- {e}</li>
-                        ))}
-                      </ul>
-                      {!tierCheck.canUnlock && tierCheck.reason && (
-                        <p className="text-xs text-amber-400 mt-2">{tierCheck.reason}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Active turnarounds */}
-                  {activeTurnarounds.filter(t => t.status === 'active').length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs text-text-muted mb-2">Active Turnarounds</p>
-                      {activeCount >= TURNAROUND_FATIGUE_THRESHOLD && (
-                        <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 mb-2 text-xs text-amber-400">
-                          Portfolio fatigue: {activeCount} active turnarounds. Success rates reduced by 10ppt.
-                        </div>
-                      )}
-                      <div className="space-y-2">
-                        {activeTurnarounds.filter(t => t.status === 'active').map(ta => {
-                          const prog = getProgramById(ta.programId);
-                          const biz = activeBusinesses.find(b => b.id === ta.businessId);
-                          if (!prog || !biz) return null;
-                          const roundsLeft = ta.endRound - round;
-                          const totalDuration = ta.endRound - ta.startRound;
-                          const progress = totalDuration > 0 ? Math.round(((totalDuration - roundsLeft) / totalDuration) * 100) : 100;
-                          return (
-                            <div key={ta.id} className="bg-white/5 rounded-lg p-3">
-                              <div className="flex items-center justify-between gap-2 mb-1">
-                                <span className="font-medium text-sm truncate min-w-0">
-                                  {SECTORS[biz.sectorId]?.emoji} {biz.name}
-                                </span>
-                                <span className="text-xs text-amber-400 whitespace-nowrap">
-                                  {prog.displayName} (Q{prog.sourceQuality} → Q{prog.targetQuality})
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2 mb-1">
-                                <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                  <div
-                                    className="h-full bg-amber-400 rounded-full transition-all"
-                                    style={{ width: `${progress}%` }}
-                                  />
-                                </div>
-                                <span className="text-xs text-text-muted whitespace-nowrap">
-                                  {roundsLeft > 0 ? `${roundsLeft}yr left` : 'Resolving...'}
-                                </span>
-                              </div>
-                              <div className="flex gap-2 text-xs text-text-muted">
-                                <span>{formatPercent(prog.successRate)} success</span>
-                                <span>{formatMoney(prog.annualCost)}/yr</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Completed/failed turnarounds summary */}
-                  {activeTurnarounds.filter(t => t.status !== 'active').length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs text-text-muted mb-2">Completed</p>
-                      <div className="flex flex-wrap gap-1">
-                        {activeTurnarounds.filter(t => t.status !== 'active').map(ta => {
-                          const biz = [...activeBusinesses, ...(allBusinesses || [])].find(b => b.id === ta.businessId);
-                          return (
-                            <span key={ta.id} className={`text-xs px-2 py-1 rounded ${
-                              ta.status === 'completed' ? 'bg-green-500/15 text-green-400' :
-                              ta.status === 'partial' ? 'bg-yellow-500/15 text-yellow-400' :
-                              'bg-red-500/15 text-red-400'
-                            }`}>
-                              {biz?.name ?? 'Unknown'}: {ta.status}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Start new turnaround */}
-                  {turnaroundTier > 0 && eligibleForTurnaround.length > 0 && (
-                    <div>
-                      <p className="text-xs text-text-muted mb-2">Eligible Businesses</p>
-                      <div className="space-y-3">
-                        {eligibleForTurnaround.map(biz => {
-                          const programs = getEligiblePrograms(biz, turnaroundTier, activeTurnarounds);
-                          return (
-                            <div key={biz.id} className="bg-white/5 rounded-lg p-3">
-                              <div className="flex items-center gap-2 mb-2">
-                                <span className="font-medium text-sm truncate min-w-0">
-                                  {SECTORS[biz.sectorId]?.emoji} {biz.name}
-                                </span>
-                                <span className="text-xs bg-white/10 px-1.5 py-0.5 rounded">Q{biz.qualityRating}</span>
-                              </div>
-                              <div className="space-y-2">
-                                {programs.map(prog => {
-                                  const upfrontCost = calculateTurnaroundCost(prog, biz);
-                                  const canAffordProg = cash >= upfrontCost;
-                                  return (
-                                    <div key={prog.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 bg-white/5 rounded p-2">
-                                      <div className="text-xs">
-                                        <span className="text-amber-400 font-medium">{prog.displayName}</span>
-                                        <span className="text-text-muted ml-1">Q{prog.sourceQuality} → Q{prog.targetQuality}</span>
-                                        <span className="text-text-muted ml-2">
-                                          {prog.durationStandard}yr &middot; {formatPercent(prog.successRate)} success
-                                        </span>
-                                        <span className="text-text-muted ml-2">
-                                          {formatMoney(upfrontCost)} + {formatMoney(prog.annualCost)}/yr
-                                        </span>
-                                      </div>
-                                      <button
-                                        onClick={() => setTurnaroundConfirm({ businessId: biz.id, programId: prog.id })}
-                                        disabled={!canAffordProg}
-                                        className={`btn-primary text-xs px-3 py-2 min-h-[44px] whitespace-nowrap ${!canAffordProg ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                      >
-                                        Start ({formatMoney(upfrontCost)})
-                                      </button>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {turnaroundTier > 0 && eligibleForTurnaround.length === 0 && activeTurnarounds.filter(t => t.status === 'active').length === 0 && (
-                    <p className="text-xs text-text-muted">
-                      No businesses currently eligible for turnaround programs. Businesses with Q1-Q2 quality ratings can be enrolled.
-                    </p>
-                  )}
-                </div>
-              );
-            })()}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {activeBusinesses.filter(b => !b.parentPlatformId).map(business => (
@@ -1257,6 +1137,9 @@ export function AllocatePhase({
                   currentRound={round}
                   lastEventType={lastEventType}
                   integratedPlatforms={integratedPlatforms}
+                  activeTurnaround={activeTurnarounds.find(t => t.businessId === business.id && t.status === 'active') ?? null}
+                  turnaroundEligible={turnaroundTier > 0 && getEligiblePrograms(business, turnaroundTier, activeTurnarounds).length > 0}
+                  onStartTurnaround={turnaroundTier > 0 ? () => setTurnaroundBusiness(business) : undefined}
                 />
               ))}
               {activeBusinesses.length === 0 && (
@@ -1629,6 +1512,125 @@ export function AllocatePhase({
                 <p className="text-xs text-purple-400 text-center">Fully upgraded — Proprietary Network active</p>
               )}
             </div>
+
+            {/* Turnaround Operations */}
+            {activeBusinesses.length >= 2 && (
+              <div className="card mb-6 border-amber-500/30 bg-amber-500/5">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="font-bold text-lg flex items-center gap-2 flex-wrap">
+                      Turnaround Operations
+                      {turnaroundTier > 0 && (
+                        <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-0.5 rounded">
+                          Tier {turnaroundTier}: {TURNAROUND_TIER_CONFIG[turnaroundTier as 1 | 2 | 3].name}
+                        </span>
+                      )}
+                    </h3>
+                    <p className="text-sm text-text-muted">
+                      {turnaroundTier > 0
+                        ? `Deploy turnaround programs to improve struggling businesses (${formatMoney(getTurnaroundTierAnnualCost(turnaroundTier))}/yr)`
+                        : 'Unlock structured turnaround capabilities for your portfolio'}
+                    </p>
+                  </div>
+                  {turnaroundTier > 0 && activeTurnarounds.filter(t => t.status === 'active').length > 0 && (
+                    <span className="text-xs bg-amber-500/20 text-amber-400 px-2 py-1 rounded whitespace-nowrap">
+                      {activeTurnarounds.filter(t => t.status === 'active').length} active
+                    </span>
+                  )}
+                </div>
+
+                {/* Tier Progress — 3-tier horizontal bar */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                  {([1, 2, 3] as const).map(tier => {
+                    const config = TURNAROUND_TIER_CONFIG[tier];
+                    const isUnlocked = turnaroundTier >= tier;
+                    const isCurrent = turnaroundTier === tier;
+                    const isNext = turnaroundTier === tier - 1;
+                    return (
+                      <div
+                        key={tier}
+                        className={`flex-1 rounded-lg p-3 border transition-colors ${
+                          isUnlocked
+                            ? isCurrent
+                              ? 'border-amber-500/50 bg-amber-500/10'
+                              : 'border-white/20 bg-white/5'
+                            : isNext
+                              ? 'border-dashed border-amber-500/30'
+                              : 'border-white/5 opacity-50'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-xs font-bold">Tier {tier}</span>
+                          {isUnlocked && <span className="text-xs text-amber-400">&#10003;</span>}
+                        </div>
+                        <p className="text-xs font-medium mb-1">{config.name}</p>
+                        <p className="text-xs text-text-muted">{formatMoney(config.annualCost)}/yr</p>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Current tier effects */}
+                {turnaroundTier > 0 && (
+                  <div className="bg-white/5 rounded-lg p-3 mb-4">
+                    <p className="text-xs font-medium text-amber-400 mb-2">
+                      Active: {TURNAROUND_TIER_CONFIG[turnaroundTier as 1 | 2 | 3].name}
+                    </p>
+                    <ul className="space-y-1">
+                      {TURNAROUND_TIER_CONFIG[turnaroundTier as 1 | 2 | 3].effects.map((effect, i) => (
+                        <li key={i} className="text-xs text-text-secondary flex items-start gap-1.5">
+                          <span className="text-amber-400 mt-0.5">&#8226;</span>
+                          {effect}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Fatigue warning */}
+                {activeTurnarounds.filter(t => t.status === 'active').length >= TURNAROUND_FATIGUE_THRESHOLD && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 mb-4 text-xs text-amber-400">
+                    Portfolio fatigue: {activeTurnarounds.filter(t => t.status === 'active').length} active turnarounds. Success rates reduced by 10ppt.
+                  </div>
+                )}
+
+                {/* Upgrade button */}
+                {turnaroundTier < 3 && (() => {
+                  const nextTier = (turnaroundTier + 1) as 1 | 2 | 3;
+                  const config = TURNAROUND_TIER_CONFIG[nextTier];
+                  const tierCheck = canUnlockTier(turnaroundTier, cash, activeBusinesses.length);
+                  return (
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium">
+                          {turnaroundTier === 0 ? 'Build' : 'Upgrade to'} {config.name}
+                        </p>
+                        <p className="text-xs text-text-muted">
+                          {!tierCheck.canUnlock && tierCheck.reason
+                            ? tierCheck.reason
+                            : `${formatMoney(config.unlockCost)} one-time + ${formatMoney(config.annualCost)}/yr`
+                          }
+                        </p>
+                      </div>
+                      <button
+                        onClick={onUnlockTurnaroundTier}
+                        disabled={!tierCheck.canUnlock}
+                        className={`btn-primary text-sm min-h-[44px] shrink-0 ${!tierCheck.canUnlock ? 'opacity-50' : 'bg-amber-600 hover:bg-amber-500'}`}
+                      >
+                        {!tierCheck.canUnlock
+                          ? tierCheck.reason?.startsWith('Need') ? tierCheck.reason.split('(')[0].trim() : 'Locked'
+                          : `${turnaroundTier === 0 ? 'Build' : 'Upgrade'} (${formatMoney(config.unlockCost)})`
+                        }
+                      </button>
+                    </div>
+                  );
+                })()}
+
+                {turnaroundTier >= 3 && (
+                  <p className="text-xs text-amber-400 text-center">Fully upgraded — Interim Management active</p>
+                )}
+              </div>
+            )}
 
             {/* Operational Shared Services */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2654,69 +2656,21 @@ export function AllocatePhase({
         );
       })()}
 
-      {/* Turnaround Confirmation Modal */}
-      {turnaroundConfirm && (() => {
-        const prog = getProgramById(turnaroundConfirm.programId);
-        const biz = activeBusinesses.find(b => b.id === turnaroundConfirm.businessId);
-        if (!prog || !biz) return null;
-        const upfrontCost = calculateTurnaroundCost(prog, biz);
-        const activeCount = activeTurnarounds.filter(t => t.status === 'active').length;
-        return (
-          <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-            <div className="bg-bg-primary border border-white/10 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-              <h3 className="text-lg font-bold text-amber-400 mb-2">{prog.displayName}</h3>
-              <div className="bg-white/5 rounded-lg p-3 mb-4">
-                <p className="font-medium text-sm">{SECTORS[biz.sectorId]?.emoji} {biz.name}</p>
-                <p className="text-xs text-text-muted mt-1">{biz.subType} &middot; Current Quality: Q{biz.qualityRating}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-3 text-xs mb-4">
-                <div className="bg-amber-500/10 rounded p-2 text-center">
-                  <p className="text-text-muted">Target</p>
-                  <p className="font-bold text-amber-400">Q{prog.sourceQuality} → Q{prog.targetQuality}</p>
-                </div>
-                <div className="bg-blue-500/10 rounded p-2 text-center">
-                  <p className="text-text-muted">Duration</p>
-                  <p className="font-bold text-blue-400">{prog.durationStandard} years</p>
-                </div>
-                <div className="bg-green-500/10 rounded p-2 text-center">
-                  <p className="text-text-muted">Success Rate</p>
-                  <p className="font-bold text-green-400">{formatPercent(prog.successRate)}</p>
-                </div>
-                <div className="bg-red-500/10 rounded p-2 text-center">
-                  <p className="text-text-muted">Failure Rate</p>
-                  <p className="font-bold text-red-400">{formatPercent(prog.failureRate)}</p>
-                </div>
-              </div>
-              <div className="text-xs text-text-muted space-y-1 mb-4">
-                <p>Upfront cost: <span className="text-text-primary font-mono">{formatMoney(upfrontCost)}</span></p>
-                <p>Annual cost: <span className="text-text-primary font-mono">{formatMoney(prog.annualCost)}/yr</span></p>
-                <p>On success: EBITDA +{formatPercent(prog.ebitdaBoostOnSuccess)}</p>
-                <p>On partial: EBITDA +{formatPercent(prog.ebitdaBoostOnPartial)} (Q+1 instead of full target)</p>
-                <p>On failure: EBITDA -{formatPercent(prog.ebitdaDamageOnFailure)}</p>
-              </div>
-              {activeCount >= TURNAROUND_FATIGUE_THRESHOLD - 1 && (
-                <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-2 mb-4 text-xs text-amber-400">
-                  Warning: This will bring you to {activeCount + 1} active turnarounds. At {TURNAROUND_FATIGUE_THRESHOLD}+ turnarounds, success rates are reduced by 10ppt.
-                </div>
-              )}
-              <div className="flex gap-3">
-                <button onClick={() => setTurnaroundConfirm(null)} className="btn-secondary px-6 min-h-[44px] flex-1">
-                  Cancel
-                </button>
-                <button
-                  onClick={() => {
-                    onStartTurnaround(turnaroundConfirm.businessId, turnaroundConfirm.programId);
-                    setTurnaroundConfirm(null);
-                  }}
-                  className="bg-amber-600 hover:bg-amber-500 text-white px-6 py-3 min-h-[44px] rounded-lg text-sm font-medium transition-colors flex-1"
-                >
-                  Start Program ({formatMoney(upfrontCost)})
-                </button>
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {/* Turnaround Modal */}
+      {turnaroundBusiness && (
+        <TurnaroundModal
+          business={turnaroundBusiness}
+          cash={cash}
+          turnaroundTier={turnaroundTier}
+          activeTurnarounds={activeTurnarounds}
+          duration={duration}
+          onStartTurnaround={(businessId, programId) => {
+            onStartTurnaround(businessId, programId);
+            setTurnaroundBusiness(null);
+          }}
+          onClose={() => setTurnaroundBusiness(null)}
+        />
+      )}
 
       {/* End Turn Confirmation Modal */}
       {showEndTurnConfirm && (

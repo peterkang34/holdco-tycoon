@@ -553,6 +553,10 @@ describe('Display Proofreader', () => {
       expect(t1[0].targetQuality).toBe(2);
       expect(t1[1].sourceQuality).toBe(2);
       expect(t1[1].targetQuality).toBe(3);
+      // Strategy B: TurnaroundModal shows quality transitions Q→Q for each program
+      const modal = readComponent('components/modals/TurnaroundModal.tsx');
+      expect(modal).toContain('prog.sourceQuality');
+      expect(modal).toContain('prog.targetQuality');
     });
 
     it('Tier 2: 2 programs (Q1→Q3, Q2→Q4)', () => {
@@ -573,6 +577,18 @@ describe('Display Proofreader', () => {
       for (const p of TURNAROUND_PROGRAMS) {
         expect(p.successRate + p.partialRate + p.failureRate).toBeCloseTo(1.0);
       }
+      // Strategy B: TurnaroundModal displays success/failure rates and EBITDA boosts
+      const modal = readComponent('components/modals/TurnaroundModal.tsx');
+      expect(modal).toContain('Success Rate');
+      expect(modal).toContain('Failure Rate');
+      expect(modal).toContain('prog.successRate');
+      expect(modal).toContain('prog.failureRate');
+      expect(modal).toContain('Success EBITDA Boost');
+      expect(modal).toContain('Partial EBITDA Boost');
+      expect(modal).toContain('Failure EBITDA Damage');
+      expect(modal).toContain('prog.ebitdaBoostOnSuccess');
+      expect(modal).toContain('prog.ebitdaBoostOnPartial');
+      expect(modal).toContain('prog.ebitdaDamageOnFailure');
     });
 
     it('Scaled failure rates: T1=5%, T2A=8%, T2B=10%, T3A=12%, T3B=10%, T3Quick=15%', () => {
@@ -588,10 +604,21 @@ describe('Display Proofreader', () => {
 
     it('Fatigue threshold = 4 simultaneous turnarounds', () => {
       expect(TURNAROUND_FATIGUE_THRESHOLD).toBe(4);
+      // Strategy B: Both TurnaroundModal and AllocatePhase reference the fatigue threshold
+      const modal = readComponent('components/modals/TurnaroundModal.tsx');
+      expect(modal).toContain('TURNAROUND_FATIGUE_THRESHOLD');
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('TURNAROUND_FATIGUE_THRESHOLD');
     });
 
     it('Fatigue penalty = -10ppt (0.10)', () => {
       expect(TURNAROUND_FATIGUE_PENALTY).toBe(0.10);
+      // Strategy B: TurnaroundModal warns about 10ppt penalty
+      const modal = readComponent('components/modals/TurnaroundModal.tsx');
+      expect(modal).toContain('10ppt');
+      // Strategy B: AllocatePhase active turnarounds summary also warns about 10ppt
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('10ppt');
     });
 
     it('Exit premium = 0.25x for 2+ tiers improved', () => {
@@ -621,6 +648,9 @@ describe('Display Proofreader', () => {
         expect(p.displayName).toBeDefined();
         expect(p.displayName.length).toBeGreaterThan(0);
       }
+      // Strategy B: TurnaroundModal renders displayName for each program card
+      const modal = readComponent('components/modals/TurnaroundModal.tsx');
+      expect(modal).toContain('prog.displayName');
     });
 
     it('UserManualModal uses display names instead of T1/T2/T3 IDs (Strategy B)', () => {
@@ -630,6 +660,12 @@ describe('Display Proofreader', () => {
       expect(manual).not.toContain("'T1 Plan A'");
       expect(manual).not.toContain("'T2 Plan A'");
       expect(manual).not.toContain("'T3 Quick'");
+      // Strategy B: BusinessCard resolves program names via getProgramById for turnaround badge
+      const card = readComponent('components/cards/BusinessCard.tsx');
+      expect(card).toContain('getProgramById');
+      expect(card).toContain('prog.displayName');
+      expect(card).toContain('prog.sourceQuality');
+      expect(card).toContain('prog.targetQuality');
     });
 
     it('UserManualModal does not reference removed wind-down feature (Strategy B)', () => {
@@ -643,18 +679,42 @@ describe('Display Proofreader', () => {
       expect(TURNAROUND_TIER_CONFIG[1].unlockCost).toBe(600);
       expect(TURNAROUND_TIER_CONFIG[2].unlockCost).toBe(1000);
       expect(TURNAROUND_TIER_CONFIG[3].unlockCost).toBe(1400);
+      // Strategy B: AllocatePhase Shared Services tab shows tier unlock costs via TURNAROUND_TIER_CONFIG
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('TURNAROUND_TIER_CONFIG');
+      expect(allocate).toContain('config.unlockCost');
     });
 
     it('Tier annual costs match config', () => {
       expect(TURNAROUND_TIER_CONFIG[1].annualCost).toBe(250);
       expect(TURNAROUND_TIER_CONFIG[2].annualCost).toBe(450);
       expect(TURNAROUND_TIER_CONFIG[3].annualCost).toBe(700);
+      // Strategy B: AllocatePhase displays tier annual cost via getTurnaroundTierAnnualCost
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('getTurnaroundTierAnnualCost');
+      // Strategy B: TurnaroundModal shows per-program upfront & annual costs
+      const modal = readComponent('components/modals/TurnaroundModal.tsx');
+      expect(modal).toContain('calculateTurnaroundCost');
+      expect(modal).toContain('Upfront Cost');
+      expect(modal).toContain('Annual Cost');
+      expect(modal).toContain('prog.annualCost');
     });
 
     it('Tier required opcos match config', () => {
       expect(TURNAROUND_TIER_CONFIG[1].requiredOpcos).toBe(2);
       expect(TURNAROUND_TIER_CONFIG[2].requiredOpcos).toBe(3);
       expect(TURNAROUND_TIER_CONFIG[3].requiredOpcos).toBe(4);
+      // Strategy B: AllocatePhase renders tier effects from TURNAROUND_TIER_CONFIG
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('.effects');
+      // Strategy B: AllocatePhase Portfolio tab shows active turnaround program names
+      expect(allocate).toContain('getProgramById');
+      expect(allocate).toContain('Active Turnarounds');
+      // Strategy B: BusinessCard shows turnaround progress bar with years remaining
+      const card = readComponent('components/cards/BusinessCard.tsx');
+      expect(card).toContain('activeTurnaround');
+      expect(card).toContain('progress');
+      expect(card).toContain('roundsLeft');
     });
 
     it('Standard durations: T1=4, T2=5, T3=3-6', () => {
@@ -669,6 +729,10 @@ describe('Display Proofreader', () => {
         expect(p.durationStandard).toBeGreaterThanOrEqual(3);
         expect(p.durationStandard).toBeLessThanOrEqual(6);
       }
+      // Strategy B: TurnaroundModal computes duration via getTurnaroundDuration and shows it
+      const modal = readComponent('components/modals/TurnaroundModal.tsx');
+      expect(modal).toContain('getTurnaroundDuration');
+      expect(modal).toContain('years');
     });
 
     it('Quick durations: T1=2, T2=3, T3=2-3', () => {
@@ -684,6 +748,7 @@ describe('Display Proofreader', () => {
         expect(p.durationQuick).toBeLessThanOrEqual(3);
       }
     });
+
   });
 
   // ══════════════════════════════════════════════════════════════════
