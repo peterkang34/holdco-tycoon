@@ -103,8 +103,6 @@ describe('Deal generation determinism', () => {
     const pipeline2 = generateDealPipeline([], 5, undefined, undefined, undefined, 0, 0, false, undefined, 20, false, streams2.deals);
 
     // Pipelines should differ in at least some deals
-    const sectors1 = pipeline1.map(d => d.business.sectorId).join(',');
-    const sectors2 = pipeline2.map(d => d.business.sectorId).join(',');
     // Very unlikely to be identical given different seeds
     const prices1 = pipeline1.map(d => d.askingPrice);
     const prices2 = pipeline2.map(d => d.askingPrice);

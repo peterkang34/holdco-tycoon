@@ -79,7 +79,7 @@ export function GameOverScreen({
   totalDebt,
   hasRestructured = false,
   challengeData,
-  incomingResult,
+  incomingResult: _incomingResult,
   onPlayAgain,
 }: GameOverScreenProps) {
   const [initials, setInitials] = useState('');

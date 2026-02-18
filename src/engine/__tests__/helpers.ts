@@ -179,6 +179,7 @@ export function createMockGameState(overrides: Partial<GameState> = {}): GameSta
     turnaroundTier: 0,
     activeTurnarounds: [],
     founderDistributionsReceived: 0,
+    seed: 42,
     ...overrides,
   };
 }
