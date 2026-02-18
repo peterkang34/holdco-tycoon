@@ -6,6 +6,8 @@ import { ChangelogModal } from '../ui/ChangelogModal';
 import { UserManualModal } from '../ui/UserManualModal';
 import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../../data/gameConfig';
 import type { ChallengeParams } from '../../utils/challenge';
+import { generateRandomSeed } from '../../engine/rng';
+import { buildChallengeUrl, shareChallenge } from '../../utils/challenge';
 
 interface IntroScreenProps {
   onStart: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty, duration: GameDuration, seed?: number) => void;
@@ -23,6 +25,10 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showUserManual, setShowUserManual] = useState(false);
+  const [showChallengeCreator, setShowChallengeCreator] = useState(false);
+  const [challengeCopied, setChallengeCopied] = useState(false);
+  const [challengeDifficulty, setChallengeDifficulty] = useState<GameDifficulty>('easy');
+  const [challengeDuration, setChallengeDuration] = useState<GameDuration>('quick');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +46,16 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
     setHoldcoName(e.target.value);
     if (showNameError && e.target.value.trim().length >= 2) {
       setShowNameError(false);
+    }
+  };
+
+  const handleCreateChallenge = async () => {
+    const seed = generateRandomSeed();
+    const url = buildChallengeUrl({ seed, difficulty: challengeDifficulty, duration: challengeDuration });
+    const shared = await shareChallenge(url, 'Challenge me in Holdco Tycoon!');
+    if (shared) {
+      setChallengeCopied(true);
+      setTimeout(() => setChallengeCopied(false), 2500);
     }
   };
 
@@ -242,8 +258,49 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
           </>
         )}
 
+        {/* Challenge a Friend */}
+        <div className="mt-4">
+          <button
+            onClick={() => setShowChallengeCreator(!showChallengeCreator)}
+            className="min-h-[44px] text-sm text-yellow-400 hover:text-yellow-300 transition-colors font-medium inline-flex items-center justify-center"
+          >
+            🏆 Challenge a Friend
+          </button>
+          {showChallengeCreator && (
+            <div className="card p-4 mt-2 border-yellow-500/20 bg-yellow-500/5 text-left">
+              <p className="text-xs text-text-muted mb-3 leading-relaxed">
+                Race your friends under identical conditions — same deals, events, and market. Share the link, play separately, compare results.
+              </p>
+              <div className="flex gap-2 mb-3">
+                <button
+                  type="button"
+                  onClick={() => setChallengeDifficulty(challengeDifficulty === 'easy' ? 'normal' : 'easy')}
+                  className={`min-h-[44px] text-xs px-4 rounded border transition-colors ${
+                    challengeDifficulty === 'normal' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-accent/20 text-accent border-accent/30'
+                  }`}
+                >
+                  {challengeDifficulty === 'normal' ? 'Hard' : 'Easy'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChallengeDuration(challengeDuration === 'quick' ? 'standard' : 'quick')}
+                  className="min-h-[44px] text-xs px-4 rounded border border-white/20 bg-white/5 text-text-secondary hover:border-white/40 transition-colors"
+                >
+                  {DURATION_CONFIG[challengeDuration].label}
+                </button>
+              </div>
+              <button
+                onClick={handleCreateChallenge}
+                className="btn-primary w-full text-sm"
+              >
+                {challengeCopied ? 'Link Copied!' : 'Share Challenge Link'}
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Global Leaderboard + Changelog + Manual */}
-        <div className="mt-4 flex flex-col items-center gap-2">
+        <div className="mt-3 flex flex-col items-center gap-2">
           <button
             onClick={() => setShowLeaderboard(true)}
             className="text-sm text-text-muted hover:text-accent transition-colors"

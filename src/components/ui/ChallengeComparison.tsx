@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { formatMoney } from '../../engine/types';
 import {
   type PlayerResult,
@@ -8,26 +8,39 @@ import {
   compareResults,
   isTied,
   buildResultUrl,
-  copyToClipboard,
-  encodeChallengeParams,
+  shareChallenge,
 } from '../../utils/challenge';
 import { getGradeColor } from '../../utils/gradeColors';
 
 interface ChallengeComparisonProps {
   challengeParams: ChallengeParams;
   myResult: PlayerResult;
+  initialOpponentResult?: PlayerResult | null;
   onClose: () => void;
 }
 
-export function ChallengeComparison({ challengeParams, myResult, onClose }: ChallengeComparisonProps) {
-  const [resultCodes, setResultCodes] = useState<string[]>(['']);
-  const [results, setResults] = useState<ComparisonEntry[]>([
-    { result: myResult, isYou: true },
-  ]);
+export function ChallengeComparison({ challengeParams, myResult, initialOpponentResult, onClose }: ChallengeComparisonProps) {
+  const [resultCodes, setResultCodes] = useState<string[]>(
+    initialOpponentResult ? [] : ['']
+  );
+  const [results, setResults] = useState<ComparisonEntry[]>(() => {
+    if (initialOpponentResult) {
+      return compareResults([
+        { result: myResult, isYou: true },
+        { result: initialOpponentResult, isYou: false },
+      ]);
+    }
+    return [{ result: myResult, isYou: true }];
+  });
   const [parseError, setParseError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const challengeCode = encodeChallengeParams(challengeParams);
+  // Lock body scroll when modal is open (prevents iOS Safari scroll bleed)
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = prev; };
+  }, []);
 
   const handleAddResult = () => {
     if (resultCodes.length < 3) {
@@ -49,7 +62,7 @@ export function ChallengeComparison({ challengeParams, myResult, onClose }: Chal
       const trimmed = code.trim();
       if (!trimmed) continue;
 
-      // Extract result code — could be a full URL or just the r= param value
+      // Extract result — could be a full URL or just the r= param value
       let resultCode = trimmed;
       if (trimmed.includes('r=')) {
         const match = trimmed.match(/[?&]r=([^&]+)/);
@@ -58,14 +71,14 @@ export function ChallengeComparison({ challengeParams, myResult, onClose }: Chal
 
       const decoded = decodePlayerResult(resultCode);
       if (!decoded) {
-        setParseError(`Could not parse result code: "${trimmed.slice(0, 30)}..."`);
+        setParseError(`Could not parse result: "${trimmed.slice(0, 30)}..."`);
         return;
       }
       entries.push({ result: decoded, isYou: false });
     }
 
     if (entries.length < 2) {
-      setParseError('Paste at least one opponent result code to compare.');
+      setParseError('Paste at least one opponent\'s result to compare.');
       return;
     }
 
@@ -73,10 +86,10 @@ export function ChallengeComparison({ challengeParams, myResult, onClose }: Chal
     setParseError(null);
   };
 
-  const handleCopyMyResult = async () => {
+  const handleShareMyResult = async () => {
     const url = buildResultUrl(challengeParams, myResult);
-    const success = await copyToClipboard(url);
-    if (success) {
+    const shared = await shareChallenge(url, 'My Holdco Tycoon result');
+    if (shared) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
@@ -88,7 +101,7 @@ export function ChallengeComparison({ challengeParams, myResult, onClose }: Chal
 
   return (
     <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-bg-secondary border border-white/10 rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
+      <div className="bg-bg-secondary border border-white/10 rounded-xl max-w-2xl w-full max-h-[90dvh] overflow-y-auto overscroll-contain p-6">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-bold">Compare Results</h2>
           <button
@@ -99,27 +112,24 @@ export function ChallengeComparison({ challengeParams, myResult, onClose }: Chal
           </button>
         </div>
 
-        {/* My Result Code */}
+        {/* My Result */}
         <div className="mb-4 p-3 rounded-lg bg-white/5 border border-white/10">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-sm text-text-muted">Your result code</span>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-text-muted">Your result</span>
             <button
-              onClick={handleCopyMyResult}
-              className="text-xs text-accent hover:text-accent/80 transition-colors"
+              onClick={handleShareMyResult}
+              className="text-xs text-accent hover:text-accent/80 transition-colors min-h-[44px] flex items-center"
             >
-              {copied ? 'Copied!' : 'Copy Result URL'}
+              {copied ? 'Copied!' : 'Share My Result'}
             </button>
           </div>
-          <p className="text-xs text-text-muted font-mono break-all">
-            Challenge: {challengeCode}
-          </p>
         </div>
 
         {/* Input opponent results */}
         {!sorted && (
           <>
             <p className="text-sm text-text-muted mb-3">
-              Paste your opponents' result URLs or codes below:
+              Paste your opponents' results below:
             </p>
             {resultCodes.map((code, i) => (
               <div key={i} className="mb-2">
@@ -127,15 +137,17 @@ export function ChallengeComparison({ challengeParams, myResult, onClose }: Chal
                   type="text"
                   value={code}
                   onChange={(e) => handleResultCodeChange(i, e.target.value)}
-                  placeholder={`Player ${i + 2} result code or URL`}
-                  className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
+                  placeholder={`Player ${i + 2} result`}
+                  autoComplete="off"
+                  autoCapitalize="off"
+                  className="w-full min-h-[44px] bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
                 />
               </div>
             ))}
             {resultCodes.length < 3 && (
               <button
                 onClick={handleAddResult}
-                className="text-xs text-accent hover:text-accent/80 mb-3"
+                className="text-xs text-accent hover:text-accent/80 min-h-[44px] inline-flex items-center mb-3"
               >
                 + Add another player
               </button>
@@ -175,7 +187,7 @@ export function ChallengeComparison({ challengeParams, myResult, onClose }: Chal
                   <tr className="border-b border-white/10">
                     <th className="text-left py-2 text-text-muted font-medium">Metric</th>
                     {sorted.map((entry, i) => (
-                      <th key={i} className={`text-right py-2 font-medium ${entry.isYou ? 'text-accent' : 'text-text-primary'}`}>
+                      <th key={i} className={`text-right py-2 font-medium whitespace-nowrap ${entry.isYou ? 'text-accent' : 'text-text-primary'}`}>
                         {entry.isYou ? 'You' : entry.result.name}
                         {i === 0 && !hasTie && <span className="ml-1 text-yellow-400">*</span>}
                       </th>
@@ -230,7 +242,7 @@ export function ChallengeComparison({ challengeParams, myResult, onClose }: Chal
 
             <button
               onClick={() => setResults([{ result: myResult, isYou: true }])}
-              className="mt-4 text-sm text-text-muted hover:text-text-primary transition-colors"
+              className="mt-4 min-h-[44px] text-sm text-text-muted hover:text-text-primary transition-colors inline-flex items-center"
             >
               Reset comparison
             </button>
@@ -260,7 +272,7 @@ function ComparisonRow({
       {values.map((value, i) => (
         <td
           key={i}
-          className={`py-2 text-right ${colorFn ? colorFn(value) : 'text-text-primary'}`}
+          className={`py-2 text-right whitespace-nowrap ${colorFn ? colorFn(value) : 'text-text-primary'}`}
         >
           {value}
         </td>

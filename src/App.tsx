@@ -55,13 +55,24 @@ function App() {
   useEffect(() => {
     const { challenge, result } = parseChallengeFromUrl();
     if (challenge) {
+      cleanChallengeUrl();
+
+      // If a saved game is in progress with a DIFFERENT seed, ignore the challenge
+      // to prevent seed mismatch poisoning the GameOverScreen
+      const hasSavedGame = holdcoName && round > 0;
+      const seedMatches = hasSavedGame && seed === challenge.seed;
+
+      if (hasSavedGame && !seedMatches) {
+        // Saved game has different seed — don't overwrite with challenge data
+        return;
+      }
+
       setChallengeData(challenge);
       if (result) {
         setIncomingResult(result);
       }
-      cleanChallengeUrl();
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check if there's a saved game on mount
   useEffect(() => {
@@ -70,7 +81,7 @@ function App() {
     } else if (gameOver) {
       setScreen('gameOver');
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStart = (name: string, startingSector: SectorId, difficulty: GameDifficulty = 'easy', duration: GameDuration = 'standard', seed?: number) => {
     startGame(name, startingSector, difficulty, duration, seed);

@@ -13,9 +13,8 @@ import {
   type ChallengeParams,
   type PlayerResult,
   buildChallengeUrl,
-  encodePlayerResult,
+  buildResultUrl,
   shareChallenge,
-  copyToClipboard,
 } from '../../utils/challenge';
 import { ChallengeComparison } from '../ui/ChallengeComparison';
 
@@ -79,7 +78,7 @@ export function GameOverScreen({
   totalDebt,
   hasRestructured = false,
   challengeData,
-  incomingResult: _incomingResult,
+  incomingResult,
   onPlayAgain,
 }: GameOverScreenProps) {
   const [initials, setInitials] = useState('');
@@ -91,7 +90,7 @@ export function GameOverScreen({
   const [saving, setSaving] = useState(false);
   const [leaderboardTab, setLeaderboardTab] = useState<LeaderboardTab>('overall');
   const [challengeCopied, setChallengeCopied] = useState(false);
-  const [showComparison, setShowComparison] = useState(false);
+  const [showComparison, setShowComparison] = useState(!!incomingResult);
 
   // Build challenge params from current game (works for both challenge and solo games)
   const currentChallengeParams: ChallengeParams = useMemo(() => (
@@ -120,11 +119,13 @@ export function GameOverScreen({
     }
   };
 
-  const handleCopyResultCode = async () => {
-    const code = encodePlayerResult(myResult);
-    await copyToClipboard(code);
-    setChallengeCopied(true);
-    setTimeout(() => setChallengeCopied(false), 2000);
+  const handleShareResult = async () => {
+    const url = buildResultUrl(currentChallengeParams, myResult);
+    const shared = await shareChallenge(url, 'My Holdco Tycoon result');
+    if (shared) {
+      setChallengeCopied(true);
+      setTimeout(() => setChallengeCopied(false), 2000);
+    }
   };
 
   // Fire telemetry on game completion
@@ -532,6 +533,50 @@ export function GameOverScreen({
         showWealth={leaderboardTab === 'distributions'}
       />
 
+      {/* Challenge Friends */}
+      <div className="card mb-6 border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 to-orange-500/5">
+        <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
+          <span>🏆</span> Challenge Friends
+        </h2>
+        {challengeData ? (
+          <p className="text-sm text-yellow-400/80 mb-3">
+            Challenge Mode — you and your friends played under identical conditions.
+          </p>
+        ) : (
+          <p className="text-sm text-text-muted mb-3">
+            Think you played well? Share this exact game — same deals, events, and market conditions — and see who builds a better holdco.
+          </p>
+        )}
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={handleChallengeShare}
+            className="btn-primary flex-1 text-sm"
+          >
+            {challengeCopied ? 'Copied!' : 'Share Challenge Link'}
+          </button>
+          <button
+            onClick={handleShareResult}
+            className="btn-secondary flex-1 text-sm"
+          >
+            Share My Result
+          </button>
+        </div>
+        <div className="mt-3 pt-3 border-t border-white/10">
+          <p className="text-xs text-text-muted mb-2">How it works:</p>
+          <ol className="text-xs text-text-muted space-y-1 list-decimal list-inside">
+            <li>Share the challenge link — everyone gets the same deals and events</li>
+            <li>After finishing, each player shares their result</li>
+            <li>Click "Compare" and paste your opponents' results to see who won</li>
+          </ol>
+        </div>
+        <button
+          onClick={() => setShowComparison(true)}
+          className="mt-3 min-h-[44px] text-xs text-accent hover:text-accent/80 transition-colors w-full text-center flex items-center justify-center"
+        >
+          Compare Results
+        </button>
+      </div>
+
       {/* Score Breakdown */}
       <div className="card mb-6">
         <h2 className="text-lg font-bold mb-4">Score Breakdown</h2>
@@ -679,41 +724,6 @@ export function GameOverScreen({
         founderOwnership={enterpriseValue > 0 ? founderEquityValue / enterpriseValue : 1}
       />
 
-      {/* Challenge Section */}
-      <div className="card mb-6">
-        <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
-          <span>🏆</span> Challenge Friends
-        </h2>
-        {challengeData && (
-          <p className="text-xs text-yellow-400/80 mb-3">
-            This was a Challenge Mode game — same seed, same conditions for all players.
-          </p>
-        )}
-        <p className="text-sm text-text-muted mb-4">
-          Share a challenge link so friends play the exact same deals, events, and market conditions.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-3">
-          <button
-            onClick={handleChallengeShare}
-            className="btn-primary flex-1 text-sm"
-          >
-            {challengeCopied ? 'Copied!' : 'Share Challenge Link'}
-          </button>
-          <button
-            onClick={() => setShowComparison(true)}
-            className="btn-secondary flex-1 text-sm"
-          >
-            Compare Results
-          </button>
-        </div>
-        <button
-          onClick={handleCopyResultCode}
-          className="mt-2 text-xs text-text-muted hover:text-text-secondary transition-colors w-full text-center"
-        >
-          Copy my result code
-        </button>
-      </div>
-
       {/* Actions */}
       <div className="flex flex-col gap-4">
         <button onClick={onPlayAgain} className="btn-primary text-lg py-4">
@@ -734,6 +744,7 @@ export function GameOverScreen({
         <ChallengeComparison
           challengeParams={currentChallengeParams}
           myResult={myResult}
+          initialOpponentResult={incomingResult}
           onClose={() => setShowComparison(false)}
         />
       )}
