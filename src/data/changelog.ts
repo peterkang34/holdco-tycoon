@@ -20,6 +20,8 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Challenge Friends — share a link so friends play the same seed with identical deals, events, and market conditions. Compare results side-by-side when everyone finishes.',
           'Seeded deterministic RNG — every game now has a unique seed. Same seed guarantees identical game conditions for fair competition.',
           'Result comparison — paste up to 3 opponent result codes to see who built the best holdco on the same seed.',
+          'Create challenges from the intro screen — generate and share a challenge link, then jump straight into the game.',
+          'Challenge mode banner — see a persistent indicator during gameplay when playing a challenge.',
         ],
       },
     ],

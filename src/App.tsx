@@ -85,6 +85,10 @@ function App() {
 
   const handleStart = (name: string, startingSector: SectorId, difficulty: GameDifficulty = 'easy', duration: GameDuration = 'standard', seed?: number) => {
     startGame(name, startingSector, difficulty, duration, seed);
+    // If starting with a seed (from challenge URL or creator), mark as challenge
+    if (seed != null && !challengeData) {
+      setChallengeData({ seed, difficulty, duration });
+    }
     setIsNewGame(true);
     setScreen('game');
   };
@@ -123,7 +127,7 @@ function App() {
           challengeData={challengeData}
         />
       )}
-      {screen === 'game' && <GameScreen onGameOver={handleGameOver} onResetGame={handlePlayAgain} showTutorial={isNewGame} />}
+      {screen === 'game' && <GameScreen onGameOver={handleGameOver} onResetGame={handlePlayAgain} showTutorial={isNewGame} isChallenge={!!challengeData} />}
       {screen === 'gameOver' && (
         <GameOverScreen
           holdcoName={holdcoName}

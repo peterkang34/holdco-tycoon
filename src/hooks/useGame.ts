@@ -66,7 +66,7 @@ import { getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
 
 import type { GameDifficulty, GameDuration } from '../engine/types';
-import { generateRandomSeed } from '../engine/rng';
+import { generateRandomSeed, createRngStreams } from '../engine/rng';
 
 /** Recompute totalDebt from holdco loan + per-business bank debt */
 function computeTotalDebt(businesses: Business[], holdcoLoanBalance: number): number {
@@ -286,7 +286,8 @@ export const useGameStore = create<GameStore>()(
         const maxRounds = durConfig.rounds;
 
         const startingBusiness = createStartingBusiness(startingSector, diffConfig.startingEbitda, diffConfig.startingMultipleCap);
-        const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds);
+        const round1Streams = createRngStreams(gameSeed, 1);
+        const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds, false, round1Streams.deals);
 
         // Holdco loan setup: Normal mode gets a structured loan, Easy mode has none
         const holdcoLoanBalance = diffConfig.startingDebt;
@@ -717,6 +718,9 @@ export const useGameStore = create<GameStore>()(
           ? state.eventHistory[state.eventHistory.length - 1].type
           : undefined;
 
+        // Create seeded RNG streams for this round's deal generation
+        const roundStreams = createRngStreams(state.seed, state.round);
+
         // Generate new deals with M&A focus and portfolio synergies
         const newPipeline = generateDealPipeline(
           state.dealPipeline,
@@ -729,13 +733,14 @@ export const useGameStore = create<GameStore>()(
           state.maSourcing.active,
           lastEvt,
           state.maxRounds,
-          state.creditTighteningRoundsRemaining > 0
+          state.creditTighteningRoundsRemaining > 0,
+          roundStreams.deals
         );
 
         // Inject distressed deals during Financial Crisis (bypass MAX_DEALS cap)
         let finalPipeline = newPipeline;
         if (state.currentEvent?.type === 'global_financial_crisis') {
-          const distressedDeals = generateDistressedDeals(state.round, state.maxRounds);
+          const distressedDeals = generateDistressedDeals(state.round, state.maxRounds, roundStreams.deals);
           finalPipeline = [...newPipeline, ...distressedDeals];
         }
 
@@ -758,7 +763,7 @@ export const useGameStore = create<GameStore>()(
               source: 'proprietary',
               qualityFloor: 3 as 1 | 2 | 3 | 4 | 5,
               maxRounds: state.maxRounds,
-            });
+            }, roundStreams.deals);
             finalPipeline = [...finalPipeline, exclusiveDeal];
           }
           clearedBoomSectorId = undefined;

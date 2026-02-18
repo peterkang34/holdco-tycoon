@@ -38,9 +38,10 @@ interface GameScreenProps {
   onGameOver: () => void;
   onResetGame: () => void;
   showTutorial?: boolean;
+  isChallenge?: boolean;
 }
 
-export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: GameScreenProps) {
+export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isChallenge = false }: GameScreenProps) {
   const [showInstructions, setShowInstructions] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [showAnnualReports, setShowAnnualReports] = useState(false);
@@ -706,6 +707,13 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
           maxRounds={maxRounds}
           onClose={handleCloseTutorial}
         />
+      )}
+
+      {/* Challenge Mode Banner */}
+      {isChallenge && (
+        <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-3 py-1.5 text-center">
+          <span className="text-xs text-yellow-400 font-medium">Challenge Mode<span className="hidden sm:inline"> — same deals, same events</span></span>
+        </div>
       )}
 
       {/* Top Bar */}

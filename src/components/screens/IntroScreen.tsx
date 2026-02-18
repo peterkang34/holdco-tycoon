@@ -29,6 +29,8 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [challengeDifficulty, setChallengeDifficulty] = useState<GameDifficulty>('easy');
   const [challengeDuration, setChallengeDuration] = useState<GameDuration>('quick');
+  // After creating a challenge, store the seed so the creator can play it too
+  const [createdChallengeSeed, setCreatedChallengeSeed] = useState<number | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,6 +44,19 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
     onStart(holdcoName.trim(), sector, selectedDifficulty, selectedDuration, challengeData?.seed);
   };
 
+  const handleChallengeStart = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (holdcoName.trim().length < 2) {
+      setShowNameError(true);
+      return;
+    }
+    const sector = selectedSector === 'random'
+      ? SECTOR_LIST[Math.floor(Math.random() * SECTOR_LIST.length)].id
+      : selectedSector;
+    // Start with the created challenge seed
+    onStart(holdcoName.trim(), sector, challengeDifficulty, challengeDuration, createdChallengeSeed!);
+  };
+
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setHoldcoName(e.target.value);
     if (showNameError && e.target.value.trim().length >= 2) {
@@ -51,6 +66,7 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
 
   const handleCreateChallenge = async () => {
     const seed = generateRandomSeed();
+    setCreatedChallengeSeed(seed);
     const url = buildChallengeUrl({ seed, difficulty: challengeDifficulty, duration: challengeDuration });
     const shared = await shareChallenge(url, 'Challenge me in Holdco Tycoon!');
     if (shared) {
@@ -84,33 +100,56 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
           </p>
         </div>
 
-        {/* Challenge Mode Banner */}
-        {isChallenge && (
-          <div className="card p-4 mb-4 border-yellow-500/30 bg-yellow-500/5">
-            <div className="flex items-center gap-2 justify-center mb-1">
+        {/* ═══ CHALLENGE RECIPIENT FLOW ═══ */}
+        {isChallenge ? (
+          <form onSubmit={handleSubmit} className="card p-6 border-yellow-500/30 bg-gradient-to-b from-yellow-500/5 to-transparent">
+            <div className="flex items-center gap-2 justify-center mb-2">
               <span className="text-lg">🏆</span>
               <span className="font-bold text-yellow-400">Challenge Mode</span>
             </div>
-            <p className="text-xs text-text-muted text-center">
-              Same seed, same deals, same events — compete under identical conditions.
+            <p className="text-xs text-text-muted text-center mb-4">
+              Same deals, same events, same market — compete under identical conditions.
             </p>
-            <div className="flex justify-center gap-2 mt-2">
+            <div className="flex justify-center gap-2 mb-5">
               <span className={`text-xs px-2 py-0.5 rounded ${selectedDifficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
                 {DIFFICULTY_CONFIG[selectedDifficulty].label.split(' — ')[0]}
               </span>
               <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-text-secondary">
                 {DURATION_CONFIG[selectedDuration].label}
               </span>
-              <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-text-muted">
-                Locked
-              </span>
             </div>
-          </div>
-        )}
 
-        {step === 'mode' ? (
+            <label className="block text-left mb-2 text-sm text-text-muted">
+              Name your holding company <span className="text-danger">*</span>
+            </label>
+            <input
+              type="text"
+              value={holdcoName}
+              onChange={handleNameChange}
+              placeholder="e.g. Apex Holdings"
+              className={`w-full bg-white/5 border rounded-lg px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none transition-colors ${
+                showNameError ? 'border-danger focus:border-danger' : 'border-white/10 focus:border-accent'
+              }`}
+              maxLength={30}
+              autoFocus
+              required
+            />
+            {showNameError && (
+              <p className="text-danger text-sm mt-1 mb-3">Please enter a name for your holding company</p>
+            )}
+            {!showNameError && <div className="mb-4" />}
+
+            <button
+              type="submit"
+              disabled={!holdcoName.trim()}
+              className="btn-primary w-full text-lg"
+            >
+              Start Challenge →
+            </button>
+          </form>
+        ) : step === 'mode' ? (
           <>
-            {/* Mode Selection */}
+            {/* ═══ NORMAL: Mode Selection ═══ */}
             <div className="card p-6">
               <label className="block text-left mb-3 text-sm text-text-muted font-medium">
                 Difficulty
@@ -165,20 +204,16 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
           </>
         ) : (
           <>
-            {/* Setup: Name + Sector */}
+            {/* ═══ NORMAL: Setup (Name + Sector) ═══ */}
             <form onSubmit={handleSubmit} className="card p-6">
               <div className="flex items-center justify-between mb-4">
-                {!isChallenge ? (
-                  <button
-                    type="button"
-                    onClick={() => setStep('mode')}
-                    className="text-sm text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center"
-                  >
-                    ← Back
-                  </button>
-                ) : (
-                  <div />
-                )}
+                <button
+                  type="button"
+                  onClick={() => setStep('mode')}
+                  className="text-sm text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center"
+                >
+                  ← Back
+                </button>
                 <div className="flex gap-2">
                   <span className={`text-xs px-2 py-0.5 rounded ${selectedDifficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
                     {DIFFICULTY_CONFIG[selectedDifficulty].label.split(' — ')[0]}
@@ -258,46 +293,90 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
           </>
         )}
 
-        {/* Challenge a Friend */}
-        <div className="mt-4">
-          <button
-            onClick={() => setShowChallengeCreator(!showChallengeCreator)}
-            className="min-h-[44px] text-sm text-yellow-400 hover:text-yellow-300 transition-colors font-medium inline-flex items-center justify-center"
-          >
-            🏆 Challenge a Friend
-          </button>
-          {showChallengeCreator && (
-            <div className="card p-4 mt-2 border-yellow-500/20 bg-yellow-500/5 text-left">
-              <p className="text-xs text-text-muted mb-3 leading-relaxed">
-                Race your friends under identical conditions — same deals, events, and market. Share the link, play separately, compare results.
-              </p>
-              <div className="flex gap-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => setChallengeDifficulty(challengeDifficulty === 'easy' ? 'normal' : 'easy')}
-                  className={`min-h-[44px] text-xs px-4 rounded border transition-colors ${
-                    challengeDifficulty === 'normal' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-accent/20 text-accent border-accent/30'
-                  }`}
-                >
-                  {challengeDifficulty === 'normal' ? 'Hard' : 'Easy'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setChallengeDuration(challengeDuration === 'quick' ? 'standard' : 'quick')}
-                  className="min-h-[44px] text-xs px-4 rounded border border-white/20 bg-white/5 text-text-secondary hover:border-white/40 transition-colors"
-                >
-                  {DURATION_CONFIG[challengeDuration].label}
-                </button>
+        {/* Challenge a Friend (only in normal flow) */}
+        {!isChallenge && (
+          <div className="mt-4">
+            <button
+              onClick={() => setShowChallengeCreator(!showChallengeCreator)}
+              className="min-h-[44px] text-sm text-yellow-400 hover:text-yellow-300 transition-colors font-medium inline-flex items-center justify-center"
+            >
+              🏆 Challenge a Friend
+            </button>
+            {showChallengeCreator && (
+              <div className="card p-4 mt-2 border-yellow-500/20 bg-yellow-500/5 text-left">
+                {!createdChallengeSeed ? (
+                  <>
+                    <p className="text-xs text-text-muted mb-3 leading-relaxed">
+                      Race your friends under identical conditions — same deals, events, and market. Share the link, play separately, compare results.
+                    </p>
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        type="button"
+                        onClick={() => setChallengeDifficulty(challengeDifficulty === 'easy' ? 'normal' : 'easy')}
+                        className={`min-h-[44px] text-xs px-4 rounded border transition-colors ${
+                          challengeDifficulty === 'normal' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-accent/20 text-accent border-accent/30'
+                        }`}
+                      >
+                        {challengeDifficulty === 'normal' ? 'Hard' : 'Easy'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setChallengeDuration(challengeDuration === 'quick' ? 'standard' : 'quick')}
+                        className="min-h-[44px] text-xs px-4 rounded border border-white/20 bg-white/5 text-text-secondary hover:border-white/40 transition-colors"
+                      >
+                        {DURATION_CONFIG[challengeDuration].label}
+                      </button>
+                    </div>
+                    <button
+                      onClick={handleCreateChallenge}
+                      className="btn-primary w-full text-sm"
+                    >
+                      {challengeCopied ? 'Link Copied!' : 'Share Challenge Link'}
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {/* After sharing — CTA to play this challenge */}
+                    <div className="text-center mb-3">
+                      <span className="text-accent text-sm font-medium">Challenge link shared!</span>
+                      <p className="text-xs text-text-muted mt-1">Now play the same challenge yourself.</p>
+                    </div>
+                    <form onSubmit={handleChallengeStart}>
+                      <input
+                        type="text"
+                        value={holdcoName}
+                        onChange={handleNameChange}
+                        placeholder="Name your holdco"
+                        className={`w-full bg-white/5 border rounded-lg px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none transition-colors mb-3 ${
+                          showNameError ? 'border-danger focus:border-danger' : 'border-white/10 focus:border-accent'
+                        }`}
+                        maxLength={30}
+                        autoFocus
+                        required
+                      />
+                      {showNameError && (
+                        <p className="text-danger text-sm mt-1 mb-2">Please enter a name</p>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={!holdcoName.trim()}
+                        className="btn-primary w-full text-sm"
+                      >
+                        Play This Challenge →
+                      </button>
+                    </form>
+                    <button
+                      onClick={() => { setCreatedChallengeSeed(null); setChallengeCopied(false); }}
+                      className="mt-2 min-h-[44px] text-xs text-text-muted hover:text-text-secondary transition-colors w-full text-center inline-flex items-center justify-center"
+                    >
+                      Create a different challenge
+                    </button>
+                  </>
+                )}
               </div>
-              <button
-                onClick={handleCreateChallenge}
-                className="btn-primary w-full text-sm"
-              >
-                {challengeCopied ? 'Link Copied!' : 'Share Challenge Link'}
-              </button>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Global Leaderboard + Changelog + Manual */}
         <div className="mt-3 flex flex-col items-center gap-2">
@@ -326,7 +405,7 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
 
         {/* Info */}
         <div className="mt-8 text-sm text-text-muted">
-          <p className="mb-2">{DURATION_CONFIG[selectedDuration].label.match(/\d+/)?.[0] || '20'} years. Build a long-term compounder.</p>
+          <p className="mb-2">{DURATION_CONFIG[isChallenge ? selectedDuration : selectedDuration].label.match(/\d+/)?.[0] || '20'} years. Build a long-term compounder.</p>
           <p>Based on <a href="https://holdcoguide.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">The Holdco Guide</a> by Peter Kang</p>
         </div>
       </div>
