@@ -44,8 +44,8 @@ export default async function middleware(request: Request) {
       `<meta property="og:url" content="${url.toString()}" />`,
     )
     .replace(
-      '<meta property="og:image" content="https://game.holdcoguide.com/api/og" />',
-      '<meta property="og:image" content="https://game.holdcoguide.com/api/og?type=challenge" />',
+      '<meta property="og:image" content="https://game.holdcoguide.com/img/og-default.png" />',
+      '<meta property="og:image" content="https://game.holdcoguide.com/img/og-challenge.png" />',
     )
     .replace(
       '<title>Holdco Tycoon - Build Your Empire</title>',
