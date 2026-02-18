@@ -18,6 +18,7 @@ import {
   randomInt,
   pickRandom,
 } from './types';
+import type { SeededRng } from './rng';
 import { clampMargin } from './helpers';
 import { SECTORS, SECTOR_LIST } from '../data/sectors';
 import { getRandomBusinessName } from '../data/names';
@@ -30,8 +31,21 @@ import {
 
 let businessIdCounter = 0;
 
-export function generateBusinessId(): string {
+export function generateBusinessId(round?: number, indexInRound?: number): string {
+  if (round !== undefined && indexInRound !== undefined) {
+    return `biz_r${round}_${indexInRound}`;
+  }
   return `biz_${++businessIdCounter}`;
+}
+
+function fisherYatesShuffle<T>(array: T[], rng?: SeededRng): T[] {
+  const arr = [...array];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const rand = rng ? rng.next() : Math.random();
+    const j = Math.floor(rand * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
 }
 
 export function resetBusinessIdCounter(): void {
@@ -50,9 +64,9 @@ export function restoreBusinessIdCounter(businesses: { id: string }[]): void {
   businessIdCounter = maxId;
 }
 
-function generateQualityRating(): QualityRating {
+function generateQualityRating(rng?: SeededRng): QualityRating {
   // Weighted distribution: more 3s, fewer 1s and 5s
-  const roll = Math.random();
+  const roll = rng ? rng.next() : Math.random();
   if (roll < 0.05) return 1;
   if (roll < 0.20) return 2;
   if (roll < 0.60) return 3;
@@ -60,7 +74,7 @@ function generateQualityRating(): QualityRating {
   return 5;
 }
 
-function generateDueDiligence(quality: QualityRating, sectorId: SectorId): DueDiligenceSignals {
+function generateDueDiligence(quality: QualityRating, sectorId: SectorId, rng?: SeededRng): DueDiligenceSignals {
   const sector = SECTORS[sectorId];
 
   // Revenue concentration based on sector and quality
@@ -80,7 +94,7 @@ function generateDueDiligence(quality: QualityRating, sectorId: SectorId): DueDi
     medium: ['Top client is 20-25% of revenue', 'Some customer concentration', 'Moderate client diversity'],
     high: ['Top client is 40%+ of revenue', 'Significant customer concentration', 'Key account dependency'],
   };
-  revenueConcentrationText = pickRandom(concentrationTexts[revenueConcentration])!;
+  revenueConcentrationText = pickRandom(concentrationTexts[revenueConcentration], rng)!;
 
   // Operator quality
   let operatorQuality: 'strong' | 'moderate' | 'weak';
@@ -93,34 +107,34 @@ function generateDueDiligence(quality: QualityRating, sectorId: SectorId): DueDi
     moderate: ['Decent team, some gaps', 'Owner willing to transition slowly', 'Management needs development'],
     weak: ['Founder looking to exit fully', 'Key person dependency', 'Management transition needed'],
   };
-  const operatorQualityText = pickRandom(operatorTexts[operatorQuality])!;
+  const operatorQualityText = pickRandom(operatorTexts[operatorQuality], rng)!;
 
   // Trend
   let trend: 'growing' | 'flat' | 'declining';
   if (quality >= 4) trend = 'growing';
-  else if (quality >= 2) trend = Math.random() > 0.3 ? 'flat' : 'growing';
-  else trend = Math.random() > 0.5 ? 'declining' : 'flat';
+  else if (quality >= 2) trend = (rng ? rng.next() : Math.random()) > 0.3 ? 'flat' : 'growing';
+  else trend = (rng ? rng.next() : Math.random()) > 0.5 ? 'declining' : 'flat';
 
   const trendTexts = {
-    growing: [`EBITDA growing ${randomInt(8, 15)}% YoY`, 'Strong growth trajectory', 'Consistent expansion'],
+    growing: [`EBITDA growing ${randomInt(8, 15, rng)}% YoY`, 'Strong growth trajectory', 'Consistent expansion'],
     flat: ['EBITDA flat for 2 years', 'Stable but not growing', 'Revenue plateau'],
     declining: ['EBITDA declining 5-10% annually', 'Business in contraction', 'Shrinking market share'],
   };
-  const trendText = pickRandom(trendTexts[trend])!;
+  const trendText = pickRandom(trendTexts[trend], rng)!;
 
   // Customer retention
   let customerRetention: number;
-  if (quality >= 4) customerRetention = randomInt(90, 98);
-  else if (quality >= 3) customerRetention = randomInt(82, 92);
-  else if (quality >= 2) customerRetention = randomInt(75, 85);
-  else customerRetention = randomInt(65, 78);
+  if (quality >= 4) customerRetention = randomInt(90, 98, rng);
+  else if (quality >= 3) customerRetention = randomInt(82, 92, rng);
+  else if (quality >= 2) customerRetention = randomInt(75, 85, rng);
+  else customerRetention = randomInt(65, 78, rng);
 
   const customerRetentionText = `${customerRetention}% annual retention`;
 
   // Competitive position
   let competitivePosition: 'leader' | 'competitive' | 'commoditized';
-  if (quality >= 4) competitivePosition = Math.random() > 0.3 ? 'leader' : 'competitive';
-  else if (quality >= 2) competitivePosition = Math.random() > 0.5 ? 'competitive' : 'commoditized';
+  if (quality >= 4) competitivePosition = (rng ? rng.next() : Math.random()) > 0.3 ? 'leader' : 'competitive';
+  else if (quality >= 2) competitivePosition = (rng ? rng.next() : Math.random()) > 0.5 ? 'competitive' : 'commoditized';
   else competitivePosition = 'commoditized';
 
   const positionTexts = {
@@ -128,7 +142,7 @@ function generateDueDiligence(quality: QualityRating, sectorId: SectorId): DueDi
     competitive: ['Solid competitive position', 'Well-regarded in market', 'Good reputation'],
     commoditized: ['Commoditized market', 'Price competition pressure', 'Low differentiation'],
   };
-  const competitivePositionText = pickRandom(positionTexts[competitivePosition])!;
+  const competitivePositionText = pickRandom(positionTexts[competitivePosition], rng)!;
 
   return {
     revenueConcentration,
@@ -148,37 +162,38 @@ export function generateBusiness(
   sectorId: SectorId,
   _round: number,
   forceQuality?: QualityRating,
-  forceSubType?: string
+  forceSubType?: string,
+  rng?: SeededRng
 ): Omit<Business, 'id' | 'acquisitionRound' | 'improvements' | 'status'> {
   const sector = SECTORS[sectorId];
-  const quality = forceQuality ?? generateQualityRating();
-  const dueDiligence = generateDueDiligence(quality, sectorId);
+  const quality = forceQuality ?? generateQualityRating(rng);
+  const dueDiligence = generateDueDiligence(quality, sectorId, rng);
 
   // Quality modifier (shared between revenue and margin)
   const qualityModifier = 0.8 + (quality - 1) * 0.1; // 0.8 to 1.2
 
   // Generate margin from sector range (quality-adjusted: Q5 +3ppt, Q1 -3ppt)
-  let ebitdaMargin = randomInRange(sector.baseMargin);
+  let ebitdaMargin = randomInRange(sector.baseMargin, rng);
   ebitdaMargin += (quality - 3) * 0.015; // ±3ppt per 2 quality stars
   ebitdaMargin = clampMargin(ebitdaMargin);
 
   // Generate revenue from sector range (quality-adjusted same as EBITDA was)
-  let revenue = Math.round(randomInRange(sector.baseRevenue) * qualityModifier);
+  let revenue = Math.round(randomInRange(sector.baseRevenue, rng) * qualityModifier);
 
   // Derive EBITDA from revenue × margin
   let ebitda = Math.round(revenue * ebitdaMargin);
 
   // Revenue growth rate from sector organic growth range (quality bonus)
-  let revenueGrowthRate = randomInRange(sector.organicGrowthRange);
+  let revenueGrowthRate = randomInRange(sector.organicGrowthRange, rng);
   revenueGrowthRate += (quality - 3) * 0.005;
   if (dueDiligence.trend === 'growing') revenueGrowthRate += 0.02;
   else if (dueDiligence.trend === 'declining') revenueGrowthRate -= 0.03;
 
   // Margin drift rate from sector range
-  const marginDriftRate = randomInRange(sector.marginDriftRange);
+  const marginDriftRate = randomInRange(sector.marginDriftRange, rng);
 
   // Calculate acquisition multiple
-  let multiple = randomInRange(sector.acquisitionMultiple);
+  let multiple = randomInRange(sector.acquisitionMultiple, rng);
   multiple += (quality - 3) * 0.35;
   // Competitive position affects pricing
   if (dueDiligence.competitivePosition === 'leader') multiple += 0.3;
@@ -187,7 +202,7 @@ export function generateBusiness(
 
   const subType = forceSubType && sector.subTypes.includes(forceSubType)
     ? forceSubType
-    : pickRandom(sector.subTypes)!;
+    : pickRandom(sector.subTypes, rng)!;
 
   // Apply sub-type financial skews
   const stIdx = sector.subTypes.indexOf(subType);
@@ -248,16 +263,16 @@ export function generateBusiness(
 }
 
 // Determine acquisition type based on EBITDA size
-function determineAcquisitionType(ebitda: number): AcquisitionType {
+function determineAcquisitionType(ebitda: number, rng?: SeededRng): AcquisitionType {
   // Small businesses (<$500k EBITDA) are tuck-in candidates
   // Medium businesses ($500k-$2M) can be standalone or platform
   // Large businesses (>$2M) are platform opportunities
   if (ebitda < 500) {
     return 'tuck_in';
   } else if (ebitda < 2000) {
-    return Math.random() > 0.6 ? 'platform' : 'standalone';
+    return (rng ? rng.next() : Math.random()) > 0.6 ? 'platform' : 'standalone';
   } else {
-    return Math.random() > 0.3 ? 'platform' : 'standalone';
+    return (rng ? rng.next() : Math.random()) > 0.3 ? 'platform' : 'standalone';
   }
 }
 
@@ -272,7 +287,7 @@ function calculateTuckInDiscount(quality: QualityRating): number {
 
 // --- Seller Archetypes ---
 
-export function assignSellerArchetype(quality: QualityRating): SellerArchetype {
+export function assignSellerArchetype(quality: QualityRating, rng?: SeededRng): SellerArchetype {
   // Weighted distribution adjusted by quality
   const weights: { archetype: SellerArchetype; baseWeight: number; qualityAdj: number }[] = [
     { archetype: 'retiring_founder', baseWeight: 0.30, qualityAdj: quality >= 4 ? 0.10 : quality <= 2 ? -0.10 : 0 },
@@ -285,7 +300,7 @@ export function assignSellerArchetype(quality: QualityRating): SellerArchetype {
 
   const adjusted = weights.map(w => ({ ...w, weight: Math.max(0.02, w.baseWeight + w.qualityAdj) }));
   const total = adjusted.reduce((s, w) => s + w.weight, 0);
-  let roll = Math.random() * total;
+  let roll = (rng ? rng.next() : Math.random()) * total;
   for (const w of adjusted) {
     roll -= w.weight;
     if (roll <= 0) return w.archetype;
@@ -304,25 +319,25 @@ function getArchetypeHeatModifier(archetype: SellerArchetype): number {
   }
 }
 
-function getArchetypePriceModifier(archetype: SellerArchetype): number {
+function getArchetypePriceModifier(archetype: SellerArchetype, rng?: SeededRng): number {
   switch (archetype) {
-    case 'retiring_founder': return randomInRange([0, 0.05]);
-    case 'burnt_out_operator': return randomInRange([-0.10, -0.05]);
-    case 'accidental_holdco': return randomInRange([0.05, 0.10]);
-    case 'distressed_seller': return randomInRange([-0.20, -0.10]);
-    case 'mbo_candidate': return randomInRange([0, 0.05]);
-    case 'franchise_breakaway': return randomInRange([0.05, 0.10]);
+    case 'retiring_founder': return randomInRange([0, 0.05], rng);
+    case 'burnt_out_operator': return randomInRange([-0.10, -0.05], rng);
+    case 'accidental_holdco': return randomInRange([0.05, 0.10], rng);
+    case 'distressed_seller': return randomInRange([-0.20, -0.10], rng);
+    case 'mbo_candidate': return randomInRange([0, 0.05], rng);
+    case 'franchise_breakaway': return randomInRange([0.05, 0.10], rng);
   }
 }
 
-function getArchetypeOperatorQuality(archetype: SellerArchetype): 'strong' | 'moderate' | 'weak' | null {
+function getArchetypeOperatorQuality(archetype: SellerArchetype, rng?: SeededRng): 'strong' | 'moderate' | 'weak' | null {
   switch (archetype) {
-    case 'retiring_founder': return Math.random() > 0.5 ? 'strong' : 'moderate';
-    case 'burnt_out_operator': return Math.random() > 0.5 ? 'weak' : 'moderate';
+    case 'retiring_founder': return (rng ? rng.next() : Math.random()) > 0.5 ? 'strong' : 'moderate';
+    case 'burnt_out_operator': return (rng ? rng.next() : Math.random()) > 0.5 ? 'weak' : 'moderate';
     case 'accidental_holdco': return 'moderate';
     case 'distressed_seller': return 'weak';
     case 'mbo_candidate': return 'strong';
-    case 'franchise_breakaway': return Math.random() > 0.5 ? 'strong' : 'moderate';
+    case 'franchise_breakaway': return (rng ? rng.next() : Math.random()) > 0.5 ? 'strong' : 'moderate';
   }
 }
 
@@ -338,10 +353,11 @@ export function calculateDealHeat(
   lastEventType?: EventType,
   sellerArchetype?: SellerArchetype,
   maxRounds: number = 20,
-  creditTighteningActive: boolean = false
+  creditTighteningActive: boolean = false,
+  rng?: SeededRng
 ): DealHeat {
   // Base distribution: cold 25%, warm 35%, hot 30%, contested 10%
-  const roll = Math.random();
+  const roll = rng ? rng.next() : Math.random();
   let tierIndex: number;
   if (roll < 0.25) tierIndex = 0; // cold
   else if (roll < 0.60) tierIndex = 1; // warm
@@ -381,12 +397,12 @@ export function calculateDealHeat(
 }
 
 // Calculate the premium multiplier for a given heat level
-export function calculateHeatPremium(heat: DealHeat): number {
+export function calculateHeatPremium(heat: DealHeat, rng?: SeededRng): number {
   switch (heat) {
     case 'cold': return 1.0;
-    case 'warm': return randomInRange([1.10, 1.15]);
-    case 'hot': return randomInRange([1.20, 1.30]);
-    case 'contested': return randomInRange([1.20, 1.35]);
+    case 'warm': return randomInRange([1.10, 1.15], rng);
+    case 'hot': return randomInRange([1.20, 1.30], rng);
+    case 'contested': return randomInRange([1.20, 1.35], rng);
   }
 }
 
@@ -618,9 +634,9 @@ export function calculateMultipleExpansion(platformScale: number, totalEbitda: n
   return scaleBonus + sizeBonus;
 }
 
-export function generateDeal(sectorId: SectorId, round: number): Deal {
-  const business = generateBusiness(sectorId, round);
-  const acquisitionType = determineAcquisitionType(business.ebitda);
+export function generateDeal(sectorId: SectorId, round: number, rng?: SeededRng): Deal {
+  const business = generateBusiness(sectorId, round, undefined, undefined, rng);
+  const acquisitionType = determineAcquisitionType(business.ebitda, rng);
   const tuckInDiscount = acquisitionType === 'tuck_in'
     ? calculateTuckInDiscount(business.qualityRating)
     : undefined;
@@ -633,9 +649,9 @@ export function generateDeal(sectorId: SectorId, round: number): Deal {
   // Always include fallback content for richer deals
   const aiContent = generateFallbackContent(sectorId, business.qualityRating);
 
-  const source: Deal['source'] = Math.random() > 0.4 ? 'inbound' : 'brokered';
-  const heat = calculateDealHeat(business.qualityRating, source, round);
-  const heatPremium = calculateHeatPremium(heat);
+  const source: Deal['source'] = (rng ? rng.next() : Math.random()) > 0.4 ? 'inbound' : 'brokered';
+  const heat = calculateDealHeat(business.qualityRating, source, round, undefined, undefined, 20, false, rng);
+  const heatPremium = calculateHeatPremium(heat, rng);
   const effectivePrice = Math.round(askingPrice * heatPremium);
 
   return {
@@ -740,10 +756,10 @@ export function getSectorWeightsForRound(round: number, maxRounds: number = 20):
   return weights as Record<SectorId, number>;
 }
 
-export function pickWeightedSector(round: number, maxRounds: number = 20): SectorId {
+export function pickWeightedSector(round: number, maxRounds: number = 20, rng?: SeededRng): SectorId {
   const weights = getSectorWeightsForRound(round, maxRounds);
   const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
-  let random = Math.random() * totalWeight;
+  let random = (rng ? rng.next() : Math.random()) * totalWeight;
 
   for (const [sector, weight] of Object.entries(weights)) {
     random -= weight;
@@ -770,9 +786,10 @@ export function generateDealWithSize(
   round: number,
   sizePreference: DealSizePreference = 'any',
   portfolioEbitda: number = 0,
-  options: DealGenerationOptions = {}
+  options: DealGenerationOptions = {},
+  rng?: SeededRng
 ): Deal {
-  let quality = generateQualityRating();
+  let quality = generateQualityRating(rng);
 
   // Apply quality floor
   if (options.qualityFloor && quality < options.qualityFloor) {
@@ -790,7 +807,7 @@ export function generateDealWithSize(
     large:  [3000, 8000], // 8000 base cap before portfolio scaler
   };
 
-  const business = generateBusiness(sectorId, round, quality, options.subType);
+  const business = generateBusiness(sectorId, round, quality, options.subType, rng);
 
   let adjustedEbitda: number;
   let adjustedRevenue: number;
@@ -805,7 +822,7 @@ export function generateDealWithSize(
   } else {
     const [minEbitda, maxEbitda] = SIZE_RANGES[sizePreference];
     // Pick a random target EBITDA within the absolute range
-    let targetEbitda = minEbitda + Math.random() * (maxEbitda - minEbitda);
+    let targetEbitda = minEbitda + (rng ? rng.next() : Math.random()) * (maxEbitda - minEbitda);
 
     // For 'large', apply portfolio scaler on top of the base range
     if (sizePreference === 'large') {
@@ -821,16 +838,16 @@ export function generateDealWithSize(
     adjustedRevenue = Math.round(adjustedEbitda / business.ebitdaMargin);
   }
   const adjustedPrice = Math.round(adjustedEbitda * business.acquisitionMultiple);
-  const acquisitionType = determineAcquisitionType(adjustedEbitda);
+  const acquisitionType = determineAcquisitionType(adjustedEbitda, rng);
   const tuckInDiscount = acquisitionType === 'tuck_in'
     ? calculateTuckInDiscount(quality)
     : undefined;
 
   // Assign seller archetype
-  const sellerArchetype = assignSellerArchetype(quality);
+  const sellerArchetype = assignSellerArchetype(quality, rng);
 
   // Apply archetype operator quality override
-  const archetypeOperator = getArchetypeOperatorQuality(sellerArchetype);
+  const archetypeOperator = getArchetypeOperatorQuality(sellerArchetype, rng);
   let adjustedBusiness = business;
   if (archetypeOperator) {
     const operatorTexts: Record<string, string[]> = {
@@ -843,13 +860,13 @@ export function generateDealWithSize(
       dueDiligence: {
         ...business.dueDiligence,
         operatorQuality: archetypeOperator,
-        operatorQualityText: pickRandom(operatorTexts[archetypeOperator])!,
+        operatorQualityText: pickRandom(operatorTexts[archetypeOperator], rng)!,
       },
     };
   }
 
   // Apply archetype price modifier — use Math.max with proprietary discount (don't stack)
-  const archetypePriceMod = getArchetypePriceModifier(sellerArchetype);
+  const archetypePriceMod = getArchetypePriceModifier(sellerArchetype, rng);
   const archetypeDiscount = archetypePriceMod < 0 ? Math.abs(archetypePriceMod) : 0;
   const archetypePremium = archetypePriceMod > 0 ? archetypePriceMod : 0;
 
@@ -891,11 +908,11 @@ export function generateDealWithSize(
   const baseFreshness = 2;
   const freshness = baseFreshness + (options.freshnessBonus ?? 0);
 
-  const dealSource = options.source ?? (Math.random() > 0.4 ? 'inbound' : 'brokered');
+  const dealSource = options.source ?? ((rng ? rng.next() : Math.random()) > 0.4 ? 'inbound' : 'brokered');
 
   // Calculate deal heat and effective price (pass archetype for heat modifier)
-  const heat = calculateDealHeat(quality, dealSource, round, options.lastEventType, sellerArchetype, options.maxRounds ?? 20, options.creditTighteningActive ?? false);
-  const heatPremium = calculateHeatPremium(heat);
+  const heat = calculateDealHeat(quality, dealSource, round, options.lastEventType, sellerArchetype, options.maxRounds ?? 20, options.creditTighteningActive ?? false, rng);
+  const heatPremium = calculateHeatPremium(heat, rng);
   let effectivePrice = Math.round(finalAskingPrice * heatPremium);
 
   // Re-cap distressed deals after heat premium (prevents heat from exceeding distressed ceiling)
@@ -946,8 +963,12 @@ export function generateDealPipeline(
   maSourcingActive: boolean = false,
   lastEventType?: EventType,
   maxRounds: number = 20,
-  creditTighteningActive: boolean = false
+  creditTighteningActive: boolean = false,
+  rng?: SeededRng
 ): Deal[] {
+  // Deal index counter for deterministic IDs within a round
+  let dealIdx = 0;
+
   // Age existing deals first
   let pipeline = currentPipeline.map(deal => ({
     ...deal,
@@ -972,13 +993,14 @@ export function generateDealPipeline(
     // Add 2 deals in focus sector with preferred size
     for (let i = 0; i < 2; i++) {
       if (pipeline.length >= MAX_DEALS) break;
-      pipeline.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda, heatOpts));
+      pipeline.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda, heatOpts, rng));
+      dealIdx++;
     }
   }
 
   // 1b. MA Sourcing bonus deals (Tier 1+, active)
   if (maSourcingActive && maSourcingTier >= 1 && pipeline.length < MAX_DEALS) {
-    const focusSector = maFocus?.sectorId ?? pickWeightedSector(round, maxRounds);
+    const focusSector = maFocus?.sectorId ?? pickWeightedSector(round, maxRounds, rng);
     const sourcingOptions: DealGenerationOptions = {
       freshnessBonus: 1, // Focus deals last 3 rounds
       source: 'sourced',
@@ -999,18 +1021,21 @@ export function generateDealPipeline(
     // +2 focus-sector deals
     for (let i = 0; i < 2; i++) {
       if (pipeline.length >= MAX_DEALS) break;
-      pipeline.push(generateDealWithSize(focusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda, sourcingOptions));
+      pipeline.push(generateDealWithSize(focusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda, sourcingOptions, rng));
+      dealIdx++;
     }
 
     // Tier 2+: 1-2 sub-type matched deals (on top of the 2 above)
     if (maSourcingTier >= 2 && maFocus?.subType && maFocus?.sectorId) {
-      const subTypeCount = maSourcingTier >= 3 ? randomInt(2, 3) : randomInt(1, 2);
+      const subTypeCount = maSourcingTier >= 3 ? randomInt(2, 3, rng) : randomInt(1, 2, rng);
       for (let i = 0; i < subTypeCount; i++) {
         if (pipeline.length >= MAX_DEALS) break;
         pipeline.push(generateDealWithSize(
           maFocus.sectorId, round, maFocus.sizePreference || 'any', portfolioEbitda,
-          { ...sourcingOptions, subType: maFocus.subType }
+          { ...sourcingOptions, subType: maFocus.subType },
+          rng
         ));
+        dealIdx++;
       }
     }
 
@@ -1030,8 +1055,10 @@ export function generateDealPipeline(
           lastEventType,
           maxRounds,
           creditTighteningActive,
-        }
+        },
+        rng
       ));
+        dealIdx++;
       }
     }
   }
@@ -1041,14 +1068,15 @@ export function generateDealPipeline(
     const focusDeals = portfolioFocusTier >= 2 ? 2 : 1;
     for (let i = 0; i < focusDeals; i++) {
       if (pipeline.length >= MAX_DEALS) break;
-      pipeline.push(generateDealWithSize(portfolioFocusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda, heatOpts));
+      pipeline.push(generateDealWithSize(portfolioFocusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda, heatOpts, rng));
+      dealIdx++;
     }
   }
 
   // 3. Ensure sector variety - add deals from sectors not in pipeline
   const missingSectors = allSectorIds.filter(s => !sectorsInPipeline.has(s));
-  // L-5/M-11: Copy before sorting to avoid mutating source arrays
-  const shuffledMissing = [...missingSectors].sort(() => Math.random() - 0.5);
+  // L-5/M-11: Fisher-Yates shuffle to avoid biased sort comparator
+  const shuffledMissing = fisherYatesShuffle(missingSectors, rng);
 
   // Early rounds: bias toward small/medium deals so players can afford first acquisitions
   // Round 1: mostly small, 1-2 medium for variety
@@ -1064,23 +1092,26 @@ export function generateDealPipeline(
   for (const sectorId of shuffledMissing.slice(0, 3)) {
     if (pipeline.length >= MAX_DEALS) break;
     const size = getEarlyRoundSize(earlyDealIndex++);
-    pipeline.push(generateDealWithSize(sectorId, round, size, portfolioEbitda, heatOpts));
+    pipeline.push(generateDealWithSize(sectorId, round, size, portfolioEbitda, heatOpts, rng));
+    dealIdx++;
   }
 
   // 4. Fill remaining slots with weighted random deals
   // H-4: Compute target once before loop to prevent infinite loop
   const targetPipelineLength = Math.min(MAX_DEALS, pipeline.length + targetNewDeals);
   while (pipeline.length < targetPipelineLength) {
-    const sectorId = pickWeightedSector(round, maxRounds);
+    const sectorId = pickWeightedSector(round, maxRounds, rng);
     const size = getEarlyRoundSize(earlyDealIndex++);
-    pipeline.push(generateDealWithSize(sectorId, round, size, portfolioEbitda, heatOpts));
+    pipeline.push(generateDealWithSize(sectorId, round, size, portfolioEbitda, heatOpts, rng));
+    dealIdx++;
   }
 
   // Ensure at least 4 deals available
   while (pipeline.length < 4) {
-    const sectorId = pickWeightedSector(round, maxRounds);
+    const sectorId = pickWeightedSector(round, maxRounds, rng);
     const size = getEarlyRoundSize(earlyDealIndex++);
-    pipeline.push(generateDealWithSize(sectorId, round, size, portfolioEbitda, heatOpts));
+    pipeline.push(generateDealWithSize(sectorId, round, size, portfolioEbitda, heatOpts, rng));
+    dealIdx++;
   }
 
   return pipeline;
@@ -1090,13 +1121,14 @@ export function generateDealPipeline(
 export function generateDistressedDeals(
   round: number,
   maxRounds: number = 20,
+  rng?: SeededRng
 ): Deal[] {
   const deals: Deal[] = [];
-  const count = randomInt(3, 4);
+  const count = randomInt(3, 4, rng);
 
   for (let i = 0; i < count; i++) {
-    const sectorId = pickWeightedSector(round, maxRounds);
-    const multipleDiscount = 0.30 + Math.random() * 0.20; // 30-50% off
+    const sectorId = pickWeightedSector(round, maxRounds, rng);
+    const multipleDiscount = 0.30 + (rng ? rng.next() : Math.random()) * 0.20; // 30-50% off
 
     deals.push(generateDealWithSize(
       sectorId,
@@ -1110,7 +1142,8 @@ export function generateDistressedDeals(
         multipleDiscount,
         maxRounds,
         creditTighteningActive: true,
-      }
+      },
+      rng
     ));
   }
 
@@ -1133,7 +1166,8 @@ export function generateSourcedDeals(
   portfolioEbitda: number = 0,
   maSourcingTier: number = 0,
   maxRounds: number = 20,
-  creditTighteningActive: boolean = false
+  creditTighteningActive: boolean = false,
+  rng?: SeededRng
 ): Deal[] {
   const deals: Deal[] = [];
 
@@ -1152,25 +1186,25 @@ export function generateSourcedDeals(
 
   // If M&A focus is set, 2 of 3 deals will be in that sector
   if (maFocus?.sectorId) {
-    deals.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda, sourcingOptions));
-    deals.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda, sourcingOptions));
+    deals.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda, sourcingOptions, rng));
+    deals.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda, sourcingOptions, rng));
 
     // Third deal from a different sector for variety
     const otherSector = portfolioFocusSector && portfolioFocusSector !== maFocus.sectorId
       ? portfolioFocusSector
-      : pickWeightedSector(round, maxRounds);
-    deals.push(generateDealWithSize(otherSector, round, maFocus.sizePreference, portfolioEbitda, sourcingOptions));
+      : pickWeightedSector(round, maxRounds, rng);
+    deals.push(generateDealWithSize(otherSector, round, maFocus.sizePreference, portfolioEbitda, sourcingOptions, rng));
   } else if (portfolioFocusSector) {
     // No M&A focus but have portfolio focus - generate deals in that sector
-    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda, sourcingOptions));
-    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda, sourcingOptions));
-    deals.push(generateDealWithSize(pickWeightedSector(round, maxRounds), round, 'any', portfolioEbitda, sourcingOptions));
+    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda, sourcingOptions, rng));
+    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda, sourcingOptions, rng));
+    deals.push(generateDealWithSize(pickWeightedSector(round, maxRounds, rng), round, 'any', portfolioEbitda, sourcingOptions, rng));
   } else {
     // No focus set - generate diverse deals
-    // M-11: Spread to avoid mutating global SECTOR_LIST
-    const sectors = [...SECTOR_LIST].sort(() => Math.random() - 0.5).slice(0, 3);
+    // M-11: Fisher-Yates shuffle to avoid biased sort comparator
+    const sectors = fisherYatesShuffle([...SECTOR_LIST], rng).slice(0, 3);
     sectors.forEach(sector => {
-      deals.push(generateDealWithSize(sector.id, round, 'any', portfolioEbitda, sourcingOptions));
+      deals.push(generateDealWithSize(sector.id, round, 'any', portfolioEbitda, sourcingOptions, rng));
     });
   }
 
@@ -1188,10 +1222,11 @@ export function generateProactiveOutreachDeals(
   maFocus: MAFocus,
   portfolioEbitda: number = 0,
   maxRounds: number = 20,
-  creditTighteningActive: boolean = false
+  creditTighteningActive: boolean = false,
+  rng?: SeededRng
 ): Deal[] {
   const deals: Deal[] = [];
-  const sectorId = maFocus.sectorId ?? pickWeightedSector(round, maxRounds);
+  const sectorId = maFocus.sectorId ?? pickWeightedSector(round, maxRounds, rng);
 
   for (let i = 0; i < 2; i++) {
     deals.push(generateDealWithSize(
@@ -1202,16 +1237,17 @@ export function generateProactiveOutreachDeals(
         source: 'proprietary',
         maxRounds,
         creditTighteningActive,
-      }
+      },
+      rng
     ));
   }
 
   return deals;
 }
 
-export function createStartingBusiness(sectorId: SectorId = 'agency', targetEbitdaParam: number = 1000, multipleCap?: number): Business {
+export function createStartingBusiness(sectorId: SectorId = 'agency', targetEbitdaParam: number = 1000, multipleCap?: number, rng?: SeededRng): Business {
   const sector = SECTORS[sectorId];
-  const business = generateBusiness(sectorId, 1, 3); // Start with a fair quality business
+  const business = generateBusiness(sectorId, 1, 3, undefined, rng); // Start with a fair quality business
 
   // Starting business: sector-appropriate multiple (optionally capped for Normal difficulty)
   const targetEbitda = targetEbitdaParam;

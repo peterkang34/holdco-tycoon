@@ -17,6 +17,7 @@ import {
   pickRandom,
   formatMoney,
 } from './types';
+import type { SeededRng } from './rng';
 import { SECTORS } from '../data/sectors';
 import { GLOBAL_EVENTS, PORTFOLIO_EVENTS, SECTOR_EVENTS, SectorEventDefinition } from '../data/events';
 import {
@@ -488,7 +489,8 @@ export function applyOrganicGrowth(
   diversificationBonus?: number, // Growth bonus from portfolio diversification (4+ unique sectors)
   currentRound?: number, // For progressive onboarding of margin drift
   sharedServicesMarginDefense?: number, // ppt offset to margin drift from shared services
-  maxRounds?: number // 20 or 10 — scales margin drift start
+  maxRounds?: number, // 20 or 10 — scales margin drift start
+  rng?: SeededRng
 ): Business {
   const sector = SECTORS[business.sectorId];
 
@@ -501,7 +503,7 @@ export function applyOrganicGrowth(
   const concentrationMultiplier = (concentrationCount && concentrationCount >= 4)
     ? 1 + (concentrationCount - 3) * 0.25
     : 1;
-  revenueGrowth += sector.volatility * (Math.random() * 2 - 1) * concentrationMultiplier;
+  revenueGrowth += sector.volatility * ((rng ? rng.next() : Math.random()) * 2 - 1) * concentrationMultiplier;
 
   // Shared services bonus (revenue portion)
   revenueGrowth += sharedServicesGrowthBonus;
@@ -531,7 +533,7 @@ export function applyOrganicGrowth(
 
   // Integration penalty
   if (business.integrationRoundsRemaining > 0) {
-    revenueGrowth -= (0.03 + Math.random() * 0.05);
+    revenueGrowth -= (0.03 + (rng ? rng.next() : Math.random()) * 0.05);
   }
 
   // Inflation drags revenue growth
@@ -549,7 +551,7 @@ export function applyOrganicGrowth(
     let marginChange = business.marginDriftRate;
 
     // Sector margin volatility (random noise)
-    marginChange += sector.marginVolatility * (Math.random() * 2 - 1);
+    marginChange += sector.marginVolatility * ((rng ? rng.next() : Math.random()) * 2 - 1);
 
     // Shared services margin defense (reduces natural drift)
     if (sharedServicesMarginDefense && sharedServicesMarginDefense > 0) {
@@ -596,12 +598,12 @@ export function applyOrganicGrowth(
   };
 }
 
-export function generateEvent(state: GameState): GameEvent | null {
+export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | null {
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
   const sharedServicesBenefits = calculateSharedServicesBenefits(state);
 
   // Roll for global event
-  const globalRoll = Math.random();
+  const globalRoll = rng ? rng.next() : Math.random();
   let cumulativeProb = 0;
 
   for (const eventDef of GLOBAL_EVENTS) {
@@ -631,7 +633,7 @@ export function generateEvent(state: GameState): GameEvent | null {
 
   // Roll for portfolio event
   if (activeBusinesses.length > 0) {
-    const portfolioRoll = Math.random();
+    const portfolioRoll = rng ? rng.next() : Math.random();
     cumulativeProb = 0;
 
     for (const eventDef of PORTFOLIO_EVENTS) {
@@ -691,21 +693,21 @@ export function generateEvent(state: GameState): GameEvent | null {
       // H-1: Cap cumulative probability at 1.0
       if (portfolioRoll < Math.min(1.0, cumulativeProb)) {
         // Select the right affected business based on event type
-        let affectedBusiness = pickRandom(activeBusinesses)!;
+        let affectedBusiness = pickRandom(activeBusinesses, rng)!;
         let choices: EventChoice[] | undefined;
 
         if (eventDef.type === 'portfolio_equity_demand') {
           const eligible = activeBusinesses.filter(b => b.dueDiligence.operatorQuality === 'strong' && b.qualityRating >= 4);
-          affectedBusiness = pickRandom(eligible) || affectedBusiness;
-          const dilution = randomInt(20, 30);
+          affectedBusiness = pickRandom(eligible, rng) || affectedBusiness;
+          const dilution = randomInt(20, 30, rng);
           choices = [
             { label: `Grant Equity (${dilution} shares)`, description: `Dilute ${dilution} shares, +2% growth, +1ppt margin`, action: 'grantEquityDemand', variant: 'positive' },
             { label: 'Decline', description: '60% chance talent leaves', action: 'declineEquityDemand', variant: 'negative' },
           ];
         } else if (eventDef.type === 'portfolio_seller_note_renego') {
           const eligible = activeBusinesses.filter(b => b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining >= 2);
-          affectedBusiness = pickRandom(eligible) || affectedBusiness;
-          const discountRate = 0.70 + Math.random() * 0.10; // 70-80%
+          affectedBusiness = pickRandom(eligible, rng) || affectedBusiness;
+          const discountRate = 0.70 + (rng ? rng.next() : Math.random()) * 0.10; // 70-80%
           const discountAmt = Math.round(affectedBusiness!.sellerNoteBalance * discountRate);
           choices = [
             { label: `Pay Early (${formatMoney(discountAmt)})`, description: `Pay ${Math.round(discountRate * 100)}% of remaining balance now`, action: 'acceptSellerNoteRenego', variant: 'positive' },
@@ -713,10 +715,10 @@ export function generateEvent(state: GameState): GameEvent | null {
           ];
         } else if (eventDef.type === 'mbo_proposal') {
           const eligible = activeBusinesses.filter(b => b.qualityRating >= 4 && (state.round - b.acquisitionRound) >= 3);
-          affectedBusiness = pickRandom(eligible) || affectedBusiness;
+          affectedBusiness = pickRandom(eligible, rng) || affectedBusiness;
           const valuation = calculateExitValuation(affectedBusiness, state.round, undefined, undefined, state.integratedPlatforms);
           const fairValue = Math.round(affectedBusiness.ebitda * valuation.totalMultiple);
-          const discountPct = 0.85 + Math.random() * 0.05; // 85-90%
+          const discountPct = 0.85 + (rng ? rng.next() : Math.random()) * 0.05; // 85-90%
           const offerAmount = Math.round(fairValue * discountPct);
           const newQuality = Math.max(1, affectedBusiness.qualityRating - 1);
           choices = [
@@ -739,9 +741,9 @@ export function generateEvent(state: GameState): GameEvent | null {
           const activeTurnaroundBizIds = new Set((state.activeTurnarounds || []).filter(t => t.status === 'active').map(t => t.businessId));
           const recentlyCompletedBizIds = new Set((state.activeTurnarounds || []).filter(t => t.status === 'completed' && t.endRound !== undefined && state.round - t.endRound < 2).map(t => t.businessId));
           const eligible = activeBusinesses.filter(b => b.qualityRating >= 4 && !activeTurnaroundBizIds.has(b.id) && !recentlyCompletedBizIds.has(b.id));
-          affectedBusiness = pickRandom(eligible) || affectedBusiness;
+          affectedBusiness = pickRandom(eligible, rng) || affectedBusiness;
           const handcuffsCost = Math.round(affectedBusiness.ebitda * KEY_MAN_GOLDEN_HANDCUFFS_COST_PCT);
-          const successionCost = randomInt(KEY_MAN_SUCCESSION_COST_MIN, KEY_MAN_SUCCESSION_COST_MAX);
+          const successionCost = randomInt(KEY_MAN_SUCCESSION_COST_MIN, KEY_MAN_SUCCESSION_COST_MAX, rng);
           choices = [
             { label: `Golden Handcuffs (${formatMoney(handcuffsCost)})`, description: `Pay ${Math.round(KEY_MAN_GOLDEN_HANDCUFFS_COST_PCT * 100)}% of EBITDA. ${Math.round(KEY_MAN_GOLDEN_HANDCUFFS_RESTORE_CHANCE * 100)}% chance quality restores`, action: 'keyManGoldenHandcuffs', variant: 'positive', cost: handcuffsCost },
             { label: `Succession Plan (${formatMoney(successionCost)})`, description: `Pay ${formatMoney(successionCost)}. Quality restores after ${KEY_MAN_SUCCESSION_ROUNDS} rounds`, action: 'keyManSuccessionPlan', variant: 'neutral', cost: successionCost },
@@ -764,9 +766,9 @@ export function generateEvent(state: GameState): GameEvent | null {
             (b.revenue - b.acquisitionRevenue) / b.acquisitionRevenue < -0.05 &&
             (!b.earnoutDisputeRound || state.round - b.earnoutDisputeRound >= 3)
           );
-          affectedBusiness = pickRandom(eligible) || affectedBusiness;
+          affectedBusiness = pickRandom(eligible, rng) || affectedBusiness;
           const settleAmount = Math.round(affectedBusiness.earnoutRemaining * EARNOUT_SETTLE_PCT);
-          const legalCost = randomInt(EARNOUT_FIGHT_LEGAL_COST_MIN, EARNOUT_FIGHT_LEGAL_COST_MAX);
+          const legalCost = randomInt(EARNOUT_FIGHT_LEGAL_COST_MIN, EARNOUT_FIGHT_LEGAL_COST_MAX, rng);
           const renegoAmount = Math.round(affectedBusiness.earnoutRemaining * EARNOUT_RENEGOTIATE_PCT);
           choices = [
             { label: `Settle (${formatMoney(settleAmount)})`, description: `Pay ${Math.round(EARNOUT_SETTLE_PCT * 100)}% of ${formatMoney(affectedBusiness.earnoutRemaining)} remaining. Obligation zeroed.`, action: 'earnoutSettle', variant: 'positive', cost: settleAmount },
@@ -790,8 +792,8 @@ export function generateEvent(state: GameState): GameEvent | null {
             const sectorMedianMargin = (sector.baseMargin[0] + sector.baseMargin[1]) / 2;
             return b.ebitdaMargin < sectorMedianMargin;
           });
-          affectedBusiness = pickRandom(eligible) || affectedBusiness;
-          const switchCost = randomInt(SUPPLIER_SWITCH_COST_MIN, SUPPLIER_SWITCH_COST_MAX);
+          affectedBusiness = pickRandom(eligible, rng) || affectedBusiness;
+          const switchCost = randomInt(SUPPLIER_SWITCH_COST_MIN, SUPPLIER_SWITCH_COST_MAX, rng);
           const sameSectorCount = activeBusinesses.filter(b => b.sectorId === affectedBusiness.sectorId).length;
           const canVertical = sameSectorCount >= SUPPLIER_VERTICAL_MIN_SAME_SECTOR;
           const supplierChoices: EventChoice[] = [
@@ -841,7 +843,7 @@ export function generateEvent(state: GameState): GameEvent | null {
   const applicableSectorEvents = SECTOR_EVENTS.filter(e => ownedSectors.has(e.sectorId));
 
   if (applicableSectorEvents.length > 0) {
-    const sectorRoll = Math.random();
+    const sectorRoll = rng ? rng.next() : Math.random();
     cumulativeProb = 0;
 
     for (const eventDef of applicableSectorEvents) {
@@ -849,7 +851,7 @@ export function generateEvent(state: GameState): GameEvent | null {
       if (sectorRoll < cumulativeProb) {
         const sectorBusinesses = activeBusinesses.filter(b => b.sectorId === eventDef.sectorId);
         if (sectorBusinesses.length === 0) continue; // C-2: Guard against empty array
-        const affectedBusiness = eventDef.affectsAll ? undefined : pickRandom(sectorBusinesses)!;
+        const affectedBusiness = eventDef.affectsAll ? undefined : pickRandom(sectorBusinesses, rng)!;
 
         return {
           id: `event_${state.round}_${eventDef.sectorId}_${eventDef.title.replace(/\s+/g, '_')}`,
@@ -866,8 +868,8 @@ export function generateEvent(state: GameState): GameEvent | null {
   }
 
   // Roll for consolidation boom (inline, same pattern as unsolicited offer)
-  if (Math.random() < CONSOLIDATION_BOOM_PROB) {
-    const boomSector = pickRandom([...CONSOLIDATION_BOOM_SECTORS]);
+  if ((rng ? rng.next() : Math.random()) < CONSOLIDATION_BOOM_PROB) {
+    const boomSector = pickRandom([...CONSOLIDATION_BOOM_SECTORS], rng);
     if (boomSector) {
       const sectorDef = SECTORS[boomSector];
       const playerOwnsInSector = activeBusinesses.filter(b => b.sectorId === boomSector).length;
@@ -893,8 +895,8 @@ export function generateEvent(state: GameState): GameEvent | null {
   // (fixes bias toward earlier businesses in the array)
   if (activeBusinesses.length > 0) {
     const offerChance = 1 - Math.pow(0.95, activeBusinesses.length); // Combined probability
-    if (Math.random() < offerChance) {
-      const business = pickRandom(activeBusinesses);
+    if ((rng ? rng.next() : Math.random()) < offerChance) {
+      const business = pickRandom(activeBusinesses, rng);
       if (business) {
         // Use calculateExitValuation for realistic pricing
         const valuation = calculateExitValuation(business, state.round, undefined, undefined, state.integratedPlatforms);
@@ -907,7 +909,7 @@ export function generateEvent(state: GameState): GameEvent | null {
         }
 
         // Apply random offer variance: 0.9-1.2x of calculated multiple
-        offerMultiple *= (0.9 + Math.random() * 0.3);
+        offerMultiple *= (0.9 + (rng ? rng.next() : Math.random()) * 0.3);
         offerMultiple = Math.max(2.0, offerMultiple);
 
         const offerAmount = Math.round(business.ebitda * offerMultiple);
@@ -947,15 +949,15 @@ export function generateEvent(state: GameState): GameEvent | null {
   };
 }
 
-export function applyEventEffects(state: GameState, event: GameEvent): GameState {
+export function applyEventEffects(state: GameState, event: GameEvent, rng?: SeededRng): GameState {
   let newState = { ...state };
   const impacts: EventImpact[] = [];
 
   switch (event.type) {
     case 'global_bull_market': {
       // Revenue +5-10%, Margin +1-2 ppt
-      const revBoost = 0.05 + Math.random() * 0.05;
-      const marginBoost = 0.01 + Math.random() * 0.01;
+      const revBoost = 0.05 + (rng ? rng.next() : Math.random()) * 0.05;
+      const marginBoost = 0.01 + (rng ? rng.next() : Math.random()) * 0.01;
       newState.businesses = newState.businesses.map(b => {
         if (b.status !== 'active') return b;
         const beforeEbitda = b.ebitda;
@@ -1007,7 +1009,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
 
     case 'global_interest_hike': {
       const before = state.interestRate;
-      const hike = 0.01 + Math.random() * 0.01;
+      const hike = 0.01 + (rng ? rng.next() : Math.random()) * 0.01;
       const after = Math.min(0.15, state.interestRate + hike);
       newState.interestRate = after;
       impacts.push({
@@ -1022,7 +1024,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
 
     case 'global_interest_cut': {
       const before = state.interestRate;
-      const cut = 0.01 + Math.random() * 0.01;
+      const cut = 0.01 + (rng ? rng.next() : Math.random()) * 0.01;
       const after = Math.max(0.03, state.interestRate - cut);
       newState.interestRate = after;
       impacts.push({
@@ -1167,7 +1169,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
     case 'portfolio_client_signs': {
       // Client win: +8-12% revenue, margin unchanged
       if (event.affectedBusinessId) {
-        const revBoost = 0.08 + Math.random() * 0.04;
+        const revBoost = 0.08 + (rng ? rng.next() : Math.random()) * 0.04;
         newState.businesses = newState.businesses.map(b => {
           if (b.id !== event.affectedBusinessId) return b;
           const beforeEbitda = b.ebitda;
@@ -1194,7 +1196,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
         const business = newState.businesses.find(b => b.id === event.affectedBusinessId);
         if (business) {
           const sector = SECTORS[business.sectorId];
-          const baseRevImpact = 0.12 + Math.random() * 0.06;
+          const baseRevImpact = 0.12 + (rng ? rng.next() : Math.random()) * 0.06;
           const concentrationMultiplier =
             sector.clientConcentration === 'high' ? 1.3 : sector.clientConcentration === 'medium' ? 1.0 : 0.7;
           const revImpact = baseRevImpact * concentrationMultiplier;
@@ -1285,7 +1287,7 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
 
       if (sectorEvent) {
         const ebitdaEffect = Array.isArray(sectorEvent.ebitdaEffect)
-          ? randomInRange(sectorEvent.ebitdaEffect as [number, number])
+          ? randomInRange(sectorEvent.ebitdaEffect as [number, number], rng)
           : sectorEvent.ebitdaEffect;
 
         // Apply sector event as revenue effect (same magnitude) — margin stays constant

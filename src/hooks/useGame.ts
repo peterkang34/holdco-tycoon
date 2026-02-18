@@ -66,6 +66,7 @@ import { getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
 
 import type { GameDifficulty, GameDuration } from '../engine/types';
+import { generateRandomSeed } from '../engine/rng';
 
 /** Recompute totalDebt from holdco loan + per-business bank debt */
 function computeTotalDebt(businesses: Business[], holdcoLoanBalance: number): number {
@@ -116,7 +117,7 @@ interface GameStore extends GameState {
   focusBonus: ReturnType<typeof calculateSectorFocusBonus>;
 
   // Actions
-  startGame: (holdcoName: string, startingSector: SectorId, difficulty?: GameDifficulty, duration?: GameDuration) => void;
+  startGame: (holdcoName: string, startingSector: SectorId, difficulty?: GameDifficulty, duration?: GameDuration, seed?: number) => void;
   resetGame: () => void;
 
   // Phase transitions
@@ -265,6 +266,7 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   bankruptRound: undefined,
   holdcoAmortizationThisRound: 0,
   consolidationBoomSectorId: undefined,
+  seed: 0,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -274,10 +276,11 @@ export const useGameStore = create<GameStore>()(
       metrics: calculateMetrics(initialState as GameState),
       focusBonus: null,
 
-      startGame: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty = 'easy', duration: GameDuration = 'standard') => {
+      startGame: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty = 'easy', duration: GameDuration = 'standard', seed?: number) => {
         resetBusinessIdCounter();
         resetUsedNames();
 
+        const gameSeed = seed ?? generateRandomSeed();
         const diffConfig = DIFFICULTY_CONFIG[difficulty];
         const durConfig = DURATION_CONFIG[duration];
         const maxRounds = durConfig.rounds;
@@ -296,6 +299,7 @@ export const useGameStore = create<GameStore>()(
         const newState: GameState = {
           ...initialState,
           holdcoName,
+          seed: gameSeed,
           difficulty,
           duration,
           maxRounds,
@@ -3182,7 +3186,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v24', // v24: choice-based events (key-man, earn-out dispute, supplier shift, consolidation boom)
+      name: 'holdco-tycoon-save-v25', // v25: seeded RNG + challenge mode
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -3241,6 +3245,7 @@ export const useGameStore = create<GameStore>()(
         metrics: state.metrics,
         focusBonus: state.focusBonus,
         consolidationBoomSectorId: state.consolidationBoomSectorId,
+        seed: state.seed,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.holdcoName) {
@@ -3249,6 +3254,8 @@ export const useGameStore = create<GameStore>()(
             if (!(state as any).difficulty) (state as any).difficulty = 'easy';
             if (!(state as any).duration) (state as any).duration = 'standard';
             if (!(state as any).maxRounds) (state as any).maxRounds = 20;
+            // Backfill seed for pre-v25 saves
+            if (!(state as any).seed) (state as any).seed = generateRandomSeed();
             if ((state as any).founderDistributionsReceived === undefined) {
               (state as any).founderDistributionsReceived = Math.round(
                 (state.totalDistributions || 0) * (state.founderShares / (state.sharesOutstanding || 1))

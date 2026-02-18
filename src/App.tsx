@@ -5,6 +5,7 @@ import { IntroScreen } from './components/screens/IntroScreen';
 import { GameScreen } from './components/screens/GameScreen';
 import { GameOverScreen } from './components/screens/GameOverScreen';
 import { SectorId, GameDifficulty, GameDuration } from './engine/types';
+import { parseChallengeFromUrl, cleanChallengeUrl, type ChallengeParams, type PlayerResult } from './utils/challenge';
 
 type Screen = 'intro' | 'game' | 'gameOver';
 
@@ -19,6 +20,8 @@ function App() {
 
   const [screen, setScreen] = useState<Screen>('intro');
   const [isNewGame, setIsNewGame] = useState(false);
+  const [challengeData, setChallengeData] = useState<ChallengeParams | null>(null);
+  const [incomingResult, setIncomingResult] = useState<PlayerResult | null>(null);
 
   const {
     holdcoName,
@@ -38,6 +41,7 @@ function App() {
     duration,
     maxRounds,
     cash,
+    seed,
     founderShares,
     sharesOutstanding,
     initialOwnershipPct,
@@ -46,6 +50,18 @@ function App() {
     startGame,
     resetGame,
   } = useGameStore();
+
+  // Parse challenge URL on mount
+  useEffect(() => {
+    const { challenge, result } = parseChallengeFromUrl();
+    if (challenge) {
+      setChallengeData(challenge);
+      if (result) {
+        setIncomingResult(result);
+      }
+      cleanChallengeUrl();
+    }
+  }, []);
 
   // Check if there's a saved game on mount
   useEffect(() => {
@@ -56,8 +72,8 @@ function App() {
     }
   }, []);
 
-  const handleStart = (name: string, startingSector: SectorId, difficulty: GameDifficulty = 'easy', duration: GameDuration = 'standard') => {
-    startGame(name, startingSector, difficulty, duration);
+  const handleStart = (name: string, startingSector: SectorId, difficulty: GameDifficulty = 'easy', duration: GameDuration = 'standard', seed?: number) => {
+    startGame(name, startingSector, difficulty, duration, seed);
     setIsNewGame(true);
     setScreen('game');
   };
@@ -68,6 +84,8 @@ function App() {
 
   const handlePlayAgain = () => {
     resetGame();
+    setChallengeData(null);
+    setIncomingResult(null);
     setScreen('intro');
   };
 
@@ -88,7 +106,12 @@ function App() {
 
   return (
     <div className="min-h-screen bg-bg-primary text-text-primary overflow-x-hidden">
-      {screen === 'intro' && <IntroScreen onStart={handleStart} />}
+      {screen === 'intro' && (
+        <IntroScreen
+          onStart={handleStart}
+          challengeData={challengeData}
+        />
+      )}
       {screen === 'game' && <GameScreen onGameOver={handleGameOver} onResetGame={handlePlayAgain} showTutorial={isNewGame} />}
       {screen === 'gameOver' && (
         <GameOverScreen
@@ -112,11 +135,14 @@ function App() {
           sharedServicesActive={sharedServices.filter(s => s.active).length}
           bankruptRound={bankruptRound}
           cash={cash}
+          seed={seed}
           founderShares={founderShares}
           sharesOutstanding={sharesOutstanding}
           initialOwnershipPct={initialOwnershipPct}
           totalDebt={totalDebt}
           hasRestructured={hasRestructured}
+          challengeData={challengeData}
+          incomingResult={incomingResult}
           onPlayAgain={handlePlayAgain}
         />
       )}

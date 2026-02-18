@@ -1,11 +1,14 @@
 import type { Range } from './types';
+import type { SeededRng } from './rng';
 
-export function randomInRange(range: Range): number {
-  return range[0] + Math.random() * (range[1] - range[0]);
+export function randomInRange(range: Range, rng?: SeededRng): number {
+  const rand = rng ? rng.next() : Math.random();
+  return range[0] + rand * (range[1] - range[0]);
 }
 
-export function randomInt(min: number, max: number): number {
-  return Math.floor(Math.random() * (max - min + 1)) + min;
+export function randomInt(min: number, max: number, rng?: SeededRng): number {
+  const rand = rng ? rng.next() : Math.random();
+  return Math.floor(rand * (max - min + 1)) + min;
 }
 
 // All internal values are stored in thousands (e.g., 1000 = $1M, 16000 = $16M)

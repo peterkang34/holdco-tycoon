@@ -1,6 +1,8 @@
 // Combinatorial business name generator — produces thousands of unique names per sector
 // by combining prefixes, core words, and suffixes. Never runs out.
 
+import type { SeededRng } from '../engine/rng';
+
 interface NameParts {
   prefixes: string[];
   cores: string[];
@@ -207,20 +209,21 @@ export function resetUsedNames(): void {
   usedNames = new Set();
 }
 
-function buildName(parts: NameParts): string {
-  const prefix = parts.prefixes[Math.floor(Math.random() * parts.prefixes.length)];
-  let core = parts.cores[Math.floor(Math.random() * parts.cores.length)];
+function buildName(parts: NameParts, rng?: SeededRng): string {
+  const rand = () => rng ? rng.next() : Math.random();
+  const prefix = parts.prefixes[Math.floor(rand() * parts.prefixes.length)];
+  let core = parts.cores[Math.floor(rand() * parts.cores.length)];
   // Avoid prefix-equals-core collisions (e.g. "Summit Summit")
   if (prefix.toLowerCase() === core.toLowerCase()) {
     const filtered = parts.cores.filter(c => c.toLowerCase() !== prefix.toLowerCase());
     if (filtered.length > 0) {
-      core = filtered[Math.floor(Math.random() * filtered.length)];
+      core = filtered[Math.floor(rand() * filtered.length)];
     }
   }
-  const suffix = parts.suffixes[Math.floor(Math.random() * parts.suffixes.length)];
+  const suffix = parts.suffixes[Math.floor(rand() * parts.suffixes.length)];
 
   // Vary the structure for diversity
-  const roll = Math.random();
+  const roll = rand();
   if (roll < 0.4) {
     // "Prefix Core Suffix" — e.g. "Titan Steel Industries"
     return [prefix, core, suffix].filter(Boolean).join(' ');
@@ -232,14 +235,15 @@ function buildName(parts: NameParts): string {
     return [prefix, suffix].filter(Boolean).join(' ') || prefix;
   } else {
     // "Core & Prefix" or "The Core Suffix" — e.g. "Steel & Titan" or "The Forge Co"
-    if (Math.random() < 0.5) {
+    if (rand() < 0.5) {
       return `${core} & ${prefix}`;
     }
     return ['The', core, suffix].filter(Boolean).join(' ');
   }
 }
 
-export function getRandomBusinessName(sectorId: string, subType?: string): string {
+export function getRandomBusinessName(sectorId: string, subType?: string, rng?: SeededRng): string {
+  const rand = () => rng ? rng.next() : Math.random();
   const sectorParts = SECTOR_NAME_PARTS[sectorId] || SECTOR_NAME_PARTS.agency;
 
   // If sub-type has specific suffixes, override the sector-wide ones
@@ -249,7 +253,7 @@ export function getRandomBusinessName(sectorId: string, subType?: string): strin
 
   // Try up to 20 times to get a unique name
   for (let i = 0; i < 20; i++) {
-    const name = buildName(parts);
+    const name = buildName(parts, rng);
     if (!usedNames.has(name)) {
       usedNames.add(name);
       return name;
@@ -257,10 +261,10 @@ export function getRandomBusinessName(sectorId: string, subType?: string): strin
   }
 
   // Extremely unlikely fallback — prefix + core guaranteed unique combo
-  const prefix = parts.prefixes[Math.floor(Math.random() * parts.prefixes.length)];
-  const core = parts.cores[Math.floor(Math.random() * parts.cores.length)];
-  const suffix = parts.suffixes[Math.floor(Math.random() * parts.suffixes.length)];
-  const name = [prefix, core, suffix, Math.floor(Math.random() * 99) + 1].filter(Boolean).join(' ');
+  const prefix = parts.prefixes[Math.floor(rand() * parts.prefixes.length)];
+  const core = parts.cores[Math.floor(rand() * parts.cores.length)];
+  const suffix = parts.suffixes[Math.floor(rand() * parts.suffixes.length)];
+  const name = [prefix, core, suffix, Math.floor(rand() * 99) + 1].filter(Boolean).join(' ');
   usedNames.add(name);
   return name;
 }

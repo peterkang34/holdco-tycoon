@@ -7,6 +7,7 @@ import {
   SectorId,
   pickRandom,
 } from './types';
+import type { SeededRng } from './rng';
 import { SECTORS } from '../data/sectors';
 
 // ── Size Tier Premium ──────────────────────────────────────────────
@@ -128,7 +129,7 @@ const STRATEGIC_TEMPLATES: Record<string, string[]> = {
 
 // ── Buyer Profile Generation ───────────────────────────────────────
 
-function getBuyerType(tier: BuyerPoolTier): { type: BuyerType; isStrategic: boolean } {
+function getBuyerType(tier: BuyerPoolTier, rng?: SeededRng): { type: BuyerType; isStrategic: boolean } {
   // Strategic chance increases by tier
   const strategicChance: Record<BuyerPoolTier, number> = {
     individual: 0.0,
@@ -138,7 +139,7 @@ function getBuyerType(tier: BuyerPoolTier): { type: BuyerType; isStrategic: bool
     large_pe: 0.35,
   };
 
-  if (Math.random() < strategicChance[tier]) {
+  if ((rng ? rng.next() : Math.random()) < strategicChance[tier]) {
     return { type: 'strategic', isStrategic: true };
   }
 
@@ -150,22 +151,22 @@ function getBuyerType(tier: BuyerPoolTier): { type: BuyerType; isStrategic: bool
     large_pe: ['large_pe', 'large_pe', 'institutional_pe'],
   };
 
-  const type = pickRandom(typeMap[tier])!;
+  const type = pickRandom(typeMap[tier], rng)!;
   return { type, isStrategic: false };
 }
 
-function pickBuyerName(buyerType: BuyerType, sectorId: SectorId): string {
+function pickBuyerName(buyerType: BuyerType, sectorId: SectorId, rng?: SeededRng): string {
   if (buyerType === 'strategic') {
     const strategics = STRATEGIC_TEMPLATES[sectorId] || STRATEGIC_TEMPLATES.b2bServices;
-    return pickRandom(strategics)!;
+    return pickRandom(strategics, rng)!;
   }
   if (buyerType === 'individual') {
     return 'Independent Sponsor';
   }
   if (buyerType === 'family_office') {
-    return pickRandom(FAMILY_OFFICE_NAMES)!;
+    return pickRandom(FAMILY_OFFICE_NAMES, rng)!;
   }
-  return pickRandom(PE_FUND_NAMES)!;
+  return pickRandom(PE_FUND_NAMES, rng)!;
 }
 
 function getFundSize(buyerType: BuyerType): string | undefined {
@@ -213,15 +214,16 @@ function generateThesis(buyerType: BuyerType, business: Business): string {
 export function generateBuyerProfile(
   business: Business,
   tier: BuyerPoolTier,
-  sectorId: SectorId
+  sectorId: SectorId,
+  rng?: SeededRng,
 ): BuyerProfile {
-  const { type, isStrategic } = getBuyerType(tier);
-  const name = pickBuyerName(type, sectorId);
+  const { type, isStrategic } = getBuyerType(tier, rng);
+  const name = pickBuyerName(type, sectorId, rng);
   const fundSize = getFundSize(type);
   const investmentThesis = generateThesis(type, business);
 
   // Strategic premium: 0.5–1.5x
-  const strategicPremium = isStrategic ? 0.5 + Math.random() * 1.0 : 0;
+  const strategicPremium = isStrategic ? 0.5 + (rng ? rng.next() : Math.random()) * 1.0 : 0;
 
   return {
     name,

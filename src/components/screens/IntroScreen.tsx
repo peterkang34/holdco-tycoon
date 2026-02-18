@@ -5,17 +5,20 @@ import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { ChangelogModal } from '../ui/ChangelogModal';
 import { UserManualModal } from '../ui/UserManualModal';
 import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../../data/gameConfig';
+import type { ChallengeParams } from '../../utils/challenge';
 
 interface IntroScreenProps {
-  onStart: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty, duration: GameDuration) => void;
+  onStart: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty, duration: GameDuration, seed?: number) => void;
+  challengeData?: ChallengeParams | null;
 }
 
-export function IntroScreen({ onStart }: IntroScreenProps) {
-  const [step, setStep] = useState<'mode' | 'setup'>('mode');
+export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
+  const isChallenge = !!challengeData;
+  const [step, setStep] = useState<'mode' | 'setup'>(isChallenge ? 'setup' : 'mode');
   const [holdcoName, setHoldcoName] = useState('');
   const [selectedSector, setSelectedSector] = useState<SectorId | 'random'>('random');
-  const [selectedDifficulty, setSelectedDifficulty] = useState<GameDifficulty>('easy');
-  const [selectedDuration, setSelectedDuration] = useState<GameDuration>('quick');
+  const [selectedDifficulty, setSelectedDifficulty] = useState<GameDifficulty>(challengeData?.difficulty ?? 'easy');
+  const [selectedDuration, setSelectedDuration] = useState<GameDuration>(challengeData?.duration ?? 'quick');
   const [showNameError, setShowNameError] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
@@ -30,7 +33,7 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
     const sector = selectedSector === 'random'
       ? SECTOR_LIST[Math.floor(Math.random() * SECTOR_LIST.length)].id
       : selectedSector;
-    onStart(holdcoName.trim(), sector, selectedDifficulty, selectedDuration);
+    onStart(holdcoName.trim(), sector, selectedDifficulty, selectedDuration, challengeData?.seed);
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,6 +67,30 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
             Build a portfolio. Allocate capital. Compound value.
           </p>
         </div>
+
+        {/* Challenge Mode Banner */}
+        {isChallenge && (
+          <div className="card p-4 mb-4 border-yellow-500/30 bg-yellow-500/5">
+            <div className="flex items-center gap-2 justify-center mb-1">
+              <span className="text-lg">🏆</span>
+              <span className="font-bold text-yellow-400">Challenge Mode</span>
+            </div>
+            <p className="text-xs text-text-muted text-center">
+              Same seed, same deals, same events — compete under identical conditions.
+            </p>
+            <div className="flex justify-center gap-2 mt-2">
+              <span className={`text-xs px-2 py-0.5 rounded ${selectedDifficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
+                {DIFFICULTY_CONFIG[selectedDifficulty].label.split(' — ')[0]}
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-text-secondary">
+                {DURATION_CONFIG[selectedDuration].label}
+              </span>
+              <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-text-muted">
+                Locked
+              </span>
+            </div>
+          </div>
+        )}
 
         {step === 'mode' ? (
           <>
@@ -125,13 +152,17 @@ export function IntroScreen({ onStart }: IntroScreenProps) {
             {/* Setup: Name + Sector */}
             <form onSubmit={handleSubmit} className="card p-6">
               <div className="flex items-center justify-between mb-4">
-                <button
-                  type="button"
-                  onClick={() => setStep('mode')}
-                  className="text-sm text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center"
-                >
-                  ← Back
-                </button>
+                {!isChallenge ? (
+                  <button
+                    type="button"
+                    onClick={() => setStep('mode')}
+                    className="text-sm text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center"
+                  >
+                    ← Back
+                  </button>
+                ) : (
+                  <div />
+                )}
                 <div className="flex gap-2">
                   <span className={`text-xs px-2 py-0.5 rounded ${selectedDifficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
                     {DIFFICULTY_CONFIG[selectedDifficulty].label.split(' — ')[0]}

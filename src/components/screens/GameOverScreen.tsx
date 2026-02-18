@@ -9,6 +9,15 @@ import { getGradeColor, getRankColor } from '../../utils/gradeColors';
 import { TABS, filterAndSort, getDisplayValue } from '../ui/LeaderboardModal';
 import type { LeaderboardTab } from '../ui/LeaderboardModal';
 import { trackGameComplete } from '../../services/telemetry';
+import {
+  type ChallengeParams,
+  type PlayerResult,
+  buildChallengeUrl,
+  encodePlayerResult,
+  shareChallenge,
+  copyToClipboard,
+} from '../../utils/challenge';
+import { ChallengeComparison } from '../ui/ChallengeComparison';
 
 interface GameOverScreenProps {
   holdcoName: string;
@@ -31,11 +40,14 @@ interface GameOverScreenProps {
   sharedServicesActive: number;
   bankruptRound?: number;
   cash: number;
+  seed: number;
   founderShares: number;
   sharesOutstanding: number;
   initialOwnershipPct: number;
   totalDebt: number;
   hasRestructured?: boolean;
+  challengeData?: ChallengeParams | null;
+  incomingResult?: PlayerResult | null;
   onPlayAgain: () => void;
 }
 
@@ -60,11 +72,14 @@ export function GameOverScreen({
   sharedServicesActive,
   bankruptRound,
   cash,
+  seed,
   founderShares,
   sharesOutstanding,
   initialOwnershipPct,
   totalDebt,
   hasRestructured = false,
+  challengeData,
+  incomingResult,
   onPlayAgain,
 }: GameOverScreenProps) {
   const [initials, setInitials] = useState('');
@@ -75,6 +90,42 @@ export function GameOverScreen({
   const [leaderboardError, setLeaderboardError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [leaderboardTab, setLeaderboardTab] = useState<LeaderboardTab>('overall');
+  const [challengeCopied, setChallengeCopied] = useState(false);
+  const [showComparison, setShowComparison] = useState(false);
+
+  // Build challenge params from current game (works for both challenge and solo games)
+  const currentChallengeParams: ChallengeParams = useMemo(() => (
+    challengeData ?? { seed, difficulty: difficulty ?? 'easy', duration: duration ?? 'standard' }
+  ), [challengeData, seed, difficulty, duration]);
+
+  // Build player result for sharing
+  const myResult: PlayerResult = useMemo(() => ({
+    name: holdcoName,
+    fev: Math.round(founderEquityValue),
+    score: score.total,
+    grade: score.grade,
+    businesses: businesses.filter(b => b.status === 'active').length,
+    sectors: new Set(businesses.filter(b => b.status === 'active').map(b => b.sectorId)).size,
+    peakLeverage: Math.max(...metricsHistory.map(h => h.metrics.netDebtToEbitda), 0),
+    restructured: hasRestructured,
+    totalDistributions: Math.round(totalDistributions),
+  }), [holdcoName, founderEquityValue, score, businesses, metricsHistory, hasRestructured, totalDistributions]);
+
+  const handleChallengeShare = async () => {
+    const url = buildChallengeUrl(currentChallengeParams);
+    const shared = await shareChallenge(url, `Challenge me in Holdco Tycoon!`);
+    if (shared) {
+      setChallengeCopied(true);
+      setTimeout(() => setChallengeCopied(false), 2000);
+    }
+  };
+
+  const handleCopyResultCode = async () => {
+    const code = encodePlayerResult(myResult);
+    await copyToClipboard(code);
+    setChallengeCopied(true);
+    setTimeout(() => setChallengeCopied(false), 2000);
+  };
 
   // Fire telemetry on game completion
   useEffect(() => {
@@ -628,6 +679,41 @@ export function GameOverScreen({
         founderOwnership={enterpriseValue > 0 ? founderEquityValue / enterpriseValue : 1}
       />
 
+      {/* Challenge Section */}
+      <div className="card mb-6">
+        <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
+          <span>🏆</span> Challenge Friends
+        </h2>
+        {challengeData && (
+          <p className="text-xs text-yellow-400/80 mb-3">
+            This was a Challenge Mode game — same seed, same conditions for all players.
+          </p>
+        )}
+        <p className="text-sm text-text-muted mb-4">
+          Share a challenge link so friends play the exact same deals, events, and market conditions.
+        </p>
+        <div className="flex flex-col sm:flex-row gap-3">
+          <button
+            onClick={handleChallengeShare}
+            className="btn-primary flex-1 text-sm"
+          >
+            {challengeCopied ? 'Copied!' : 'Share Challenge Link'}
+          </button>
+          <button
+            onClick={() => setShowComparison(true)}
+            className="btn-secondary flex-1 text-sm"
+          >
+            Compare Results
+          </button>
+        </div>
+        <button
+          onClick={handleCopyResultCode}
+          className="mt-2 text-xs text-text-muted hover:text-text-secondary transition-colors w-full text-center"
+        >
+          Copy my result code
+        </button>
+      </div>
+
       {/* Actions */}
       <div className="flex flex-col gap-4">
         <button onClick={onPlayAgain} className="btn-primary text-lg py-4">
@@ -642,6 +728,15 @@ export function GameOverScreen({
           Get The Holdco Guide →
         </a>
       </div>
+
+      {/* Challenge Comparison Modal */}
+      {showComparison && (
+        <ChallengeComparison
+          challengeParams={currentChallengeParams}
+          myResult={myResult}
+          onClose={() => setShowComparison(false)}
+        />
+      )}
 
       {/* Footer */}
       <p className="text-center text-text-muted text-sm mt-8">

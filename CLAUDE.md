@@ -70,8 +70,8 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
-- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v24`
-- **Tests**: Vitest in `src/engine/__tests__/` — 762 tests across 14 suites (incl. display-proofreader)
+- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v25`
+- **Tests**: Vitest in `src/engine/__tests__/` — 798 tests across 16 suites (incl. display-proofreader)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Rollover Equity**: 6th deal structure — seller reinvests ~25% (standard) or ~20% (quick) as equity; gated behind M&A Tier 2+, Q3+, non-distressed archetypes, noNewDebt; exit split applied AFTER debt payoff; FEV deducts rollover claims; note rate 5%
@@ -96,6 +96,9 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/data/platformRecipes.ts` — 38 integrated platform recipes (32 within-sector + 6 cross-sector)
 - `src/engine/platforms.ts` — Platform eligibility, forging, bonus application
 - `src/components/ui/LeaderboardModal.tsx` — Tabbed leaderboard (exports filtering utils for GameOverScreen)
+- `src/engine/rng.ts` — Seeded deterministic RNG (Mulberry32, stream isolation, pre-rolled outcomes)
+- `src/utils/challenge.ts` — Challenge mode encoding/decoding (URL params, result sharing, comparison)
+- `src/components/ui/ChallengeComparison.tsx` — Side-by-side player result comparison modal
 - `src/data/changelog.ts` — Structured changelog data (player-facing release notes)
 - `src/components/ui/ChangelogModal.tsx` — "What's New" modal
 - `src/services/telemetry.ts` — Client-side event tracking
@@ -146,6 +149,10 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **Tax calc**: Pass `holdcoLoanBalance` (not `totalDebt`) to `calculatePortfolioTax` — per-business bank debt interest is in opcoInterest
 - **Waterfall order**: Holdco P&I → Bank debt P&I → Seller notes → Earnouts
 - **Leaderboard FEV**: All tabs show `Adj FEV` consistently using `DIFFICULTY_CONFIG` multiplier
+
+- **Seeded RNG**: All engine functions accept optional `rng?: SeededRng` last param; when omitted, falls back to `Math.random()`. RNG is NOT in Zustand (non-serializable) — reconstruct from `state.seed + state.round`. 5 streams: deals, events, simulation, market, cosmetic. NEVER pass RNG to async functions (AI generation).
+- **Challenge mode**: URL format `?c=SEED.DIFF.DUR` (challenge) + `&r=NAME.FEV.SCORE...` (result). Base36-encoded for compact URLs. Comparison supports 2-4 players.
+- **Fisher-Yates shuffle**: All shuffles use `fisherYatesShuffle()` or `rng.shuffle()` — NEVER use `sort(() => Math.random() - 0.5)` (biased, browser-dependent)
 
 ## Known Remaining Issues (Low Severity)
 - (none currently tracked)

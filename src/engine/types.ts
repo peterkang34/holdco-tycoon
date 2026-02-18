@@ -425,6 +425,7 @@ export interface GameState {
   difficulty: GameDifficulty;
   duration: GameDuration;
   maxRounds: number; // 20 or 10
+  seed: number; // Master seed for deterministic RNG (challenge mode parity)
 
   // Portfolio
   businesses: Business[];
@@ -590,9 +591,10 @@ export type Range = [number, number];
 
 export { randomInRange, randomInt, formatMoney, formatPercent, formatMultiple } from './utils';
 
-export function pickRandom<T>(array: T[]): T | undefined {
+export function pickRandom<T>(array: T[], rng?: import('./rng').SeededRng): T | undefined {
   if (array.length === 0) return undefined;
-  return array[Math.floor(Math.random() * array.length)];
+  const rand = rng ? rng.next() : Math.random();
+  return array[Math.floor(rand * array.length)];
 }
 
 // Exit valuation breakdown for transparency

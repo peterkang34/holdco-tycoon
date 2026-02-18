@@ -495,6 +495,30 @@ export function migrateV23ToV24(): void {
   }
 }
 
+// --- v24 → v25: seeded RNG for challenge mode ---
+
+export function migrateV24ToV25(): void {
+  try {
+    const v25Key = 'holdco-tycoon-save-v25';
+    const v24Key = 'holdco-tycoon-save-v24';
+    if (localStorage.getItem(v25Key)) return;
+    const v24Raw = localStorage.getItem(v24Key);
+    if (!v24Raw) return;
+    const v24Data = JSON.parse(v24Raw);
+    if (!v24Data?.state) return;
+
+    // Backfill seed with a random value for existing saves
+    if (v24Data.state.seed === undefined) {
+      v24Data.state.seed = (Math.random() * 0x7fffffff) | 0;
+    }
+
+    localStorage.setItem(v25Key, JSON.stringify(v24Data));
+    localStorage.removeItem(v24Key);
+  } catch (e) {
+    console.error('v24→v25 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -515,4 +539,5 @@ export function runAllMigrations(): void {
   migrateV21ToV22();
   migrateV22ToV23();
   migrateV23ToV24();
+  migrateV24ToV25();
 }

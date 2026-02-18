@@ -11,6 +11,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'February 18, 2025',
+    title: 'Challenge Friends Mode',
+    sections: [
+      {
+        heading: 'New',
+        items: [
+          'Challenge Friends — share a link so friends play the same seed with identical deals, events, and market conditions. Compare results side-by-side when everyone finishes.',
+          'Seeded deterministic RNG — every game now has a unique seed. Same seed guarantees identical game conditions for fair competition.',
+          'Result comparison — paste up to 3 opponent result codes to see who built the best holdco on the same seed.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 17, 2025',
     title: 'Next Year Cash Forecast',
     sections: [
