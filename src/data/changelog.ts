@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 17, 2025',
+    title: 'Cash Flow & Restart Fixes',
+    sections: [
+      {
+        heading: 'Fixes',
+        items: [
+          'Fixed false bankruptcy on game restart — starting a new game after a bankruptcy no longer carries over the old bankrupt status.',
+          'Cash flow estimates in the Collection phase are now much more accurate — turnaround costs, cash conversion bonuses, and earn-out expirations are now properly reflected in projections.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 17, 2025',
     title: '4 New Choice-Based Events',
     sections: [
       {

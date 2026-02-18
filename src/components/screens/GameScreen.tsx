@@ -3,6 +3,7 @@ import { useGameStore } from '../../hooks/useGame';
 import { useToastStore } from '../../hooks/useToast';
 import { getDistressRestrictions } from '../../engine/distress';
 import { getMASourcingAnnualCost, MA_SOURCING_CONFIG } from '../../data/sharedServices';
+import { getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
 import { SECTORS } from '../../data/sectors';
 import { Deal, DealStructure, SharedServiceType, OperationalImprovementType, formatMoney } from '../../engine/types';
 import { getStructureLabel } from '../../engine/deals';
@@ -545,6 +546,23 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     const scaleMultiplier = opcoCount >= 6 ? 1.2 : opcoCount >= 3 ? 1.0 + (opcoCount - 2) * 0.05 : 1.0;
     return 0.15 * scaleMultiplier;
   }, [sharedServices, activeBusinesses]);
+  const turnaroundCost = useMemo(() => {
+    const tierCost = getTurnaroundTierAnnualCost(turnaroundTier);
+    const programCosts = activeTurnarounds
+      .filter(t => t.status === 'active')
+      .reduce((sum, t) => {
+        const prog = getProgramById(t.programId);
+        return sum + (prog ? prog.annualCost : 0);
+      }, 0);
+    return tierCost + programCosts;
+  }, [turnaroundTier, activeTurnarounds]);
+  const cashConversionBonus = useMemo(() => {
+    const hasFinance = sharedServices.some(s => s.type === 'finance_reporting' && s.active);
+    if (!hasFinance) return 0;
+    const opcoCount = activeBusinesses.length;
+    const scaleMultiplier = opcoCount >= 6 ? 1.2 : opcoCount >= 3 ? 1.0 + (opcoCount - 2) * 0.05 : 1.0;
+    return 0.05 * scaleMultiplier;
+  }, [sharedServices, activeBusinesses]);
 
   const renderPhase = () => {
     switch (phase) {
@@ -560,6 +578,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
             interestRate={interestRate}
             sharedServicesCost={sharedServicesCost}
             maSourcingCost={maSourcingCost}
+            turnaroundCost={turnaroundCost}
+            cashConversionBonus={cashConversionBonus}
             round={round}
             yearChronicle={yearChronicle}
             debtPaymentThisRound={debtPaymentThisRound}

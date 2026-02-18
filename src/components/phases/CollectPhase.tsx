@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Business, formatMoney, formatPercent } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { calculatePortfolioTax, TAX_RATE } from '../../engine/simulation';
+import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
 
 interface CollectPhaseProps {
   businesses: Business[];
@@ -13,6 +14,8 @@ interface CollectPhaseProps {
   interestRate: number;
   sharedServicesCost: number;
   maSourcingCost?: number;
+  turnaroundCost?: number;
+  cashConversionBonus?: number;
   round: number;
   yearChronicle?: string | null;
   debtPaymentThisRound?: number;
@@ -23,11 +26,14 @@ interface CollectPhaseProps {
 }
 
 // Calculate detailed FCF breakdown for a business (pre-tax — tax is at portfolio level)
-function calculateFcfBreakdown(business: Business, _interestRate: number, capexReduction: number = 0) {
+function calculateFcfBreakdown(business: Business, _interestRate: number, capexReduction: number = 0, cashConversionBonus: number = 0, round: number = 0) {
   const sector = SECTORS[business.sectorId];
   const ebitda = business.ebitda;
   const effectiveCapexRate = sector.capexRate * (1 - capexReduction);
   const capex = Math.round(ebitda * effectiveCapexRate);
+
+  // Pre-debt FCF with cash conversion bonus (matches engine's calculateAnnualFcf)
+  const preFcf = Math.round((ebitda - capex) * (1 + cashConversionBonus));
 
   // OpCo-level debt service
   const sellerNoteInterest = Math.round(business.sellerNoteBalance * business.sellerNoteRate);
@@ -39,9 +45,10 @@ function calculateFcfBreakdown(business: Business, _interestRate: number, capexR
     ? Math.round(business.bankDebtBalance / business.bankDebtRoundsRemaining)
     : 0;
 
-  // Earn-out: triggers when cumulative EBITDA growth meets target
+  // Earn-out: triggers when cumulative EBITDA growth meets target (expires after EARNOUT_EXPIRATION_YEARS)
   let earnoutPayment = 0;
-  if (business.earnoutRemaining > 0 && business.earnoutTarget > 0 && business.acquisitionEbitda > 0) {
+  const earnoutExpired = round > 0 && business.earnoutRemaining > 0 && round - business.acquisitionRound > EARNOUT_EXPIRATION_YEARS;
+  if (!earnoutExpired && business.earnoutRemaining > 0 && business.earnoutTarget > 0 && business.acquisitionEbitda > 0) {
     const growth = (business.ebitda - business.acquisitionEbitda) / business.acquisitionEbitda;
     if (growth >= business.earnoutTarget) {
       earnoutPayment = business.earnoutRemaining;
@@ -49,7 +56,7 @@ function calculateFcfBreakdown(business: Business, _interestRate: number, capexR
   }
 
   const totalDeductions = capex + sellerNoteInterest + sellerNotePrincipal + bankDebtInterest + bankDebtPrincipal + earnoutPayment;
-  const fcf = ebitda - totalDeductions;
+  const fcf = preFcf - (totalDeductions - capex); // preFcf already includes capex
 
   return {
     ebitda,
@@ -67,7 +74,7 @@ function calculateFcfBreakdown(business: Business, _interestRate: number, capexR
 }
 
 // Calculate all debt service for integrated (tuck-in) businesses: seller notes + bank debt + earnouts
-function calculateIntegratedDebtService(businesses: Business[]): { sellerNotes: number; bankDebt: number; earnouts: number; total: number } {
+function calculateIntegratedDebtService(businesses: Business[], round: number = 0): { sellerNotes: number; bankDebt: number; earnouts: number; total: number } {
   const integrated = businesses.filter(b => b.status === 'integrated');
   let sellerNotes = 0;
   let bankDebt = 0;
@@ -83,8 +90,9 @@ function calculateIntegratedDebtService(businesses: Business[]): { sellerNotes: 
       bankDebt += Math.round(b.bankDebtBalance * (b.bankDebtRate || 0));
       bankDebt += Math.round(b.bankDebtBalance / b.bankDebtRoundsRemaining);
     }
-    // Earn-out using platform growth as proxy
-    if (b.earnoutRemaining > 0 && b.earnoutTarget > 0 && b.parentPlatformId) {
+    // Earn-out using platform growth as proxy (skip if expired)
+    const earnoutExpired = round > 0 && b.earnoutRemaining > 0 && round - b.acquisitionRound > EARNOUT_EXPIRATION_YEARS;
+    if (!earnoutExpired && b.earnoutRemaining > 0 && b.earnoutTarget > 0 && b.parentPlatformId) {
       const platform = businesses.find(p => p.id === b.parentPlatformId && p.status === 'active');
       if (platform && platform.acquisitionEbitda > 0) {
         const growth = (platform.ebitda - platform.acquisitionEbitda) / platform.acquisitionEbitda;
@@ -105,6 +113,8 @@ export function CollectPhase({
   interestRate,
   sharedServicesCost,
   maSourcingCost = 0,
+  turnaroundCost = 0,
+  cashConversionBonus = 0,
   round,
   yearChronicle,
   debtPaymentThisRound: _debtPaymentThisRound,
@@ -120,7 +130,7 @@ export function CollectPhase({
   // Calculate breakdowns for all businesses (pre-tax)
   const businessBreakdowns = activeBusinesses.map(b => ({
     business: b,
-    breakdown: calculateFcfBreakdown(b, interestRate, capexReduction),
+    breakdown: calculateFcfBreakdown(b, interestRate, capexReduction, cashConversionBonus, round),
   }));
 
   // Calculate total pre-tax FCF from all businesses (annual)
@@ -128,7 +138,7 @@ export function CollectPhase({
   const totalEbitda = businessBreakdowns.reduce((sum, { breakdown }) => sum + breakdown.ebitda, 0);
 
   // Debt service from integrated (tuck-in) businesses: seller notes + earnouts
-  const integratedDebt = calculateIntegratedDebtService(businesses);
+  const integratedDebt = calculateIntegratedDebtService(businesses, round);
 
   // Portfolio-level tax with all deductions (uses holdco loan balance, not total debt)
   const taxBreakdown = calculatePortfolioTax(activeBusinesses, holdcoLoanBalance, holdcoLoanRate, sharedServicesCost + (maSourcingCost ?? 0));
@@ -147,7 +157,7 @@ export function CollectPhase({
   const uncappedTotalEarnouts = uncappedActiveEarnouts + integratedDebt.earnouts;
 
   // Net FCF WITHOUT earn-outs (to determine how much cash is available for earn-outs)
-  const netFcfBeforeEarnouts = totalBusinessFcf + uncappedActiveEarnouts - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - integratedDebt.sellerNotes - integratedDebt.bankDebt;
+  const netFcfBeforeEarnouts = totalBusinessFcf + uncappedActiveEarnouts - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - turnaroundCost - integratedDebt.sellerNotes - integratedDebt.bankDebt;
   const availableForEarnouts = Math.max(0, cash + netFcfBeforeEarnouts);
 
   // Cap earn-outs at available cash (matches store's Math.min logic)

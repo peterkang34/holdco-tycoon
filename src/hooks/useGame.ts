@@ -262,6 +262,9 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   lastAcquisitionResult: null,
   lastIntegrationOutcome: null,
   founderDistributionsReceived: 0,
+  bankruptRound: undefined,
+  holdcoAmortizationThisRound: 0,
+  consolidationBoomSectorId: undefined,
 };
 
 export const useGameStore = create<GameStore>()(
