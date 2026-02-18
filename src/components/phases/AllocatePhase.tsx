@@ -2214,6 +2214,42 @@ export function AllocatePhase({
         )}
       </div>
 
+      {/* Next Year Forecast */}
+      {activeBusinesses.length > 0 && (
+        <div className="bg-white/5 border border-white/10 rounded-lg p-3 sm:p-4 mb-4">
+          <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Next Year Forecast</p>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 text-sm font-mono">
+            <div className="flex items-center gap-1">
+              <span className="text-text-muted text-xs">Cash</span>
+              <span className="text-text-primary font-medium">{formatMoney(cash)}</span>
+            </div>
+            <span className="hidden sm:inline text-text-muted">→</span>
+            <div className="flex items-center gap-1">
+              <span className="text-text-muted text-xs">+ Est. FCF</span>
+              <span className={`font-medium ${covenantHeadroom.estimatedNetFcf < 0 ? 'text-red-400' : 'text-text-primary'}`}>
+                ~{formatMoney(covenantHeadroom.estimatedNetFcf)}
+              </span>
+            </div>
+            {totalDebt > 0 && (
+              <>
+                <span className="hidden sm:inline text-text-muted">→</span>
+                <div className="flex items-center gap-1">
+                  <span className="text-text-muted text-xs">− Debt Service</span>
+                  <span className="text-text-primary font-medium">~{formatMoney(covenantHeadroom.nextYearDebtService)}</span>
+                </div>
+              </>
+            )}
+            <span className="hidden sm:inline text-text-muted">→</span>
+            <div className="flex items-center gap-1">
+              <span className="text-text-muted text-xs">= Projected</span>
+              <span className={`font-medium ${covenantHeadroom.cashWillGoNegative ? 'text-red-400 font-bold' : 'text-text-primary'}`}>
+                ~{formatMoney(covenantHeadroom.projectedCashAfterDebt)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* End Round Button */}
       <div className="flex justify-end">
         <button onClick={() => setShowEndTurnConfirm(true)} className="btn-primary text-lg px-8">

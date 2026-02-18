@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 17, 2025',
+    title: 'Next Year Cash Forecast',
+    sections: [
+      {
+        heading: 'New',
+        items: [
+          'Added a "Next Year Forecast" summary card above the End Year button during the Allocate phase — see your current cash, estimated FCF, debt service, and projected year-end cash at a glance without opening the End Year confirmation.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 17, 2025',
     title: 'Cash Flow & Restart Fixes',
     sections: [
       {
