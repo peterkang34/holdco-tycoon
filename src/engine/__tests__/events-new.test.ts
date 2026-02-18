@@ -7,7 +7,7 @@
  * - Consolidation Boom (deal premium, exclusive tuck-in)
  */
 
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   KEY_MAN_QUALITY_DROP,
   KEY_MAN_GOLDEN_HANDCUFFS_COST_PCT,
@@ -24,7 +24,7 @@ import {
   CONSOLIDATION_BOOM_PRICE_PREMIUM,
   CONSOLIDATION_BOOM_EXCLUSIVE_MIN_OPCOS,
 } from '../../data/gameConfig';
-import type { Business, GameState, GameEvent, QualityRating } from '../types';
+import type { Business, QualityRating } from '../types';
 
 // Helper: create a minimal business
 function makeBusiness(overrides: Partial<Business> = {}): Business {
@@ -88,7 +88,8 @@ describe('Bug Fix: bolt-on bankDebtBalance in sell proceeds', () => {
     // sellBusiness line: .reduce((sum, b) => sum + b.sellerNoteBalance + b.earnoutRemaining, 0)
     // should be: .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0)
 
-    const platform = makeBusiness({
+    // Platform business (used for context; boltOn references it via parentPlatformId)
+    makeBusiness({
       id: 'platform_1',
       name: 'Platform Co',
       isPlatform: true,
@@ -198,8 +199,7 @@ describe('Earn-Out Dispute Event', () => {
 
   it('fight: win should zero out earnout', () => {
     const business = makeBusiness({ earnoutRemaining: 400 });
-    // On win: earnoutRemaining = 0, only legal costs paid
-    const legalCost = 150;
+    // On win: earnoutRemaining = 0, only legal costs paid (legal cost ~150 within [100,200] range)
     const afterWin = { ...business, earnoutRemaining: 0 };
     expect(afterWin.earnoutRemaining).toBe(0);
   });

@@ -593,8 +593,8 @@ export const useGameStore = create<GameStore>()(
 
         // Events with choices that have NO immediate effects — skip applyEventEffects entirely
         const skipEffects = event && (event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand' || event.type === 'portfolio_seller_note_renego' || event.type === 'portfolio_earnout_dispute' || event.type === 'mbo_proposal');
-        // Events with choices that need player input before advancing (includes key-man/supplier which DO have immediate effects)
-        const hasChoices = event && (event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand' || event.type === 'portfolio_seller_note_renego' || event.type === 'portfolio_key_man_risk' || event.type === 'portfolio_earnout_dispute' || event.type === 'portfolio_supplier_shift' || event.type === 'mbo_proposal');
+        // Note: choice-based events (unsolicited_offer, equity_demand, seller_note_renego, key_man_risk, earnout_dispute, supplier_shift, mbo_proposal)
+        // need player input before advancing — handled by EventPhase UI
         if (event && !skipEffects && !requiresRestructuring) {
           gameState = applyEventEffects(gameState, event);
         }
