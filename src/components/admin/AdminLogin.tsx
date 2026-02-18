@@ -16,11 +16,13 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
 
     try {
       const res = await fetch('/api/admin/verify', {
+        method: 'POST',
         headers: { Authorization: `Bearer ${password}` },
       });
       if (res.ok) {
-        sessionStorage.setItem('admin_token', password);
-        onLogin(password);
+        const { token } = await res.json();
+        sessionStorage.setItem('admin_token', token);
+        onLogin(token);
       } else {
         setError('Invalid password');
       }

@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import { LEADERBOARD_KEY } from '../_lib/leaderboard.js';
+import { verifyAdminToken } from '../_lib/adminAuth.js';
 
 interface MonthData {
   month: string;
@@ -35,11 +36,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  // Auth check
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token || token !== process.env.ADMIN_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  // Auth check — verify session token from KV
+  const authorized = await verifyAdminToken(req, res);
+  if (!authorized) return;
 
   try {
     const monthKeys = getLastNMonthKeys(6);
