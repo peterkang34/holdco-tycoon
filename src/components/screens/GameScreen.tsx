@@ -21,6 +21,7 @@ import { ToastContainer } from '../ui/ToastContainer';
 import { calculateFounderEquityValue, calculateFounderPersonalWealth } from '../../engine/scoring';
 import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
 import { updateSessionRound } from '../../services/telemetry';
+import { buildChallengeUrl, copyToClipboard } from '../../utils/challenge';
 
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
 
@@ -48,6 +49,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showManual, setShowManual] = useState(false);
   const [drilldownMetric, setDrilldownMetric] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const {
     holdcoName,
@@ -148,12 +150,23 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     maxRounds,
     difficulty,
     duration,
+    seed,
     lastAcquisitionResult,
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;
 
   const addToast = useToastStore((s) => s.addToast);
+
+  const handleCopyChallenge = useCallback(async () => {
+    if (!seed || !difficulty || !duration) return;
+    const url = buildChallengeUrl({ seed, difficulty, duration });
+    const ok = await copyToClipboard(url);
+    if (ok) {
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2000);
+    }
+  }, [seed, difficulty, duration]);
 
   const handleEventChoice = (action: string) => {
     // Locked choices are no-ops
@@ -711,8 +724,14 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
 
       {/* Challenge Mode Banner */}
       {isChallenge && (
-        <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-3 py-1.5 text-center">
+        <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-3 py-1.5 flex items-center justify-center gap-3">
           <span className="text-xs text-yellow-400 font-medium">Challenge Mode<span className="hidden sm:inline"> — same deals, same events</span></span>
+          <button
+            onClick={handleCopyChallenge}
+            className="text-xs px-2 py-0.5 rounded bg-yellow-500/20 text-yellow-300 hover:bg-yellow-500/30 transition-colors font-medium"
+          >
+            {copiedLink ? 'Copied!' : 'Copy Link'}
+          </button>
         </div>
       )}
 
