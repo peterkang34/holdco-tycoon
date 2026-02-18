@@ -32,6 +32,29 @@ import {
   capGrowthRate,
   applyEbitdaFloor,
 } from './helpers';
+import {
+  KEY_MAN_QUALITY_DROP,
+  KEY_MAN_GOLDEN_HANDCUFFS_COST_PCT,
+  KEY_MAN_GOLDEN_HANDCUFFS_RESTORE_CHANCE,
+  KEY_MAN_SUCCESSION_COST_MIN,
+  KEY_MAN_SUCCESSION_COST_MAX,
+  KEY_MAN_SUCCESSION_ROUNDS,
+  EARNOUT_SETTLE_PCT,
+  EARNOUT_FIGHT_LEGAL_COST_MIN,
+  EARNOUT_FIGHT_LEGAL_COST_MAX,
+  EARNOUT_FIGHT_WIN_CHANCE,
+  EARNOUT_RENEGOTIATE_PCT,
+  SUPPLIER_SHIFT_MARGIN_HIT,
+  SUPPLIER_ABSORB_RECOVERY_PPT,
+  SUPPLIER_SWITCH_COST_MIN,
+  SUPPLIER_SWITCH_COST_MAX,
+  SUPPLIER_SWITCH_REVENUE_PENALTY,
+  SUPPLIER_VERTICAL_COST,
+  SUPPLIER_VERTICAL_BONUS_PPT,
+  SUPPLIER_VERTICAL_MIN_SAME_SECTOR,
+  CONSOLIDATION_BOOM_PROB,
+  CONSOLIDATION_BOOM_SECTORS,
+} from '../data/gameConfig';
 import { getPlatformMultipleExpansion, getPlatformRecessionModifier } from './platforms';
 import { getTurnaroundExitPremium } from './turnarounds';
 
@@ -630,6 +653,31 @@ export function generateEvent(state: GameState): GameEvent | null {
         const eligible = activeBusinesses.filter(b => b.qualityRating >= 4 && (state.round - b.acquisitionRound) >= 3);
         if (eligible.length === 0) adjustedProb = 0;
       }
+      // Key-Man Risk: quality >= 4 AND no active turnaround AND 2-round cooldown after turnaround completion
+      if (eventDef.type === 'portfolio_key_man_risk') {
+        const activeTurnaroundBizIds = new Set((state.activeTurnarounds || []).filter(t => t.status === 'active').map(t => t.businessId));
+        const recentlyCompletedBizIds = new Set((state.activeTurnarounds || []).filter(t => t.status === 'completed' && t.endRound !== undefined && state.round - t.endRound < 2).map(t => t.businessId));
+        const eligible = activeBusinesses.filter(b => b.qualityRating >= 4 && !activeTurnaroundBizIds.has(b.id) && !recentlyCompletedBizIds.has(b.id));
+        if (eligible.length === 0) adjustedProb = 0;
+      }
+      // Earn-Out Dispute: earnoutRemaining > 0 AND revenue dropped >5% from acquisition AND 3-round cooldown
+      if (eventDef.type === 'portfolio_earnout_dispute') {
+        const eligible = activeBusinesses.filter(b =>
+          b.earnoutRemaining > 0 && b.acquisitionRevenue > 0 &&
+          (b.revenue - b.acquisitionRevenue) / b.acquisitionRevenue < -0.05 &&
+          (!b.earnoutDisputeRound || state.round - b.earnoutDisputeRound >= 3)
+        );
+        adjustedProb = eligible.length > 0 ? 0.04 : 0; // probability-gated by eligibility
+      }
+      // Supplier Shift: ebitdaMargin below sector median
+      if (eventDef.type === 'portfolio_supplier_shift') {
+        const eligible = activeBusinesses.filter(b => {
+          const sector = SECTORS[b.sectorId];
+          const sectorMedianMargin = (sector.baseMargin[0] + sector.baseMargin[1]) / 2;
+          return b.ebitdaMargin < sectorMedianMargin;
+        });
+        if (eligible.length === 0) adjustedProb = 0;
+      }
 
       // Adjust talent events based on shared services
       // H-1: Clamp adjusted probabilities to prevent exceeding 1.0
@@ -687,6 +735,86 @@ export function generateEvent(state: GameState): GameEvent | null {
             offerAmount,
             choices,
           };
+        } else if (eventDef.type === 'portfolio_key_man_risk') {
+          const activeTurnaroundBizIds = new Set((state.activeTurnarounds || []).filter(t => t.status === 'active').map(t => t.businessId));
+          const recentlyCompletedBizIds = new Set((state.activeTurnarounds || []).filter(t => t.status === 'completed' && t.endRound !== undefined && state.round - t.endRound < 2).map(t => t.businessId));
+          const eligible = activeBusinesses.filter(b => b.qualityRating >= 4 && !activeTurnaroundBizIds.has(b.id) && !recentlyCompletedBizIds.has(b.id));
+          affectedBusiness = pickRandom(eligible) || affectedBusiness;
+          const handcuffsCost = Math.round(affectedBusiness.ebitda * KEY_MAN_GOLDEN_HANDCUFFS_COST_PCT);
+          const successionCost = randomInt(KEY_MAN_SUCCESSION_COST_MIN, KEY_MAN_SUCCESSION_COST_MAX);
+          choices = [
+            { label: `Golden Handcuffs (${formatMoney(handcuffsCost)})`, description: `Pay ${Math.round(KEY_MAN_GOLDEN_HANDCUFFS_COST_PCT * 100)}% of EBITDA. ${Math.round(KEY_MAN_GOLDEN_HANDCUFFS_RESTORE_CHANCE * 100)}% chance quality restores`, action: 'keyManGoldenHandcuffs', variant: 'positive', cost: handcuffsCost },
+            { label: `Succession Plan (${formatMoney(successionCost)})`, description: `Pay ${formatMoney(successionCost)}. Quality restores after ${KEY_MAN_SUCCESSION_ROUNDS} rounds`, action: 'keyManSuccessionPlan', variant: 'neutral', cost: successionCost },
+            { label: 'Accept the Hit', description: 'Quality stays dropped. No cost.', action: 'keyManAcceptHit', variant: 'negative' },
+          ];
+          return {
+            id: `event_${state.round}_${eventDef.type}`,
+            type: eventDef.type,
+            title: eventDef.title,
+            description: `${affectedBusiness.name}'s key operator is threatening to leave. Quality has dropped from Q${affectedBusiness.qualityRating} to Q${Math.max(1, affectedBusiness.qualityRating - KEY_MAN_QUALITY_DROP)}.`,
+            effect: eventDef.effectDescription,
+            tip: eventDef.tip,
+            tipSource: eventDef.tipSource,
+            affectedBusinessId: affectedBusiness.id,
+            choices,
+          };
+        } else if (eventDef.type === 'portfolio_earnout_dispute') {
+          const eligible = activeBusinesses.filter(b =>
+            b.earnoutRemaining > 0 && b.acquisitionRevenue > 0 &&
+            (b.revenue - b.acquisitionRevenue) / b.acquisitionRevenue < -0.05 &&
+            (!b.earnoutDisputeRound || state.round - b.earnoutDisputeRound >= 3)
+          );
+          affectedBusiness = pickRandom(eligible) || affectedBusiness;
+          const settleAmount = Math.round(affectedBusiness.earnoutRemaining * EARNOUT_SETTLE_PCT);
+          const legalCost = randomInt(EARNOUT_FIGHT_LEGAL_COST_MIN, EARNOUT_FIGHT_LEGAL_COST_MAX);
+          const renegoAmount = Math.round(affectedBusiness.earnoutRemaining * EARNOUT_RENEGOTIATE_PCT);
+          choices = [
+            { label: `Settle (${formatMoney(settleAmount)})`, description: `Pay ${Math.round(EARNOUT_SETTLE_PCT * 100)}% of ${formatMoney(affectedBusiness.earnoutRemaining)} remaining. Obligation zeroed.`, action: 'earnoutSettle', variant: 'positive', cost: settleAmount },
+            { label: `Fight in Court (${formatMoney(legalCost)})`, description: `${Math.round(EARNOUT_FIGHT_WIN_CHANCE * 100)}% win (zeroed), ${Math.round((1 - EARNOUT_FIGHT_WIN_CHANCE) * 100)}% lose (pay full + legal)`, action: 'earnoutFight', variant: 'negative', cost: legalCost },
+            { label: 'Renegotiate', description: `Reduce obligation to ${formatMoney(renegoAmount)} (${Math.round(EARNOUT_RENEGOTIATE_PCT * 100)}%)`, action: 'earnoutRenegotiate', variant: 'neutral' },
+          ];
+          return {
+            id: `event_${state.round}_${eventDef.type}`,
+            type: eventDef.type,
+            title: eventDef.title,
+            description: `The former seller of ${affectedBusiness.name} disputes the earn-out. Revenue has declined ${Math.round(Math.abs((affectedBusiness.revenue - affectedBusiness.acquisitionRevenue) / affectedBusiness.acquisitionRevenue) * 100)}% since acquisition. ${formatMoney(affectedBusiness.earnoutRemaining)} remaining obligation.`,
+            effect: eventDef.effectDescription,
+            tip: eventDef.tip,
+            tipSource: eventDef.tipSource,
+            affectedBusinessId: affectedBusiness.id,
+            choices,
+          };
+        } else if (eventDef.type === 'portfolio_supplier_shift') {
+          const eligible = activeBusinesses.filter(b => {
+            const sector = SECTORS[b.sectorId];
+            const sectorMedianMargin = (sector.baseMargin[0] + sector.baseMargin[1]) / 2;
+            return b.ebitdaMargin < sectorMedianMargin;
+          });
+          affectedBusiness = pickRandom(eligible) || affectedBusiness;
+          const switchCost = randomInt(SUPPLIER_SWITCH_COST_MIN, SUPPLIER_SWITCH_COST_MAX);
+          const sameSectorCount = activeBusinesses.filter(b => b.sectorId === affectedBusiness.sectorId).length;
+          const canVertical = sameSectorCount >= SUPPLIER_VERTICAL_MIN_SAME_SECTOR;
+          const supplierChoices: EventChoice[] = [
+            { label: 'Absorb Costs', description: `Recover ${Math.round(SUPPLIER_ABSORB_RECOVERY_PPT * 100)}ppt of the ${Math.round(SUPPLIER_SHIFT_MARGIN_HIT * 100)}ppt hit (net -${Math.round((SUPPLIER_SHIFT_MARGIN_HIT - SUPPLIER_ABSORB_RECOVERY_PPT) * 100)}ppt permanent)`, action: 'supplierAbsorb', variant: 'neutral' },
+            { label: `Switch Suppliers (${formatMoney(switchCost)})`, description: `Full margin recovery. -${Math.round(SUPPLIER_SWITCH_REVENUE_PENALTY * 100)}% revenue this round.`, action: 'supplierSwitch', variant: 'positive', cost: switchCost },
+          ];
+          if (canVertical) {
+            supplierChoices.push({ label: `Vertical Integration (${formatMoney(SUPPLIER_VERTICAL_COST)})`, description: `Full recovery +${Math.round(SUPPLIER_VERTICAL_BONUS_PPT * 100)}ppt bonus. Requires ${SUPPLIER_VERTICAL_MIN_SAME_SECTOR}+ same-sector businesses.`, action: 'supplierVerticalIntegration', variant: 'positive', cost: SUPPLIER_VERTICAL_COST });
+          } else {
+            supplierChoices.push({ label: 'Vertical Integration (Locked)', description: `Requires ${SUPPLIER_VERTICAL_MIN_SAME_SECTOR}+ businesses in ${SECTORS[affectedBusiness.sectorId]?.name ?? 'sector'}`, action: 'supplierVerticalIntegrationLocked', variant: 'neutral' });
+          }
+          choices = supplierChoices;
+          return {
+            id: `event_${state.round}_${eventDef.type}`,
+            type: eventDef.type,
+            title: eventDef.title,
+            description: `A key supplier to ${affectedBusiness.name} has consolidated and raised prices. Margin has dropped ${Math.round(SUPPLIER_SHIFT_MARGIN_HIT * 100)}ppt.`,
+            effect: eventDef.effectDescription,
+            tip: eventDef.tip,
+            tipSource: eventDef.tipSource,
+            affectedBusinessId: affectedBusiness.id,
+            choices,
+          };
         } else if (eventDef.type === 'portfolio_referral_deal') {
           // Referral deal — no affectedBusiness needed, deal injected in applyEventEffects
           affectedBusiness = undefined as unknown as typeof affectedBusiness;
@@ -734,6 +862,30 @@ export function generateEvent(state: GameState): GameEvent | null {
           affectedBusinessId: affectedBusiness?.id,
         };
       }
+    }
+  }
+
+  // Roll for consolidation boom (inline, same pattern as unsolicited offer)
+  if (Math.random() < CONSOLIDATION_BOOM_PROB) {
+    const boomSector = pickRandom([...CONSOLIDATION_BOOM_SECTORS]);
+    if (boomSector) {
+      const sectorDef = SECTORS[boomSector];
+      const playerOwnsInSector = activeBusinesses.filter(b => b.sectorId === boomSector).length;
+      const qualifiesForExclusive = playerOwnsInSector >= 2;
+      const exclusiveNote = qualifiesForExclusive
+        ? ` You own ${playerOwnsInSector} businesses in ${sectorDef.name} — an exclusive tuck-in opportunity will appear.`
+        : '';
+
+      return {
+        id: `event_${state.round}_consolidation_boom_${boomSector}`,
+        type: 'sector_consolidation_boom' as const,
+        title: `${sectorDef.name} Consolidation Boom`,
+        description: `A wave of M&A activity is sweeping the ${sectorDef.name.toLowerCase()} sector. Buyers are competing aggressively, driving up deal prices — but also creating opportunities for well-positioned platforms.${exclusiveNote}`,
+        effect: `All ${sectorDef.name.toLowerCase()} deals this round have +20% price premium. ${qualifiesForExclusive ? 'Exclusive tuck-in at normal pricing available.' : `Own 2+ ${sectorDef.name.toLowerCase()} businesses to unlock exclusive deal.`}`,
+        tip: 'Consolidation waves create both opportunities and overpayment risk. Discipline matters most when everyone else is buying.',
+        tipSource: 'Ch. IV',
+        consolidationSectorId: boomSector,
+      };
     }
   }
 
@@ -1200,13 +1352,70 @@ export function applyEventEffects(state: GameState, event: GameEvent): GameState
     case 'unsolicited_offer':
       break;
 
+    // Key-Man Risk: apply quality -1 immediately (choices are recovery responses)
+    case 'portfolio_key_man_risk': {
+      if (event.affectedBusinessId) {
+        newState.businesses = newState.businesses.map(b => {
+          if (b.id !== event.affectedBusinessId) return b;
+          const newQuality = Math.max(1, b.qualityRating - KEY_MAN_QUALITY_DROP) as 1 | 2 | 3 | 4 | 5;
+          const marginDelta = -0.015 * KEY_MAN_QUALITY_DROP;
+          const newMargin = clampMargin(b.ebitdaMargin + marginDelta);
+          const newEbitda = Math.round(b.revenue * newMargin);
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'margin',
+            before: b.ebitdaMargin, after: newMargin, delta: newMargin - b.ebitdaMargin,
+          });
+          return { ...b, qualityRating: newQuality, ebitdaMargin: newMargin, ebitda: newEbitda };
+        });
+      }
+      break;
+    }
+
+    // Supplier Shift: apply -3ppt margin immediately (choices are how to respond)
+    case 'portfolio_supplier_shift': {
+      if (event.affectedBusinessId) {
+        newState.businesses = newState.businesses.map(b => {
+          if (b.id !== event.affectedBusinessId) return b;
+          const beforeEbitda = b.ebitda;
+          const newMargin = clampMargin(b.ebitdaMargin - SUPPLIER_SHIFT_MARGIN_HIT);
+          const newEbitda = Math.round(b.revenue * newMargin);
+          const floored = applyEbitdaFloor(newEbitda, b.revenue, newMargin, b.acquisitionEbitda);
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'margin',
+            before: b.ebitdaMargin, after: floored.margin, delta: floored.margin - b.ebitdaMargin,
+          });
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'ebitda',
+            before: beforeEbitda, after: floored.ebitda, delta: floored.ebitda - beforeEbitda,
+            deltaPercent: beforeEbitda > 0 ? (floored.ebitda - beforeEbitda) / beforeEbitda : 0,
+          });
+          return { ...b, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
+        });
+      }
+      break;
+    }
+
+    // Earn-Out Dispute: no immediate effect — choices resolve everything
+    case 'portfolio_earnout_dispute':
+      break;
+
+    // Consolidation Boom: set consolidationBoomSectorId on state
+    case 'sector_consolidation_boom': {
+      if (event.consolidationSectorId) {
+        newState.consolidationBoomSectorId = event.consolidationSectorId;
+      }
+      break;
+    }
+
     case 'global_quiet':
     default:
       break;
   }
 
   // Events with choices should pass through with choices preserved
-  const hasChoices = event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand' || event.type === 'portfolio_seller_note_renego';
+  const hasChoices = event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand'
+    || event.type === 'portfolio_seller_note_renego' || event.type === 'portfolio_key_man_risk'
+    || event.type === 'portfolio_earnout_dispute' || event.type === 'portfolio_supplier_shift';
 
   // Attach impacts to the event in state
   newState.currentEvent = !hasChoices && impacts.length > 0

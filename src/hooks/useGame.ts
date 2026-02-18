@@ -17,6 +17,7 @@ import {
   TurnaroundTier,
   ActiveTurnaround,
   formatMoney,
+  randomInt,
 } from '../engine/types';
 import {
   createStartingBusiness,
@@ -88,7 +89,17 @@ import { buildChronicleContext } from '../services/chronicleContext';
 import { useToastStore } from './useToast';
 import { calculateIntegrationCost, forgePlatform, checkPlatformDissolution, calculateAddToPlatformCost } from '../engine/platforms';
 import { getRecipeById } from '../data/platformRecipes';
-import { PLATFORM_SALE_BONUS, COVENANT_BREACH_ROUNDS_THRESHOLD, EARNOUT_EXPIRATION_YEARS } from '../data/gameConfig';
+import {
+  PLATFORM_SALE_BONUS, COVENANT_BREACH_ROUNDS_THRESHOLD, EARNOUT_EXPIRATION_YEARS,
+  KEY_MAN_GOLDEN_HANDCUFFS_COST_PCT, KEY_MAN_GOLDEN_HANDCUFFS_RESTORE_CHANCE,
+  KEY_MAN_SUCCESSION_COST_MIN, KEY_MAN_SUCCESSION_COST_MAX, KEY_MAN_SUCCESSION_ROUNDS,
+  EARNOUT_SETTLE_PCT, EARNOUT_FIGHT_LEGAL_COST_MIN, EARNOUT_FIGHT_LEGAL_COST_MAX,
+  EARNOUT_FIGHT_WIN_CHANCE, EARNOUT_RENEGOTIATE_PCT,
+  SUPPLIER_ABSORB_RECOVERY_PPT, SUPPLIER_SWITCH_COST_MIN, SUPPLIER_SWITCH_COST_MAX,
+  SUPPLIER_SWITCH_REVENUE_PENALTY, SUPPLIER_VERTICAL_COST, SUPPLIER_VERTICAL_BONUS_PPT,
+  SUPPLIER_VERTICAL_MIN_SAME_SECTOR, SUPPLIER_SHIFT_MARGIN_HIT,
+  CONSOLIDATION_BOOM_PRICE_PREMIUM, CONSOLIDATION_BOOM_EXCLUSIVE_MIN_OPCOS,
+} from '../data/gameConfig';
 import {
   canUnlockTier,
   calculateTurnaroundCost,
@@ -136,6 +147,18 @@ interface GameStore extends GameState {
   declineEquityDemand: () => void;
   acceptSellerNoteRenego: () => void;
   declineSellerNoteRenego: () => void;
+
+  // New choice-based event actions
+  keyManGoldenHandcuffs: () => void;
+  keyManSuccessionPlan: () => void;
+  keyManAcceptHit: () => void;
+  earnoutSettle: () => void;
+  earnoutFight: () => void;
+  earnoutRenegotiate: () => void;
+  supplierAbsorb: () => void;
+  supplierSwitch: () => void;
+  supplierVerticalIntegration: () => void;
+
   setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference, subType?: string | null) => void;
 
   // MA Sourcing
@@ -565,8 +588,11 @@ export const useGameStore = create<GameStore>()(
           phase: requiresRestructuring ? 'restructure' as GamePhase : 'event' as GamePhase,
         };
 
-        const hasChoices = event && (event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand' || event.type === 'portfolio_seller_note_renego');
-        if (event && !hasChoices && !requiresRestructuring) {
+        // Events with choices that have NO immediate effects — skip applyEventEffects entirely
+        const skipEffects = event && (event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand' || event.type === 'portfolio_seller_note_renego' || event.type === 'portfolio_earnout_dispute' || event.type === 'mbo_proposal');
+        // Events with choices that need player input before advancing (includes key-man/supplier which DO have immediate effects)
+        const hasChoices = event && (event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand' || event.type === 'portfolio_seller_note_renego' || event.type === 'portfolio_key_man_risk' || event.type === 'portfolio_earnout_dispute' || event.type === 'portfolio_supplier_shift' || event.type === 'mbo_proposal');
+        if (event && !skipEffects && !requiresRestructuring) {
           gameState = applyEventEffects(gameState, event);
         }
 
@@ -574,8 +600,8 @@ export const useGameStore = create<GameStore>()(
         if (event && event.type === 'portfolio_referral_deal') {
           const referralSector = pickWeightedSector(state.round, state.maxRounds);
           const referralDeal = generateDealWithSize(referralSector, state.round, 'any', 0, {
-            qualityFloor: 3 as any,
-            source: 'sourced' as any,
+            qualityFloor: 3 as 1 | 2 | 3 | 4 | 5,
+            source: 'sourced',
             maxRounds: state.maxRounds,
           });
           gameState.dealPipeline = [...gameState.dealPipeline, referralDeal];
@@ -651,6 +677,18 @@ export const useGameStore = create<GameStore>()(
         gameState.businesses = businessesAfterTurnarounds;
         gameState.activeTurnarounds = resolvedTurnarounds;
 
+        // Succession plan countdown — restore quality after KEY_MAN_SUCCESSION_ROUNDS
+        gameState.businesses = gameState.businesses.map(b => {
+          if (b.status !== 'active' || !b.successionPlanRound) return b;
+          if (state.round - b.successionPlanRound >= KEY_MAN_SUCCESSION_ROUNDS) {
+            const restoredQuality = Math.min(5, b.qualityRating + 1) as 1 | 2 | 3 | 4 | 5;
+            const newMargin = clampMargin(b.ebitdaMargin + 0.015);
+            addToast({ message: `Succession plan complete — ${b.name} quality restored to Q${restoredQuality}`, type: 'success' });
+            return { ...b, qualityRating: restoredQuality, ebitdaMargin: newMargin, ebitda: Math.round(b.revenue * newMargin), successionPlanRound: undefined };
+          }
+          return b;
+        });
+
         set({
           ...gameState,
           eventHistory: event ? [...state.eventHistory, event] : state.eventHistory,
@@ -694,9 +732,35 @@ export const useGameStore = create<GameStore>()(
           finalPipeline = [...newPipeline, ...distressedDeals];
         }
 
+        // Consolidation boom: apply price premium to sector deals + inject exclusive tuck-in
+        let clearedBoomSectorId = state.consolidationBoomSectorId;
+        if (state.consolidationBoomSectorId) {
+          const boomSector = state.consolidationBoomSectorId;
+          // Apply +20% price premium to all boom-sector deals
+          finalPipeline = finalPipeline.map(d => {
+            if (d.business.sectorId === boomSector) {
+              const premiumPrice = Math.round(d.askingPrice * (1 + CONSOLIDATION_BOOM_PRICE_PREMIUM));
+              return { ...d, askingPrice: premiumPrice, effectivePrice: Math.round(d.effectivePrice * (1 + CONSOLIDATION_BOOM_PRICE_PREMIUM)) };
+            }
+            return d;
+          });
+          // If player owns 2+ in boom sector, inject exclusive tuck-in at normal pricing
+          const playerBoomOpcos = state.businesses.filter(b => b.status === 'active' && b.sectorId === boomSector);
+          if (playerBoomOpcos.length >= CONSOLIDATION_BOOM_EXCLUSIVE_MIN_OPCOS) {
+            const exclusiveDeal = generateDealWithSize(boomSector, state.round, 'any', 0, {
+              source: 'proprietary',
+              qualityFloor: 3 as 1 | 2 | 3 | 4 | 5,
+              maxRounds: state.maxRounds,
+            });
+            finalPipeline = [...finalPipeline, exclusiveDeal];
+          }
+          clearedBoomSectorId = undefined;
+        }
+
         set({
           phase: 'allocate',
           dealPipeline: finalPipeline,
+          consolidationBoomSectorId: clearedBoomSectorId,
           actionsThisRound: [],
           focusBonus,
           lastAcquisitionResult: null,
@@ -1811,7 +1875,7 @@ export const useGameStore = create<GameStore>()(
         // Include bolt-on debt + earn-out obligations in total debt payoff
         const boltOnDebt = state.businesses
           .filter(b => boltOnIds.has(b.id))
-          .reduce((sum, b) => sum + b.sellerNoteBalance + b.earnoutRemaining, 0);
+          .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0);
         const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
         const netProceeds = Math.max(0, exitPrice - debtPayoff);
 
@@ -1820,8 +1884,8 @@ export const useGameStore = create<GameStore>()(
         const playerProceeds = rolloverPct > 0 ? Math.round(netProceeds * (1 - rolloverPct)) : netProceeds;
 
         let updatedBusinesses = state.businesses.map(b => {
-          if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round };
-          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
+          if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round, earnoutRemaining: 0 };
+          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 };
           return b;
         });
 
@@ -1911,8 +1975,8 @@ export const useGameStore = create<GameStore>()(
         const playerProceedsOffer = rolloverPctOffer > 0 ? Math.round(netProceeds * (1 - rolloverPctOffer)) : netProceeds;
 
         const updatedBusinesses = state.businesses.map(b => {
-          if (b.id === event.affectedBusinessId) return { ...b, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round };
-          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
+          if (b.id === event.affectedBusinessId) return { ...b, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round, earnoutRemaining: 0 };
+          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 };
           return b;
         });
         const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
@@ -1926,7 +1990,7 @@ export const useGameStore = create<GameStore>()(
         // Collect bolt-on businesses for exitedBusinesses
         const exitedBoltOns = state.businesses
           .filter(b => boltOnIds.has(b.id))
-          .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round }));
+          .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 }));
 
         const acceptState = {
           ...state,
@@ -1985,8 +2049,8 @@ export const useGameStore = create<GameStore>()(
         const playerProceedsMBO = rolloverPctMBO > 0 ? Math.round(netProceeds * (1 - rolloverPctMBO)) : netProceeds;
 
         let updatedBusinesses = state.businesses.map(b => {
-          if (b.id === event.affectedBusinessId) return { ...b, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round };
-          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
+          if (b.id === event.affectedBusinessId) return { ...b, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round, earnoutRemaining: 0 };
+          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 };
           return b;
         });
         const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
@@ -2176,6 +2240,214 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
+      // ── New choice-based event actions ──
+
+      keyManGoldenHandcuffs: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_key_man_risk' || !event.affectedBusinessId) return;
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+        const cost = event.choices?.find(c => c.action === 'keyManGoldenHandcuffs')?.cost ?? Math.round(business.ebitda * KEY_MAN_GOLDEN_HANDCUFFS_COST_PCT);
+        if (state.cash < cost) return;
+        const restored = Math.random() < KEY_MAN_GOLDEN_HANDCUFFS_RESTORE_CHANCE;
+        const newState = {
+          ...state,
+          cash: state.cash - cost,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            if (restored) {
+              // Quality already dropped in applyEventEffects — restore it
+              const restoredQuality = Math.min(5, b.qualityRating + 1) as 1 | 2 | 3 | 4 | 5;
+              const newMargin = clampMargin(b.ebitdaMargin + 0.015);
+              return { ...b, qualityRating: restoredQuality, ebitdaMargin: newMargin, ebitda: Math.round(b.revenue * newMargin) };
+            }
+            return b; // Quality stays dropped
+          }),
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        const addToast = useToastStore.getState().addToast;
+        if (restored) {
+          addToast({ message: `Golden handcuffs worked — ${business.name} quality restored`, type: 'success' });
+        } else {
+          addToast({ message: `Golden handcuffs paid but ${business.name} quality stays dropped`, type: 'warning' });
+        }
+      },
+
+      keyManSuccessionPlan: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_key_man_risk' || !event.affectedBusinessId) return;
+        const cost = event.choices?.find(c => c.action === 'keyManSuccessionPlan')?.cost ?? randomInt(KEY_MAN_SUCCESSION_COST_MIN, KEY_MAN_SUCCESSION_COST_MAX);
+        if (state.cash < cost) return;
+        const newState = {
+          ...state,
+          cash: state.cash - cost,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            return { ...b, successionPlanRound: state.round };
+          }),
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Succession plan started — quality will restore in ${KEY_MAN_SUCCESSION_ROUNDS} rounds`, type: 'info' });
+      },
+
+      keyManAcceptHit: () => {
+        const state = get();
+        set({ currentEvent: null, metrics: calculateMetrics(state) });
+        useToastStore.getState().addToast({ message: 'Accepted key-man quality drop', type: 'warning' });
+      },
+
+      earnoutSettle: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_earnout_dispute' || !event.affectedBusinessId) return;
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+        const settleAmount = Math.round(business.earnoutRemaining * EARNOUT_SETTLE_PCT);
+        if (state.cash < settleAmount) return;
+        const newState = {
+          ...state,
+          cash: state.cash - settleAmount,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            return { ...b, earnoutRemaining: 0, earnoutTarget: 0 };
+          }),
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Settled earn-out dispute for ${formatMoney(settleAmount)}`, type: 'success' });
+      },
+
+      earnoutFight: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_earnout_dispute' || !event.affectedBusinessId) return;
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+        const legalCost = event.choices?.find(c => c.action === 'earnoutFight')?.cost ?? randomInt(EARNOUT_FIGHT_LEGAL_COST_MIN, EARNOUT_FIGHT_LEGAL_COST_MAX);
+        if (state.cash < legalCost) return;
+        const won = Math.random() < EARNOUT_FIGHT_WIN_CHANCE;
+        const addToast = useToastStore.getState().addToast;
+        if (won) {
+          const newState = {
+            ...state,
+            cash: state.cash - legalCost,
+            businesses: state.businesses.map(b => {
+              if (b.id !== event.affectedBusinessId) return b;
+              return { ...b, earnoutRemaining: 0, earnoutTarget: 0 };
+            }),
+            currentEvent: null,
+          };
+          set({ ...newState, metrics: calculateMetrics(newState) });
+          addToast({ message: `Won earn-out dispute! Legal costs: ${formatMoney(legalCost)}`, type: 'success' });
+        } else {
+          // Lost: pay full earnout + legal costs
+          const totalCost = legalCost + business.earnoutRemaining;
+          const actualPay = Math.min(totalCost, state.cash);
+          const remainingEarnout = Math.max(0, business.earnoutRemaining - (actualPay - legalCost));
+          const newState = {
+            ...state,
+            cash: state.cash - actualPay,
+            businesses: state.businesses.map(b => {
+              if (b.id !== event.affectedBusinessId) return b;
+              return { ...b, earnoutRemaining: remainingEarnout, earnoutTarget: remainingEarnout > 0 ? b.earnoutTarget : 0 };
+            }),
+            currentEvent: null,
+          };
+          set({ ...newState, metrics: calculateMetrics(newState) });
+          addToast({ message: `Lost earn-out fight. Paid ${formatMoney(actualPay)} (legal + obligation)`, type: 'danger' });
+        }
+      },
+
+      earnoutRenegotiate: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_earnout_dispute' || !event.affectedBusinessId) return;
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+        const newAmount = Math.round(business.earnoutRemaining * EARNOUT_RENEGOTIATE_PCT);
+        const newState = {
+          ...state,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            return { ...b, earnoutRemaining: newAmount, earnoutDisputeRound: state.round };
+          }),
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Renegotiated earn-out to ${formatMoney(newAmount)}`, type: 'info' });
+      },
+
+      supplierAbsorb: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_supplier_shift' || !event.affectedBusinessId) return;
+        // Recover 2ppt of the 3ppt hit (net -1ppt permanent)
+        const newState = {
+          ...state,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            const newMargin = clampMargin(b.ebitdaMargin + SUPPLIER_ABSORB_RECOVERY_PPT);
+            return { ...b, ebitdaMargin: newMargin, ebitda: Math.round(b.revenue * newMargin) };
+          }),
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Absorbed supplier costs — net ${Math.round((SUPPLIER_SHIFT_MARGIN_HIT - SUPPLIER_ABSORB_RECOVERY_PPT) * 100)}ppt permanent margin loss`, type: 'warning' });
+      },
+
+      supplierSwitch: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_supplier_shift' || !event.affectedBusinessId) return;
+        const cost = event.choices?.find(c => c.action === 'supplierSwitch')?.cost ?? randomInt(SUPPLIER_SWITCH_COST_MIN, SUPPLIER_SWITCH_COST_MAX);
+        if (state.cash < cost) return;
+        const newState = {
+          ...state,
+          cash: state.cash - cost,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            // Full margin recovery (restore the 3ppt hit)
+            const newMargin = clampMargin(b.ebitdaMargin + SUPPLIER_SHIFT_MARGIN_HIT);
+            // -5% revenue this round
+            const newRevenue = Math.round(b.revenue * (1 - SUPPLIER_SWITCH_REVENUE_PENALTY));
+            const newEbitda = Math.round(newRevenue * newMargin);
+            return { ...b, ebitdaMargin: newMargin, revenue: newRevenue, ebitda: newEbitda };
+          }),
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Switched suppliers — margin restored, -${Math.round(SUPPLIER_SWITCH_REVENUE_PENALTY * 100)}% revenue hit`, type: 'info' });
+      },
+
+      supplierVerticalIntegration: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_supplier_shift' || !event.affectedBusinessId) return;
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+        // Verify eligibility
+        const sameSectorCount = state.businesses.filter(b => b.status === 'active' && b.sectorId === business.sectorId).length;
+        if (sameSectorCount < SUPPLIER_VERTICAL_MIN_SAME_SECTOR) return;
+        if (state.cash < SUPPLIER_VERTICAL_COST) return;
+        const newState = {
+          ...state,
+          cash: state.cash - SUPPLIER_VERTICAL_COST,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            // Full recovery + 1ppt bonus
+            const newMargin = clampMargin(b.ebitdaMargin + SUPPLIER_SHIFT_MARGIN_HIT + SUPPLIER_VERTICAL_BONUS_PPT);
+            return { ...b, ebitdaMargin: newMargin, ebitda: Math.round(b.revenue * newMargin) };
+          }),
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Vertically integrated — margin restored +${Math.round(SUPPLIER_VERTICAL_BONUS_PPT * 100)}ppt bonus`, type: 'success' });
+      },
+
       // Restructuring actions
       distressedSale: (businessId: string) => {
         const state = get();
@@ -2202,8 +2474,8 @@ export const useGameStore = create<GameStore>()(
         const playerProceedsDistress = rolloverPctDistress > 0 ? Math.round(netProceeds * (1 - rolloverPctDistress)) : netProceeds;
 
         const updatedBusinesses = state.businesses.map(b => {
-          if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round };
-          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round };
+          if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round, earnoutRemaining: 0 };
+          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 };
           return b;
         });
         const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
@@ -2217,7 +2489,7 @@ export const useGameStore = create<GameStore>()(
         // Collect bolt-on businesses for exitedBusinesses
         const exitedBoltOns = state.businesses
           .filter(b => boltOnIds.has(b.id))
-          .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round }));
+          .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 }));
 
         const distressState = {
           ...state,
@@ -2592,7 +2864,7 @@ export const useGameStore = create<GameStore>()(
           const boltOnIds = new Set(biz.boltOnIds || []);
           const boltOnDebt = state.businesses
             .filter(b => boltOnIds.has(b.id))
-            .reduce((sum, b) => sum + b.sellerNoteBalance + b.earnoutRemaining, 0);
+            .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0);
           const bizDebt = biz.sellerNoteBalance + biz.bankDebtBalance + biz.earnoutRemaining + boltOnDebt;
           totalDebtPayoff += bizDebt;
 
@@ -2610,7 +2882,7 @@ export const useGameStore = create<GameStore>()(
         // Mark all constituents + bolt-ons as sold
         const updatedBusinesses = state.businesses.map(b => {
           if (allSoldIds.has(b.id)) {
-            return { ...b, status: 'sold' as const, exitPrice: constituents.find(c => c.id === b.id) ? Math.round(totalExitPrice / constituents.length) : 0, exitRound: state.round, integratedPlatformId: undefined };
+            return { ...b, status: 'sold' as const, exitPrice: constituents.find(c => c.id === b.id) ? Math.round(totalExitPrice / constituents.length) : 0, exitRound: state.round, integratedPlatformId: undefined, earnoutRemaining: 0 };
           }
           // Clear integratedPlatformId from any remaining references
           if (b.integratedPlatformId === platformId) return { ...b, integratedPlatformId: undefined };
@@ -2907,7 +3179,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v23', // v23: rollover equity deal structure
+      name: 'holdco-tycoon-save-v24', // v24: choice-based events (key-man, earn-out dispute, supplier shift, consolidation boom)
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -2965,6 +3237,7 @@ export const useGameStore = create<GameStore>()(
         founderDistributionsReceived: state.founderDistributionsReceived,
         metrics: state.metrics,
         focusBonus: state.focusBonus,
+        consolidationBoomSectorId: state.consolidationBoomSectorId,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.holdcoName) {

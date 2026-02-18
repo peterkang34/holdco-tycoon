@@ -170,6 +170,33 @@ export const PORTFOLIO_EVENTS: EventDefinition[] = [
     tip: 'The best PE firms know that management buyouts preserve relationships and reputation. If the price is fair and you can redeploy capital better elsewhere, consider it.',
     tipSource: 'Ch. IV',
   },
+  {
+    type: 'portfolio_key_man_risk',
+    title: 'Key-Man Risk Emerges',
+    description: 'A critical operator at one of your best businesses is threatening to leave. The business depends heavily on their relationships and expertise.',
+    probability: 0.05,
+    effectDescription: 'Quality drops -1 immediately. Choose how to respond: golden handcuffs, succession plan, or accept the hit.',
+    tip: 'KKR always builds bench depth at portfolio companies. Never let a single person be irreplaceable.',
+    tipSource: 'Ch. VIII',
+  },
+  {
+    type: 'portfolio_earnout_dispute',
+    title: 'Earn-Out Dispute',
+    description: 'A former seller disputes the earn-out calculation, claiming the revenue decline was caused by your operational changes.',
+    probability: 0,  // eligibility-gated in generateEvent
+    effectDescription: 'Settle (pay 50%), fight in court, or renegotiate the earn-out terms.',
+    tip: 'Earn-out disputes are common in PE. Clean documentation and fair dealing prevent most conflicts.',
+    tipSource: 'Ch. V',
+  },
+  {
+    type: 'portfolio_supplier_shift',
+    title: 'Supplier Pricing Power Shift',
+    description: 'A key supplier has consolidated and is now demanding significantly higher prices, compressing margins at one of your businesses.',
+    probability: 0.05,
+    effectDescription: 'Margin drops -3ppt immediately. Choose: absorb costs, switch suppliers, or vertically integrate.',
+    tip: 'Danaher vertically integrates to control supplier relationships. Own your supply chain when possible.',
+    tipSource: 'Ch. III',
+  },
 ];
 
 export interface SectorEventDefinition extends EventDefinition {

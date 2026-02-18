@@ -100,7 +100,7 @@ function DataTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
           {rows.map((row, ri) => (
             <tr key={ri} className={ri % 2 === 0 ? 'bg-white/[0.02]' : ''}>
               {row.map((cell, ci) => (
-                <td key={ci} className="py-1.5 px-2 border-b border-white/5 whitespace-nowrap">
+                <td key={ci} className={`py-1.5 px-2 border-b border-white/5 ${ci === 0 ? 'whitespace-nowrap' : ''}`}>
                   {cell}
                 </td>
               ))}
@@ -867,6 +867,22 @@ function EventsContent() {
           ['Management Buyout', 'CEO offers 85-90% of fair value; accept to sell, decline risks CEO departure (quality -1)'],
           ['Equity Demand', 'A key employee demands equity; grant or risk losing them'],
           ['Seller Note Renegotiation', 'A seller asks to renegotiate their note terms'],
+        ]}
+      />
+
+      <SubHeading>Choice-Based Events</SubHeading>
+      <P>
+        Some events present you with a strategic choice. Each option has different costs,
+        risks, and outcomes — there&apos;s no universally &quot;right&quot; answer.
+      </P>
+
+      <DataTable
+        headers={['Event', 'Trigger', 'Choices']}
+        rows={[
+          ['Key-Man Risk', 'Quality 4+ business, no active turnaround', 'Golden Handcuffs (15% EBITDA, 55% restore chance) · Succession Plan ($200-400K, restores quality after 2 years) · Accept Hit (free, quality stays dropped)'],
+          ['Earn-Out Dispute', 'Business with earn-out that has underperformed', 'Settle (pay 50%, obligation cleared) · Fight (70% win, 30% pay full + legal) · Renegotiate (reduce to 55%, no cash cost)'],
+          ['Supplier Pricing Power Shift', 'Below-median-margin business', 'Absorb (recover 2 of 3ppt) · Switch Suppliers (full recovery, -5% revenue) · Vertical Integration (full +1ppt bonus, requires 2+ same-sector businesses)'],
+          ['Consolidation Boom', '3% random, targets specific sector', 'No choice — all deals in the booming sector cost 20% more. Own 2+ businesses in that sector? You get an exclusive tuck-in at normal price.'],
         ]}
       />
     </>

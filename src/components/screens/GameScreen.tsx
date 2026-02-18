@@ -105,6 +105,15 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
     declineEquityDemand,
     acceptSellerNoteRenego,
     declineSellerNoteRenego,
+    keyManGoldenHandcuffs,
+    keyManSuccessionPlan,
+    keyManAcceptHit,
+    earnoutSettle,
+    earnoutFight,
+    earnoutRenegotiate,
+    supplierAbsorb,
+    supplierSwitch,
+    supplierVerticalIntegration,
     maFocus,
     setMAFocus,
     maSourcing,
@@ -145,6 +154,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
   const addToast = useToastStore((s) => s.addToast);
 
   const handleEventChoice = (action: string) => {
+    // Locked choices are no-ops
+    if (action.endsWith('Locked')) return;
+
     switch (action) {
       case 'acceptOffer': acceptOffer(); break;
       case 'declineOffer': declineOffer(); break;
@@ -154,8 +166,23 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false }: Ga
       case 'declineEquityDemand': declineEquityDemand(); break;
       case 'acceptSellerNoteRenego': acceptSellerNoteRenego(); break;
       case 'declineSellerNoteRenego': declineSellerNoteRenego(); break;
+      case 'keyManGoldenHandcuffs': keyManGoldenHandcuffs(); break;
+      case 'keyManSuccessionPlan': keyManSuccessionPlan(); break;
+      case 'keyManAcceptHit': keyManAcceptHit(); break;
+      case 'earnoutSettle': earnoutSettle(); break;
+      case 'earnoutFight': earnoutFight(); break;
+      case 'earnoutRenegotiate': earnoutRenegotiate(); break;
+      case 'supplierAbsorb': supplierAbsorb(); break;
+      case 'supplierSwitch': supplierSwitch(); break;
+      case 'supplierVerticalIntegration': supplierVerticalIntegration(); break;
     }
-    advanceToAllocate();
+    // Only advance if the action succeeded (cleared currentEvent)
+    // If it failed (e.g., insufficient cash), event stays on screen
+    if (!useGameStore.getState().currentEvent) {
+      advanceToAllocate();
+    } else {
+      addToast({ message: 'Insufficient cash for that choice', type: 'warning' });
+    }
   };
 
   // Toast-wrapped action handlers

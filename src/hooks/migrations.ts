@@ -472,6 +472,29 @@ export function migrateV22ToV23(): void {
   }
 }
 
+// --- v23 → v24: new choice-based events (key-man, earn-out dispute, supplier shift, consolidation boom) ---
+
+export function migrateV23ToV24(): void {
+  try {
+    const v24Key = 'holdco-tycoon-save-v24';
+    const v23Key = 'holdco-tycoon-save-v23';
+    if (localStorage.getItem(v24Key)) return;
+    const v23Raw = localStorage.getItem(v23Key);
+    if (!v23Raw) return;
+    const v23Data = JSON.parse(v23Raw);
+    if (!v23Data?.state) return;
+
+    // New optional fields default to undefined — no backfill needed
+    // successionPlanRound, supplierSwitchRound on businesses
+    // consolidationBoomSectorId on state
+
+    localStorage.setItem(v24Key, JSON.stringify(v23Data));
+    localStorage.removeItem(v23Key);
+  } catch (e) {
+    console.error('v23→v24 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -491,4 +514,5 @@ export function runAllMigrations(): void {
   migrateV20ToV21();
   migrateV21ToV22();
   migrateV22ToV23();
+  migrateV23ToV24();
 }

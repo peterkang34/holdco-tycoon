@@ -44,6 +44,14 @@ export function EventCard({ event, businesses, currentRound, lastEventType, onCh
         return '👤';
       case 'portfolio_seller_note_renego':
         return '📝';
+      case 'portfolio_key_man_risk':
+        return '🔑';
+      case 'portfolio_earnout_dispute':
+        return '⚖️';
+      case 'portfolio_supplier_shift':
+        return '🏭';
+      case 'sector_consolidation_boom':
+        return '🔥';
       case 'unsolicited_offer':
         return '💰';
       case 'sector_event':
@@ -59,6 +67,7 @@ export function EventCard({ event, businesses, currentRound, lastEventType, onCh
     event.type === 'portfolio_client_signs' ||
     event.type === 'portfolio_breakthrough' ||
     event.type === 'portfolio_referral_deal' ||
+    event.type === 'sector_consolidation_boom' ||
     (event.type === 'sector_event' && !event.effect.includes('-'));
 
   const isNegative = event.type === 'global_recession' ||
@@ -68,6 +77,8 @@ export function EventCard({ event, businesses, currentRound, lastEventType, onCh
     event.type === 'portfolio_talent_leaves' ||
     event.type === 'portfolio_client_churns' ||
     event.type === 'portfolio_compliance' ||
+    event.type === 'portfolio_key_man_risk' ||
+    event.type === 'portfolio_supplier_shift' ||
     (event.type === 'sector_event' && event.effect.includes('-'));
 
   const borderColor = event.type === 'global_quiet' ? 'border-white/20' :
@@ -245,21 +256,28 @@ export function EventCard({ event, businesses, currentRound, lastEventType, onCh
 
       {/* Generalized choice buttons */}
       {event.choices && event.choices.length > 0 && onChoice ? (
-        <div className="flex gap-3">
-          {event.choices.map((choice, idx) => (
-            <button
-              key={idx}
-              onClick={() => onChoice(choice.action)}
-              className={`flex-1 ${
-                choice.variant === 'positive' ? 'btn-primary' :
-                choice.variant === 'negative' ? 'btn-secondary' :
-                'btn-secondary'
-              }`}
-              title={choice.description}
-            >
-              {choice.label}
-            </button>
-          ))}
+        <div className={`${event.choices.length >= 3 ? 'flex flex-col' : 'flex'} gap-3`}>
+          {event.choices.map((choice, idx) => {
+            const isLocked = choice.action.endsWith('Locked');
+            return (
+              <button
+                key={idx}
+                onClick={() => !isLocked && onChoice(choice.action)}
+                disabled={isLocked}
+                className={`flex-1 text-left ${
+                  isLocked ? 'btn-secondary opacity-40 cursor-not-allowed' :
+                  choice.variant === 'positive' ? 'btn-primary' :
+                  choice.variant === 'negative' ? 'btn-secondary' :
+                  'btn-secondary'
+                }`}
+              >
+                <span className="font-medium">{choice.label}</span>
+                {choice.description && (
+                  <span className="block text-xs mt-1 opacity-70">{choice.description}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       ) : (
         onContinue && (

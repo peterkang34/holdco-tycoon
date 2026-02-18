@@ -12,6 +12,28 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 17, 2025',
+    title: '4 New Choice-Based Events',
+    sections: [
+      {
+        heading: 'New Events',
+        items: [
+          'Key-Man Risk — your star operator gets poached. Pay golden handcuffs (15% EBITDA, 55% chance they stay), invest in a succession plan (quality restores after 2 years), or accept the quality hit.',
+          'Earn-Out Dispute — when a business underperforms its earn-out targets, the seller comes knocking. Settle at 50%, fight in court (70% win chance), or renegotiate to 55%.',
+          'Supplier Pricing Power Shift — a key supplier raises prices, compressing margins by 3ppt. Absorb the hit (recover 2ppt), switch suppliers (full recovery but -5% revenue), or vertically integrate (+1ppt bonus, requires 2+ same-sector businesses).',
+          'Industry Consolidation Boom — a sector heats up with +20% deal price premiums. If you own 2+ businesses in the booming sector, you get access to an exclusive tuck-in deal at normal pricing.',
+        ],
+      },
+      {
+        heading: 'Fixes',
+        items: [
+          'Fixed bolt-on bank debt not being deducted from sale proceeds — selling platforms with leveraged bolt-ons now correctly accounts for all outstanding debt.',
+          'Sold businesses now properly zero out earn-out obligations.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 17, 2025',
     title: 'Dashboard Stats Fix',
     sections: [
       {

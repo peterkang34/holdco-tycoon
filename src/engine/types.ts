@@ -144,6 +144,10 @@ export interface Business {
   qualityImprovedTiers?: number; // tracks total quality improvement for exit premium
   rolloverEquityPct: number; // 0-1 — seller's retained equity share (0 = no rollover)
 
+  // Event-driven tracking
+  successionPlanRound?: number;   // Key-Man succession plan countdown start
+  earnoutDisputeRound?: number;   // Cooldown: last earn-out dispute round
+
   // Dynamic narratives
   storyBeats?: StoryBeat[]; // Narrative events that happened to this business
 }
@@ -327,13 +331,18 @@ export type EventType =
   | 'portfolio_seller_note_renego'
   | 'mbo_proposal'
   | 'unsolicited_offer'
-  | 'sector_event';
+  | 'sector_event'
+  | 'portfolio_key_man_risk'
+  | 'portfolio_earnout_dispute'
+  | 'portfolio_supplier_shift'
+  | 'sector_consolidation_boom';
 
 export interface EventChoice {
   label: string;
   description: string;
   action: string;
   variant: 'positive' | 'negative' | 'neutral';
+  cost?: number; // pre-computed cost in $K for store actions to consume (avoids parsing from label)
 }
 
 // Tracks the actual impact of an event for display
@@ -362,6 +371,7 @@ export interface GameEvent {
   narrative?: string; // AI-generated narrative context
   buyerProfile?: BuyerProfile; // buyer profile for unsolicited offers
   choices?: EventChoice[]; // player choices (e.g., accept/decline for offers, equity demands, etc.)
+  consolidationSectorId?: SectorId; // which sector the boom targets
 }
 
 export interface Metrics {
@@ -489,6 +499,9 @@ export interface GameState {
 
   // Exit multiple penalty (Financial Crisis)
   exitMultiplePenalty: number;
+
+  // Consolidation boom — set by event, consumed by deal generation
+  consolidationBoomSectorId?: SectorId;
 
   // Deal heat / acquisition limits
   acquisitionsThisRound: number;

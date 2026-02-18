@@ -93,6 +93,42 @@ export const QUALITY_IMPROVEMENT_TIER_BONUS: Record<1 | 2 | 3, number> = {
   3: 0.25, // total 55%
 };
 
+// ── New Event Constants ──
+
+// Key-Man Risk
+export const KEY_MAN_RISK_PROB = 0.05;
+export const KEY_MAN_QUALITY_DROP = 1;                 // quality tiers lost immediately
+export const KEY_MAN_GOLDEN_HANDCUFFS_COST_PCT = 0.15; // % of EBITDA
+export const KEY_MAN_GOLDEN_HANDCUFFS_RESTORE_CHANCE = 0.55;
+export const KEY_MAN_SUCCESSION_COST_MIN = 200;        // $K
+export const KEY_MAN_SUCCESSION_COST_MAX = 400;        // $K
+export const KEY_MAN_SUCCESSION_ROUNDS = 2;            // rounds until quality restores
+
+// Earn-Out Dispute
+export const EARNOUT_DISPUTE_PROB = 0;                 // eligibility-gated in generateEvent
+export const EARNOUT_SETTLE_PCT = 0.50;                // pay 50% of remaining
+export const EARNOUT_FIGHT_LEGAL_COST_MIN = 100;       // $K
+export const EARNOUT_FIGHT_LEGAL_COST_MAX = 200;       // $K
+export const EARNOUT_FIGHT_WIN_CHANCE = 0.70;
+export const EARNOUT_RENEGOTIATE_PCT = 0.55;           // reduce to 55% of remaining (zero cash cost)
+
+// Supplier Pricing Power Shift
+export const SUPPLIER_SHIFT_PROB = 0.05;
+export const SUPPLIER_SHIFT_MARGIN_HIT = 0.03;         // 3ppt margin loss immediately
+export const SUPPLIER_ABSORB_RECOVERY_PPT = 0.02;      // recover 2ppt of the 3ppt
+export const SUPPLIER_SWITCH_COST_MIN = 150;            // $K
+export const SUPPLIER_SWITCH_COST_MAX = 300;            // $K
+export const SUPPLIER_SWITCH_REVENUE_PENALTY = 0.05;    // -5% revenue this round
+export const SUPPLIER_VERTICAL_COST = 400;              // $K
+export const SUPPLIER_VERTICAL_BONUS_PPT = 0.01;        // +1ppt bonus above full recovery
+export const SUPPLIER_VERTICAL_MIN_SAME_SECTOR = 2;     // need 2+ same-sector businesses
+
+// Industry Consolidation Boom
+export const CONSOLIDATION_BOOM_PROB = 0.03;
+export const CONSOLIDATION_BOOM_PRICE_PREMIUM = 0.20;       // +20% price premium on deals
+export const CONSOLIDATION_BOOM_EXCLUSIVE_MIN_OPCOS = 2;     // need 2+ in sector for exclusive tuck-in
+export const CONSOLIDATION_BOOM_SECTORS = ['environmental', 'homeServices', 'autoServices', 'industrial'] as const;
+
 // Type helpers for consumers
 export type DifficultyConfig = typeof DIFFICULTY_CONFIG;
 export type DurationConfig = typeof DURATION_CONFIG;
