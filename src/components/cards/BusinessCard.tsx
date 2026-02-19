@@ -4,6 +4,7 @@ import { getProgramById } from '../../data/turnaroundPrograms';
 import { SECTORS } from '../../data/sectors';
 import { calculateExitValuation } from '../../engine/simulation';
 import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
+import { debtCountdownLabel, earnoutTargetLabel, earnoutCountdownLabel } from '../../data/mechanicsCopy';
 import { Tooltip } from '../ui/Tooltip';
 
 interface BusinessCardProps {
@@ -280,13 +281,13 @@ export function BusinessCard({
               {business.sellerNoteBalance > 0 && (
                 <p className="text-text-secondary">
                   Seller Note: {formatMoney(business.sellerNoteBalance)}
-                  <span className="text-text-muted"> ({business.sellerNoteRoundsRemaining}y auto-pay)</span>
+                  <span className="text-text-muted"> ({debtCountdownLabel(business.sellerNoteRoundsRemaining)})</span>
                 </p>
               )}
               {business.bankDebtBalance > 0 && (
                 <p className="text-text-secondary">
                   Bank Debt: {formatMoney(business.bankDebtBalance)}
-                  <span className="text-text-muted"> (paid on exit)</span>
+                  <span className="text-text-muted"> ({debtCountdownLabel(business.bankDebtRoundsRemaining)})</span>
                 </p>
               )}
               {business.earnoutRemaining > 0 && (() => {
@@ -294,10 +295,10 @@ export function BusinessCard({
                 return (
                   <p className="text-text-secondary">
                     Earn-out: {formatMoney(business.earnoutRemaining)}
-                    <span className="text-text-muted"> (if {Math.round(business.earnoutTarget * 100)}%+ growth)</span>
+                    <span className="text-text-muted"> ({earnoutTargetLabel(business.earnoutTarget)})</span>
                     {yearsLeft > 0 && (
                       <span className={`ml-1 ${yearsLeft <= 1 ? 'text-warning' : 'text-text-muted'}`}>
-                        ({yearsLeft}yr left)
+                        ({earnoutCountdownLabel(yearsLeft)})
                       </span>
                     )}
                   </p>

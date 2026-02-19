@@ -5,6 +5,7 @@ import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLe
 import { calculateExitValuation } from '../../engine/simulation';
 import { AIAnalysisSection } from '../ui/AIAnalysisSection';
 import { DIFFICULTY_CONFIG, RESTRUCTURING_FEV_PENALTY } from '../../data/gameConfig';
+import { EV_WATERFALL_LABELS } from '../../data/mechanicsCopy';
 import { getGradeColor, getRankColor } from '../../utils/gradeColors';
 import { TABS, filterAndSort, getDisplayValue } from '../ui/LeaderboardModal';
 import type { LeaderboardTab } from '../ui/LeaderboardModal';
@@ -432,13 +433,13 @@ export function GameOverScreen({
               </div>
               {totalDebt > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-text-muted">- Holdco Bank Debt</span>
+                  <span className="text-text-muted">- {EV_WATERFALL_LABELS.bankDebt}</span>
                   <span className="font-mono text-danger">({formatMoney(totalDebt)})</span>
                 </div>
               )}
               {opcoDebt > 0 && (
                 <div className="flex justify-between text-sm">
-                  <span className="text-text-muted">- Opco Seller Notes</span>
+                  <span className="text-text-muted">- {EV_WATERFALL_LABELS.sellerNotes}</span>
                   <span className="font-mono text-danger">({formatMoney(opcoDebt)})</span>
                 </div>
               )}

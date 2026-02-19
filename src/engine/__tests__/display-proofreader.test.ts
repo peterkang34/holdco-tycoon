@@ -43,6 +43,14 @@ import {
   ROLLOVER_MIN_MA_TIER,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
+import {
+  DEBT_LABELS,
+  DEBT_EXPLAINER,
+  debtCountdownLabel,
+  earnoutTargetLabel,
+  earnoutCountdownLabel,
+  BANNED_COPY_PATTERNS,
+} from '../../data/mechanicsCopy';
 
 // ── File reading helper ──
 const __filename = fileURLToPath(import.meta.url);
@@ -1073,9 +1081,9 @@ describe('Display Proofreader', () => {
       expect(manual).toContain('paid down voluntarily');
     });
 
-    it('AllocatePhase debt explanation mentions voluntary bank debt paydown', () => {
+    it('AllocatePhase debt explanation uses centralized DEBT_EXPLAINER', () => {
       const allocatePhase = readComponent('components/phases/AllocatePhase.tsx');
-      expect(allocatePhase).toContain('paid down voluntarily');
+      expect(allocatePhase).toContain('DEBT_EXPLAINER');
     });
   });
 
@@ -1162,7 +1170,7 @@ describe('Display Proofreader', () => {
     it('BusinessCard.tsx shows earn-out countdown (Strategy B)', () => {
       const card = readComponent('components/cards/BusinessCard.tsx');
       expect(card).toContain('EARNOUT_EXPIRATION_YEARS');
-      expect(card).toContain('yr left');
+      expect(card).toContain('earnoutCountdownLabel');
     });
 
     it('AllocatePhase.tsx shows 4yr window in deal review (Strategy B)', () => {
@@ -1297,6 +1305,142 @@ describe('Display Proofreader', () => {
     it('Strategy B: deals.ts contains rollover_equity', () => {
       const deals = readComponent('engine/deals.ts');
       expect(deals).toContain('rollover_equity');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // STRATEGY D: BEHAVIORAL CLAIM SCANNER
+  // Scans component files for banned patterns and verifies centralized copy
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Strategy D: Behavioral Claim Scanner', () => {
+    const COMPONENT_FILES = [
+      'components/cards/BusinessCard.tsx',
+      'components/phases/AllocatePhase.tsx',
+      'components/phases/CollectPhase.tsx',
+      'components/screens/GameOverScreen.tsx',
+      'components/ui/MetricDrilldownModal.tsx',
+      'components/ui/UserManualModal.tsx',
+      'components/cards/DealCard.tsx',
+      'components/phases/RestructurePhase.tsx',
+      'components/modals/TurnaroundModal.tsx',
+      'components/modals/ImprovementModal.tsx',
+      'components/ui/RollUpGuideModal.tsx',
+      'components/dashboard/Dashboard.tsx',
+      'components/ui/InstructionsModal.tsx',
+    ];
+
+    function scanComponentFiles(pattern: RegExp, excludeFiles: readonly string[] = []): string[] {
+      const matches: string[] = [];
+      for (const file of COMPONENT_FILES) {
+        const basename = file.split('/').pop()!;
+        if (excludeFiles.includes(basename)) continue;
+        const content = readComponent(file);
+        if (pattern.test(content)) {
+          matches.push(file);
+        }
+      }
+      return matches;
+    }
+
+    // ── A. Banned Pattern Tests ──
+
+    describe('Banned patterns', () => {
+      for (const { pattern, reason, allow } of BANNED_COPY_PATTERNS) {
+        it(`Strategy D: no component contains ${pattern.source}`, () => {
+          const matches = scanComponentFiles(pattern, allow);
+          expect(matches, `Found "${pattern.source}" — ${reason}`).toEqual([]);
+        });
+      }
+    });
+
+    // ── B. Absence-of-Old-Pattern Tests ──
+
+    describe('Old hardcoded patterns removed', () => {
+      it('Strategy D: BusinessCard no longer contains "y auto-pay)"', () => {
+        const content = readComponent('components/cards/BusinessCard.tsx');
+        expect(content).not.toMatch(/\dy auto-pay\)/);
+      });
+
+      it('Strategy D: BusinessCard no longer contains "y amort)"', () => {
+        const content = readComponent('components/cards/BusinessCard.tsx');
+        expect(content).not.toMatch(/\dy amort\)/);
+      });
+
+      it('Strategy D: BusinessCard uses debtCountdownLabel for debt years', () => {
+        const content = readComponent('components/cards/BusinessCard.tsx');
+        expect(content).toContain('debtCountdownLabel');
+      });
+
+      it('Strategy D: AllocatePhase no longer contains "10%/yr"', () => {
+        const content = readComponent('components/phases/AllocatePhase.tsx');
+        expect(content).not.toMatch(/10%\/yr/);
+      });
+
+      it('Strategy D: AllocatePhase no longer contains hardcoded debt explainer', () => {
+        const content = readComponent('components/phases/AllocatePhase.tsx');
+        expect(content).not.toContain('10% of the balance amortizes');
+      });
+
+      it('Strategy D: CollectPhase no longer contains "yr rem)"', () => {
+        const content = readComponent('components/phases/CollectPhase.tsx');
+        expect(content).not.toMatch(/yr rem\)/);
+      });
+
+      it('Strategy D: GameOverScreen uses EV_WATERFALL_LABELS for waterfall', () => {
+        const content = readComponent('components/screens/GameOverScreen.tsx');
+        expect(content).toContain('EV_WATERFALL_LABELS');
+      });
+
+      it('Strategy D: UserManualModal debt table has 4 rows (holdco + seller + bank + earnout)', () => {
+        const content = readComponent('components/ui/UserManualModal.tsx');
+        expect(content).toContain('Holdco Loan');
+        expect(content).toContain('Seller Notes');
+        expect(content).toContain('Bank Debt');
+        expect(content).toContain('Earn-outs');
+      });
+    });
+
+    // ── C. Registry Consistency Tests ──
+
+    describe('Registry consistency', () => {
+      it('Strategy D: DEBT_LABELS has all 3 debt types with required fields', () => {
+        for (const key of ['holdco', 'sellerNote', 'bankDebt'] as const) {
+          expect(DEBT_LABELS[key]).toHaveProperty('name');
+          expect(DEBT_LABELS[key]).toHaveProperty('behavior');
+          expect(DEBT_LABELS[key]).toHaveProperty('summaryShort');
+        }
+      });
+
+      it('Strategy D: DEBT_EXPLAINER mentions holdco, seller notes, and bank debt', () => {
+        expect(DEBT_EXPLAINER.toLowerCase()).toContain('holdco');
+        expect(DEBT_EXPLAINER.toLowerCase()).toContain('seller note');
+        expect(DEBT_EXPLAINER.toLowerCase()).toContain('bank debt');
+      });
+
+      it('Strategy D: debtCountdownLabel(5) returns "5yr left"', () => {
+        expect(debtCountdownLabel(5)).toBe('5yr left');
+      });
+
+      it('Strategy D: earnoutTargetLabel(0.10) returns "if 10%+ growth"', () => {
+        expect(earnoutTargetLabel(0.10)).toBe('if 10%+ growth');
+      });
+    });
+
+    // ── D. Edge-Input Tests for Label Functions ──
+
+    describe('Label function edge inputs', () => {
+      it('Strategy D: debtCountdownLabel(0) returns "0yr left"', () => {
+        expect(debtCountdownLabel(0)).toBe('0yr left');
+      });
+
+      it('Strategy D: debtCountdownLabel(1) returns "1yr left"', () => {
+        expect(debtCountdownLabel(1)).toBe('1yr left');
+      });
+
+      it('Strategy D: earnoutCountdownLabel(0) returns "0yr left"', () => {
+        expect(earnoutCountdownLabel(0)).toBe('0yr left');
+      });
     });
   });
 });

@@ -3,6 +3,7 @@ import { Business, formatMoney, formatPercent } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { calculatePortfolioTax, TAX_RATE } from '../../engine/simulation';
 import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
+import { debtCountdownLabel } from '../../data/mechanicsCopy';
 
 interface CollectPhaseProps {
   businesses: Business[];
@@ -453,7 +454,7 @@ export function CollectPhase({
                             <tr className="text-danger">
                               <td className="py-1">(-) Seller Note Principal</td>
                               <td className="py-1 text-right font-mono">-{formatMoney(breakdown.sellerNotePrincipal)}</td>
-                              <td className="py-1 text-right text-text-muted text-xs">{business.sellerNoteRoundsRemaining}y left</td>
+                              <td className="py-1 text-right text-text-muted text-xs">{debtCountdownLabel(business.sellerNoteRoundsRemaining)}</td>
                             </tr>
                           </>
                         )}
@@ -467,7 +468,7 @@ export function CollectPhase({
                             <tr className="text-danger">
                               <td className="py-1">(-) Bank Debt Principal</td>
                               <td className="py-1 text-right font-mono">-{formatMoney(breakdown.bankDebtPrincipal)}</td>
-                              <td className="py-1 text-right text-text-muted text-xs">{business.bankDebtRoundsRemaining}y left</td>
+                              <td className="py-1 text-right text-text-muted text-xs">{debtCountdownLabel(business.bankDebtRoundsRemaining)}</td>
                             </tr>
                           </>
                         )}
@@ -524,7 +525,7 @@ export function CollectPhase({
                   {(interestPenalty ?? 0) > 0 && (
                     <span className="text-red-400"> + {formatPercent(interestPenalty!)} penalty</span>
                   )}
-                  , {holdcoLoanRoundsRemaining}yr rem)
+                  , {debtCountdownLabel(holdcoLoanRoundsRemaining)})
                 </span>
               </div>
               <span className="font-mono text-danger">-{formatMoney(holdcoInterest)}</span>

@@ -417,8 +417,9 @@ function FinancialContent() {
       <DataTable
         headers={['Type', 'Level', 'Rate', 'Notes']}
         rows={[
-          ['Seller Notes', 'Deal-level', '5-6%', 'Amortizes over 4-5 years; tied to individual acquisition'],
-          ['Bank Debt', 'Per-business', '7% base', 'Amortizes over 5-10 years; can be paid down voluntarily in the Allocate phase; affected by events and distress penalties'],
+          ['Holdco Loan', 'Portfolio-level', '7% base', 'Grace period then auto-pays (balance ÷ remaining years) each year; can be paid down in the Capital tab'],
+          ['Seller Notes', 'Deal-level', '5-6%', 'Auto-pays each year (interest + principal); tied to individual acquisition'],
+          ['Bank Debt', 'Per-business', '7% base', 'Auto-pays each year; can be paid down voluntarily in the Allocate phase; affected by events and distress penalties'],
           ['Earn-outs', 'Deal-level', 'N/A', 'Contingent payments based on EBITDA growth targets; expire after 4 years if not triggered'],
         ]}
       />

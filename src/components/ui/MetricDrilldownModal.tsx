@@ -11,6 +11,7 @@ import { getDistressLabel, getDistressDescription, calculateCovenantHeadroom, ge
 import { getMASourcingAnnualCost } from '../../data/sharedServices';
 import { getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
 import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
+import { debtCountdownLabel } from '../../data/mechanicsCopy';
 
 interface MetricDrilldownModalProps {
   metricKey: string;
@@ -714,7 +715,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
           {state.holdcoLoanBalance > 0 && (
             <div className="flex justify-between py-1.5 text-sm">
               <span className="text-text-secondary">Holdco Loan</span>
-              <span className="font-mono">{formatMoney(state.holdcoLoanBalance)} @ {(state.holdcoLoanRate * 100).toFixed(1)}% ({state.holdcoLoanRoundsRemaining}yr left)</span>
+              <span className="font-mono">{formatMoney(state.holdcoLoanBalance)} @ {(state.holdcoLoanRate * 100).toFixed(1)}% ({debtCountdownLabel(state.holdcoLoanRoundsRemaining)})</span>
             </div>
           )}
           {opcoBankDebt > 0 && (
@@ -727,7 +728,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
             <div key={b.id} className="flex justify-between py-1.5 text-sm">
               <span className="text-text-secondary pl-2">{b.name} seller note</span>
               <span className="font-mono text-xs">
-                {formatMoney(b.sellerNoteBalance)} @ {(b.sellerNoteRate * 100).toFixed(1)}% ({b.sellerNoteRoundsRemaining}yr left)
+                {formatMoney(b.sellerNoteBalance)} @ {(b.sellerNoteRate * 100).toFixed(1)}% ({debtCountdownLabel(b.sellerNoteRoundsRemaining)})
               </span>
             </div>
           ))}

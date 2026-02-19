@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 19, 2025',
+    title: 'Debt Description Accuracy',
+    sections: [
+      {
+        heading: 'Copy Fix',
+        items: [
+          'Fixed holdco debt description — was incorrectly showing "10%/yr" when it actually splits the remaining balance evenly over remaining years.',
+          'Unified all debt countdown labels to "Xyr left" across every screen (Capital tab, cash flow waterfall, drilldown, game over).',
+          'Added Holdco Loan row to the manual\'s debt table — it was previously missing.',
+          'Game over waterfall now says "Bank Debt (Holdco + Opco)" to clarify what\'s included.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 19, 2025',
     title: 'Equity Raise Clarity',
     sections: [
       {

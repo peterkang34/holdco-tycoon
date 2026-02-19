@@ -40,6 +40,7 @@ import { PLATFORM_SALE_BONUS } from '../../data/gameConfig';
 import { getEligiblePrograms, canUnlockTier } from '../../engine/turnarounds';
 import { TURNAROUND_TIER_CONFIG, getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
 import { TURNAROUND_FATIGUE_THRESHOLD } from '../../data/gameConfig';
+import { DEBT_LABELS, DEBT_EXPLAINER } from '../../data/mechanicsCopy';
 
 const STARTING_SHARES = 1000;
 
@@ -1735,17 +1736,17 @@ export function AllocatePhase({
                     <div>
                       <p className="text-text-muted">Holdco Debt</p>
                       <p className="font-mono font-bold text-lg">{formatMoney(holdcoLoanBalance)}</p>
-                      <p className="text-xs text-text-muted">Auto-amortizes (10%/yr) + manual</p>
+                      <p className="text-xs text-text-muted">{DEBT_LABELS.holdco.behavior}</p>
                     </div>
                     <div>
                       <p className="text-text-muted">Opco Seller Notes</p>
                       <p className="font-mono font-bold text-lg">{formatMoney(opcoSellerNotes)}</p>
-                      <p className="text-xs text-text-muted">Auto-amortizing</p>
+                      <p className="text-xs text-text-muted">{DEBT_LABELS.sellerNote.summaryShort}</p>
                     </div>
                     <div>
                       <p className="text-text-muted">Opco Bank Debt</p>
                       <p className="font-mono font-bold text-lg">{formatMoney(opcoBankDebt)}</p>
-                      <p className="text-xs text-text-muted">Paid on sale</p>
+                      <p className="text-xs text-text-muted">{DEBT_LABELS.bankDebt.summaryShort}</p>
                     </div>
                     <div>
                       <p className="text-text-muted">Total Debt</p>
@@ -1753,7 +1754,7 @@ export function AllocatePhase({
                     </div>
                   </div>
                   <div className="mt-4 p-3 bg-white/5 rounded text-xs text-text-muted">
-                    <strong>How debt works:</strong> Holdco debt has a 2-year grace period, then 10% of the balance amortizes automatically each year. You can also pay down extra here. Seller notes auto-amortize each year. Bank debt at the business level amortizes automatically and can also be paid down voluntarily below.
+                    <strong>How debt works:</strong> {DEBT_EXPLAINER}
                   </div>
                 </div>
               );
