@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 18, 2025',
+    title: 'Shared Services Description Accuracy',
+    sections: [
+      {
+        heading: 'UI Fix',
+        items: [
+          'Fixed shared service effect descriptions to accurately reflect what each service does mechanically. Finance, Recruiting, Procurement, and Technology all defend margins — this was happening in-game but not shown in descriptions.',
+          'Removed misleading "reinvestment efficiency" language from Technology & Systems — the actual effect is organic growth +0.5% and margin defense.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 18, 2025',
     title: 'Merge Staging & Multiple Transparency',
     sections: [
       {

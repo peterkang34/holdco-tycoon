@@ -211,7 +211,7 @@ describe('calculateSharedServicesBenefits', () => {
     expect(benefits.capexReduction).toBe(0);
     expect(benefits.cashConversionBonus).toBe(0);
     expect(benefits.growthBonus).toBe(0);
-    expect(benefits.reinvestmentBonus).toBe(0);
+    expect(benefits.marginDefense).toBe(0);
     expect(benefits.talentRetentionBonus).toBe(0);
     expect(benefits.talentGainBonus).toBe(0);
   });

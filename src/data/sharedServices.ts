@@ -8,7 +8,7 @@ export const SHARED_SERVICES_CONFIG: Record<SharedServiceType, Omit<SharedServic
     unlockCost: 660,
     annualCost: 295,
     description: 'Centralized financial reporting and controls',
-    effect: 'Cash conversion +5% across portfolio; better visibility into opco metrics',
+    effect: 'Cash conversion +5% across portfolio; margin erosion slowed ~0.1 ppt/yr',
   },
   recruiting_hr: {
     type: 'recruiting_hr',
@@ -16,7 +16,7 @@ export const SHARED_SERVICES_CONFIG: Record<SharedServiceType, Omit<SharedServic
     unlockCost: 885,
     annualCost: 378,
     description: 'Shared talent acquisition and retention programs',
-    effect: 'Talent loss events 50% less likely; talent gain events 30% more likely',
+    effect: 'Talent loss events 50% less likely; talent gain events 30% more likely; margin erosion slowed ~0.15 ppt/yr',
   },
   procurement: {
     type: 'procurement',
@@ -24,7 +24,7 @@ export const SHARED_SERVICES_CONFIG: Record<SharedServiceType, Omit<SharedServic
     unlockCost: 710,
     annualCost: 224,
     description: 'Centralized purchasing and vendor management',
-    effect: 'Capex rate reduced by 15% across portfolio (bulk purchasing power)',
+    effect: 'Capex rate reduced by 15% across portfolio; margin erosion slowed ~0.25 ppt/yr',
   },
   marketing_brand: {
     type: 'marketing_brand',
@@ -40,7 +40,7 @@ export const SHARED_SERVICES_CONFIG: Record<SharedServiceType, Omit<SharedServic
     unlockCost: 1060,
     annualCost: 450,
     description: 'Shared IT infrastructure and operational systems',
-    effect: 'Reinvestment efficiency +20% for all opcos; SaaS and B2B services get +30%',
+    effect: 'Organic growth +0.5% and margin erosion slowed by ~0.2 ppt/yr across portfolio',
   },
 };
 

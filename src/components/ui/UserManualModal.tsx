@@ -357,7 +357,7 @@ function OperationsContent() {
         <><strong>Margin drift:</strong> Varies by sector. Restaurants drift -0.8 to -1.5 ppt/year. SaaS drifts -0.3 to +0.2 ppt/year.</>,
         <><strong>Margin volatility:</strong> Random annual noise on top of drift</>,
         <><strong>Margin range:</strong> Clamped between 3% minimum and 80% maximum</>,
-        <><strong>Shared services:</strong> Procurement reduces CapEx by 15%. Marketing and Technology help defend margins.</>,
+        <><strong>Shared services:</strong> Procurement reduces CapEx by 15%. Procurement, Technology, Recruiting, and Finance all slow margin erosion.</>,
       ]} />
 
       <SubHeading>EBITDA Floor</SubHeading>
@@ -720,11 +720,11 @@ function SharedServicesContent() {
       <DataTable
         headers={['Service', 'Unlock Cost', 'Annual Cost', 'Key Effect']}
         rows={[
-          ['Finance & Reporting', '$660K', '$295K/yr', 'Cash conversion +5%; better visibility into opco metrics'],
-          ['Recruiting & HR', '$885K', '$378K/yr', 'Talent loss 50% less likely; talent gain 30% more likely'],
-          ['Procurement', '$710K', '$224K/yr', 'CapEx reduced by 15% across portfolio'],
+          ['Finance & Reporting', '$660K', '$295K/yr', 'Cash conversion +5%; margin erosion slowed ~0.1 ppt/yr'],
+          ['Recruiting & HR', '$885K', '$378K/yr', 'Talent loss 50% less likely; talent gain 30% more likely; margin erosion slowed ~0.15 ppt/yr'],
+          ['Procurement', '$710K', '$224K/yr', 'CapEx reduced by 15%; margin erosion slowed ~0.25 ppt/yr'],
           ['Marketing & Brand', '$800K', '$295K/yr', 'Growth rate +1.5% (+2.5% for agency/consumer)'],
-          ['Technology & Systems', '$1,060K', '$450K/yr', 'Reinvestment efficiency +20% (+30% for SaaS/B2B)'],
+          ['Technology & Systems', '$1,060K', '$450K/yr', 'Growth +0.5%, margin erosion slowed ~0.2 ppt/yr'],
         ]}
       />
 

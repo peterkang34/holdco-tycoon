@@ -85,7 +85,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/hooks/migrations.ts` — Save migration logic (current: v22)
 - `src/hooks/chronicleContext.ts` — AI chronicle context builder
 - `src/engine/helpers.ts` — Shared helpers (clampMargin, capGrowthRate, applyEbitdaFloor)
-- `src/engine/__tests__/display-proofreader.test.ts` — 146 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
+- `src/engine/__tests__/display-proofreader.test.ts` — 158 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
 - `src/data/gameConfig.ts` — Game constants and configuration
 - `src/components/screens/GameScreen.tsx` — Main game screen (phase routing, toast handlers)
 - `src/components/phases/CollectPhase.tsx` — Cash flow waterfall display
@@ -117,7 +117,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 6. **Secret Sauce Docs** — Update `_secret-sauce/` files if any game mechanics, formulas, events, recipes, scoring, or balance constants changed (these are gitignored, local-only design docs)
 
 ## Display Proofreader (MANDATORY)
-- **`display-proofreader.test.ts`** — 146 tests that validate UI copy matches engine constants
+- **`display-proofreader.test.ts`** — 158 tests that validate UI copy matches engine constants
 - **When changing ANY game mechanic**: ALWAYS update UserManualModal.tsx to reflect the change (user rule: manual must ALWAYS be updated automatically)
 - **When changing ANY engine constant** (rates, thresholds, formulas, scoring weights): update the proofreader test AND the UI copy (UserManualModal, CollectPhase, DealCard, etc.)
 - **When changing ANY UI copy** that references numbers/mechanics: update the proofreader test to assert the new value

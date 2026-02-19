@@ -360,7 +360,6 @@ export function calculateSharedServicesBenefits(state: GameState): {
   capexReduction: number;
   cashConversionBonus: number;
   growthBonus: number;
-  reinvestmentBonus: number;
   talentRetentionBonus: number;
   talentGainBonus: number;
   marginDefense: number; // ppt offset to margin drift from shared services
@@ -375,7 +374,6 @@ export function calculateSharedServicesBenefits(state: GameState): {
   let capexReduction = 0;
   let cashConversionBonus = 0;
   let growthBonus = 0;
-  let reinvestmentBonus = 0;
   let talentRetentionBonus = 0;
   let talentGainBonus = 0;
   let marginDefense = 0;
@@ -399,7 +397,6 @@ export function calculateSharedServicesBenefits(state: GameState): {
         growthBonus += 0.015 * scaleMultiplier;
         break;
       case 'technology_systems':
-        reinvestmentBonus += 0.2 * scaleMultiplier;
         growthBonus += 0.005 * scaleMultiplier; // +0.5% revenue growth
         marginDefense += 0.002 * scaleMultiplier; // +0.20 ppt/yr margin defense
         break;
@@ -410,7 +407,6 @@ export function calculateSharedServicesBenefits(state: GameState): {
     capexReduction,
     cashConversionBonus,
     growthBonus,
-    reinvestmentBonus,
     talentRetentionBonus,
     talentGainBonus,
     marginDefense,
