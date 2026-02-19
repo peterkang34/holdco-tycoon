@@ -71,7 +71,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
 - **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v25`
-- **Tests**: Vitest in `src/engine/__tests__/` — 865 tests across 16 suites (incl. display-proofreader)
+- **Tests**: Vitest in `src/engine/__tests__/` — 866 tests across 16 suites (incl. display-proofreader)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Rollover Equity**: 6th deal structure — seller reinvests ~25% (standard) or ~20% (quick) as equity; gated behind M&A Tier 2+, Q3+, non-distressed archetypes, noNewDebt; exit split applied AFTER debt payoff; FEV deducts rollover claims; note rate 5%
@@ -85,7 +85,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/hooks/migrations.ts` — Save migration logic (current: v22)
 - `src/hooks/chronicleContext.ts` — AI chronicle context builder
 - `src/engine/helpers.ts` — Shared helpers (clampMargin, capGrowthRate, applyEbitdaFloor)
-- `src/engine/__tests__/display-proofreader.test.ts` — 181 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
+- `src/engine/__tests__/display-proofreader.test.ts` — 182 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
 - `src/data/mechanicsCopy.ts` — Centralized registry for mechanic descriptions (debt labels, waterfall labels, countdown functions, banned patterns)
 - `src/data/gameConfig.ts` — Game constants and configuration
 - `src/components/screens/GameScreen.tsx` — Main game screen (phase routing, toast handlers)
@@ -119,7 +119,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 7. **Secret Sauce Docs** — Update `_secret-sauce/` files if any game mechanics, formulas, events, recipes, scoring, or balance constants changed (these are gitignored, local-only design docs)
 
 ## Display Proofreader (MANDATORY)
-- **`display-proofreader.test.ts`** — 181 tests that validate UI copy matches engine constants
+- **`display-proofreader.test.ts`** — 182 tests that validate UI copy matches engine constants
 - **When changing ANY game mechanic**: ALWAYS update UserManualModal.tsx to reflect the change (user rule: manual must ALWAYS be updated automatically)
 - **When changing ANY engine constant** (rates, thresholds, formulas, scoring weights): update the proofreader test AND the UI copy (UserManualModal, CollectPhase, DealCard, etc.)
 - **When changing ANY UI copy** that references numbers/mechanics: update the proofreader test to assert the new value

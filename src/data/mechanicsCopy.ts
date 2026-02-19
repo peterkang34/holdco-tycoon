@@ -32,8 +32,8 @@ export const EV_WATERFALL_LABELS = {
 } as const;
 
 export const DEBT_EXPLAINER =
-  'Holdco debt has a 2-year grace period, then the remaining balance is split evenly ' +
-  'over the remaining term each year. You can also pay down extra in the Capital tab. ' +
+  'Holdco debt auto-pays each year (remaining balance split evenly over the remaining term). ' +
+  'You can also pay down extra in the Capital tab. ' +
   'Seller notes auto-pay each year (interest + principal). Bank debt at the business ' +
   'level auto-pays each year and can also be paid down voluntarily.';
 
@@ -62,4 +62,5 @@ export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   { pattern: /interest.only/i, reason: 'Removed in v19. All debt amortizes.', allow: ['changelog.ts'] },
   { pattern: /balloon payment/i, reason: 'No balloon payments in the game.' },
   { pattern: /recurring.*bonus.*platform|platform.*recurring.*bonus/i, reason: 'Platform bonuses are ONE-TIME mutations at forge time.' },
+  { pattern: /grace period/i, reason: 'Grace period not implemented in engine. Holdco amortizes from round 1.' },
 ];
