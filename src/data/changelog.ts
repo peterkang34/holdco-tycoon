@@ -11,6 +11,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'February 19, 2025',
+    title: 'Integrated Platform Exit Valuation Fix',
+    sections: [
+      {
+        heading: 'Balance Fix',
+        items: [
+          'Fixed a bug where a star performer inside an integrated platform could sell for more individually than as part of a platform sale. The integrated platform premium (from forging) now stacks on top of the earned premium cap instead of competing with it — so forging a platform always adds its full multiple expansion benefit.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 18, 2025',
     title: 'Shared Services Description Accuracy',
     sections: [

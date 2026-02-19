@@ -966,11 +966,13 @@ describe('Display Proofreader', () => {
       expect(Math.min(1.0, 5 / 2)).toBe(1.0);
     });
 
-    it('Aggregate premium cap: min(rawPremiums, max(10, base * 1.5)) (Strategy B)', () => {
+    it('Aggregate premium cap: min(earnedPremiums, max(10, base * 1.5)) + structural platform premium (Strategy B)', () => {
       // simulation.ts: premiumCap = Math.max(10, baseMultiple * 1.5)
       const sim = readComponent('engine/simulation.ts');
       expect(sim).toContain('Math.max(10, baseMultiple * 1.5)');
-      expect(sim).toContain('Math.min(rawTotalPremiums, premiumCap)');
+      // Earned premiums are capped, then structural platform premium added after
+      expect(sim).toContain('Math.min(rawEarnedPremiums, premiumCap)');
+      expect(sim).toContain('cappedEarnedPremiums + integratedPlatformPremium');
     });
   });
 

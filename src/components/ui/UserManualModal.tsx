@@ -782,8 +782,9 @@ function SellingContent() {
         <><strong>Market Conditions:</strong> +0.5x during bull markets, -0.5x during recessions</>,
       ]} />
       <HighlightBox>
-        <strong>Premium Cap:</strong> Total positive premiums are capped at the higher of <strong>10x</strong> or{' '}
-        <strong>1.5× the base multiple</strong>, preventing runaway exit valuations on stacked portfolios.
+        <strong>Premium Cap:</strong> Earned premiums (growth, quality, improvements, etc.) are capped at the higher of <strong>10x</strong> or{' '}
+        <strong>1.5× the base multiple</strong>. The integrated platform premium is structural and added on top of this cap,
+        so forging a platform always provides its full multiple expansion benefit.
       </HighlightBox>
       <HighlightBox>
         <strong>Multiple Floor:</strong> The exit multiple can never drop below <strong>2.0x</strong>,

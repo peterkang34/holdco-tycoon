@@ -160,19 +160,24 @@ export function calculateExitValuation(
   // Premiums ramp from 0% to 100% over 2 years of ownership
   const seasoningMultiplier = Math.min(1.0, yearsHeld / 2);
 
-  // Sum all premiums above base
-  const rawTotalPremiums = growthPremium + qualityPremium + platformPremium + holdPremium +
+  // Sum EARNED premiums (growth, quality, improvements, etc.) — subject to aggregate cap
+  const rawEarnedPremiums = growthPremium + qualityPremium + platformPremium + holdPremium +
     improvementsPremium + marketModifier + sizeTierPremium + deRiskingPremium +
-    ruleOf40Premium + marginExpansionPremium + mergerPremium + integratedPlatformPremium +
-    turnaroundPremium;
+    ruleOf40Premium + marginExpansionPremium + mergerPremium + turnaroundPremium;
 
-  // Cap aggregate premiums to prevent runaway multiples
+  // Cap earned premiums to prevent runaway multiples
   // Floor of 10x ensures well-built platforms still get rewarded;
   // 1.5× base keeps premium proportional to sector baseline
   const premiumCap = Math.max(10, baseMultiple * 1.5);
-  const totalPremiums = rawTotalPremiums > 0
-    ? Math.min(rawTotalPremiums, premiumCap)
-    : rawTotalPremiums;
+  const cappedEarnedPremiums = rawEarnedPremiums > 0
+    ? Math.min(rawEarnedPremiums, premiumCap)
+    : rawEarnedPremiums;
+
+  // Integrated platform premium is STRUCTURAL (from recipe forging cost), not earned —
+  // apply after cap so it never squeezes earned premiums out of headroom.
+  // Without this, a star performer's growth/quality premiums get cut when platform
+  // premium pushes total over the cap, making individual sale > platform sale.
+  const totalPremiums = cappedEarnedPremiums + integratedPlatformPremium;
 
   // Calculate exit multiple (premiums scaled by seasoning, raw premiums preserved for display)
   const totalMultiple = Math.max(

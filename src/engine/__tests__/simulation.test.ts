@@ -19,7 +19,7 @@ import {
   createMockGameState,
   createMockDueDiligence,
 } from './helpers';
-import { Metrics } from '../types';
+import { Metrics, IntegratedPlatform } from '../types';
 
 describe('calculateAnnualFcf', () => {
   it('should calculate pre-tax FCF correctly for a basic business', () => {
@@ -762,6 +762,52 @@ describe('calculateExitValuation', () => {
     const standaloneVal = calculateExitValuation(standaloneBiz, 5);
 
     expect(platformVal.platformPremium).toBeGreaterThan(standaloneVal.platformPremium);
+  });
+
+  it('should apply integrated platform premium AFTER earned premium cap', () => {
+    // A star performer with high earned premiums near the cap should NOT have
+    // earned premiums squeezed by the integrated platform premium.
+    const bizId = 'test-plat-biz';
+    const starBiz = createMockBusiness({
+      id: bizId,
+      sectorId: 'saas',
+      acquisitionMultiple: 8.0,
+      ebitda: 5000,
+      acquisitionEbitda: 1000, // 400% growth → max growth premium
+      qualityRating: 5,
+      isPlatform: true,
+      platformScale: 3,
+      integratedPlatformId: 'test-plat',
+    });
+
+    const platform: IntegratedPlatform = {
+      id: 'test-plat',
+      recipeId: 'test-recipe',
+      name: 'Test Platform',
+      sectorIds: ['saas'],
+      constituentBusinessIds: [bizId],
+      forgedInRound: 1,
+      bonuses: {
+        marginBoost: 0.04,
+        growthBoost: 0.03,
+        multipleExpansion: 2.0,
+        recessionResistanceReduction: 0.8,
+      },
+    };
+
+    // With platform: earned premiums capped independently, platform premium added after
+    const withPlatform = calculateExitValuation(starBiz, 10, undefined, undefined, [platform]);
+    // Without platform: same business, no platform premium
+    const withoutPlatform = calculateExitValuation(starBiz, 10, undefined, undefined, []);
+
+    // Platform premium should always ADD value, never squeeze earned premiums
+    expect(withPlatform.integratedPlatformPremium).toBe(2.0);
+    expect(withoutPlatform.integratedPlatformPremium).toBe(0);
+    expect(withPlatform.totalMultiple).toBeGreaterThan(withoutPlatform.totalMultiple);
+    // The difference should be exactly the platform premium (scaled by seasoning)
+    const yearsHeld = 10 - starBiz.acquisitionRound;
+    const seasoning = Math.min(1.0, yearsHeld / 2);
+    expect(withPlatform.totalMultiple - withoutPlatform.totalMultiple).toBeCloseTo(2.0 * seasoning);
   });
 
   it('should cap hold premium at 0.5', () => {
