@@ -20,7 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { TAX_RATE, calculateAnnualFcf, calculatePortfolioTax } from '../simulation';
 import { createMockBusiness } from './helpers';
 import { calculateDistressLevel, getDistressRestrictions, getDistressDescription, calculateCovenantHeadroom } from '../distress';
-import { calculateHeatPremium, getMaxAcquisitions } from '../businesses';
+import { calculateHeatPremium, getMaxAcquisitions, calculateMultipleExpansion } from '../businesses';
 import { MA_SOURCING_CONFIG, SHARED_SERVICES_CONFIG } from '../../data/sharedServices';
 import { SECTORS, SECTOR_LIST } from '../../data/sectors';
 import {
@@ -774,6 +774,103 @@ describe('Display Proofreader', () => {
 
     it('Platform sale bonus = 0.8x', () => {
       expect(PLATFORM_SALE_BONUS).toBe(0.8);
+    });
+
+    // ── Multiple Expansion (Strategy A) ──
+
+    it('Multiple expansion: Scale 0=0, 1=+0.3x, 2=+0.6x, 3+=+1.0x (capped)', () => {
+      expect(calculateMultipleExpansion(0, 1000)).toBe(0);
+      expect(calculateMultipleExpansion(1, 1000)).toBe(0.3);
+      expect(calculateMultipleExpansion(2, 1000)).toBe(0.6);
+      expect(calculateMultipleExpansion(3, 1000)).toBe(1.0);
+      // Cap: scales above 3 return same as scale 3
+      expect(calculateMultipleExpansion(4, 1000)).toBe(1.0);
+      expect(calculateMultipleExpansion(8, 1000)).toBe(1.0);
+    });
+
+    it('Multiple expansion size bonus: >$5M=+0.3x, >$3M=+0.15x', () => {
+      // Scale 1 with $6M EBITDA: 0.3 + 0.3 = 0.6
+      expect(calculateMultipleExpansion(1, 6000)).toBeCloseTo(0.6);
+      // Scale 1 with $4M EBITDA: 0.3 + 0.15 = 0.45
+      expect(calculateMultipleExpansion(1, 4000)).toBeCloseTo(0.45);
+      // Scale 1 with $2M EBITDA: 0.3 + 0 = 0.3
+      expect(calculateMultipleExpansion(1, 2000)).toBeCloseTo(0.3);
+    });
+
+    // ── Platform Premium at Exit (Strategy A) ──
+
+    it('Platform premium: +0.2x per scale, capped at Scale 5 (+1.0x)', () => {
+      const sim = readComponent('engine/simulation.ts');
+      expect(sim).toContain('Math.min(business.platformScale, 5) * 0.2');
+      // Verify formula produces correct values
+      const premiumAt = (scale: number) => Math.min(scale, 5) * 0.2;
+      expect(premiumAt(1)).toBeCloseTo(0.2);
+      expect(premiumAt(3)).toBeCloseTo(0.6);
+      expect(premiumAt(5)).toBeCloseTo(1.0);
+      expect(premiumAt(8)).toBeCloseTo(1.0); // capped
+    });
+
+    // ── Merge Scale Formula (Strategy B) ──
+
+    it('Merge scale formula: sum of both scales + 2 (Strategy B)', () => {
+      const useGame = readComponent('hooks/useGame.ts');
+      expect(useGame).toContain('biz1.platformScale + biz2.platformScale + 2');
+    });
+
+    it('Merge cost: 15% of smaller business EBITDA, $100K floor (Strategy B)', () => {
+      const useGame = readComponent('hooks/useGame.ts');
+      expect(useGame).toContain('Math.max(100, Math.round(Math.min(Math.abs(biz1.ebitda), Math.abs(biz2.ebitda)) * 0.15))');
+    });
+
+    it('Merge preview matches engine formula (Strategy B)', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      // Scale formula in UI preview
+      expect(allocate).toContain('(mergeSelection.first.platformScale || 0) + (mergeSelection.second.platformScale || 0) + 2');
+      // Blended multiple in UI preview
+      expect(allocate).toContain('mergeSelection.first.acquisitionMultiple + mergeSelection.second.acquisitionMultiple) / 2');
+      // Merge cost preview uses Math.abs and $100K floor
+      expect(allocate).toContain('Math.max(100, Math.round(Math.min(Math.abs(mergeSelection.first.ebitda)');
+    });
+
+    // ── RollUpGuideModal Copy (Strategy B) ──
+
+    it('RollUpGuideModal scale bonuses: +0.3x, +0.6x, +1.0x (not +0.9x)', () => {
+      const guide = readComponent('components/ui/RollUpGuideModal.tsx');
+      expect(guide).toContain('+0.3x');
+      expect(guide).toContain('+0.6x');
+      expect(guide).toContain('+1.0x (cap)');
+      expect(guide).not.toContain('+0.9x');
+    });
+
+    it('RollUpGuideModal merge cost: 15% of smaller (not 10% of combined)', () => {
+      const guide = readComponent('components/ui/RollUpGuideModal.tsx');
+      expect(guide).toContain('15% of smaller business EBITDA');
+      expect(guide).not.toContain('10% of combined EBITDA');
+    });
+
+    // ── UserManualModal Platform Copy (Strategy B) ──
+
+    it('UserManualModal documents platform premium cap at Scale 5', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('capped at Scale 5');
+    });
+
+    it('UserManualModal documents multiple expansion values +0.3x/+0.6x/+1.0x', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('+0.3x/+0.6x/+1.0x');
+    });
+
+    it('UserManualModal explains merges start at Scale 2', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('merging two companies jumps straight to Scale 2');
+    });
+
+    // ── BusinessCard Tooltip (Strategy B) ──
+
+    it('BusinessCard tooltip documents both caps: Scale 3 (expansion) and Scale 5 (exit)', () => {
+      const card = readComponent('components/cards/BusinessCard.tsx');
+      expect(card).toContain('Multiple expansion caps at Scale 3 (+1.0x)');
+      expect(card).toContain('Exit premium caps at Scale 5 (+1.0x)');
     });
   });
 
