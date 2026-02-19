@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 19, 2025',
+    title: 'Deal Pass Persistence',
+    sections: [
+      {
+        heading: 'Bug Fix',
+        items: [
+          'Passing on a deal now persists across rounds — passed deals stay hidden until they naturally expire from the pipeline. Previously, passed deals reappeared the following year.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 19, 2025',
     title: 'Debt Transparency Improvements',
     sections: [
       {

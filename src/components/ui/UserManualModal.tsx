@@ -241,7 +241,8 @@ function AcquiringContent() {
       <SubHeading>The Deal Pipeline</SubHeading>
       <P>
         Each round, you receive 3-5 deals in your pipeline. Deals have a freshness timer (1-3
-        rounds) and expire if not acted upon. Deals come from various sources: inbound, brokered,
+        rounds) and expire if not acted upon. You can pass on deals to hide them &mdash; passed deals
+        stay hidden until they expire. Deals come from various sources: inbound, brokered,
         sourced, or proprietary (the rarest and best).
       </P>
 
