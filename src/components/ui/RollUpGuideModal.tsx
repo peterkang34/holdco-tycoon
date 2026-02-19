@@ -75,8 +75,8 @@ export function RollUpGuideModal({ onClose }: RollUpGuideModalProps) {
               <div>
                 <p className="font-medium">Exit at Premium</p>
                 <p className="text-text-muted text-sm">
-                  Platforms with scale command higher exit multiples. A scale-3 platform can
-                  add +0.9x to your exit multiple.
+                  Platforms with scale command higher exit multiples. A scale-3+ platform can
+                  add up to +1.0x multiple expansion, plus +0.2x per scale level at exit.
                 </p>
               </div>
             </div>
@@ -108,15 +108,15 @@ export function RollUpGuideModal({ onClose }: RollUpGuideModalProps) {
                   <td className="py-3">
                     <span className="bg-accent/20 text-accent px-2 py-1 rounded text-xs font-medium">Scale 2</span>
                   </td>
-                  <td className="py-3 text-text-secondary">1 tuck-in or merge</td>
+                  <td className="py-3 text-text-secondary">Merge two companies or 1 tuck-in</td>
                   <td className="py-3 text-right font-mono">+0.6x</td>
                 </tr>
                 <tr>
                   <td className="py-3">
-                    <span className="bg-accent/20 text-accent px-2 py-1 rounded text-xs font-medium">Scale 3</span>
+                    <span className="bg-accent/20 text-accent px-2 py-1 rounded text-xs font-medium">Scale 3+</span>
                   </td>
-                  <td className="py-3 text-text-secondary">2+ tuck-ins or merges</td>
-                  <td className="py-3 text-right font-mono">+0.9x</td>
+                  <td className="py-3 text-text-secondary">2+ tuck-ins or merge + tuck-in</td>
+                  <td className="py-3 text-right font-mono">+1.0x (cap)</td>
                 </tr>
               </tbody>
             </table>
@@ -170,7 +170,7 @@ export function RollUpGuideModal({ onClose }: RollUpGuideModalProps) {
                 <li>* Combine 2 owned businesses</li>
                 <li>* Must be same sector</li>
                 <li>* Creates new platform</li>
-                <li>* Costs 10% of combined EBITDA</li>
+                <li>* Costs 15% of smaller business EBITDA</li>
               </ul>
             </div>
           </div>

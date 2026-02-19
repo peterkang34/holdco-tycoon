@@ -12,6 +12,27 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 18, 2025',
+    title: 'Merge Staging & Multiple Transparency',
+    sections: [
+      {
+        heading: 'Balance',
+        items: [
+          'Merging two standalone companies now creates a Scale 2 platform (was Scale 1). Merges are now more impactful than simply designating a platform — reflecting the greater complexity of combining two businesses.',
+          'Platform exit premium now caps at Scale 5 (+1.0x max) to prevent runaway values from chain merges.',
+        ],
+      },
+      {
+        heading: 'UI',
+        items: [
+          'The merge confirmation preview now shows the blended acquisition multiple of both companies, so you can see the implied valuation before committing.',
+          'Fixed incorrect merge cost in Roll-Up Guide (was "10% of combined EBITDA", now correctly shows "15% of smaller business EBITDA").',
+          'Fixed Scale 3 multiple expansion bonus in Roll-Up Guide (was +0.9x, now correctly shows +1.0x).',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 18, 2025',
     title: 'Covenant Breach Fix: Sell-All Death Spiral',
     sections: [
       {

@@ -147,10 +147,10 @@ export function BusinessCard({
             <Tooltip
               trigger={<span className="text-xs bg-accent/20 text-accent px-2 py-1 rounded">Scale {platformScale}</span>}
               align="right"
-              width="w-48 md:w-56"
+              width="w-56 md:w-64"
             >
-              <p className="text-sm text-text-secondary font-normal">This is a roll-up hub. Tuck-in bolt-on acquisitions to increase scale and unlock synergies + exit multiple expansion.</p>
-              <p className="text-xs text-text-muted mt-2 font-normal">Multiple expansion bonus caps at Scale 3 (+1.0x), but bolt-ons can continue beyond that.</p>
+              <p className="text-sm text-text-secondary font-normal">This is a roll-up hub. Tuck-in bolt-on acquisitions or merge with another business to increase scale and unlock synergies + exit multiple expansion.</p>
+              <p className="text-xs text-text-muted mt-2 font-normal">Multiple expansion caps at Scale 3 (+1.0x). Exit premium caps at Scale 5 (+1.0x). Merges add more scale than tuck-ins.</p>
               <p className="text-xs text-accent mt-1 font-normal">Current: Scale {platformScale}, {boltOnCount} bolt-on{boltOnCount !== 1 ? 's' : ''}</p>
             </Tooltip>
           )}

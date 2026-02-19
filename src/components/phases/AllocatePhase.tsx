@@ -2383,7 +2383,7 @@ export function AllocatePhase({
                 </div>
 
                 {mergeSelection.first && mergeSelection.second && (() => {
-                  const mergeCost = Math.round(Math.min(mergeSelection.first.ebitda, mergeSelection.second.ebitda) * 0.15);
+                  const mergeCost = Math.max(100, Math.round(Math.min(Math.abs(mergeSelection.first.ebitda), Math.abs(mergeSelection.second.ebitda)) * 0.15));
                   return (
                   <>
                     <div className="card bg-white/5 mb-6">
@@ -2407,7 +2407,7 @@ export function AllocatePhase({
                         );
                       })()}
 
-                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 text-xs sm:text-sm">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4 text-xs sm:text-sm">
                         <div>
                           <p className="text-text-muted">Combined EBITDA</p>
                           <p className="font-mono font-bold text-lg text-accent">
@@ -2425,9 +2425,16 @@ export function AllocatePhase({
                         <div>
                           <p className="text-text-muted">Platform Scale</p>
                           <p className="font-mono font-bold text-lg">
-                            {Math.max(mergeSelection.first.platformScale || 0, mergeSelection.second.platformScale || 0) + 1}
+                            {(mergeSelection.first.platformScale || 0) + (mergeSelection.second.platformScale || 0) + 2}
                           </p>
                           <p className="text-xs text-text-muted">Multiple expansion</p>
+                        </div>
+                        <div>
+                          <p className="text-text-muted">Blended Multiple</p>
+                          <p className="font-mono font-bold text-lg">
+                            {((mergeSelection.first.acquisitionMultiple + mergeSelection.second.acquisitionMultiple) / 2).toFixed(1)}x
+                          </p>
+                          <p className="text-xs text-text-muted">Avg of both companies</p>
                         </div>
                       </div>
                     </div>
