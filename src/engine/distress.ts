@@ -92,7 +92,7 @@ export interface CovenantHeadroom {
 
 /**
  * Calculate how close the player is to a 4.5x covenant breach and
- * estimate next year's mandatory debt service (holdco P&I + bank debt P&I).
+ * estimate next year's mandatory debt service (holdco P&I + bank debt P&I + seller note P&I).
  *
  * headroomCash = how much cash can be spent before ND/E hits 4.5x.
  *   ND = totalDebt - cash, so spending $X increases ND by $X.
@@ -139,12 +139,17 @@ export function calculateCovenantHeadroom(
     debtService += holdcoInterest + holdcoPrincipal;
   }
 
-  // Per-business bank debt P&I
+  // Per-business bank debt P&I + seller note P&I
   for (const b of businesses) {
     if (b.bankDebtBalance > 0 && b.bankDebtRoundsRemaining > 0) {
       const bankInterest = Math.round(b.bankDebtBalance * (b.bankDebtRate || interestRate));
       const bankPrincipal = Math.round(b.bankDebtBalance / b.bankDebtRoundsRemaining);
       debtService += bankInterest + bankPrincipal;
+    }
+    if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
+      const sellerInterest = Math.round(b.sellerNoteBalance * b.sellerNoteRate);
+      const sellerPrincipal = Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
+      debtService += sellerInterest + sellerPrincipal;
     }
   }
 

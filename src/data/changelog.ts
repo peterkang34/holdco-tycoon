@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 19, 2025',
+    title: 'Debt Transparency Improvements',
+    sections: [
+      {
+        heading: 'Bug Fix',
+        items: [
+          'Covenant headroom warnings now include seller note payments — previously only holdco and bank debt were projected, causing overly optimistic cash projections.',
+        ],
+      },
+      {
+        heading: 'UX Improvement',
+        items: [
+          'The cash flow waterfall now shows annual debt service cost (P&I/yr) per business instead of just outstanding balance — easier to plan around.',
+          'All debt types now consistently describe their repayment as "equal annual installments (balance ÷ remaining years)" across the manual, tooltips, and capital tab.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 19, 2025',
     title: 'Debt Description Accuracy',
     sections: [
       {

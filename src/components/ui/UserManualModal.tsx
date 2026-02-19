@@ -417,9 +417,9 @@ function FinancialContent() {
       <DataTable
         headers={['Type', 'Level', 'Rate', 'Notes']}
         rows={[
-          ['Holdco Loan', 'Portfolio-level', '7% base', 'Auto-pays (balance ÷ remaining years) each year; can be paid down in the Capital tab'],
-          ['Seller Notes', 'Deal-level', '5-6%', 'Auto-pays each year (interest + principal); tied to individual acquisition'],
-          ['Bank Debt', 'Per-business', '7% base', 'Auto-pays each year; can be paid down voluntarily in the Allocate phase; affected by events and distress penalties'],
+          ['Holdco Loan', 'Portfolio-level', '7% base', 'Equal annual installments (balance ÷ remaining years) + interest; can be paid down early in the Capital tab'],
+          ['Seller Notes', 'Deal-level', '5-6%', 'Equal annual installments (balance ÷ remaining years) + interest; tied to individual acquisition'],
+          ['Bank Debt', 'Per-business', '7% base', 'Equal annual installments (balance ÷ remaining years) + interest; can be paid down early; affected by events and distress penalties'],
           ['Earn-outs', 'Deal-level', 'N/A', 'Contingent payments based on EBITDA growth targets; expire after 4 years if not triggered'],
         ]}
       />
@@ -1130,8 +1130,8 @@ function GlossaryContent() {
         </div>
         <div>
           <strong className="text-white">Seller Note</strong> &mdash; Financing provided by the
-          seller of a business. Typically 5-6% interest rate, amortizing over 4-5 years. Less
-          risky than bank debt because the seller is aligned with your success.
+          seller of a business. Typically 5-6% interest rate, amortizing over 5 years in equal
+          annual installments. Less risky than bank debt because the seller is aligned with your success.
         </div>
         <div>
           <strong className="text-white">Covenant</strong> &mdash; A financial condition you must

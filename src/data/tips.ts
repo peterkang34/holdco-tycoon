@@ -73,7 +73,7 @@ export const METRIC_TOOLTIPS: Record<string, { definition: string; formula: stri
     chapter: 'Ch. IV',
   },
   interestrate: {
-    definition: 'The current annual interest rate on holdco debt.',
+    definition: 'The current annual interest rate on holdco and bank debt.',
     formula: 'Base rate adjusted by market events',
     benchmark: '<8% is favorable, >10% makes debt expensive',
     chapter: 'Ch. VII',

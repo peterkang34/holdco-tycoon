@@ -1075,10 +1075,10 @@ describe('Display Proofreader', () => {
       expect(manual).toContain('0.80x penalty');
     });
 
-    it('bank debt described as per-business with voluntary paydown', () => {
+    it('bank debt described as per-business with early paydown', () => {
       const manual = readComponent('components/ui/UserManualModal.tsx');
       expect(manual).toContain('Per-business');
-      expect(manual).toContain('paid down voluntarily');
+      expect(manual).toContain('paid down early');
     });
 
     it('AllocatePhase debt explanation uses centralized DEBT_EXPLAINER', () => {

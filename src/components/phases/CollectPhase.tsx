@@ -415,7 +415,9 @@ export function CollectPhase({
                       {formatMoney(breakdown.fcf)}
                     </span>
                     {hasDebt && (
-                      <span className="text-danger text-xs">(debt: {formatMoney(breakdown.sellerNoteBalance + breakdown.bankDebtBalance)})</span>
+                      <span className="text-danger text-xs">
+                        (P&I: {formatMoney(breakdown.sellerNoteInterest + breakdown.sellerNotePrincipal + breakdown.bankDebtInterest + breakdown.bankDebtPrincipal)}/yr)
+                      </span>
                     )}
                   </div>
 
