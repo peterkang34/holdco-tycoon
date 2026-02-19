@@ -1,6 +1,6 @@
 import type { PlayerResult } from '../utils/challenge';
 
-const BASE = '/api/challenge';
+const BASE = '/api/challenge?action=';
 
 export interface ChallengeParticipant {
   name: string;
@@ -55,7 +55,7 @@ export async function submitChallengeResult(
   hostToken?: string,
 ): Promise<{ success: boolean; participantCount?: number; duplicate?: boolean }> {
   try {
-    const res = await fetch(`${BASE}/submit`, {
+    const res = await fetch(`${BASE}submit`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code, playerToken, result, hostToken }),
@@ -78,7 +78,7 @@ export async function getChallengeStatus(
 ): Promise<ChallengeStatus | null> {
   try {
     const res = await fetch(
-      `${BASE}/status?code=${encodeURIComponent(code)}&playerToken=${encodeURIComponent(playerToken)}`,
+      `${BASE}status&code=${encodeURIComponent(code)}&playerToken=${encodeURIComponent(playerToken)}`,
     );
     if (!res.ok) return null;
     return await res.json();
@@ -93,7 +93,7 @@ export async function revealChallengeScores(
   hostPlayerToken: string,
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const res = await fetch(`${BASE}/reveal`, {
+    const res = await fetch(`${BASE}reveal`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code, hostToken, hostPlayerToken }),
