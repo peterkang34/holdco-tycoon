@@ -34,9 +34,17 @@ describe('calculateDistressLevel', () => {
     expect(calculateDistressLevel(10.0, 10000, 1000)).toBe('breach');
   });
 
-  it('should return breach when EBITDA is zero/negative but debt exists', () => {
-    expect(calculateDistressLevel(0, 5000, 0)).toBe('breach');
-    expect(calculateDistressLevel(0, 5000, -1000)).toBe('breach');
+  it('should return breach when EBITDA is zero/negative, debt exists, and cash < debt', () => {
+    expect(calculateDistressLevel(0, 5000, 0, 0)).toBe('breach');
+    expect(calculateDistressLevel(0, 5000, 0, 4999)).toBe('breach');
+    expect(calculateDistressLevel(0, 5000, -1000, 0)).toBe('breach');
+  });
+
+  it('should return stressed (not breach) when EBITDA is zero, debt exists, but cash >= debt', () => {
+    // Solvent but idle — player sold all businesses but has cash to cover debt
+    expect(calculateDistressLevel(0, 5000, 0, 5000)).toBe('stressed');
+    expect(calculateDistressLevel(0, 5000, 0, 10000)).toBe('stressed');
+    expect(calculateDistressLevel(0, 1000, 0, 50000)).toBe('stressed');
   });
 
   it('should return comfortable when no debt and no EBITDA', () => {

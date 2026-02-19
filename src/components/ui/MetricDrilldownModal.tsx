@@ -35,7 +35,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
   const totalDebtTop = state.holdcoLoanBalance + allDebtBusinessesTop.reduce((sum, b) => sum + b.bankDebtBalance, 0)
     + allDebtBusinessesTop.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
   const leverageTop = totalEbitdaTop > 0 ? Math.max(0, totalDebtTop - state.cash) / totalEbitdaTop : 0;
-  const distressLevelTop = calculateDistressLevel(leverageTop, totalDebtTop, totalEbitdaTop);
+  const distressLevelTop = calculateDistressLevel(leverageTop, totalDebtTop, totalEbitdaTop, state.cash);
   const distressRestrictionsTop = getDistressRestrictions(distressLevelTop);
 
   // Use holdcoLoanBalance (not totalDebt) with penalty for tax shield
@@ -537,7 +537,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
     const netDebt = totalDebt - state.cash;
     const leverage = totalEbitda > 0 ? netDebt / totalEbitda : 0;
 
-    const distressLevel = calculateDistressLevel(leverage, totalDebt, totalEbitda);
+    const distressLevel = calculateDistressLevel(leverage, totalDebt, totalEbitda, state.cash);
     const distressRestrictions = getDistressRestrictions(distressLevel);
 
     // Estimate net FCF for cash projection

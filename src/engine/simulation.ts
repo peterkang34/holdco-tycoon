@@ -99,7 +99,7 @@ export function calculateExitValuation(
   const qualityPremium = (business.qualityRating - 3) * 0.4;
 
   // Platform premium: reduced since size tier now does the heavy lifting
-  const platformPremium = business.isPlatform ? (business.platformScale * 0.2) : 0;
+  const platformPremium = business.isPlatform ? (Math.min(business.platformScale, 5) * 0.2) : 0;
 
   // Hold period premium: longer holds show stability (max +0.5x for 5+ years)
   const yearsHeld = currentRound - business.acquisitionRound;
@@ -1529,7 +1529,7 @@ export function calculateMetrics(state: GameState): Metrics {
   const netDebtToEbitda = totalEbitda > 0 ? (totalDebt - state.cash) / totalEbitda : 0;
 
   // Distress level
-  const distressLevel = calculateDistressLevel(netDebtToEbitda, totalDebt, totalEbitda);
+  const distressLevel = calculateDistressLevel(netDebtToEbitda, totalDebt, totalEbitda, state.cash);
 
   // Cash conversion
   const cashConversion = totalEbitda > 0 ? totalFcf / totalEbitda : 0;

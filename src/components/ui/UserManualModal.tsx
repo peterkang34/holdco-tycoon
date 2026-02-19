@@ -513,8 +513,11 @@ function DistressContent() {
 
       <SubHeading>When EBITDA Goes to Zero</SubHeading>
       <P>
-        If your total EBITDA drops to zero or below while you have debt, the system automatically
-        treats this as a covenant breach, since the leverage ratio becomes undefined (division by zero).
+        If your total EBITDA drops to zero or below while you have debt, the system checks
+        your solvency. If you have enough cash to cover your total debt, you enter Covenant Watch
+        (stressed) — you can still make all-cash acquisitions to rebuild, but no new debt is available
+        and you pay a 1% interest penalty. If your cash is below your total debt, it is a full
+        covenant breach.
       </P>
     </>
   );
@@ -531,10 +534,11 @@ function PlatformsContent() {
 
       <SubHeading>Manual Platforms</SubHeading>
       <P>
-        You can designate any active business as a &ldquo;platform&rdquo; company. This lets it receive
-        tuck-in acquisitions (bolt-ons) at a quality-dependent price discount (5-25%). As tuck-ins are added, the
-        platform&apos;s scale increases (1-3), which provides a small exit multiple premium
-        (+0.2x per scale level).
+        You can designate any active business as a &ldquo;platform&rdquo; company (Scale 1). This lets it receive
+        tuck-in acquisitions (bolt-ons) at a quality-dependent price discount (5-25%). Each tuck-in adds +1 scale.
+        Alternatively, merging two companies jumps straight to Scale 2 (combining both scales + 2),
+        reflecting the greater complexity of combining two businesses. Scale provides an exit multiple premium
+        (+0.2x per scale level, capped at Scale 5) and multiple expansion (+0.3x/+0.6x/+1.0x at Scale 1/2/3+).
       </P>
 
       <SubHeading>Integrated Platforms</SubHeading>
@@ -772,7 +776,7 @@ function SellingContent() {
         <><strong>Hold Period Premium:</strong> +0.1x per year held, capped at +0.5x (5+ years)</>,
         <><strong>Improvements Premium:</strong> Based on operational improvements applied (capped at +1.0x total)</>,
         <><strong>Size Tier Premium:</strong> Larger EBITDA businesses attract larger buyer pools and higher multiples</>,
-        <><strong>Platform Premium:</strong> +0.2x per platform scale level</>,
+        <><strong>Platform Premium:</strong> +0.2x per platform scale level (capped at Scale 5 = +1.0x)</>,
         <><strong>Integrated Platform Premium:</strong> +1.0 to +2.0x for businesses in forged platforms</>,
         <><strong>Turnaround Premium:</strong> +0.25x for businesses improved 2+ quality tiers</>,
         <><strong>Market Conditions:</strong> +0.5x during bull markets, -0.5x during recessions</>,

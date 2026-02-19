@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 18, 2025',
+    title: 'Covenant Breach Fix: Sell-All Death Spiral',
+    sections: [
+      {
+        heading: 'Balance Fix',
+        items: [
+          'Selling your last business with holdco debt no longer traps you in permanent covenant breach. If you have enough cash to cover your debt, you enter Covenant Watch instead — you can still make all-cash acquisitions to rebuild your portfolio.',
+          'Updated the game manual to explain the zero-EBITDA solvency check and recovery path.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 18, 2025',
     title: 'Challenge Scoreboard Persists on Refresh',
     sections: [
       {

@@ -12,14 +12,20 @@ export interface DistressRestrictions {
 
 /**
  * Determine distress level based on net debt / EBITDA ratio.
- * When EBITDA <= 0 and there is debt, treat as breach.
+ * When EBITDA <= 0 and there is debt, check cash solvency:
+ *   - Cash >= debt → 'stressed' (solvent but idle — can acquire all-cash to rebuild)
+ *   - Cash < debt  → 'breach' (insolvent — full lockdown)
  */
-export function calculateDistressLevel(netDebtToEbitda: number, totalDebt: number = 0, totalEbitda: number = 0): DistressLevel {
+export function calculateDistressLevel(netDebtToEbitda: number, totalDebt: number = 0, totalEbitda: number = 0, cash: number = 0): DistressLevel {
   // If no debt, always comfortable
   if (totalDebt <= 0 && netDebtToEbitda <= 0) return 'comfortable';
 
-  // If EBITDA is zero/negative but there's debt, that's a breach
-  if (totalEbitda <= 0 && totalDebt > 0) return 'breach';
+  // If EBITDA is zero/negative but there's debt, check solvency
+  if (totalEbitda <= 0 && totalDebt > 0) {
+    // Solvent (cash covers debt): stressed, not breach — player can acquire all-cash to rebuild
+    if (cash >= totalDebt) return 'stressed';
+    return 'breach';
+  }
 
   if (netDebtToEbitda >= 4.5) return 'breach';
   if (netDebtToEbitda >= 3.5) return 'stressed';
@@ -65,7 +71,7 @@ export function getDistressDescription(level: DistressLevel): string {
     case 'elevated':
       return 'Leverage is getting high. Banks are watching more closely. Consider deleveraging before it gets worse.';
     case 'stressed':
-      return 'Your lenders have put you on covenant watch. Bank debt is no longer available, and you\'re paying a 1% interest rate penalty. Reduce leverage to regain full access.';
+      return 'Your lenders have put you on covenant watch. Bank debt is no longer available, and you\'re paying a 1% interest rate penalty. Reduce leverage to regain full access. If you have no businesses, use your cash to acquire one (all-cash only) or pay down debt.';
     case 'breach':
       return 'You\'ve breached your debt covenants. No acquisitions, distributions, or buybacks allowed. You\'re paying a 2% interest penalty. If this continues for 2 years, you\'ll be forced into restructuring. After a restructuring, any further breach years are cumulative — lenders won\'t reset the clock.';
   }

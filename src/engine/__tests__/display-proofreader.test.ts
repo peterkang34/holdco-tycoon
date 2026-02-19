@@ -375,6 +375,15 @@ describe('Display Proofreader', () => {
       expect(useGame).toContain('COVENANT_BREACH_ROUNDS_THRESHOLD');
     });
 
+    it('Zero-EBITDA solvency: cash >= debt → stressed (not breach)', () => {
+      // Matches UserManualModal "When EBITDA Goes to Zero" section
+      expect(calculateDistressLevel(0, 5000, 0, 10000)).toBe('stressed'); // solvent
+      expect(calculateDistressLevel(0, 5000, 0, 1000)).toBe('breach');    // insolvent
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Covenant Watch');
+      expect(manual).toContain('all-cash acquisitions');
+    });
+
     it('Covenant headroom uses 4.5x breach threshold', () => {
       const headroom = calculateCovenantHeadroom(5000, 10000, 3000, 5000, 0.06, 5, [], 0.06, 0);
       expect(headroom.breachThreshold).toBe(4.5);
