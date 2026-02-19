@@ -263,6 +263,7 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   lastAcquisitionResult: null,
   lastIntegrationOutcome: null,
   founderDistributionsReceived: 0,
+  isChallenge: false,
   bankruptRound: undefined,
   holdcoAmortizationThisRound: 0,
   consolidationBoomSectorId: undefined,
@@ -324,6 +325,7 @@ export const useGameStore = create<GameStore>()(
           turnaroundTier: 0 as any,
           activeTurnarounds: [],
           founderDistributionsReceived: 0,
+          isChallenge: seed != null,
         };
 
         set({
@@ -1261,7 +1263,9 @@ export const useGameStore = create<GameStore>()(
           : (biz1.ebitdaMargin + biz2.ebitdaMargin) / 2;
         const totalMergeCost = mergeCost + mergeRestructuringCost;
         const combinedTotalCost = biz1.totalAcquisitionCost + biz2.totalAcquisitionCost + totalMergeCost;
-        const newPlatformScale = Math.max(biz1.platformScale, biz2.platformScale) + 1;
+        // Merges are more impactful than tuck-ins: combine both scales + 2
+        // Two standalones (0+0) → scale 2, platform+standalone (1+0) → scale 3, etc.
+        const newPlatformScale = biz1.platformScale + biz2.platformScale + 2;
         const prevScale = Math.max(biz1.platformScale, biz2.platformScale);
         const prevEbitda = Math.max(biz1.ebitda, biz2.ebitda);
         const multipleExpansion = calculateMultipleExpansion(newPlatformScale, combinedEbitda)
@@ -3269,6 +3273,7 @@ export const useGameStore = create<GameStore>()(
         lastAcquisitionResult: state.lastAcquisitionResult,
         lastIntegrationOutcome: state.lastIntegrationOutcome,
         founderDistributionsReceived: state.founderDistributionsReceived,
+        isChallenge: state.isChallenge,
         metrics: state.metrics,
         focusBonus: state.focusBonus,
         consolidationBoomSectorId: state.consolidationBoomSectorId,
@@ -3283,6 +3288,8 @@ export const useGameStore = create<GameStore>()(
             if (!(state as any).maxRounds) (state as any).maxRounds = 20;
             // Backfill seed for pre-v25 saves
             if (!(state as any).seed) (state as any).seed = generateRandomSeed();
+            // Backfill isChallenge for pre-existing saves
+            if ((state as any).isChallenge === undefined) (state as any).isChallenge = false;
             if ((state as any).founderDistributionsReceived === undefined) {
               (state as any).founderDistributionsReceived = Math.round(
                 (state.totalDistributions || 0) * (state.founderShares / (state.sharesOutstanding || 1))

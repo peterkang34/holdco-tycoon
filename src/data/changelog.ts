@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 18, 2025',
+    title: 'Challenge Scoreboard Persists on Refresh',
+    sections: [
+      {
+        heading: 'Fix',
+        items: [
+          'Fixed a bug where refreshing the browser after finishing a challenge game would hide the scoreboard — challenge status now persists across page reloads.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 18, 2025',
     title: 'Challenge Mode Fixes & Persistent Scoreboard',
     sections: [
       {

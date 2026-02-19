@@ -49,6 +49,7 @@ function App() {
     initialOwnershipPct,
     totalDebt,
     hasRestructured,
+    isChallenge,
     startGame,
     resetGame,
   } = useGameStore();
@@ -81,6 +82,9 @@ function App() {
       if (result) {
         setIncomingResult(result);
       }
+    } else if (isChallenge && seed) {
+      // Reconstruct challengeData from persisted store (survives browser refresh)
+      setChallengeData({ seed, difficulty: difficulty ?? 'easy', duration: duration ?? 'standard' });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

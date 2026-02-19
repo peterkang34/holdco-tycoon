@@ -73,6 +73,7 @@ function makeGameState(businesses: Business[], round: number = 1): GameState {
     lastAcquisitionResult: null,
     lastIntegrationOutcome: null,
     founderDistributionsReceived: 0,
+    isChallenge: false,
     bankruptRound: undefined,
     holdcoAmortizationThisRound: 0,
     consolidationBoomSectorId: undefined,

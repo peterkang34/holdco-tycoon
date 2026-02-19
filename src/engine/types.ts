@@ -128,7 +128,7 @@ export interface Business {
 
   // Platform/Roll-up mechanics
   isPlatform: boolean; // Is this a platform company that can receive bolt-ons?
-  platformScale: number; // 1-3: 1=small platform, 3=large platform (affects multiple expansion)
+  platformScale: number; // 1+: designate=1, tuck-in=+1, merge=sum+2 (multiple expansion caps at 3, exit premium caps at 5)
   boltOnIds: string[]; // IDs of businesses that have been tucked into this platform
   parentPlatformId?: string; // If this was a tuck-in, the ID of the platform it was merged into
   integrationOutcome?: IntegrationOutcome; // How well the integration went
@@ -512,6 +512,9 @@ export interface GameState {
 
   // Founder tracking
   founderDistributionsReceived: number; // cumulative founder's share of distributions
+
+  // Challenge mode
+  isChallenge: boolean; // true when game started from a challenge URL
 }
 
 export type GameActionType =
