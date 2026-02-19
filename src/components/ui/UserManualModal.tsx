@@ -316,18 +316,103 @@ function AcquiringContent() {
       <SubHeading>Tuck-in Acquisitions</SubHeading>
       <P>
         If you have a business designated as a platform, you can acquire compatible businesses
-        as bolt-on &ldquo;tuck-ins.&rdquo; Tuck-ins receive a quality-dependent price discount (5-25%,
-        lower quality = deeper discount) and integrate into the parent platform, sharing overhead
-        and scaling the platform. Integration period depends on operator quality (1-3 years).
+        as bolt-on &ldquo;tuck-ins.&rdquo; Tuck-ins receive a quality-dependent price discount and
+        integrate into the parent platform, sharing overhead and scaling the platform.
+        Integration period depends on operator quality (1-3 years).
+      </P>
+      <DataTable
+        headers={['Quality', 'Discount']}
+        rows={[
+          ['Q5 (Best)', '5%'],
+          ['Q4', '10%'],
+          ['Q3', '15%'],
+          ['Q2', '20%'],
+          ['Q1 (Worst)', '25%'],
+        ]}
+      />
+      <P>
+        The discount is applied to the asking price. For example, a Q2 business with a $5M asking
+        price would cost $4M as a tuck-in (20% off). Lower quality businesses get steeper
+        discounts because they carry more integration risk.
       </P>
 
       <SubHeading>Integration Quality</SubHeading>
       <P>
-        Integration outcomes range from <strong>Seamless</strong> (full synergies) to{' '}
-        <strong>Rocky</strong> (reduced synergies) to <strong>Troubled</strong> (restructuring
-        costs and growth penalties). Factors include operator quality, sub-type compatibility,
-        size ratio, and shared services support.
+        When you acquire a business, an integration roll determines how smoothly it merges
+        into your portfolio. The base success probability is 60%, modified by:
       </P>
+      <BulletList items={[
+        <><strong>Quality rating:</strong> &plusmn;10% per star above/below Q3</>,
+        <><strong>Operator quality:</strong> Strong +15%, Weak -15%</>,
+        <><strong>Same sector as platform:</strong> +15%</>,
+        <><strong>Sub-type affinity:</strong> Related -5%, Distant -15%</>,
+        <><strong>Shared Services active:</strong> +10%</>,
+        <><strong>High customer concentration:</strong> -10%</>,
+      ]} />
+      <P>
+        These modifiers are additive. For example, a Q4 business (+10%) with a strong
+        operator (+15%) in the same sector (+15%) starts at 60% + 10% + 15% + 15% = 100%
+        success probability before other factors.
+      </P>
+      <P>
+        Three outcomes are possible, each with different synergy capture rates:
+      </P>
+      <DataTable
+        headers={['Outcome', 'Tuck-in Synergy', 'Standalone Synergy', 'Merger Synergy']}
+        rows={[
+          ['Seamless (full synergies)', '20% of EBITDA', '10% of EBITDA', '15% of EBITDA'],
+          ['Rocky (reduced synergies)', '8% of EBITDA', '3% of EBITDA', '5% of EBITDA'],
+          ['Troubled (negative drag)', '-5% of EBITDA', '-10% of EBITDA', '-7% of EBITDA'],
+        ]}
+      />
+      <P>
+        <strong>What &ldquo;Rocky&rdquo; means in practice:</strong> A rocky integration captures
+        roughly a third to two-fifths of the synergies you&apos;d get from a seamless one, depending
+        on acquisition type (40% for tuck-ins, ~30% for standalones). You still come out ahead
+        versus no acquisition, but the value creation is significantly dampened. For example, a
+        tuck-in that would generate $100K in synergies on a seamless outcome only generates $40K
+        on a rocky one.
+      </P>
+      <P>
+        <strong>What &ldquo;Troubled&rdquo; means:</strong> A troubled integration actually
+        destroys value &mdash; you suffer negative synergies (restructuring costs and
+        organizational friction) on top of the purchase price.
+      </P>
+      <P>
+        All newly acquired businesses also face a temporary integration penalty during the
+        integration period (1-3 rounds depending on operator quality: strong = 1, moderate = 2,
+        weak = 3). Each round, revenue growth is reduced by 3-8 percentage points (a fresh roll
+        each year, not cumulative).
+      </P>
+
+      <SubHeading>Synergy Modifiers</SubHeading>
+      <P>
+        The base synergy rates above are further adjusted by sub-type affinity and size ratio:
+      </P>
+      <DataTable
+        headers={['Modifier', 'Effect on Synergies']}
+        rows={[
+          ['Same sub-type', '100% (full synergy capture)'],
+          ['Related sub-type', '75% of base synergies'],
+          ['Distant sub-type', '45% of base synergies'],
+        ]}
+      />
+      <P>
+        <strong>Size ratio</strong> also matters for tuck-ins. If the bolt-on is too large
+        relative to the platform, synergy capture drops:
+      </P>
+      <BulletList items={[
+        <><strong>Ideal</strong> (bolt-on &le;50% of platform EBITDA): 100% synergy capture</>,
+        <><strong>Stretch</strong> (50-100%): 80% synergy capture</>,
+        <><strong>Strained</strong> (100-200%): 50% synergy capture</>,
+        <><strong>Overreach</strong> (&gt;200%): 25% synergy capture</>,
+      ]} />
+
+      <HighlightBox variant="tip">
+        <strong>Example:</strong> You tuck in a $500K EBITDA business (related sub-type, ideal size
+        ratio) with a seamless integration. Synergies = $500K &times; 20% &times; 75% = $75K EBITDA boost.
+        If that same tuck-in had a rocky outcome instead, synergies = $500K &times; 8% &times; 75% = $30K.
+      </HighlightBox>
     </>
   );
 }
@@ -560,6 +645,21 @@ function PlatformsContent() {
           ['Recession Resistance', '0.75-0.85x', 'Reduces recession sensitivity for platform members'],
         ]}
       />
+      <P>
+        These bonuses are applied <strong>once at forge time</strong> as permanent mutations to each
+        constituent business. For example, if a business has a 22% EBITDA margin and you forge a
+        platform with a +4 ppt margin boost, it becomes 26% permanently. The growth boost works the
+        same way &mdash; added directly to the business&apos;s base organic growth rate (before event
+        modifiers). Multiple expansion and recession resistance are applied automatically at exit
+        and during downturns.
+      </P>
+      <P>
+        <strong>These are separate from acquisition synergies.</strong> Acquisition synergies (from
+        the integration roll when you buy a business) and platform bonuses (from forging) stack
+        independently. Both can benefit the same business. If you acquire a business and later forge
+        a platform with it, the platform bonuses apply to the business&apos;s current margins and
+        growth &mdash; including any synergies already captured from the acquisition.
+      </P>
 
       <SubHeading>Integration Cost</SubHeading>
       <P>
