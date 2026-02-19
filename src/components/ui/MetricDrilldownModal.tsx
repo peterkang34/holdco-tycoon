@@ -718,12 +718,14 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
               <span className="font-mono">{formatMoney(state.holdcoLoanBalance)} @ {(state.holdcoLoanRate * 100).toFixed(1)}% ({debtCountdownLabel(state.holdcoLoanRoundsRemaining)})</span>
             </div>
           )}
-          {opcoBankDebt > 0 && (
-            <div className="flex justify-between py-1.5 text-sm">
-              <span className="text-text-secondary">Opco Bank Debt</span>
-              <span className="font-mono">{formatMoney(opcoBankDebt)}</span>
+          {allDebtBusinesses.filter(b => b.bankDebtBalance > 0).map(b => (
+            <div key={`bank-${b.id}`} className="flex justify-between py-1.5 text-sm">
+              <span className="text-text-secondary pl-2">{b.name} bank debt</span>
+              <span className="font-mono text-xs">
+                {formatMoney(b.bankDebtBalance)} @ {(b.bankDebtRate * 100).toFixed(1)}% ({debtCountdownLabel(b.bankDebtRoundsRemaining)})
+              </span>
             </div>
-          )}
+          ))}
           {allDebtBusinesses.filter(b => b.sellerNoteBalance > 0).map(b => (
             <div key={b.id} className="flex justify-between py-1.5 text-sm">
               <span className="text-text-secondary pl-2">{b.name} seller note</span>

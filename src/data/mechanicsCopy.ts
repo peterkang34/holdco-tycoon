@@ -38,6 +38,7 @@ export const DEBT_EXPLAINER =
   'level auto-pays each year and can also be paid down voluntarily.';
 
 export function debtCountdownLabel(yearsLeft: number): string {
+  if (yearsLeft <= 0) return 'overdue';
   return `${yearsLeft}yr left`;
 }
 
@@ -46,6 +47,7 @@ export function earnoutTargetLabel(targetPct: number): string {
 }
 
 export function earnoutCountdownLabel(yearsLeft: number): string {
+  if (yearsLeft <= 0) return 'overdue';
   return `${yearsLeft}yr left`;
 }
 

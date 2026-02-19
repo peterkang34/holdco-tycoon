@@ -1736,7 +1736,7 @@ export function AllocatePhase({
                     <div>
                       <p className="text-text-muted">Holdco Debt</p>
                       <p className="font-mono font-bold text-lg">{formatMoney(holdcoLoanBalance)}</p>
-                      <p className="text-xs text-text-muted">{DEBT_LABELS.holdco.behavior}</p>
+                      <p className="text-xs text-text-muted">{DEBT_LABELS.holdco.summaryShort}</p>
                     </div>
                     <div>
                       <p className="text-text-muted">Opco Seller Notes</p>

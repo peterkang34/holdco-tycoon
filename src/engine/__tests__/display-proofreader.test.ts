@@ -1430,16 +1430,16 @@ describe('Display Proofreader', () => {
     // ── D. Edge-Input Tests for Label Functions ──
 
     describe('Label function edge inputs', () => {
-      it('Strategy D: debtCountdownLabel(0) returns "0yr left"', () => {
-        expect(debtCountdownLabel(0)).toBe('0yr left');
+      it('Strategy D: debtCountdownLabel(0) returns "overdue"', () => {
+        expect(debtCountdownLabel(0)).toBe('overdue');
       });
 
       it('Strategy D: debtCountdownLabel(1) returns "1yr left"', () => {
         expect(debtCountdownLabel(1)).toBe('1yr left');
       });
 
-      it('Strategy D: earnoutCountdownLabel(0) returns "0yr left"', () => {
-        expect(earnoutCountdownLabel(0)).toBe('0yr left');
+      it('Strategy D: earnoutCountdownLabel(0) returns "overdue"', () => {
+        expect(earnoutCountdownLabel(0)).toBe('overdue');
       });
     });
   });
