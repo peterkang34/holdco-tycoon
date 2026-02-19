@@ -46,6 +46,7 @@ function makeGameState(businesses: Business[], round: number = 1): GameState {
     lastBuybackRound: 0,
     sharedServices: [],
     dealPipeline: [],
+    passedDealIds: [],
     maFocus: { sectorId: null, sizePreference: 'any', subType: null },
     maSourcing: { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 },
     integratedPlatforms: [],

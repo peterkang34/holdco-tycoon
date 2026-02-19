@@ -126,6 +126,7 @@ interface GameStore extends GameState {
   // Allocate phase actions
   acquireBusiness: (deal: Deal, structure: DealStructure) => void;
   acquireTuckIn: (deal: Deal, structure: DealStructure, targetPlatformId: string) => void;
+  passDeal: (dealId: string) => void;
   mergeBusinesses: (businessId1: string, businessId2: string, newName: string) => void;
   designatePlatform: (businessId: string) => void;
   improveBusiness: (businessId: string, improvementType: OperationalImprovementType) => void;
@@ -234,6 +235,7 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   lastBuybackRound: 0,
   sharedServices: initializeSharedServices(),
   dealPipeline: [],
+  passedDealIds: [],
   maFocus: { sectorId: null, sizePreference: 'any' as DealSizePreference, subType: null },
   maSourcing: { tier: 0 as MASourcingTier, active: false, unlockedRound: 0, lastUpgradeRound: 0 },
   integratedPlatforms: [],
@@ -770,9 +772,14 @@ export const useGameStore = create<GameStore>()(
           clearedBoomSectorId = undefined;
         }
 
+        // Clean up passedDealIds — remove IDs for deals no longer in the pipeline
+        const finalPipelineIds = new Set(finalPipeline.map(d => d.id));
+        const cleanedPassedIds = state.passedDealIds.filter(id => finalPipelineIds.has(id));
+
         set({
           phase: 'allocate',
           dealPipeline: finalPipeline,
+          passedDealIds: cleanedPassedIds,
           consolidationBoomSectorId: clearedBoomSectorId,
           actionsThisRound: [],
           focusBonus,
@@ -946,6 +953,16 @@ export const useGameStore = create<GameStore>()(
             focusBonus: calculateSectorFocusBonus(updatedBusinesses),
           });
         }
+      },
+
+      passDeal: (dealId: string) => {
+        const state = get();
+        const alreadyPassed = state.passedDealIds.includes(dealId);
+        set({
+          passedDealIds: alreadyPassed
+            ? state.passedDealIds.filter(id => id !== dealId)
+            : [...state.passedDealIds, dealId],
+        });
       },
 
       acquireBusiness: (deal: Deal, structure: DealStructure) => {
@@ -3323,6 +3340,10 @@ export const useGameStore = create<GameStore>()(
             }
             if ((state as any).lastIntegrationOutcome === undefined) {
               (state as any).lastIntegrationOutcome = null;
+            }
+            // Backwards compat: initialize passedDealIds if missing
+            if (!Array.isArray(state.passedDealIds)) {
+              (state as any).passedDealIds = [];
             }
             // Ensure pipeline deals have heat fields
             if (Array.isArray(state.dealPipeline)) {

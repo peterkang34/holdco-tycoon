@@ -65,6 +65,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     interestRate,
     creditTighteningRoundsRemaining,
     dealPipeline,
+    passedDealIds,
     sharedServices,
     currentEvent,
     eventHistory,
@@ -89,6 +90,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     endRound,
     acquireBusiness,
     acquireTuckIn,
+    passDeal,
     mergeBusinesses,
     designatePlatform,
     unlockSharedService,
@@ -648,6 +650,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             holdcoLoanRate={holdcoLoanRate}
             holdcoLoanRoundsRemaining={holdcoLoanRoundsRemaining}
             dealPipeline={dealPipeline}
+            passedDealIds={passedDealIds}
+            onPassDeal={passDeal}
             sharedServices={sharedServices}
             round={round}
             maxRounds={maxRounds}

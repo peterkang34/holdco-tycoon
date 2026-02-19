@@ -61,6 +61,8 @@ interface AllocatePhaseProps {
   holdcoLoanRate: number;
   holdcoLoanRoundsRemaining: number;
   dealPipeline: Deal[];
+  passedDealIds: string[];
+  onPassDeal: (dealId: string) => void;
   sharedServices: SharedService[];
   round: number;
   maxRounds?: number;
@@ -127,6 +129,8 @@ export function AllocatePhase({
   holdcoLoanRate,
   holdcoLoanRoundsRemaining,
   dealPipeline,
+  passedDealIds,
+  onPassDeal,
   sharedServices,
   round,
   maxRounds: maxRoundsFromStore,
@@ -191,8 +195,8 @@ export function AllocatePhase({
   // In-modal equity raise state
   const [modalEquityAmount, setModalEquityAmount] = useState('');
   const [showModalEquityRaise, setShowModalEquityRaise] = useState(false);
-  // Deal pass state
-  const [passedDealIds, setPassedDealIds] = useState<Set<string>>(new Set());
+  // Deal pass state (persisted in game state)
+  const passedDealIdSet = useMemo(() => new Set(passedDealIds), [passedDealIds]);
   const [showPassedDeals, setShowPassedDeals] = useState(false);
   // Tuck-in and merge state
   const [selectedTuckInPlatform, setSelectedTuckInPlatform] = useState<string | null>(null);
@@ -1351,12 +1355,12 @@ export function AllocatePhase({
                   <p>You can attempt {maxAcquisitionsPerRound} acquisitions per year{maSourcing.tier >= 1 ? ` (boosted by M&A Sourcing Tier ${maSourcing.tier})` : ''}. Tuck-ins count toward this limit. Contested deals may be snatched by competing buyers, consuming your attempt without spending cash.</p>
                 </div>
               </div>
-              {passedDealIds.size > 0 && (
+              {passedDealIdSet.size > 0 && (
                 <button
                   onClick={() => setShowPassedDeals(!showPassedDeals)}
                   className="text-xs text-text-muted hover:text-text-secondary transition-colors"
                 >
-                  {showPassedDeals ? 'Hide' : 'Show'} {passedDealIds.size} passed deal{passedDealIds.size !== 1 ? 's' : ''}
+                  {showPassedDeals ? 'Hide' : 'Show'} {passedDealIdSet.size} passed deal{passedDealIdSet.size !== 1 ? 's' : ''}
                 </button>
               )}
             </div>
@@ -1382,7 +1386,7 @@ export function AllocatePhase({
             {/* Deals Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {dealPipeline
-                .filter(deal => showPassedDeals || !passedDealIds.has(deal.id))
+                .filter(deal => showPassedDeals || !passedDealIdSet.has(deal.id))
                 .map(deal => (
                 <DealCard
                   key={deal.id}
@@ -1391,18 +1395,8 @@ export function AllocatePhase({
                   disabled={!distressRestrictions.canAcquire || acquisitionsThisRound >= maxAcquisitionsPerRound}
                   unaffordable={cash < Math.round(deal.effectivePrice * 0.25)}
                   availablePlatforms={getPlatformsForSector(deal.business.sectorId)}
-                  isPassed={passedDealIds.has(deal.id)}
-                  onPass={() => {
-                    setPassedDealIds(prev => {
-                      const next = new Set(prev);
-                      if (next.has(deal.id)) {
-                        next.delete(deal.id);
-                      } else {
-                        next.add(deal.id);
-                      }
-                      return next;
-                    });
-                  }}
+                  isPassed={passedDealIdSet.has(deal.id)}
+                  onPass={() => onPassDeal(deal.id)}
                 />
               ))}
               {dealPipeline.length === 0 && (
@@ -1411,7 +1405,7 @@ export function AllocatePhase({
                   <p className="text-sm mt-2">New opportunities will appear next year.</p>
                 </div>
               )}
-              {dealPipeline.length > 0 && dealPipeline.every(d => passedDealIds.has(d.id)) && !showPassedDeals && (
+              {dealPipeline.length > 0 && dealPipeline.every(d => passedDealIdSet.has(d.id)) && !showPassedDeals && (
                 <div className="col-span-full card text-center text-text-muted py-12">
                   <p>All deals passed on.</p>
                   <p className="text-sm mt-2">

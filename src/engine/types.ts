@@ -456,6 +456,7 @@ export interface GameState {
 
   // Deal Pipeline
   dealPipeline: Deal[];
+  passedDealIds: string[]; // IDs of deals the player has passed on (persisted across rounds)
   maFocus: MAFocus; // M&A sector and size focus
   maSourcing: MASourcingState; // M&A Sourcing capability tier
 

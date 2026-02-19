@@ -152,6 +152,7 @@ export function createMockGameState(overrides: Partial<GameState> = {}): GameSta
     lastBuybackRound: 0,
     sharedServices: initializeSharedServices(),
     dealPipeline: [],
+    passedDealIds: [],
     maFocus: { sectorId: null, sizePreference: 'any', subType: null },
     maSourcing: { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 },
     currentEvent: null,
