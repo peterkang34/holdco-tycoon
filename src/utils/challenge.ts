@@ -133,6 +133,10 @@ export function buildResultUrl(params: ChallengeParams, result: PlayerResult): s
   return `${BASE_URL}/?c=${encodeChallengeParams(params)}&r=${encodePlayerResult(result)}`;
 }
 
+export function buildScoreboardUrl(params: ChallengeParams): string {
+  return `${BASE_URL}/?s=${encodeChallengeParams(params)}`;
+}
+
 // ── URL Parsing ──────────────────────────────────────────────────
 
 export function parseChallengeFromUrl(): {
@@ -149,11 +153,19 @@ export function parseChallengeFromUrl(): {
   };
 }
 
+/** Parse ?s= scoreboard param from URL */
+export function parseScoreboardFromUrl(): ChallengeParams | null {
+  const params = new URLSearchParams(window.location.search);
+  const scoreboardCode = params.get('s');
+  return scoreboardCode ? decodeChallengeParams(scoreboardCode) : null;
+}
+
 /** Clean challenge params from URL without page reload */
 export function cleanChallengeUrl(): void {
   const url = new URL(window.location.href);
   url.searchParams.delete('c');
   url.searchParams.delete('r');
+  url.searchParams.delete('s');
   window.history.replaceState({}, '', url.pathname + url.hash);
 }
 

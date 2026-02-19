@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { SectorId, GameDifficulty, GameDuration } from '../../engine/types';
 import { SECTOR_LIST } from '../../data/sectors';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
@@ -32,6 +32,15 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
   // After creating a challenge, store the seed so the creator can play it too
   const [createdChallengeSeed, setCreatedChallengeSeed] = useState<number | null>(null);
 
+  // Sync challenge settings when challengeData arrives (it's null on first render,
+  // populated asynchronously via useEffect in App.tsx)
+  useEffect(() => {
+    if (challengeData) {
+      setSelectedDifficulty(challengeData.difficulty);
+      setSelectedDuration(challengeData.duration);
+    }
+  }, [challengeData]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (holdcoName.trim().length < 2) {
@@ -39,7 +48,9 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
       return;
     }
     const sector = selectedSector === 'random'
-      ? SECTOR_LIST[Math.floor(Math.random() * SECTOR_LIST.length)].id
+      ? SECTOR_LIST[challengeData?.seed != null
+          ? Math.abs(challengeData.seed) % SECTOR_LIST.length
+          : Math.floor(Math.random() * SECTOR_LIST.length)].id
       : selectedSector;
     onStart(holdcoName.trim(), sector, selectedDifficulty, selectedDuration, challengeData?.seed);
   };
@@ -51,7 +62,7 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
       return;
     }
     const sector = selectedSector === 'random'
-      ? SECTOR_LIST[Math.floor(Math.random() * SECTOR_LIST.length)].id
+      ? SECTOR_LIST[Math.abs(createdChallengeSeed!) % SECTOR_LIST.length].id
       : selectedSector;
     // Start with the created challenge seed
     onStart(holdcoName.trim(), sector, challengeDifficulty, challengeDuration, createdChallengeSeed!);

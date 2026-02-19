@@ -285,8 +285,8 @@ export const useGameStore = create<GameStore>()(
         const durConfig = DURATION_CONFIG[duration];
         const maxRounds = durConfig.rounds;
 
-        const startingBusiness = createStartingBusiness(startingSector, diffConfig.startingEbitda, diffConfig.startingMultipleCap);
         const round1Streams = createRngStreams(gameSeed, 1);
+        const startingBusiness = createStartingBusiness(startingSector, diffConfig.startingEbitda, diffConfig.startingMultipleCap, round1Streams.cosmetic);
         const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds, false, round1Streams.deals);
 
         // Holdco loan setup: Normal mode gets a structured loan, Easy mode has none
@@ -357,6 +357,7 @@ export const useGameStore = create<GameStore>()(
 
       advanceToEvent: () => {
         const state = get();
+        const roundStreams = createRngStreams(state.seed, state.round);
         const sharedBenefits = calculateSharedServicesBenefits(state as GameState);
 
         const sharedServicesCost = state.sharedServices
@@ -558,8 +559,8 @@ export const useGameStore = create<GameStore>()(
           });
         }
 
-        // Generate event
-        const event = generateEvent(state as GameState);
+        // Generate event (seeded for challenge mode determinism)
+        const event = generateEvent(state as GameState, roundStreams.events);
 
         // Recompute totalDebt from holdco loan + per-business bank debt
         const newTotalDebt = computeTotalDebt(updatedBusinesses, updatedHoldcoLoanBalance);
@@ -606,12 +607,12 @@ export const useGameStore = create<GameStore>()(
 
         // Referral deal: inject a quality-3+ cold/warm deal into pipeline
         if (event && event.type === 'portfolio_referral_deal') {
-          const referralSector = pickWeightedSector(state.round, state.maxRounds);
+          const referralSector = pickWeightedSector(state.round, state.maxRounds, roundStreams.deals);
           const referralDeal = generateDealWithSize(referralSector, state.round, 'any', 0, {
             qualityFloor: 3 as 1 | 2 | 3 | 4 | 5,
             source: 'sourced',
             maxRounds: state.maxRounds,
-          });
+          }, roundStreams.deals);
           gameState.dealPipeline = [...gameState.dealPipeline, referralDeal];
         }
 
@@ -639,7 +640,7 @@ export const useGameStore = create<GameStore>()(
           const biz = businessesAfterTurnarounds.find(b => b.id === ta.businessId);
           if (!prog || !biz) continue;
 
-          const result = resolveTurnaround(prog, activeCount);
+          const result = resolveTurnaround(prog, activeCount, roundStreams.market.fork(ta.businessId).next());
 
           // Map engine result to turnaround status
           const newStatus = result.result === 'success' ? 'completed' as const
@@ -782,6 +783,7 @@ export const useGameStore = create<GameStore>()(
 
       endRound: () => {
         const state = get();
+        const roundStreams = createRngStreams(state.seed, state.round);
         const sharedBenefits = calculateSharedServicesBenefits(state);
         const focusBonus = calculateSectorFocusBonus(state.businesses);
         const focusEbitdaBonus = focusBonus ? getSectorFocusEbitdaBonus(focusBonus.tier) : 0;
@@ -818,7 +820,8 @@ export const useGameStore = create<GameStore>()(
             diversificationGrowthBonus,
             state.round,
             sharedBenefits.marginDefense,
-            state.maxRounds
+            state.maxRounds,
+            roundStreams.simulation
           );
         });
 
@@ -961,7 +964,8 @@ export const useGameStore = create<GameStore>()(
         if (state.cash < structure.cashRequired) return;
 
         // Contested deal snatch check — 40% chance another buyer outbids you
-        if (deal.heat === 'contested' && Math.random() < 0.40) {
+        const acqStreams = createRngStreams(state.seed, state.round);
+        if (deal.heat === 'contested' && acqStreams.market.fork(deal.id).next() < 0.40) {
           set({
             dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
             acquisitionsThisRound: state.acquisitionsThisRound + 1,
@@ -1032,7 +1036,8 @@ export const useGameStore = create<GameStore>()(
         if (state.cash < structure.cashRequired) return;
 
         // Contested deal snatch check — 40% chance another buyer outbids you
-        if (deal.heat === 'contested' && Math.random() < 0.40) {
+        const tuckInStreams = createRngStreams(state.seed, state.round);
+        if (deal.heat === 'contested' && tuckInStreams.market.fork(deal.id).next() < 0.40) {
           set({
             dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
             acquisitionsThisRound: state.acquisitionsThisRound + 1,
@@ -1510,11 +1515,13 @@ export const useGameStore = create<GameStore>()(
             revenueBoost = 0.01; // +1% revenue
             growthBoost = 0.01;
             break;
-          case 'service_expansion':
+          case 'service_expansion': {
             cost = Math.round(absEbitda * 0.20);
-            revenueBoost = 0.08 + Math.random() * 0.04; // +8-12% revenue
+            const impStreams = createRngStreams(state.seed, state.round);
+            revenueBoost = 0.08 + impStreams.market.fork(businessId + '_improve').next() * 0.04; // +8-12% revenue
             marginBoost = -0.01; // -1 ppt margin initially (cost of expansion)
             break;
+          }
           case 'fix_underperformance':
             cost = Math.round(absEbitda * 0.12);
             marginBoost = 0.04; // +4 ppt margin
@@ -1599,7 +1606,8 @@ export const useGameStore = create<GameStore>()(
           const ceiling = getQualityCeiling(improvedBusiness.sectorId);
           if (improvedBusiness.qualityRating < ceiling) {
             const chance = getQualityImprovementChance(state.turnaroundTier);
-            if (Math.random() < chance) {
+            const qualStreams = createRngStreams(state.seed, state.round);
+            if (qualStreams.market.fork(businessId + '_quality').next() < chance) {
               const newQuality = Math.min(improvedBusiness.qualityRating + 1, ceiling) as QualityRating;
               const idx = updatedBusinesses.findIndex(b => b.id === businessId);
               updatedBusinesses[idx] = {
@@ -1864,8 +1872,10 @@ export const useGameStore = create<GameStore>()(
         const lastEvent = state.eventHistory[state.eventHistory.length - 1];
         const valuation = calculateExitValuation(business, state.round, lastEvent?.type, undefined, state.integratedPlatforms);
 
-        // Generate buyer profile for the sale
-        const buyerProfile = generateBuyerProfile(business, valuation.buyerPoolTier, business.sectorId);
+        // Generate buyer profile for the sale (seeded for challenge determinism)
+        const sellStreams = createRngStreams(state.seed, state.round);
+        const sellRng = sellStreams.market.fork(businessId + '_sell');
+        const buyerProfile = generateBuyerProfile(business, valuation.buyerPoolTier, business.sectorId, sellRng);
 
         // If strategic buyer, add their premium
         let effectiveMultiple = valuation.totalMultiple;
@@ -1877,9 +1887,9 @@ export const useGameStore = create<GameStore>()(
         effectiveMultiple -= (state.exitMultiplePenalty || 0);
 
         // Add small random variance for actual sale (market conditions variation)
-        const marketVariance = lastEvent?.type === 'global_bull_market' ? Math.random() * 0.3
-          : lastEvent?.type === 'global_recession' ? -(Math.random() * 0.3)
-          : (Math.random() * 0.2 - 0.1);
+        const marketVariance = lastEvent?.type === 'global_bull_market' ? sellRng.next() * 0.3
+          : lastEvent?.type === 'global_recession' ? -(sellRng.next() * 0.3)
+          : (sellRng.next() * 0.2 - 0.1);
         const exitPrice = Math.max(0, Math.round(business.ebitda * Math.max(2.0, effectiveMultiple + marketVariance)));
         // Also mark bolt-ons as sold when selling a platform
         const boltOnIds = new Set(business.boltOnIds || []);
@@ -2132,7 +2142,8 @@ export const useGameStore = create<GameStore>()(
         if (!event || event.type !== 'mbo_proposal' || !event.affectedBusinessId) return;
 
         let declineState = { ...state, currentEvent: null as typeof state.currentEvent };
-        if (Math.random() < 0.40) {
+        const mboStreams = createRngStreams(state.seed, state.round);
+        if (mboStreams.events.fork('mbo_decline').next() < 0.40) {
           // CEO leaves: quality -1 (floor Q1), recalculate EBITDA with adjusted margin
           declineState.businesses = state.businesses.map(b => {
             if (b.id !== event.affectedBusinessId) return b;
@@ -2196,7 +2207,8 @@ export const useGameStore = create<GameStore>()(
         if (!event || event.type !== 'portfolio_equity_demand' || !event.affectedBusinessId) return;
         // 60% chance talent leaves
         let declineState = { ...state, currentEvent: null };
-        if (Math.random() < 0.60 && event.affectedBusinessId) {
+        const eqStreams = createRngStreams(state.seed, state.round);
+        if (eqStreams.events.fork('equity_decline').next() < 0.60 && event.affectedBusinessId) {
           declineState.businesses = state.businesses.map(b => {
             if (b.id !== event.affectedBusinessId) return b;
             const newRevenue = Math.round(b.revenue * 0.94);
@@ -2262,7 +2274,8 @@ export const useGameStore = create<GameStore>()(
         if (!business) return;
         const cost = event.choices?.find(c => c.action === 'keyManGoldenHandcuffs')?.cost ?? Math.round(business.ebitda * KEY_MAN_GOLDEN_HANDCUFFS_COST_PCT);
         if (state.cash < cost) return;
-        const restored = Math.random() < KEY_MAN_GOLDEN_HANDCUFFS_RESTORE_CHANCE;
+        const kmStreams = createRngStreams(state.seed, state.round);
+        const restored = kmStreams.events.fork('golden_handcuffs').next() < KEY_MAN_GOLDEN_HANDCUFFS_RESTORE_CHANCE;
         const newState = {
           ...state,
           cash: state.cash - cost,
@@ -2341,7 +2354,8 @@ export const useGameStore = create<GameStore>()(
         if (!business) return;
         const legalCost = event.choices?.find(c => c.action === 'earnoutFight')?.cost ?? randomInt(EARNOUT_FIGHT_LEGAL_COST_MIN, EARNOUT_FIGHT_LEGAL_COST_MAX);
         if (state.cash < legalCost) return;
-        const won = Math.random() < EARNOUT_FIGHT_WIN_CHANCE;
+        const eoStreams = createRngStreams(state.seed, state.round);
+        const won = eoStreams.events.fork('earnout_fight').next() < EARNOUT_FIGHT_WIN_CHANCE;
         const addToast = useToastStore.getState().addToast;
         if (won) {
           const newState = {
@@ -2611,6 +2625,7 @@ export const useGameStore = create<GameStore>()(
           .filter(b => b.status === 'active')
           .reduce((sum, b) => sum + b.ebitda, 0);
 
+        const srcStreams = createRngStreams(state.seed, state.round);
         const newDeals = generateSourcedDeals(
           state.round,
           state.maFocus,
@@ -2618,7 +2633,8 @@ export const useGameStore = create<GameStore>()(
           totalPortfolioEbitda,
           state.maSourcing.active ? state.maSourcing.tier : 0,
           state.maxRounds,
-          state.creditTighteningRoundsRemaining > 0
+          state.creditTighteningRoundsRemaining > 0,
+          srcStreams.deals.fork('source')
         );
 
         set({
@@ -2700,12 +2716,14 @@ export const useGameStore = create<GameStore>()(
           .filter(b => b.status === 'active')
           .reduce((sum, b) => sum + b.ebitda, 0);
 
+        const outStreams = createRngStreams(state.seed, state.round);
         const newDeals = generateProactiveOutreachDeals(
           state.round,
           state.maFocus,
           totalPortfolioEbitda,
           state.maxRounds,
-          state.creditTighteningRoundsRemaining > 0
+          state.creditTighteningRoundsRemaining > 0,
+          outStreams.deals.fork('outreach')
         );
 
         set({
@@ -2849,10 +2867,13 @@ export const useGameStore = create<GameStore>()(
         if (constituents.length === 0) return;
 
         // Find the largest constituent for buyer pool tier
+        const platStreams = createRngStreams(state.seed, state.round);
+        const platRng = platStreams.market.fork(platformId + '_sell');
         const largestConstituent = constituents.reduce((a, b) => a.ebitda > b.ebitda ? a : b);
         const buyerProfile = generateBuyerProfile(largestConstituent,
           calculateExitValuation(largestConstituent, state.round, lastEvent?.type, undefined, state.integratedPlatforms).buyerPoolTier,
-          largestConstituent.sectorId
+          largestConstituent.sectorId,
+          platRng
         );
 
         // Calculate total exit across all constituents with platform sale bonus
@@ -2866,9 +2887,10 @@ export const useGameStore = create<GameStore>()(
           // Apply platform sale bonus + strategic premium + market variance
           let effectiveMultiple = valuation.totalMultiple + PLATFORM_SALE_BONUS;
           if (buyerProfile.isStrategic) effectiveMultiple += buyerProfile.strategicPremium;
-          const marketVariance = lastEvent?.type === 'global_bull_market' ? Math.random() * 0.3
-            : lastEvent?.type === 'global_recession' ? -(Math.random() * 0.3)
-            : (Math.random() * 0.2 - 0.1);
+          const bizSellRng = platStreams.market.fork(biz.id + '_sell');
+          const marketVariance = lastEvent?.type === 'global_bull_market' ? bizSellRng.next() * 0.3
+            : lastEvent?.type === 'global_recession' ? -(bizSellRng.next() * 0.3)
+            : (bizSellRng.next() * 0.2 - 0.1);
           const exitPrice = Math.max(0, Math.round(biz.ebitda * Math.max(2.0, effectiveMultiple + marketVariance)));
           totalExitPrice += exitPrice;
 

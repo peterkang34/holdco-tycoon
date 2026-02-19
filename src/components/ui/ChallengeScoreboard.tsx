@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { PlayerResult, ChallengeParams } from '../../utils/challenge';
-import { encodeChallengeParams, getPlayerToken, getHostToken, isTied } from '../../utils/challenge';
+import { encodeChallengeParams, getPlayerToken, getHostToken, isTied, buildScoreboardUrl, shareChallenge } from '../../utils/challenge';
 import {
   submitChallengeResult,
   getChallengeStatus,
@@ -31,6 +31,7 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
   const [revealing, setRevealing] = useState(false);
   const [revealError, setRevealError] = useState<string | null>(null);
   const [pollError, setPollError] = useState(false);
+  const [scoreboardCopied, setScoreboardCopied] = useState(false);
   const pollCount = useRef(0);
   const consecutiveFailures = useRef(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -91,11 +92,9 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
     }
   }, [code, playerToken]);
 
-  useEffect(() => {
-    // Initial fetch after submit succeeds
-    if (submitState !== 'success') return;
-    fetchStatus();
-
+  const startPolling = useCallback(() => {
+    if (intervalRef.current) clearInterval(intervalRef.current);
+    pollCount.current = 0;
     intervalRef.current = setInterval(() => {
       pollCount.current += 1;
       if (pollCount.current >= MAX_POLLS) {
@@ -105,11 +104,18 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
       }
       fetchStatus();
     }, POLL_INTERVAL);
+  }, [fetchStatus]);
+
+  useEffect(() => {
+    // Initial fetch after submit succeeds
+    if (submitState !== 'success') return;
+    fetchStatus();
+    startPolling();
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [submitState, fetchStatus]);
+  }, [submitState, fetchStatus, startPolling]);
 
   const handleReveal = async () => {
     if (!hostToken || revealing) return;
@@ -179,7 +185,7 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
         </p>
         <div className="flex gap-3">
           <button
-            onClick={() => { consecutiveFailures.current = 0; setPollError(false); fetchStatus(); }}
+            onClick={() => { consecutiveFailures.current = 0; setPollError(false); fetchStatus(); startPolling(); }}
             className="btn-primary text-sm min-h-[44px]"
           >
             Retry
@@ -222,14 +228,16 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
         )}
 
         {/* Comparison table — min-width forces visible overflow on small screens (#10) */}
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto -mx-2 px-2">
           <table className="w-full min-w-[420px] text-sm">
             <thead>
               <tr className="border-b border-white/10">
                 <th className="text-left py-2 text-text-muted font-medium">Metric</th>
                 {results.map((entry, i) => (
-                  <th key={i} className={`text-right py-2 font-medium whitespace-nowrap ${entry.isYou ? 'text-accent' : 'text-text-primary'}`}>
-                    {entry.isYou ? 'You' : entry.name}
+                  <th key={i} className={`text-right py-2 font-medium ${entry.isYou ? 'text-accent' : 'text-text-primary'}`}>
+                    <span className="inline-block max-w-[120px] truncate align-bottom">
+                      {entry.isYou ? 'You' : entry.name}
+                    </span>
                     {i === 0 && !hasTie && <span className="ml-1 text-yellow-400">*</span>}
                   </th>
                 ))}
@@ -248,6 +256,24 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
             </tbody>
           </table>
         </div>
+
+        {/* Persistent results link */}
+        <div className="mt-4 pt-3 border-t border-white/10">
+          <button
+            onClick={async () => {
+              const url = buildScoreboardUrl(challengeParams);
+              const shared = await shareChallenge(url, 'Holdco Tycoon Challenge Results');
+              if (shared) {
+                setScoreboardCopied(true);
+                setTimeout(() => setScoreboardCopied(false), 2000);
+              }
+            }}
+            className="btn-secondary w-full text-sm min-h-[44px]"
+          >
+            {scoreboardCopied ? 'Copied!' : 'Copy Scoreboard Link'}
+          </button>
+          <p className="text-xs text-text-muted mt-1 text-center">Bookmark or share — this link stays live for 30 days</p>
+        </div>
       </div>
     );
   }
@@ -259,7 +285,7 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
         <span>🏆</span> Challenge Scoreboard
       </h2>
       <p className="text-xs text-text-muted mb-4">
-        Scores are hidden until the host reveals them.
+        Scores are hidden until the challenge creator reveals them.
       </p>
 
       <div className="space-y-2 mb-4">
@@ -316,8 +342,8 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
 
       {/* Footer */}
       <div className="flex items-center justify-between text-xs text-text-muted pt-2 border-t border-white/10">
-        <span>{status.participantCount} participant{status.participantCount !== 1 ? 's' : ''}</span>
-        <span>Auto-refreshing</span>
+        <span>{status.participantCount} player{status.participantCount !== 1 ? 's' : ''}</span>
+        <span>Updates automatically</span>
       </div>
     </div>
   );

@@ -71,7 +71,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
 - **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v25`
-- **Tests**: Vitest in `src/engine/__tests__/` — 798 tests across 16 suites (incl. display-proofreader)
+- **Tests**: Vitest in `src/engine/__tests__/` — 827 tests across 16 suites (incl. display-proofreader)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Rollover Equity**: 6th deal structure — seller reinvests ~25% (standard) or ~20% (quick) as equity; gated behind M&A Tier 2+, Q3+, non-distressed archetypes, noNewDebt; exit split applied AFTER debt payoff; FEV deducts rollover claims; note rate 5%
@@ -104,6 +104,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/services/telemetry.ts` — Client-side event tracking
 - `src/services/challengeApi.ts` — Challenge API client (submit/status/reveal)
 - `src/components/ui/ChallengeScoreboard.tsx` — Live scoreboard (auto-submit, polling, hidden/revealed, host reveal)
+- `src/components/screens/ScoreboardScreen.tsx` — Standalone scoreboard page (via ?s= URL, persistent results link)
 - `api/_lib/` — Shared API middleware (ai.ts, leaderboard.ts, telemetry.ts, challenge.ts)
 - `api/challenge/` — Challenge endpoints (submit.ts, status.ts, reveal.ts) — Vercel KV-backed
 

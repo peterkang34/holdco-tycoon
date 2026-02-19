@@ -12,6 +12,27 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 18, 2025',
+    title: 'Challenge Mode Fixes & Persistent Scoreboard',
+    sections: [
+      {
+        heading: 'Fixes',
+        items: [
+          'Challenge difficulty and duration now apply correctly to all players — previously recipients always got Easy mode regardless of the creator\'s settings.',
+          'Seeded RNG fully wired up — all players now get identical starting businesses, market events, organic growth, turnaround outcomes, and deal flow. Every source of randomness is now deterministic from the shared seed.',
+          'Fixed 13 remaining unseeded random calls in player-action handlers (sell, improve, acquire, source deals) — outcomes are now consistent across players.',
+        ],
+      },
+      {
+        heading: 'New',
+        items: [
+          'Persistent Scoreboard Link — bookmark or share a link to your challenge results. Come back anytime within 30 days to check scores, no need to keep the tab open.',
+          'Scoreboard results now kept for 30 days (previously 7).',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 18, 2025',
     title: 'Cash Forecast Accuracy',
     sections: [
       {

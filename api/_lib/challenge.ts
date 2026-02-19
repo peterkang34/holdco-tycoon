@@ -1,6 +1,6 @@
 import { sanitizeString } from './rateLimit.js';
 
-export const CHALLENGE_TTL = 604800; // 7 days in seconds
+export const CHALLENGE_TTL = 2592000; // 30 days in seconds
 export const MAX_PARTICIPANTS = 10;
 
 export function challengeMetaKey(code: string): string {

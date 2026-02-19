@@ -4,10 +4,11 @@ import { useGameStore, getFinalScore, getPostGameInsights, getEnterpriseValue, g
 import { IntroScreen } from './components/screens/IntroScreen';
 import { GameScreen } from './components/screens/GameScreen';
 import { GameOverScreen } from './components/screens/GameOverScreen';
+import { ScoreboardScreen } from './components/screens/ScoreboardScreen';
 import { SectorId, GameDifficulty, GameDuration } from './engine/types';
-import { parseChallengeFromUrl, cleanChallengeUrl, type ChallengeParams, type PlayerResult } from './utils/challenge';
+import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, type ChallengeParams, type PlayerResult } from './utils/challenge';
 
-type Screen = 'intro' | 'game' | 'gameOver';
+type Screen = 'intro' | 'game' | 'gameOver' | 'scoreboard';
 
 function App() {
   const [isAdmin, setIsAdmin] = useState(window.location.hash === '#/admin');
@@ -22,6 +23,7 @@ function App() {
   const [isNewGame, setIsNewGame] = useState(false);
   const [challengeData, setChallengeData] = useState<ChallengeParams | null>(null);
   const [incomingResult, setIncomingResult] = useState<PlayerResult | null>(null);
+  const [scoreboardParams, setScoreboardParams] = useState<ChallengeParams | null>(null);
 
   const {
     holdcoName,
@@ -51,8 +53,16 @@ function App() {
     resetGame,
   } = useGameStore();
 
-  // Parse challenge URL on mount
+  // Parse challenge/scoreboard URL on mount (?s= takes precedence over ?c=)
   useEffect(() => {
+    const scoreboard = parseScoreboardFromUrl();
+    if (scoreboard) {
+      cleanChallengeUrl();
+      setScoreboardParams(scoreboard);
+      setScreen('scoreboard');
+      return;
+    }
+
     const { challenge, result } = parseChallengeFromUrl();
     if (challenge) {
       cleanChallengeUrl();
@@ -74,8 +84,9 @@ function App() {
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Check if there's a saved game on mount
+  // Check if there's a saved game on mount (skip if scoreboard URL already set screen)
   useEffect(() => {
+    if (scoreboardParams) return;
     if (holdcoName && round > 0 && !gameOver) {
       setScreen('game');
     } else if (gameOver) {
@@ -159,6 +170,20 @@ function App() {
           challengeData={challengeData}
           incomingResult={incomingResult}
           onPlayAgain={handlePlayAgain}
+        />
+      )}
+      {screen === 'scoreboard' && scoreboardParams && (
+        <ScoreboardScreen
+          challengeParams={scoreboardParams}
+          onPlayChallenge={(params) => {
+            setChallengeData(params);
+            setScoreboardParams(null);
+            setScreen('intro');
+          }}
+          onPlayAgain={() => {
+            setScoreboardParams(null);
+            handlePlayAgain();
+          }}
         />
       )}
     </div>
