@@ -21,7 +21,7 @@ import {
   formatPercent,
 } from '../../engine/types';
 import { getDistressRestrictions, calculateCovenantHeadroom } from '../../engine/distress';
-import { EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN } from '../../data/gameConfig';
+import { EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
 import { SECTOR_LIST } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
@@ -243,12 +243,46 @@ export function AllocatePhase({
     const preTaxFcf = activeBusinesses.reduce(
       (sum, b) => sum + calculateAnnualFcf(b, ssCapexReduction, ssCashConversionBonus), 0
     );
-    const holdcoInterestEst = Math.round(holdcoLoanBalance * (holdcoLoanRate + distressRestrictions.interestPenalty));
-    const opcoInterestEst = allBusinesses.reduce(
-      (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate), 0
-    );
-    const taxEst = calculatePortfolioTax(activeBusinesses, holdcoLoanBalance, holdcoLoanRate, sharedServicesCostAnnual);
-    const estimatedNetFcf = preTaxFcf - taxEst.taxAmount - holdcoInterestEst - opcoInterestEst - sharedServicesCostAnnual;
+
+    // Operating costs
+    const maCostAnnual = maSourcing.active ? getMASourcingAnnualCost(maSourcing.tier) : 0;
+    const turnaroundCostAnnual = getTurnaroundTierAnnualCost(turnaroundTier)
+      + activeTurnarounds.filter(t => t.status === 'active').reduce((sum, t) => {
+          const prog = getProgramById(t.programId);
+          return sum + (prog ? prog.annualCost : 0);
+        }, 0);
+
+    // Seller note P&I for all active + integrated businesses
+    const sellerNoteServiceEst = allBusinesses.reduce((sum, b) => {
+      if ((b.status === 'active' || b.status === 'integrated') && b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
+        return sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate) + Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
+      }
+      return sum;
+    }, 0);
+
+    // Earnout estimate (current growth as proxy)
+    const earnoutEst = allBusinesses.reduce((sum, b) => {
+      if (b.earnoutRemaining <= 0 || b.earnoutTarget <= 0) return sum;
+      if (round > 0 && round - b.acquisitionRound > EARNOUT_EXPIRATION_YEARS) return sum;
+      if (b.status === 'active' && b.acquisitionEbitda > 0) {
+        const growth = (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda;
+        if (growth >= b.earnoutTarget) return sum + b.earnoutRemaining;
+      } else if (b.status === 'integrated' && b.parentPlatformId) {
+        const platform = allBusinesses.find(p => p.id === b.parentPlatformId && p.status === 'active');
+        if (platform && platform.acquisitionEbitda > 0) {
+          const growth = (platform.ebitda - platform.acquisitionEbitda) / platform.acquisitionEbitda;
+          if (growth >= b.earnoutTarget) return sum + b.earnoutRemaining;
+        }
+      }
+      return sum;
+    }, 0);
+
+    // Tax with penalty included for holdco interest deduction
+    const taxEst = calculatePortfolioTax(activeBusinesses, holdcoLoanBalance, holdcoLoanRate + distressRestrictions.interestPenalty, sharedServicesCostAnnual + maCostAnnual);
+
+    // Net FCF after tax, operating costs, and opco-level debt service
+    // NOTE: holdco P&I and bank debt P&I are computed inside calculateCovenantHeadroom — do NOT include here
+    const estimatedNetFcf = preTaxFcf - taxEst.taxAmount - sharedServicesCostAnnual - maCostAnnual - turnaroundCostAnnual - sellerNoteServiceEst - earnoutEst;
 
     return calculateCovenantHeadroom(
       cash,
@@ -262,7 +296,7 @@ export function AllocatePhase({
       distressRestrictions.interestPenalty,
       estimatedNetFcf,
     );
-  }, [cash, totalDebt, totalEbitda, holdcoLoanBalance, holdcoLoanRate, holdcoLoanRoundsRemaining, allBusinesses, interestRate, distressRestrictions.interestPenalty, activeBusinesses, ssCapexReduction, ssCashConversionBonus, sharedServicesCostAnnual]);
+  }, [cash, totalDebt, totalEbitda, holdcoLoanBalance, holdcoLoanRate, holdcoLoanRoundsRemaining, allBusinesses, interestRate, distressRestrictions.interestPenalty, activeBusinesses, ssCapexReduction, ssCashConversionBonus, sharedServicesCostAnnual, maSourcing, turnaroundTier, activeTurnarounds]);
 
   // Platform and tuck-in helpers
   const platforms = activeBusinesses.filter(b => b.isPlatform);

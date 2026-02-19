@@ -141,7 +141,8 @@ export function CollectPhase({
   const integratedDebt = calculateIntegratedDebtService(businesses, round);
 
   // Portfolio-level tax with all deductions (uses holdco loan balance, not total debt)
-  const taxBreakdown = calculatePortfolioTax(activeBusinesses, holdcoLoanBalance, holdcoLoanRate, sharedServicesCost + (maSourcingCost ?? 0));
+  // Include interest penalty in holdco rate for accurate tax shield (matches actual interest paid)
+  const taxBreakdown = calculatePortfolioTax(activeBusinesses, holdcoLoanBalance, holdcoLoanRate + (interestPenalty ?? 0), sharedServicesCost + (maSourcingCost ?? 0));
   const hasDeductions = taxBreakdown.totalTaxSavings > 0;
   const effectiveRatePct = Math.round(taxBreakdown.effectiveTaxRate * 100);
 

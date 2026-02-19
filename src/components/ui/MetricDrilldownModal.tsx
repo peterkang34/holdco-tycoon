@@ -9,6 +9,8 @@ import {
 } from '../../engine/simulation';
 import { getDistressLabel, getDistressDescription, calculateCovenantHeadroom, getDistressRestrictions, calculateDistressLevel } from '../../engine/distress';
 import { getMASourcingAnnualCost } from '../../data/sharedServices';
+import { getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
+import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
 
 interface MetricDrilldownModalProps {
   metricKey: string;
@@ -27,8 +29,18 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
     : 0;
   const totalDeductibleCosts = sharedServicesCost + maSourcingCost;
 
+  // Distress restrictions for accurate interest penalty
+  const allDebtBusinessesTop = state.businesses.filter(b => b.status === 'active' || b.status === 'integrated');
+  const totalEbitdaTop = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
+  const totalDebtTop = state.holdcoLoanBalance + allDebtBusinessesTop.reduce((sum, b) => sum + b.bankDebtBalance, 0)
+    + allDebtBusinessesTop.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+  const leverageTop = totalEbitdaTop > 0 ? Math.max(0, totalDebtTop - state.cash) / totalEbitdaTop : 0;
+  const distressLevelTop = calculateDistressLevel(leverageTop, totalDebtTop, totalEbitdaTop);
+  const distressRestrictionsTop = getDistressRestrictions(distressLevelTop);
+
+  // Use holdcoLoanBalance (not totalDebt) with penalty for tax shield
   const taxBreakdown = calculatePortfolioTax(
-    activeBusinesses, state.totalDebt, state.interestRate, totalDeductibleCosts
+    activeBusinesses, state.holdcoLoanBalance, state.holdcoLoanRate + distressRestrictionsTop.interestPenalty, totalDeductibleCosts
   );
 
   const renderContent = () => {
@@ -168,7 +180,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
       return sum + b.ebitda * effectiveCapexRate;
     }, 0);
 
-    const holdcoInterest = Math.round(state.totalDebt * state.interestRate);
+    const holdcoInterest = Math.round(state.holdcoLoanBalance * (state.holdcoLoanRate + distressRestrictionsTop.interestPenalty));
     const opcoInterest = activeBusinesses.reduce(
       (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate), 0
     );
@@ -244,7 +256,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
   }
 
   function renderFcfShare() {
-    const holdcoInterest = Math.round(state.totalDebt * state.interestRate);
+    const holdcoInterest = Math.round(state.holdcoLoanBalance * (state.holdcoLoanRate + distressRestrictionsTop.interestPenalty));
     const opcoInterest = activeBusinesses.reduce(
       (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate), 0
     );
@@ -529,14 +541,48 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
     const distressRestrictions = getDistressRestrictions(distressLevel);
 
     // Estimate net FCF for cash projection
-    const holdcoInterestEst = Math.round(state.holdcoLoanBalance * (state.holdcoLoanRate + distressRestrictions.interestPenalty));
-    const opcoInterestEst = allDebtBusinesses.reduce(
-      (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate), 0
-    );
     const preTaxFcfEst = activeBusinesses.reduce(
       (sum, b) => sum + calculateAnnualFcf(b, ssBenefits.capexReduction, ssBenefits.cashConversionBonus), 0
     );
-    const estimatedNetFcf = preTaxFcfEst - taxBreakdown.taxAmount - holdcoInterestEst - opcoInterestEst - sharedServicesCost;
+
+    // Operating costs
+    const turnaroundCostAnnual = getTurnaroundTierAnnualCost(state.turnaroundTier)
+      + state.activeTurnarounds.filter(t => t.status === 'active').reduce((sum, t) => {
+          const prog = getProgramById(t.programId);
+          return sum + (prog ? prog.annualCost : 0);
+        }, 0);
+
+    // Seller note P&I for all active + integrated businesses
+    const sellerNoteServiceEst = allDebtBusinesses.reduce((sum, b) => {
+      if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
+        return sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate) + Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
+      }
+      return sum;
+    }, 0);
+
+    // Earnout estimate (current growth as proxy)
+    const earnoutEst = state.businesses.reduce((sum, b) => {
+      if (b.earnoutRemaining <= 0 || b.earnoutTarget <= 0) return sum;
+      if (state.round > 0 && state.round - b.acquisitionRound > EARNOUT_EXPIRATION_YEARS) return sum;
+      if (b.status === 'active' && b.acquisitionEbitda > 0) {
+        const growth = (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda;
+        if (growth >= b.earnoutTarget) return sum + b.earnoutRemaining;
+      } else if (b.status === 'integrated' && b.parentPlatformId) {
+        const platform = state.businesses.find(p => p.id === b.parentPlatformId && p.status === 'active');
+        if (platform && platform.acquisitionEbitda > 0) {
+          const growth = (platform.ebitda - platform.acquisitionEbitda) / platform.acquisitionEbitda;
+          if (growth >= b.earnoutTarget) return sum + b.earnoutRemaining;
+        }
+      }
+      return sum;
+    }, 0);
+
+    // Tax with penalty and all deductible costs
+    const taxEstLeverage = calculatePortfolioTax(activeBusinesses, state.holdcoLoanBalance, state.holdcoLoanRate + distressRestrictions.interestPenalty, sharedServicesCost + maSourcingCost);
+
+    // Net FCF after tax, operating costs, and opco-level debt service
+    // NOTE: holdco P&I and bank debt P&I are computed inside calculateCovenantHeadroom — do NOT include here
+    const estimatedNetFcf = preTaxFcfEst - taxEstLeverage.taxAmount - sharedServicesCost - maSourcingCost - turnaroundCostAnnual - sellerNoteServiceEst - earnoutEst;
 
     const covenantHeadroom = calculateCovenantHeadroom(
       state.cash,

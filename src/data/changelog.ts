@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 18, 2025',
+    title: 'Cash Forecast Accuracy',
+    sections: [
+      {
+        heading: 'Fixes',
+        items: [
+          'Year-End Forecast now accounts for seller note principal, MA sourcing costs, turnaround costs, and earnout payments — previously only holdco P&I and bank debt P&I were included, making the projection consistently too optimistic.',
+          'Fixed holdco interest being double-counted in the forecast (subtracted twice).',
+          'Net FCF and FCF/Share drilldowns now use correct holdco loan balance instead of total debt for interest calculations.',
+          'Tax shield calculations now include the distress interest penalty across all views.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 18, 2025',
     title: 'Live Challenge Scoreboard',
     sections: [
       {

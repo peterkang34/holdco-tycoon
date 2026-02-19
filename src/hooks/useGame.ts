@@ -382,17 +382,17 @@ export const useGameStore = create<GameStore>()(
         // Apply distress interest penalty
         const currentMetrics = calculateMetrics(state as GameState);
         const distressRestrictions = getDistressRestrictions(currentMetrics.distressLevel);
-        const effectiveRate = state.interestRate + distressRestrictions.interestPenalty;
 
         // Collect FCF when transitioning from collect to event phase (annual)
         // Portfolio tax (with interest/SS+MA deductions for tax shield) is computed inside
+        // Use holdcoLoanRate + penalty for tax deduction (matches actual interest paid)
         const totalDeductibleCosts = sharedServicesCost + maSourcingCost;
         const annualFcf = calculatePortfolioFcf(
           state.businesses.filter(b => b.status === 'active'),
           sharedBenefits.capexReduction,
           sharedBenefits.cashConversionBonus,
           state.holdcoLoanBalance,
-          effectiveRate,
+          state.holdcoLoanRate + distressRestrictions.interestPenalty,
           totalDeductibleCosts
         );
 
