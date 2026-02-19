@@ -48,28 +48,44 @@ export interface ChallengeStatusRevealed {
 
 export type ChallengeStatus = ChallengeStatusUnrevealed | ChallengeStatusRevealed;
 
+const SUBMIT_RETRIES = 3; // 3 retries + 1 initial = 4 total attempts
+const SUBMIT_BACKOFF = [2000, 5000, 10000]; // ms delay before each retry
+
 export async function submitChallengeResult(
   code: string,
   playerToken: string,
   result: PlayerResult,
   hostToken?: string,
 ): Promise<{ success: boolean; participantCount?: number; duplicate?: boolean }> {
-  try {
-    const res = await fetch(`${BASE}submit`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, playerToken, result, hostToken }),
-    });
-    if (res.status === 409) {
-      const data = await res.json().catch(() => ({}));
-      return { success: true, duplicate: true, participantCount: data.participantCount };
+  for (let attempt = 0; attempt <= SUBMIT_RETRIES; attempt++) {
+    try {
+      const res = await fetch(`${BASE}submit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, playerToken, result, hostToken }),
+      });
+      if (res.status === 409) {
+        const data = await res.json().catch(() => ({}));
+        return { success: true, duplicate: true, participantCount: data.participantCount };
+      }
+      // Retry on 429 (rate limited) or 5xx (server error)
+      if ((res.status === 429 || res.status >= 500) && attempt < SUBMIT_RETRIES) {
+        await new Promise(r => setTimeout(r, SUBMIT_BACKOFF[attempt]));
+        continue;
+      }
+      if (!res.ok) return { success: false };
+      const data = await res.json();
+      return { success: true, participantCount: data.participantCount };
+    } catch {
+      // Network error — retry if attempts remain
+      if (attempt < SUBMIT_RETRIES) {
+        await new Promise(r => setTimeout(r, SUBMIT_BACKOFF[attempt]));
+        continue;
+      }
+      return { success: false };
     }
-    if (!res.ok) return { success: false };
-    const data = await res.json();
-    return { success: true, participantCount: data.participantCount };
-  } catch {
-    return { success: false };
   }
+  return { success: false };
 }
 
 export async function getChallengeStatus(

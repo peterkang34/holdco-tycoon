@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 19, 2025',
+    title: 'Challenger Mode Fix',
+    sections: [
+      {
+        heading: 'Bug Fix',
+        items: [
+          'Fixed a bug where challenge scores from players on the same WiFi network would silently fail to submit. All players on shared networks can now submit their scores reliably.',
+          'Score submission now retries automatically if the server is temporarily unavailable, and a manual Retry button is shown if all retries fail.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 19, 2025',
     title: 'Integrated Platform Exit Valuation Fix',
     sections: [
       {

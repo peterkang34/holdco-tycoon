@@ -57,9 +57,17 @@ async function handleSubmit(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Invalid result data' });
     }
 
-    // Rate limit: 1 per 30s per IP — set BEFORE writes to close burst window (#7)
+    // Per-IP global cap: 10 submissions/min across all challenges (abuse prevention)
     const ip = getClientIp(req);
-    const rateLimitKey = `ratelimit:challenge-submit:${ip}`;
+    const ipGlobalKey = `ratelimit:challenge-submit-global:${ip}`;
+    const globalCount = await kv.incr(ipGlobalKey);
+    if (globalCount === 1) await kv.expire(ipGlobalKey, 60);
+    if (globalCount > 10) {
+      return res.status(429).json({ error: 'Rate limited' });
+    }
+
+    // Per-player per-challenge: 1 per 30s (#18 — was IP-only, blocked shared-network players)
+    const rateLimitKey = `ratelimit:challenge-submit:${playerToken}:${code}`;
     const existingLimit = await kv.get(rateLimitKey);
     if (existingLimit) {
       return res.status(429).json({ error: 'Rate limited. One submission per 30 seconds.' });
@@ -108,8 +116,7 @@ async function handleSubmit(req: VercelRequest, res: VercelResponse) {
     pipe.expire(resultsKey, CHALLENGE_TTL);
     await pipe.exec();
 
-    const participantCount = await kv.hlen(resultsKey);
-    return res.status(200).json({ success: true, participantCount });
+    return res.status(200).json({ success: true, participantCount: currentCount });
   } catch (error) {
     console.error('Challenge submit error:', error);
     return res.status(500).json({ error: 'Failed to submit result' });
@@ -128,10 +135,20 @@ async function handleStatus(req: VercelRequest, res: VercelResponse) {
 
   res.setHeader('Cache-Control', 's-maxage=5, stale-while-revalidate=10');
 
-  // Rate limit: 30 req/min per IP (#5)
+  const code = String(req.query.code ?? '');
+  const playerToken = String(req.query.playerToken ?? '');
+
+  if (!isValidChallengeCode(code)) {
+    return res.status(400).json({ error: 'Invalid challenge code' });
+  }
+  if (!isValidToken(playerToken)) {
+    return res.status(400).json({ error: 'Invalid player token' });
+  }
+
+  // Rate limit: 30 req/min per IP per challenge (#5, #18 — scoped to validated challenge code)
   const ip = getClientIp(req);
   try {
-    const rateLimitKey = `ratelimit:challenge-status:${ip}`;
+    const rateLimitKey = `ratelimit:challenge-status:${ip}:${code}`;
     const count = await kv.incr(rateLimitKey);
     if (count === 1) {
       await kv.expire(rateLimitKey, STATUS_RATE_WINDOW);
@@ -144,15 +161,6 @@ async function handleStatus(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const code = String(req.query.code ?? '');
-    const playerToken = String(req.query.playerToken ?? '');
-
-    if (!isValidChallengeCode(code)) {
-      return res.status(400).json({ error: 'Invalid challenge code' });
-    }
-    if (!isValidToken(playerToken)) {
-      return res.status(400).json({ error: 'Invalid player token' });
-    }
 
     const metaKey = challengeMetaKey(code);
     const resultsKey = challengeResultsKey(code);
@@ -235,9 +243,9 @@ async function handleReveal(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Invalid host player token' });
     }
 
-    // Rate limit: 1 per 10s per IP
+    // Rate limit: 1 per 10s per IP per challenge (#18 — scoped to challenge code)
     const ip = getClientIp(req);
-    const rateLimitKey = `ratelimit:challenge-reveal:${ip}`;
+    const rateLimitKey = `ratelimit:challenge-reveal:${ip}:${code}`;
     const existingLimit = await kv.get(rateLimitKey);
     if (existingLimit) {
       return res.status(429).json({ error: 'Rate limited. Try again shortly.' });

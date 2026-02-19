@@ -37,20 +37,19 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isVisible = useRef(true);
 
+  // Submit result (called on mount + retry)
+  const doSubmit = useCallback(async () => {
+    setSubmitState('pending');
+    const res = await submitChallengeResult(code, playerToken, myResult, hostToken ?? undefined);
+    if (res.success) {
+      setSubmitState('success');
+    } else {
+      setSubmitState('error');
+    }
+  }, [code, playerToken, myResult, hostToken]);
+
   // Auto-submit on mount
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const res = await submitChallengeResult(code, playerToken, myResult, hostToken ?? undefined);
-      if (cancelled) return;
-      if (res.success) {
-        setSubmitState('success');
-      } else {
-        setSubmitState('error');
-      }
-    })();
-    return () => { cancelled = true; };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { doSubmit(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Track tab visibility to pause polling (#6)
   useEffect(() => {
@@ -130,7 +129,7 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
     setRevealing(false);
   };
 
-  // Error state — fallback to manual
+  // Error state — retry + fallback to manual
   if (submitState === 'error') {
     return (
       <div className="card mb-6 border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 to-orange-500/5">
@@ -140,12 +139,20 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
         <p className="text-sm text-text-muted mb-3">
           Could not connect to the scoreboard server.
         </p>
-        <button
-          onClick={onFallbackToManual}
-          className="btn-secondary text-sm min-h-[44px]"
-        >
-          Use manual comparison instead
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={doSubmit}
+            className="btn-primary text-sm min-h-[44px]"
+          >
+            Retry
+          </button>
+          <button
+            onClick={onFallbackToManual}
+            className="btn-secondary text-sm min-h-[44px]"
+          >
+            Use manual comparison instead
+          </button>
+        </div>
       </div>
     );
   }
