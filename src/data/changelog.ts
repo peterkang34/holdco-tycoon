@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 18, 2025',
+    title: 'Live Challenge Scoreboard',
+    sections: [
+      {
+        heading: 'New',
+        items: [
+          'Live Challenge Scoreboard — when you finish a challenge, your result auto-submits to a shared scoreboard. See who has finished (scores stay hidden) and wait for the big reveal.',
+          'Host Reveal — the challenge creator controls when scores are unveiled. Hit "Reveal Scores" for the dramatic moment.',
+          'Automatic fallback — if the server is unreachable, you\'ll seamlessly fall back to manual result code comparison.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 18, 2025',
     title: 'Challenge Friends Mode',
     sections: [
       {

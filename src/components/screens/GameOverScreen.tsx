@@ -17,6 +17,7 @@ import {
   shareChallenge,
 } from '../../utils/challenge';
 import { ChallengeComparison } from '../ui/ChallengeComparison';
+import { ChallengeScoreboard } from '../ui/ChallengeScoreboard';
 
 interface GameOverScreenProps {
   holdcoName: string;
@@ -91,6 +92,7 @@ export function GameOverScreen({
   const [leaderboardTab, setLeaderboardTab] = useState<LeaderboardTab>('overall');
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [showComparison, setShowComparison] = useState(!!incomingResult);
+  const [scoreboardFailed, setScoreboardFailed] = useState(false);
 
   // Build challenge params from current game (works for both challenge and solo games)
   const currentChallengeParams: ChallengeParams = useMemo(() => (
@@ -537,7 +539,17 @@ export function GameOverScreen({
         showWealth={leaderboardTab === 'distributions'}
       />
 
-      {/* Challenge Friends */}
+      {/* Challenge Scoreboard (auto-submit + live scoreboard for challenge games) */}
+      {challengeData && !scoreboardFailed && (
+        <ChallengeScoreboard
+          challengeParams={currentChallengeParams}
+          myResult={myResult}
+          onFallbackToManual={() => setScoreboardFailed(true)}
+        />
+      )}
+
+      {/* Challenge Friends (manual flow — shown for solo games, or as fallback when scoreboard fails) */}
+      {(!challengeData || scoreboardFailed) && (
       <div className="card mb-6 border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 to-orange-500/5">
         <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
           <span>🏆</span> Challenge Friends
@@ -580,6 +592,7 @@ export function GameOverScreen({
           Compare Results
         </button>
       </div>
+      )}
 
       {/* Score Breakdown */}
       <div className="card mb-6">

@@ -102,7 +102,10 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/data/changelog.ts` — Structured changelog data (player-facing release notes)
 - `src/components/ui/ChangelogModal.tsx` — "What's New" modal
 - `src/services/telemetry.ts` — Client-side event tracking
-- `api/_lib/` — Shared API middleware (ai.ts, leaderboard.ts, telemetry.ts)
+- `src/services/challengeApi.ts` — Challenge API client (submit/status/reveal)
+- `src/components/ui/ChallengeScoreboard.tsx` — Live scoreboard (auto-submit, polling, hidden/revealed, host reveal)
+- `api/_lib/` — Shared API middleware (ai.ts, leaderboard.ts, telemetry.ts, challenge.ts)
+- `api/challenge/` — Challenge endpoints (submit.ts, status.ts, reveal.ts) — Vercel KV-backed
 
 ## Deploy Checklist (MANDATORY — do ALL automatically before commit/deploy)
 1. **Changelog** — Update `src/data/changelog.ts` with player-facing summary (editorial, not auto-generated)

@@ -182,6 +182,53 @@ export function isTied(a: PlayerResult, b: PlayerResult): boolean {
     (a.fev + a.totalDistributions) === (b.fev + b.totalDistributions);
 }
 
+// ── Token Helpers ─────────────────────────────────────────────────
+
+const PLAYER_TOKEN_KEY = 'holdco-challenge-player-token';
+const HOST_TOKEN_PREFIX = 'holdco-challenge-host:';
+
+/** Generate a cryptographically random token */
+export function generateToken(): string {
+  return crypto.randomUUID();
+}
+
+/** Get or create a persistent player token for this browser */
+let _sessionToken: string | null = null; // Fallback for when localStorage is unavailable
+export function getPlayerToken(): string {
+  try {
+    const existing = localStorage.getItem(PLAYER_TOKEN_KEY);
+    if (existing) return existing;
+    const token = generateToken();
+    localStorage.setItem(PLAYER_TOKEN_KEY, token);
+    return token;
+  } catch {
+    // If localStorage is unavailable, memoize in memory for session lifetime (#2)
+    if (!_sessionToken) _sessionToken = generateToken();
+    return _sessionToken;
+  }
+}
+
+/** Get the host token for a specific challenge code */
+export function getHostToken(code: string): string | null {
+  try {
+    return localStorage.getItem(HOST_TOKEN_PREFIX + code);
+  } catch {
+    return null;
+  }
+}
+
+/** Save a host token for a specific challenge code */
+export function setHostToken(code: string, token: string): void {
+  try {
+    localStorage.setItem(HOST_TOKEN_PREFIX + code, token);
+  } catch {}
+}
+
+/** Check if this browser is the host for a specific challenge */
+export function isHost(code: string): boolean {
+  return getHostToken(code) !== null;
+}
+
 // ── Share Helpers ─────────────────────────────────────────────────
 
 /** Copy text to clipboard, returns true on success */
