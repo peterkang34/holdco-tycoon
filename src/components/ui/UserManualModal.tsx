@@ -440,7 +440,8 @@ function FinancialContent() {
       </P>
       <BulletList items={[
         'Each raise applies escalating dilution (10% more discount per prior raise, floor of 10% of intrinsic value)',
-        'There is no hard cap — but successive raises become increasingly expensive',
+        'You must maintain majority control — ownership cannot drop below 51%',
+        'There is no hard cap — but successive raises become increasingly expensive as you approach the 51% floor',
         '2-round cooldown between equity raises and buybacks',
         'New shares are issued at intrinsic value per share (minus escalating discount)',
       ]} />

@@ -52,6 +52,7 @@ export const RESTRUCTURING_FEV_PENALTY = 0.80; // 20% FEV haircut for restructur
 export const EQUITY_DILUTION_STEP = 0.10;   // 10% discount per prior raise
 export const EQUITY_DILUTION_FLOOR = 0.10;  // minimum 10% of intrinsic value
 export const EQUITY_BUYBACK_COOLDOWN = 2;   // rounds between raise↔buyback
+export const MIN_FOUNDER_OWNERSHIP = 0.51;  // 51% floor — must maintain majority control
 
 // ── Earn-out Constants ──
 

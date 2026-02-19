@@ -21,7 +21,7 @@ import {
   formatPercent,
 } from '../../engine/types';
 import { getDistressRestrictions, calculateCovenantHeadroom } from '../../engine/distress';
-import { EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
+import { EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EARNOUT_EXPIRATION_YEARS, MIN_FOUNDER_OWNERSHIP } from '../../data/gameConfig';
 import { SECTOR_LIST } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
@@ -224,6 +224,12 @@ export function AllocatePhase({
   const buybackCooldownBlocked = lastEquityRaiseRound > 0 && round - lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN;
   const raiseBlocked = raiseCooldownBlocked || intrinsicValuePerShare <= 0;
   const raiseCooldownRemainder = raiseCooldownBlocked ? EQUITY_BUYBACK_COOLDOWN - (round - lastBuybackRound) : 0;
+  // Max raise before hitting 51% floor: founderShares / (sharesOutstanding + maxNewShares) = MIN_FOUNDER_OWNERSHIP
+  // => maxNewShares = (founderShares / MIN_FOUNDER_OWNERSHIP) - sharesOutstanding
+  const maxNewShares = Math.max(0, (founderShares / MIN_FOUNDER_OWNERSHIP) - sharesOutstanding);
+  const maxRaiseAmount = Math.floor(maxNewShares * effectivePricePerShare); // in $k (internal)
+  const atOwnershipFloor = maxRaiseAmount <= 0;
+  const ownershipFloorPct = Math.round(MIN_FOUNDER_OWNERSHIP * 100);
   const buybackCooldownRemainder = buybackCooldownBlocked ? EQUITY_BUYBACK_COOLDOWN - (round - lastEquityRaiseRound) : 0;
   const aiEnabled = isAIEnabled();
   const activeServicesCount = sharedServices.filter(s => s.active).length;
@@ -539,13 +545,13 @@ export function AllocatePhase({
               {(() => {
                 const shortfall = Math.max(0, Math.round(selectedDeal.effectivePrice * 0.25) - cash);
                 const suggestedRaise = Math.ceil(shortfall / 100) * 100;
-                const canRaise = !raiseBlocked;
+                const canRaise = !raiseBlocked && !atOwnershipFloor;
                 const parsedAmount = parseInt(modalEquityAmount) || 0;
                 const internalAmount = Math.round(parsedAmount / 1000);
                 const newShares = effectivePricePerShare > 0 ? Math.round((internalAmount / effectivePricePerShare) * 1000) / 1000 : 0;
                 const newTotal = sharesOutstanding + newShares;
                 const newOwnership = newTotal > 0 ? founderShares / newTotal * 100 : 100;
-                const wouldBreachFloor = newOwnership < 51;
+                const wouldBreachFloor = newOwnership < ownershipFloorPct;
                 return (
                   <div className="border border-accent/30 bg-accent/5 rounded-lg p-4">
                     <h5 className="font-bold text-text-primary mb-3">Raise Capital</h5>
@@ -589,14 +595,14 @@ export function AllocatePhase({
                             <p className={`font-medium ${wouldBreachFloor ? 'text-danger' : newOwnership < 55 ? 'text-warning' : 'text-text-secondary'}`}>
                               Ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% → {newOwnership.toFixed(1)}%
                             </p>
-                            {wouldBreachFloor && <p className="text-danger">Below 51% — raise would be blocked</p>}
+                            {wouldBreachFloor && <p className="text-danger">Below {ownershipFloorPct}% — raise would be blocked</p>}
                           </div>
                         )}
                         <p className="text-xs text-text-muted mt-2">Raise #{equityRaisesUsed + 1}{equityRaisesUsed > 0 ? ` — ${Math.round((1 - equityDiscount) * 100)}% investor discount` : ' — no discount'}</p>
                       </>
                     ) : (
                       <p className="text-sm text-warning">
-                        {raiseCooldownBlocked ? `Cooldown: buyback in Y${lastBuybackRound} — wait ${raiseCooldownRemainder} more yr` : 'Cannot raise equity at this time.'}
+                        {atOwnershipFloor ? `At ${ownershipFloorPct}% ownership floor — must maintain majority control.` : raiseCooldownBlocked ? `Cooldown: buyback in Y${lastBuybackRound} — wait ${raiseCooldownRemainder} more yr` : 'Cannot raise equity at this time.'}
                       </p>
                     )}
                   </div>
@@ -708,13 +714,13 @@ export function AllocatePhase({
 
             {/* Scenario B: Collapsible equity raise for when you can afford some structures but want more options */}
             {(() => {
-              if (raiseBlocked) return null;
+              if (raiseBlocked || atOwnershipFloor) return null;
               const parsedAmount = parseInt(modalEquityAmount) || 0;
               const internalAmount = Math.round(parsedAmount / 1000);
               const newShares = effectivePricePerShare > 0 ? Math.round((internalAmount / effectivePricePerShare) * 1000) / 1000 : 0;
               const newTotal = sharesOutstanding + newShares;
               const newOwnership = newTotal > 0 ? founderShares / newTotal * 100 : 100;
-              const wouldBreachFloor = newOwnership < 51;
+              const wouldBreachFloor = newOwnership < ownershipFloorPct;
               return (
                 <div className="mt-4">
                   <button
@@ -757,7 +763,7 @@ export function AllocatePhase({
                           <p className={`font-medium ${wouldBreachFloor ? 'text-danger' : newOwnership < 55 ? 'text-warning' : 'text-text-secondary'}`}>
                             Ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% → {newOwnership.toFixed(1)}%
                           </p>
-                          {wouldBreachFloor && <p className="text-danger">Below 51% — raise would be blocked</p>}
+                          {wouldBreachFloor && <p className="text-danger">Below {ownershipFloorPct}% — raise would be blocked</p>}
                         </div>
                       )}
                       <p className="text-xs text-text-muted mt-2">Raise #{equityRaisesUsed + 1}{equityRaisesUsed > 0 ? ` — ${Math.round((1 - equityDiscount) * 100)}% investor discount` : ' — no discount'}</p>
@@ -1367,7 +1373,7 @@ export function AllocatePhase({
                 </span>
                 <span className="hidden sm:inline text-white/20">|</span>
                 <span className="text-text-muted text-xs sm:text-sm">
-                  Next raise: {equityRaisesUsed > 0 ? `${Math.round((1 - equityDiscount) * 100)}% discount` : 'no discount'}{raiseCooldownBlocked ? ` (cooldown: ${raiseCooldownRemainder}yr)` : ''}
+                  {atOwnershipFloor ? `At ${ownershipFloorPct}% ownership floor` : `Next raise: ${equityRaisesUsed > 0 ? `${Math.round((1 - equityDiscount) * 100)}% discount` : 'no discount'}${raiseCooldownBlocked ? ` (cooldown: ${raiseCooldownRemainder}yr)` : ''}`}
                 </span>
               </div>
             )}
@@ -1776,7 +1782,7 @@ export function AllocatePhase({
                       />
                     </div>
                     {founderOwnership < 0.55 && (
-                      <p className="text-xs text-warning mt-1">Control at risk — you must stay above 51%</p>
+                      <p className="text-xs text-warning mt-1">Control at risk — you must stay above {ownershipFloorPct}%</p>
                     )}
                   </div>
 
@@ -1822,7 +1828,7 @@ export function AllocatePhase({
                       : <>You started with 1,000 shares and 100% ownership.</>
                     }{' '}
                     Issuing new shares raises cash but dilutes your ownership %. Buybacks retire outside shares, increasing your % back.
-                    You must always hold &gt;51% to keep control.
+                    You must always hold &gt;{ownershipFloorPct}% to keep control.
                   </div>
                 </div>
               );
@@ -1939,9 +1945,20 @@ export function AllocatePhase({
               <p className="text-sm text-text-muted mb-2">
                 Raise capital by selling new shares at {formatMoney(effectivePricePerShare)}/share{equityRaisesUsed > 0 ? ` (${Math.round((1 - equityDiscount) * 100)}% discount)` : ''}.
               </p>
-              <p className="text-xs text-text-muted mb-4">
-                Your ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% | Raise #{equityRaisesUsed + 1}
-              </p>
+              <div className="text-xs text-text-muted mb-4 flex flex-wrap gap-x-2 gap-y-0.5">
+                <span>Your ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}%</span>
+                <span className="hidden sm:inline text-white/20">|</span>
+                <span>Raise #{equityRaisesUsed + 1}</span>
+                {!atOwnershipFloor && maxRaiseAmount > 0 && (
+                  <>
+                    <span className="hidden sm:inline text-white/20">|</span>
+                    <span>Max raise: {formatMoney(maxRaiseAmount)}</span>
+                  </>
+                )}
+              </div>
+              {atOwnershipFloor && (
+                <p className="text-xs text-warning mb-4">At {ownershipFloorPct}% ownership floor — must maintain majority control. Buy back shares to raise more equity later.</p>
+              )}
               {raiseCooldownBlocked && (
                 <p className="text-xs text-warning mb-4">Cooldown: buyback in Y{lastBuybackRound} — wait {raiseCooldownRemainder} more yr</p>
               )}
@@ -1949,13 +1966,13 @@ export function AllocatePhase({
               <div className="flex gap-1 mb-3 bg-white/5 rounded p-0.5 w-fit">
                 <button
                   onClick={() => { setEquityMode('dollars'); setEquityAmount(''); }}
-                  className={`text-xs px-3 py-1 rounded transition-colors ${equityMode === 'dollars' ? 'bg-accent text-white' : 'text-text-muted hover:text-text-secondary'}`}
+                  className={`text-xs px-3 py-2.5 min-h-[44px] rounded transition-colors flex items-center ${equityMode === 'dollars' ? 'bg-accent text-white' : 'text-text-muted hover:text-text-secondary'}`}
                 >
                   $ Amount
                 </button>
                 <button
                   onClick={() => { setEquityMode('shares'); setEquityAmount(''); }}
-                  className={`text-xs px-3 py-1 rounded transition-colors ${equityMode === 'shares' ? 'bg-accent text-white' : 'text-text-muted hover:text-text-secondary'}`}
+                  className={`text-xs px-3 py-2.5 min-h-[44px] rounded transition-colors flex items-center ${equityMode === 'shares' ? 'bg-accent text-white' : 'text-text-muted hover:text-text-secondary'}`}
                 >
                   # Shares
                 </button>
@@ -2001,15 +2018,22 @@ export function AllocatePhase({
                     }
                   }}
                   disabled={(() => {
-                    if (raiseBlocked) return true;
+                    if (raiseBlocked || atOwnershipFloor) return true;
                     if (!equityAmount || effectivePricePerShare <= 0) return true;
+                    let internalAmt: number;
                     if (equityMode === 'dollars') {
                       const dollars = parseInt(equityAmount) || 0;
-                      return dollars < 1000;
+                      if (dollars < 1000) return true;
+                      internalAmt = Math.round(dollars / 1000);
                     } else {
                       const shareCount = parseInt(equityAmount) || 0;
-                      return shareCount < 1;
+                      if (shareCount < 1) return true;
+                      internalAmt = Math.floor(shareCount * effectivePricePerShare);
                     }
+                    // Check if this amount would breach 51% floor
+                    const newShares_ = Math.round((internalAmt / effectivePricePerShare) * 1000) / 1000;
+                    const newOwnership_ = founderShares / (sharesOutstanding + newShares_);
+                    return newOwnership_ < MIN_FOUNDER_OWNERSHIP;
                   })()}
                   className="btn-primary text-sm min-h-[44px]"
                 >
@@ -2055,12 +2079,12 @@ export function AllocatePhase({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-text-muted">Your new ownership</span>
-                      <span className={`font-mono font-bold ${newOwnership < 51 ? 'text-danger' : newOwnership < 55 ? 'text-warning' : ''}`}>
+                      <span className={`font-mono font-bold ${newOwnership < ownershipFloorPct ? 'text-danger' : newOwnership < 55 ? 'text-warning' : ''}`}>
                         {newOwnership.toFixed(1)}%
                       </span>
                     </div>
-                    {newOwnership < 51 && (
-                      <p className="text-danger mt-1">Below 51% — this raise would be blocked</p>
+                    {newOwnership < ownershipFloorPct && (
+                      <p className="text-danger mt-1">Below {ownershipFloorPct}% — this raise would be blocked</p>
                     )}
                   </div>
                 );

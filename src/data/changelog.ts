@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 19, 2025',
+    title: 'Equity Raise Clarity',
+    sections: [
+      {
+        heading: 'UX Improvement',
+        items: [
+          'Equity raises now clearly explain the 51% ownership floor — you\'ll see your max raise amount and a warning when you\'re at the limit.',
+          'The Issue Equity button is now properly disabled when a raise would breach the floor, instead of silently failing.',
+          'Updated the manual to document the ownership floor rule.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 19, 2025',
     title: 'Challenger Mode Fix',
     sections: [
       {
