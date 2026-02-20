@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 19, 2025',
+    title: 'Manual Transparency Update',
+    sections: [
+      {
+        heading: 'User Manual',
+        items: [
+          'Tuck-in acquisitions now show a full quality-to-discount table (Q5 = 5% off through Q1 = 25% off) with a worked pricing example.',
+          'Integration quality section expanded with the exact synergy rates for all three outcomes (Seamless, Rocky, Troubled) across tuck-ins, standalones, and mergers — plus the probability modifiers that influence the roll.',
+          'New synergy modifiers section explains how sub-type affinity (100%/75%/45%) and size ratio (Ideal through Overreach) affect synergy capture, with a worked dollar example.',
+          'Integrated platform bonuses clarified: applied once at forge time, stack independently with acquisition synergies, and apply to post-synergy margins if acquired first.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 19, 2025',
     title: 'Deal Pass Persistence',
     sections: [
       {
