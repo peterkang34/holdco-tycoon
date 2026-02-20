@@ -243,7 +243,7 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
                 </div>
               ))}
 
-              {status.participantCount < 2 && (
+              {status && status.participantCount < 2 && (
                 <div className="flex items-center gap-2 p-3 rounded-lg bg-white/5 border border-dashed border-white/10">
                   <span className="text-text-muted text-sm">◌</span>
                   <span className="text-text-muted text-sm">Waiting for more players...</span>
@@ -252,7 +252,7 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
             </div>
 
             <div className="flex items-center justify-between text-xs text-text-muted pt-2 border-t border-white/10">
-              <span>{status.participantCount} player{status.participantCount !== 1 ? 's' : ''}</span>
+              <span>{status?.participantCount ?? 0} player{status?.participantCount !== 1 ? 's' : ''}</span>
               <span>Updates automatically</span>
             </div>
           </div>
