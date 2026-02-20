@@ -160,13 +160,24 @@ export function parseScoreboardFromUrl(): ChallengeParams | null {
   return scoreboardCode ? decodeChallengeParams(scoreboardCode) : null;
 }
 
-/** Clean challenge params from URL without page reload */
+/** Clean challenge params from URL without page reload (preserves any non-challenge params) */
 export function cleanChallengeUrl(): void {
   const url = new URL(window.location.href);
   url.searchParams.delete('c');
   url.searchParams.delete('r');
   url.searchParams.delete('s');
-  window.history.replaceState({}, '', url.pathname + url.hash);
+  const qs = url.searchParams.toString();
+  window.history.replaceState({}, '', url.pathname + (qs ? '?' + qs : '') + url.hash);
+}
+
+/** Replace current URL with ?c= challenge param (e.g. when transitioning from scoreboard to play) */
+export function replaceUrlWithChallenge(params: ChallengeParams): void {
+  const encoded = encodeChallengeParams(params);
+  const url = new URL(window.location.href);
+  url.searchParams.delete('s');
+  url.searchParams.delete('r');
+  url.searchParams.set('c', encoded);
+  window.history.replaceState({}, '', url.pathname + '?' + url.searchParams.toString() + url.hash);
 }
 
 // ── Comparison Logic ─────────────────────────────────────────────

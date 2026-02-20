@@ -6,7 +6,7 @@ import { GameScreen } from './components/screens/GameScreen';
 import { GameOverScreen } from './components/screens/GameOverScreen';
 import { ScoreboardScreen } from './components/screens/ScoreboardScreen';
 import { SectorId, GameDifficulty, GameDuration } from './engine/types';
-import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, type ChallengeParams, type PlayerResult } from './utils/challenge';
+import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, replaceUrlWithChallenge, type ChallengeParams, type PlayerResult } from './utils/challenge';
 
 type Screen = 'intro' | 'game' | 'gameOver' | 'scoreboard';
 
@@ -49,16 +49,15 @@ function App() {
     initialOwnershipPct,
     totalDebt,
     hasRestructured,
-    isChallenge,
     startGame,
     resetGame,
   } = useGameStore();
 
   // Parse challenge/scoreboard URL on mount (?s= takes precedence over ?c=)
+  // URL params are kept in the browser bar for bookmarking/sharing — cleaned only on explicit navigation
   useEffect(() => {
     const scoreboard = parseScoreboardFromUrl();
     if (scoreboard) {
-      cleanChallengeUrl();
       setScoreboardParams(scoreboard);
       setScreen('scoreboard');
       return;
@@ -66,15 +65,14 @@ function App() {
 
     const { challenge, result } = parseChallengeFromUrl();
     if (challenge) {
-      cleanChallengeUrl();
-
       // If a saved game is in progress with a DIFFERENT seed, ignore the challenge
       // to prevent seed mismatch poisoning the GameOverScreen
       const hasSavedGame = holdcoName && round > 0;
       const seedMatches = hasSavedGame && seed === challenge.seed;
 
       if (hasSavedGame && !seedMatches) {
-        // Saved game has different seed — don't overwrite with challenge data
+        // Saved game has different seed — clean challenge URL and keep saved game
+        cleanChallengeUrl();
         return;
       }
 
@@ -82,10 +80,8 @@ function App() {
       if (result) {
         setIncomingResult(result);
       }
-    } else if (isChallenge && seed) {
-      // Reconstruct challengeData from persisted store (survives browser refresh)
-      setChallengeData({ seed, difficulty: difficulty ?? 'easy', duration: duration ?? 'standard' });
     }
+    // No fallback from persisted isChallenge — URL is the source of truth for challenge context
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check if there's a saved game on mount (skip if scoreboard URL already set screen)
@@ -102,7 +98,9 @@ function App() {
     startGame(name, startingSector, difficulty, duration, seed);
     // If starting with a seed (from challenge URL or creator), mark as challenge
     if (seed != null && !challengeData) {
-      setChallengeData({ seed, difficulty, duration });
+      const params = { seed, difficulty, duration };
+      setChallengeData(params);
+      replaceUrlWithChallenge(params);
     }
     setIsNewGame(true);
     setScreen('game');
@@ -116,6 +114,7 @@ function App() {
     resetGame();
     setChallengeData(null);
     setIncomingResult(null);
+    cleanChallengeUrl();
     setScreen('intro');
   };
 
@@ -182,6 +181,7 @@ function App() {
           onPlayChallenge={(params) => {
             setChallengeData(params);
             setScoreboardParams(null);
+            replaceUrlWithChallenge(params);
             setScreen('intro');
           }}
           onPlayAgain={() => {

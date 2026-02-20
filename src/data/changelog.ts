@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 19, 2025',
+    title: 'Challenge Mode: Persistent Links',
+    sections: [
+      {
+        heading: 'Challenge Mode',
+        items: [
+          'Challenge and scoreboard URLs now stay in your browser address bar — bookmark them, share directly from the URL bar, or refresh without losing the link.',
+          'Fixed an issue where stale challenge UI would reappear on page refresh after completing a challenge game.',
+          'Challenge creators now keep their challenge context when refreshing mid-game.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 19, 2025',
     title: 'Deal Evaluation Guide',
     sections: [
       {
