@@ -290,27 +290,84 @@ function AcquiringContent() {
 
       <SubHeading>Quality Ratings</SubHeading>
       <P>
-        Every business has a quality rating from 1 to 5 stars. Quality profoundly affects
-        performance:
+        Every business has a quality rating from 1 to 5 stars. Quality is the single most
+        important attribute of a deal &mdash; it drives the due diligence signals you see,
+        the seller archetype you encounter, and the financial profile of the business.
       </P>
-      <BulletList items={[
-        'Higher quality = better organic growth rates',
-        'Higher quality = stronger margin retention',
-        'Higher quality = higher exit multiples (quality premium: +0.4x per star above 3)',
-        'Higher quality = smoother integration when acquired',
-        'Quality 1-2 businesses are turnaround candidates',
-      ]} />
+      <DataTable
+        headers={['Quality', 'Margin', 'Growth', 'Acq Multiple', 'Exit Premium']}
+        rows={[
+          ['Q5 Best-in-Class', '+3.0 ppt', '+1.0 ppt', '+0.70x', '+0.8x'],
+          ['Q4 Well-Run', '+1.5 ppt', '+0.5 ppt', '+0.35x', '+0.4x'],
+          ['Q3 Solid', 'Baseline', 'Baseline', 'Baseline', '0'],
+          ['Q2 Below Avg', '-1.5 ppt', '-0.5 ppt', '-0.35x', '-0.4x'],
+          ['Q1 Struggling', '-3.0 ppt', '-1.0 ppt', '-0.70x', '-0.8x'],
+        ]}
+      />
+      <P>
+        Revenue is also scaled by quality: Q5 businesses generate ~120% of the sector range,
+        while Q1 businesses generate ~80%. Quality 1-2 businesses are turnaround candidates
+        that can be improved through turnaround programs (see the Turnaround Programs section).
+      </P>
 
       <SubHeading>Due Diligence Signals</SubHeading>
       <P>
-        Each deal shows due diligence signals to help you evaluate risk:
+        Each deal shows five due diligence signals. These are
+        <strong> direct indicators of the underlying quality rating</strong>. Learning to read
+        them helps you evaluate deals even before checking the star count:
+      </P>
+      <DataTable
+        headers={['Signal', 'Q4-5', 'Q2-3', 'Q1']}
+        rows={[
+          ['Operator Quality', 'Strong', 'Moderate', 'Weak'],
+          ['Trend', 'Growing', 'Flat or Growing', 'Flat or Declining'],
+          ['Retention', '90-98%', '75-92%', '65-78%'],
+          ['Competition', 'Leader / Competitive', 'Competitive / Commoditized', 'Commoditized'],
+          ['Revenue Conc.', 'Low to Medium', 'Medium (varies by sector)', 'High'],
+        ]}
+      />
+      <P>
+        <strong>How each signal affects gameplay:</strong>
       </P>
       <BulletList items={[
-        <><strong>Revenue Concentration</strong> (low/medium/high) &mdash; high concentration means losing one client is devastating</>,
-        <><strong>Operator Quality</strong> (strong/moderate/weak) &mdash; affects integration success</>,
-        <><strong>Trend</strong> (growing/flat/declining) &mdash; current trajectory</>,
-        <><strong>Customer Retention</strong> (0-100%) &mdash; how sticky the revenue is</>,
-        <><strong>Competitive Position</strong> (leader/competitive/commoditized) &mdash; market power</>,
+        <><strong>Operator Quality</strong> is the most impactful signal. It directly affects integration: Strong = 1-year integration + 15% success bonus + 0.3x exit de-risking premium. Weak = 3-year integration - 15% success penalty.</>,
+        <><strong>Revenue Concentration</strong> affects exit multiples: low concentration adds +0.3x de-risking premium at exit. High concentration carries event risk (client loss).</>,
+        <><strong>Customer Retention</strong> of 90%+ adds +0.2x de-risking premium at exit. Retention also signals organic revenue stability.</>,
+        <><strong>Competitive Position</strong> affects the acquisition multiple: +0.3x for market leaders, -0.3x for commoditized businesses. This flows into exit valuation as a higher base multiple.</>,
+        <><strong>Trend</strong> signals the business&rsquo;s current growth trajectory. Growing businesses have higher organic growth rates built in (+2 ppt).</>,
+      ]} />
+
+      <SubHeading>Seller Archetypes</SubHeading>
+      <P>
+        Every deal features one of six seller archetypes. Like due diligence signals, archetypes
+        are correlated with quality: high-quality businesses attract better seller situations,
+        while low-quality businesses trend toward distressed or burnt-out sellers.
+      </P>
+      <DataTable
+        headers={['Archetype', 'Price', 'Heat', 'Operator']}
+        rows={[
+          ['Retiring Founder', '0 to +5%', '-1 tier', 'Str / Mod'],
+          ['MBO Candidate', '0 to +5%', 'No change', 'Strong'],
+          ['Ex-Franchise', '+5 to +10%', 'No change', 'Str / Mod'],
+          ['Divestiture', '+5 to +10%', '+1 tier', 'Moderate'],
+          ['Burnt Out', '-5 to -10%', 'No change', 'Weak / Mod'],
+          ['Distressed', '-10 to -20%', '-2 tiers', 'Weak'],
+        ]}
+      />
+      <P>
+        The archetype can override the due-diligence operator quality. For example, a Q3 business
+        normally has a &ldquo;Moderate&rdquo; operator, but if the seller is an MBO Candidate,
+        the operator is always &ldquo;Strong.&rdquo; This makes MBO deals more integration-friendly
+        even at average quality. Conversely, a Distressed seller always has a &ldquo;Weak&rdquo;
+        operator regardless of quality rating.
+      </P>
+      <BulletList items={[
+        <><strong>Retiring Founder:</strong> Fair price, smooth transition. The classic &ldquo;aging owner&rdquo; scenario &mdash; good businesses with motivated sellers. More common at Q4-5.</>,
+        <><strong>MBO Candidate:</strong> Management already runs the business. Strong operator is locked in, making integration almost guaranteed. Worth paying fair price. More common at Q4-5.</>,
+        <><strong>Ex-Franchise:</strong> Former franchisee going independent. Slight premium but comes with +2% organic growth bonus and entrepreneurial energy.</>,
+        <><strong>Divestiture:</strong> Parent company shedding a non-core division. Clean separation but you pay a premium and face more competition (higher heat).</>,
+        <><strong>Burnt Out:</strong> Owner wants out. Discounted price but expect operational weakness &mdash; the business may need turnaround investment. Not eligible for rollover equity. More common at Q1-2.</>,
+        <><strong>Distressed:</strong> Seller under financial pressure. Steep discount and low competition, but weak operations and higher integration risk. Not eligible for rollover equity. More common at Q1-2.</>,
       ]} />
 
       <SubHeading>Tuck-in Acquisitions</SubHeading>

@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 19, 2025',
+    title: 'Deal Evaluation Guide',
+    sections: [
+      {
+        heading: 'User Manual',
+        items: [
+          'Quality Ratings section now shows a full table of how each star level affects margins, growth rates, acquisition multiples, and exit premiums.',
+          'New Due Diligence Signals section explains what each signal (operator quality, revenue concentration, retention, competitive position, trend) means for gameplay — including exact integration duration, success probability modifiers, and exit de-risking premiums.',
+          'New Seller Archetypes section documents all six seller types with their price impacts, heat modifiers, operator quality overrides, and quality correlations.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 19, 2025',
     title: 'Challenge Mode: FEV Ranking',
     sections: [
       {
