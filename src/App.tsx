@@ -49,6 +49,7 @@ function App() {
     initialOwnershipPct,
     totalDebt,
     hasRestructured,
+    integratedPlatforms,
     startGame,
     resetGame,
   } = useGameStore();
@@ -170,6 +171,7 @@ function App() {
           initialOwnershipPct={initialOwnershipPct}
           totalDebt={totalDebt}
           hasRestructured={hasRestructured}
+          integratedPlatforms={integratedPlatforms}
           challengeData={challengeData}
           incomingResult={incomingResult}
           onPlayAgain={handlePlayAgain}

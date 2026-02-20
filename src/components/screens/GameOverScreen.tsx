@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration } from '../../engine/types';
+import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration, IntegratedPlatform } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLeaderboardRankFromList } from '../../engine/scoring';
 import { calculateExitValuation } from '../../engine/simulation';
@@ -15,6 +15,7 @@ import {
   type PlayerResult,
   buildChallengeUrl,
   buildResultUrl,
+  buildScoreboardUrl,
   shareChallenge,
 } from '../../utils/challenge';
 import { ChallengeComparison } from '../ui/ChallengeComparison';
@@ -47,6 +48,7 @@ interface GameOverScreenProps {
   initialOwnershipPct: number;
   totalDebt: number;
   hasRestructured?: boolean;
+  integratedPlatforms: IntegratedPlatform[];
   challengeData?: ChallengeParams | null;
   incomingResult?: PlayerResult | null;
   onPlayAgain: () => void;
@@ -79,6 +81,7 @@ export function GameOverScreen({
   initialOwnershipPct,
   totalDebt,
   hasRestructured = false,
+  integratedPlatforms,
   challengeData,
   incomingResult,
   onPlayAgain,
@@ -92,6 +95,7 @@ export function GameOverScreen({
   const [saving, setSaving] = useState(false);
   const [leaderboardTab, setLeaderboardTab] = useState<LeaderboardTab>('overall');
   const [challengeCopied, setChallengeCopied] = useState(false);
+  const [scoreboardLinkCopied, setScoreboardLinkCopied] = useState(false);
   const [showComparison, setShowComparison] = useState(!!incomingResult);
   const [scoreboardFailed, setScoreboardFailed] = useState(false);
 
@@ -131,6 +135,15 @@ export function GameOverScreen({
     }
   };
 
+  const handleShareScoreboardLink = async () => {
+    const url = buildScoreboardUrl(currentChallengeParams);
+    const shared = await shareChallenge(url, 'Holdco Tycoon Challenge Scoreboard');
+    if (shared) {
+      setScoreboardLinkCopied(true);
+      setTimeout(() => setScoreboardLinkCopied(false), 2000);
+    }
+  };
+
   // Fire telemetry on game completion
   useEffect(() => {
     const sector = businesses[0]?.sectorId || exitedBusinesses[0]?.sectorId || 'agency';
@@ -161,7 +174,7 @@ export function GameOverScreen({
     const currentOwnership = sharesOutstanding > 0 ? founderShares / sharesOutstanding : 1;
     const opcoDebt = activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
     const businessValues = activeBusinesses.map(business => {
-      const valuation = calculateExitValuation(business, maxRounds);
+      const valuation = calculateExitValuation(business, maxRounds, undefined, undefined, integratedPlatforms);
       const value = Math.round(business.ebitda * valuation.totalMultiple);
       const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
       const moic = totalInvested > 0 ? value / totalInvested : 0;
@@ -542,11 +555,36 @@ export function GameOverScreen({
 
       {/* Challenge Scoreboard (auto-submit + live scoreboard for challenge games) */}
       {challengeData && !scoreboardFailed && (
-        <ChallengeScoreboard
-          challengeParams={currentChallengeParams}
-          myResult={myResult}
-          onFallbackToManual={() => setScoreboardFailed(true)}
-        />
+        <>
+          <ChallengeScoreboard
+            challengeParams={currentChallengeParams}
+            myResult={myResult}
+            onFallbackToManual={() => setScoreboardFailed(true)}
+          />
+          {/* Sharing buttons for challenge games */}
+          <div className="card mb-6 border-accent/20">
+            <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
+              <span>🔗</span> Share
+            </h2>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleShareScoreboardLink}
+                className="btn-primary flex-1 text-sm min-h-[44px]"
+              >
+                {scoreboardLinkCopied ? 'Copied!' : 'Copy Scoreboard Link'}
+              </button>
+              <button
+                onClick={handleChallengeShare}
+                className="btn-secondary flex-1 text-sm min-h-[44px]"
+              >
+                {challengeCopied ? 'Copied!' : 'Invite More Players'}
+              </button>
+            </div>
+            <p className="text-xs text-text-muted mt-2 text-center">
+              Share the scoreboard so others can see results, or invite more players to compete
+            </p>
+          </div>
+        </>
       )}
 
       {/* Challenge Friends (manual flow — shown for solo games, or as fallback when scoreboard fails) */}
@@ -567,13 +605,13 @@ export function GameOverScreen({
         <div className="flex flex-col sm:flex-row gap-3">
           <button
             onClick={handleChallengeShare}
-            className="btn-primary flex-1 text-sm"
+            className="btn-primary flex-1 text-sm min-h-[44px]"
           >
             {challengeCopied ? 'Copied!' : 'Share Challenge Link'}
           </button>
           <button
             onClick={handleShareResult}
-            className="btn-secondary flex-1 text-sm"
+            className="btn-secondary flex-1 text-sm min-h-[44px]"
           >
             Share My Result
           </button>
@@ -649,7 +687,7 @@ export function GameOverScreen({
             if (business.status === 'sold') {
               exitValue = business.exitPrice || 0;
             } else {
-              const valuation = calculateExitValuation(business, maxRounds);
+              const valuation = calculateExitValuation(business, maxRounds, undefined, undefined, integratedPlatforms);
               exitMultiple = valuation.totalMultiple;
               exitValue = Math.round(business.ebitda * valuation.totalMultiple);
             }

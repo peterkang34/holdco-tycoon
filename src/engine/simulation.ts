@@ -26,7 +26,7 @@ import {
   generateBuyerProfile,
   generateValuationCommentary,
 } from './buyers';
-import { calculateDistressLevel } from './distress';
+import { calculateDistressLevel, getDistressRestrictions } from './distress';
 import { getMASourcingAnnualCost } from '../data/sharedServices';
 import {
   clampMargin,
@@ -55,9 +55,11 @@ import {
   SUPPLIER_VERTICAL_MIN_SAME_SECTOR,
   CONSOLIDATION_BOOM_PROB,
   CONSOLIDATION_BOOM_SECTORS,
+  EARNOUT_EXPIRATION_YEARS,
 } from '../data/gameConfig';
 import { getPlatformMultipleExpansion, getPlatformRecessionModifier } from './platforms';
 import { getTurnaroundExitPremium } from './turnarounds';
+import { getTurnaroundTierAnnualCost, getProgramById } from '../data/turnaroundPrograms';
 
 export const TAX_RATE = 0.30;
 
@@ -1450,43 +1452,95 @@ export function calculateMetrics(state: GameState): Metrics {
     : 0;
   const totalDeductibleCosts = sharedServicesCost + maSourcingCost;
 
-  // Total FCF (annual - each round is now 1 year)
-  // Portfolio-level tax is computed inside calculatePortfolioFcf
-  // holdcoLoanBalance is the holdco-level loan; per-business bank debt is on each business
+  // Holdco loan
   const holdcoLoanBalance = state.holdcoLoanBalance ?? 0;
   const holdcoLoanRate = state.holdcoLoanRate ?? state.interestRate;
 
-  const totalFcf = calculatePortfolioFcf(
-    activeBusinesses,
-    sharedServicesBenefits.capexReduction,
-    sharedServicesBenefits.cashConversionBonus,
-    holdcoLoanBalance,
-    holdcoLoanRate,
-    totalDeductibleCosts
-  );
-
-  // Portfolio tax breakdown for NOPAT calculation
-  const taxBreakdown = calculatePortfolioTax(
-    activeBusinesses, holdcoLoanBalance, holdcoLoanRate, totalDeductibleCosts
-  );
-
   // Total debt = holdco loan + per-business bank debt + seller notes
-  const opcoSellerNotes = activeBusinesses.reduce(
+  const allDebtBusinesses = state.businesses.filter(b => b.status === 'active' || b.status === 'integrated');
+  const opcoSellerNotes = allDebtBusinesses.reduce(
     (sum, b) => sum + b.sellerNoteBalance,
     0
   );
   const totalDebt = state.totalDebt + opcoSellerNotes;
 
-  // Interest expense
-  const annualInterest = holdcoLoanBalance * holdcoLoanRate;
-  const opcoInterest = activeBusinesses.reduce(
-    (sum, b) => sum + b.sellerNoteBalance * b.sellerNoteRate
-               + b.bankDebtBalance * (b.bankDebtRate || 0),
-    0
+  // Distress interest penalty (matches CollectPhase and store waterfall)
+  const distressLevelForFcf = calculateDistressLevel(
+    totalEbitda > 0 ? Math.max(0, totalDebt - state.cash) / totalEbitda : 0,
+    totalDebt, totalEbitda, state.cash
+  );
+  const distressRestrictions = getDistressRestrictions(distressLevelForFcf);
+  const interestPenalty = distressRestrictions.interestPenalty;
+
+  // Total FCF (annual): EBITDA - CapEx - Tax (with penalty in tax shield)
+  // Pass holdcoLoanRate + interestPenalty so tax shield matches actual interest paid
+  const totalFcf = calculatePortfolioFcf(
+    activeBusinesses,
+    sharedServicesBenefits.capexReduction,
+    sharedServicesBenefits.cashConversionBonus,
+    holdcoLoanBalance,
+    holdcoLoanRate + interestPenalty,
+    totalDeductibleCosts
   );
 
-  // Net FCF after interest and shared services costs
-  const netFcf = totalFcf - annualInterest - opcoInterest - sharedServicesCost;
+  // Portfolio tax breakdown for NOPAT calculation (with penalty for accurate shield)
+  const taxBreakdown = calculatePortfolioTax(
+    activeBusinesses, holdcoLoanBalance, holdcoLoanRate + interestPenalty, totalDeductibleCosts
+  );
+
+  // Holdco loan P&I (interest + principal — matches CollectPhase waterfall)
+  const holdcoLoanInterest = Math.round(holdcoLoanBalance * (holdcoLoanRate + interestPenalty));
+  const holdcoLoanPrincipal = (state.holdcoLoanRoundsRemaining ?? 0) > 0
+    ? Math.round(holdcoLoanBalance / state.holdcoLoanRoundsRemaining)
+    : 0;
+  const holdcoLoanPI = holdcoLoanInterest + holdcoLoanPrincipal;
+
+  // OpCo debt service: seller note P&I + bank debt P&I for active + integrated businesses
+  let opcoSellerNoteService = 0;
+  let opcoBankDebtService = 0;
+  for (const b of allDebtBusinesses) {
+    if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
+      opcoSellerNoteService += Math.round(b.sellerNoteBalance * b.sellerNoteRate);
+      opcoSellerNoteService += Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
+    }
+    if (b.bankDebtBalance > 0 && b.bankDebtRoundsRemaining > 0) {
+      opcoBankDebtService += Math.round(b.bankDebtBalance * (b.bankDebtRate || 0));
+      opcoBankDebtService += Math.round(b.bankDebtBalance / b.bankDebtRoundsRemaining);
+    }
+  }
+
+  // Earn-out payments (active + integrated businesses — matches CollectPhase logic)
+  let earnoutPayments = 0;
+  for (const b of allDebtBusinesses) {
+    if (b.earnoutRemaining <= 0 || b.earnoutTarget <= 0) continue;
+    if (state.round > 0 && state.round - b.acquisitionRound > EARNOUT_EXPIRATION_YEARS) continue;
+    if (b.status === 'active' && b.acquisitionEbitda > 0) {
+      const growth = (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda;
+      if (growth >= b.earnoutTarget) earnoutPayments += b.earnoutRemaining;
+    } else if (b.status === 'integrated' && b.parentPlatformId) {
+      const platform = state.businesses.find(p => p.id === b.parentPlatformId && p.status === 'active');
+      if (platform && platform.acquisitionEbitda > 0) {
+        const growth = (platform.ebitda - platform.acquisitionEbitda) / platform.acquisitionEbitda;
+        if (growth >= b.earnoutTarget) earnoutPayments += b.earnoutRemaining;
+      }
+    }
+  }
+
+  // Turnaround costs (tier + active program costs)
+  const turnaroundTierCost = getTurnaroundTierAnnualCost(state.turnaroundTier ?? 0);
+  const turnaroundProgramCosts = (state.activeTurnarounds ?? [])
+    .filter(t => t.status === 'active')
+    .reduce((sum, t) => {
+      const prog = getProgramById(t.programId);
+      return sum + (prog ? prog.annualCost : 0);
+    }, 0);
+  const turnaroundCost = turnaroundTierCost + turnaroundProgramCosts;
+
+  // Net FCF matching CollectPhase waterfall:
+  // totalFcf (EBITDA - CapEx - Tax) - holdco P&I - opco debt service - earnouts
+  // - shared services - MA sourcing - turnaround costs
+  const netFcf = totalFcf - holdcoLoanPI - opcoSellerNoteService - opcoBankDebtService
+    - earnoutPayments - sharedServicesCost - maSourcingCost - turnaroundCost;
 
   // Portfolio value (full exit valuation engine — aligns buyback/equity pricing with FEV)
   const portfolioValue = activeBusinesses.reduce((sum, b) => {

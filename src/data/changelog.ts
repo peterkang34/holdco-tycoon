@@ -11,6 +11,35 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'February 20, 2025',
+    title: 'Bug Fixes & Polish',
+    sections: [
+      {
+        heading: 'Fixes',
+        items: [
+          'Fixed FCF forecast and waterfall calculations to include all debt obligations — dashboard numbers now match the actual cash flow waterfall exactly.',
+          'Fixed MOIC breakdown to show actual market valuations (with all premiums and buyer-pool logic) instead of simplified sector averages.',
+          'Fixed leverage ratio to correctly include integrated (bolt-on) business seller notes — previously only counted standalone businesses.',
+          'Fixed FEV breakdown on the game-over screen to account for integrated platform bonuses when calculating exit valuations.',
+        ],
+      },
+      {
+        heading: 'Challenge Mode',
+        items: [
+          'Scores are now revealed immediately when players finish — no more waiting for the host to reveal.',
+          'Removed the hidden-score step entirely for a simpler, faster experience.',
+        ],
+      },
+      {
+        heading: 'Mobile',
+        items: [
+          'Fixed waterfall values getting squeezed on narrow screens.',
+          'Improved touch target sizes on challenge sharing buttons.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 19, 2025',
     title: 'Challenge Mode: Persistent Links',
     sections: [

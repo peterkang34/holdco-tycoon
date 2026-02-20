@@ -1,14 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { PlayerResult, ChallengeParams } from '../../utils/challenge';
-import { encodeChallengeParams, getPlayerToken, getHostToken, isTied, buildScoreboardUrl, shareChallenge } from '../../utils/challenge';
+import { encodeChallengeParams, getPlayerToken, isTied, buildScoreboardUrl, shareChallenge } from '../../utils/challenge';
 import {
   submitChallengeResult,
   getChallengeStatus,
-  revealChallengeScores,
   type ChallengeStatus,
 } from '../../services/challengeApi';
 import { formatMoney } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
+import { ScoreboardRow } from './ScoreboardRow';
 
 interface ChallengeScoreboardProps {
   challengeParams: ChallengeParams;
@@ -23,13 +23,9 @@ const MAX_CONSECUTIVE_FAILURES = 4; // Fall back after 4 failed polls (~1 min)
 export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToManual }: ChallengeScoreboardProps) {
   const code = encodeChallengeParams(challengeParams);
   const playerToken = getPlayerToken();
-  const hostToken = getHostToken(code);
-  const amHost = !!hostToken;
 
   const [status, setStatus] = useState<ChallengeStatus | null>(null);
   const [submitState, setSubmitState] = useState<'pending' | 'success' | 'error'>('pending');
-  const [revealing, setRevealing] = useState(false);
-  const [revealError, setRevealError] = useState<string | null>(null);
   const [pollError, setPollError] = useState(false);
   const [scoreboardCopied, setScoreboardCopied] = useState(false);
   const pollCount = useRef(0);
@@ -40,13 +36,13 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
   // Submit result (called on mount + retry)
   const doSubmit = useCallback(async () => {
     setSubmitState('pending');
-    const res = await submitChallengeResult(code, playerToken, myResult, hostToken ?? undefined);
+    const res = await submitChallengeResult(code, playerToken, myResult);
     if (res.success) {
       setSubmitState('success');
     } else {
       setSubmitState('error');
     }
-  }, [code, playerToken, myResult, hostToken]);
+  }, [code, playerToken, myResult]);
 
   // Auto-submit on mount
   useEffect(() => { doSubmit(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -73,11 +69,6 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
     if (data) {
       setStatus(data);
       consecutiveFailures.current = 0;
-      // Stop polling once revealed
-      if (data.revealed && intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
     } else {
       // Track consecutive failures (#4)
       consecutiveFailures.current += 1;
@@ -116,17 +107,13 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
     };
   }, [submitState, fetchStatus, startPolling]);
 
-  const handleReveal = async () => {
-    if (!hostToken || revealing) return;
-    setRevealing(true);
-    setRevealError(null);
-    const res = await revealChallengeScores(code, hostToken, playerToken);
-    if (res.success) {
-      await fetchStatus();
-    } else {
-      setRevealError(res.error || 'Failed to reveal scores');
+  const handleCopyScoreboardLink = async () => {
+    const url = buildScoreboardUrl(challengeParams);
+    const shared = await shareChallenge(url, 'Holdco Tycoon Challenge Results');
+    if (shared) {
+      setScoreboardCopied(true);
+      setTimeout(() => setScoreboardCopied(false), 2000);
     }
-    setRevealing(false);
   };
 
   // Error state — retry + fallback to manual
@@ -180,8 +167,8 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
     );
   }
 
-  // Poll error after initial success — show degraded state (#4)
-  if (pollError && !status.revealed) {
+  // Poll error after initial success (#4)
+  if (pollError) {
     return (
       <div className="card mb-6 border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 to-orange-500/5">
         <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
@@ -208,9 +195,11 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
     );
   }
 
-  // Revealed state — full comparison table
-  if (status.revealed) {
-    const results = status.results;
+  // Scores are always revealed now — show the full comparison table
+  // For backwards compat, handle legacy unrevealed status by showing participant list with scores
+  const results = status.revealed ? status.results : null;
+
+  if (results) {
     const winner = results[0];
     const hasTie = results.length >= 2 && isTied(results[0], results[1]);
 
@@ -221,7 +210,7 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
         </h2>
 
         {/* Winner banner */}
-        {winner && !hasTie && (
+        {winner && !hasTie && results.length >= 2 && (
           <div className="mb-4 p-3 rounded-lg bg-accent/10 border border-accent/30 text-center">
             <span className="text-accent font-bold">
               {winner.isYou ? 'You win!' : `${winner.name} wins!`}
@@ -245,7 +234,7 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
                     <span className="inline-block max-w-[120px] truncate align-bottom">
                       {entry.isYou ? 'You' : entry.name}
                     </span>
-                    {i === 0 && !hasTie && <span className="ml-1 text-yellow-400">*</span>}
+                    {i === 0 && !hasTie && results.length >= 2 && <span className="ml-1 text-yellow-400">*</span>}
                   </th>
                 ))}
               </tr>
@@ -264,122 +253,93 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
           </table>
         </div>
 
-        {/* Persistent results link */}
+        {/* Footer with participant count + copy link */}
         <div className="mt-4 pt-3 border-t border-white/10">
           <button
-            onClick={async () => {
-              const url = buildScoreboardUrl(challengeParams);
-              const shared = await shareChallenge(url, 'Holdco Tycoon Challenge Results');
-              if (shared) {
-                setScoreboardCopied(true);
-                setTimeout(() => setScoreboardCopied(false), 2000);
-              }
-            }}
+            onClick={handleCopyScoreboardLink}
             className="btn-secondary w-full text-sm min-h-[44px]"
           >
             {scoreboardCopied ? 'Copied!' : 'Copy Scoreboard Link'}
           </button>
           <p className="text-xs text-text-muted mt-1 text-center">Bookmark or share — this link stays live for 30 days</p>
         </div>
+
+        <div className="flex items-center justify-between text-xs text-text-muted pt-2">
+          <span>{results.length} player{results.length !== 1 ? 's' : ''}</span>
+          <span>Updates automatically</span>
+        </div>
       </div>
     );
   }
 
-  // Unrevealed state — names with hidden scores
-  return (
-    <div className="card mb-6 border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 to-orange-500/5">
-      <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
-        <span>🏆</span> Challenge Scoreboard
-      </h2>
-      <p className="text-xs text-text-muted mb-4">
-        Scores are hidden until the challenge creator reveals them.
-      </p>
+  // Fallback: legacy unrevealed status (backwards compat for old challenges)
+  // Still show participants with their scores visible
+  if (!status.revealed) {
+    const participants = status.participants;
 
-      <div className="space-y-2 mb-4">
-        {status.participants.map((p, i) => (
-          <div
-            key={i}
-            className={`flex items-center justify-between p-3 rounded-lg ${
-              p.isYou ? 'bg-accent/10 border border-accent/30' : 'bg-white/5'
-            }`}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-accent text-sm">✓</span>
-              <span className={`font-medium text-sm ${p.isYou ? 'text-accent' : ''}`}>
-                {p.name}
-                {p.isYou && <span className="text-xs text-text-muted ml-1">(you)</span>}
-              </span>
-            </div>
-            <div className="text-right">
-              {p.isYou && p.result ? (
-                <span className="font-mono text-sm">
-                  {formatMoney(p.result.fev)} ({p.result.grade})
+    return (
+      <div className="card mb-6 border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 to-orange-500/5">
+        <h2 className="text-lg font-bold mb-3 flex items-center gap-2">
+          <span>🏆</span> Challenge Scoreboard
+        </h2>
+
+        <div className="space-y-2 mb-4">
+          {participants.map((p, i) => (
+            <div
+              key={i}
+              className={`flex items-center justify-between p-3 rounded-lg ${
+                p.isYou ? 'bg-accent/10 border border-accent/30' : 'bg-white/5'
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-accent text-sm">✓</span>
+                <span className={`font-medium text-sm ${p.isYou ? 'text-accent' : ''}`}>
+                  {p.name}
+                  {p.isYou && <span className="text-xs text-text-muted ml-1">(you)</span>}
                 </span>
-              ) : (
-                <span className="text-text-muted text-sm">???</span>
-              )}
+              </div>
+              <div className="text-right">
+                {p.result ? (
+                  <span className="font-mono text-sm">
+                    {formatMoney(p.result.fev)} ({p.result.grade})
+                  </span>
+                ) : (
+                  <span className="text-text-muted text-sm">Submitted</span>
+                )}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {/* Waiting placeholder */}
-        {status.participantCount < 2 && (
-          <div className="flex items-center gap-2 p-3 rounded-lg bg-white/5 border border-dashed border-white/10">
-            <span className="text-text-muted text-sm">◌</span>
-            <span className="text-text-muted text-sm">Waiting for more players...</span>
-          </div>
-        )}
-      </div>
-
-      {/* Host reveal button */}
-      {amHost && status.participantCount >= 2 && (
-        <div className="mb-3">
-          <button
-            onClick={handleReveal}
-            disabled={revealing}
-            className="btn-primary w-full text-sm min-h-[44px]"
-          >
-            {revealing ? 'Revealing...' : 'Reveal Scores'}
-          </button>
-          {revealError && (
-            <p className="text-danger text-xs mt-2">{revealError}</p>
+          {/* Waiting placeholder */}
+          {status.participantCount < 2 && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-white/5 border border-dashed border-white/10">
+              <span className="text-text-muted text-sm">◌</span>
+              <span className="text-text-muted text-sm">Waiting for more players...</span>
+            </div>
           )}
         </div>
-      )}
 
-      {/* Footer */}
-      <div className="flex items-center justify-between text-xs text-text-muted pt-2 border-t border-white/10">
-        <span>{status.participantCount} player{status.participantCount !== 1 ? 's' : ''}</span>
-        <span>Updates automatically</span>
+        {/* Copy link */}
+        <div className="mb-3">
+          <button
+            onClick={handleCopyScoreboardLink}
+            className="btn-secondary w-full text-sm min-h-[44px]"
+          >
+            {scoreboardCopied ? 'Copied!' : 'Copy Scoreboard Link'}
+          </button>
+          <p className="text-xs text-text-muted mt-1 text-center">Bookmark or share — this link stays live for 30 days</p>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-between text-xs text-text-muted pt-2 border-t border-white/10">
+          <span>{status.participantCount} player{status.participantCount !== 1 ? 's' : ''}</span>
+          <span>Updates automatically</span>
+        </div>
       </div>
-    </div>
-  );
+    );
+  }
+
+  return null;
 }
 
-// ── Table Row Component ──────────────────────────────────────────
-
-function ScoreboardRow({
-  label,
-  values,
-  highlight,
-  colorFn,
-}: {
-  label: string;
-  values: string[];
-  highlight?: boolean;
-  colorFn?: (value: string) => string;
-}) {
-  return (
-    <tr className={`border-b border-white/5 ${highlight ? 'bg-white/5' : ''}`}>
-      <td className="py-2 text-text-muted">{label}</td>
-      {values.map((value, i) => (
-        <td
-          key={i}
-          className={`py-2 text-right whitespace-nowrap ${colorFn ? colorFn(value) : 'text-text-primary'}`}
-        >
-          {value}
-        </td>
-      ))}
-    </tr>
-  );
-}
+// ScoreboardRow extracted to shared component

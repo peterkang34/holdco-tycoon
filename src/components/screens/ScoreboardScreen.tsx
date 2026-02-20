@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ChallengeParams } from '../../utils/challenge';
-import { encodeChallengeParams, getPlayerToken, getHostToken, buildScoreboardUrl, shareChallenge, isTied } from '../../utils/challenge';
-import { getChallengeStatus, revealChallengeScores, type ChallengeStatus } from '../../services/challengeApi';
+import { encodeChallengeParams, getPlayerToken, buildScoreboardUrl, shareChallenge, isTied } from '../../utils/challenge';
+import { getChallengeStatus, type ChallengeStatus } from '../../services/challengeApi';
 import { formatMoney } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
+import { ScoreboardRow } from '../ui/ScoreboardRow';
 import { DURATION_CONFIG } from '../../data/gameConfig';
 
 interface ScoreboardScreenProps {
@@ -18,14 +19,10 @@ const MAX_POLLS = 80; // ~20 minutes
 export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain }: ScoreboardScreenProps) {
   const code = encodeChallengeParams(challengeParams);
   const playerToken = getPlayerToken();
-  const hostToken = getHostToken(code);
-  const amHost = !!hostToken;
 
   const [status, setStatus] = useState<ChallengeStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [expired, setExpired] = useState(false);
-  const [revealing, setRevealing] = useState(false);
-  const [revealError, setRevealError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [pollError, setPollError] = useState(false);
   const pollCount = useRef(0);
@@ -41,10 +38,6 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
       consecutiveFailures.current = 0;
       setStatus(data);
       setLoading(false);
-      if (data.revealed && intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
     } else {
       consecutiveFailures.current += 1;
       setLoading(false);
@@ -90,19 +83,6 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
     return () => document.removeEventListener('visibilitychange', handleVisibility);
   }, [fetchStatus]);
 
-  const handleReveal = async () => {
-    if (!hostToken || revealing) return;
-    setRevealing(true);
-    setRevealError(null);
-    const res = await revealChallengeScores(code, hostToken, playerToken);
-    if (res.success) {
-      await fetchStatus();
-    } else {
-      setRevealError(res.error || 'Failed to reveal scores');
-    }
-    setRevealing(false);
-  };
-
   const handleShareScoreboard = async () => {
     const url = buildScoreboardUrl(challengeParams);
     const shared = await shareChallenge(url, 'Holdco Tycoon Challenge Scoreboard');
@@ -115,10 +95,13 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
   const diffLabel = challengeParams.difficulty === 'normal' ? 'Hard' : 'Easy';
   const durLabel = DURATION_CONFIG[challengeParams.duration].label;
 
-  // Pre-compute revealed results outside JSX (avoid IIFE)
+  // Pre-compute results (scores are always revealed now)
   const results = status?.revealed ? status.results : null;
   const winner = results?.[0] ?? null;
   const hasTie = results && results.length >= 2 ? isTied(results[0], results[1]) : false;
+
+  // For legacy unrevealed challenges, show participant list with visible scores
+  const participants = status && !status.revealed ? status.participants : null;
 
   return (
     <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center px-4 sm:px-8 py-8">
@@ -150,7 +133,7 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
         )}
 
         {/* Poll error */}
-        {pollError && !loading && !expired && !status?.revealed && (
+        {pollError && !loading && !expired && (
           <div className="card p-8 text-center">
             <p className="text-text-muted mb-4">Having trouble reaching the server.</p>
             <div className="flex justify-center gap-3">
@@ -177,11 +160,11 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
           </div>
         )}
 
-        {/* Revealed results */}
+        {/* Revealed results — full comparison table */}
         {results && (
           <div className="card p-6 border-yellow-500/20 bg-gradient-to-b from-yellow-500/5 to-transparent">
             {/* Winner banner */}
-            {winner && !hasTie && (
+            {winner && !hasTie && results.length >= 2 && (
               <div className="mb-4 p-3 rounded-lg bg-accent/10 border border-accent/30 text-center">
                 <span className="text-accent font-bold">
                   {winner.isYou ? 'You win!' : `${winner.name} wins!`}
@@ -205,7 +188,7 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
                         <span className="inline-block max-w-[120px] truncate align-bottom">
                           {entry.isYou ? 'You' : entry.name}
                         </span>
-                        {i === 0 && !hasTie && <span className="ml-1 text-yellow-400">*</span>}
+                        {i === 0 && !hasTie && results.length >= 2 && <span className="ml-1 text-yellow-400">*</span>}
                       </th>
                     ))}
                   </tr>
@@ -223,18 +206,20 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
                 </tbody>
               </table>
             </div>
+
+            {/* Participant count + auto-update note */}
+            <div className="flex items-center justify-between text-xs text-text-muted mt-3 pt-2 border-t border-white/10">
+              <span>{results.length} player{results.length !== 1 ? 's' : ''}</span>
+              <span>Updates automatically</span>
+            </div>
           </div>
         )}
 
-        {/* Unrevealed state */}
-        {status && !status.revealed && (
+        {/* Legacy unrevealed state — show participant list with scores visible */}
+        {participants && (
           <div className="card p-6 border-yellow-500/20 bg-gradient-to-b from-yellow-500/5 to-transparent">
-            <p className="text-xs text-text-muted mb-4 text-center">
-              Scores are hidden until the challenge creator reveals them.
-            </p>
-
             <div className="space-y-2 mb-4">
-              {status.participants.map((p, i) => (
+              {participants.map((p, i) => (
                 <div
                   key={i}
                   className={`flex items-center justify-between p-3 rounded-lg ${
@@ -249,10 +234,10 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
                     </span>
                   </div>
                   <div className="text-right">
-                    {p.isYou && p.result ? (
+                    {p.result ? (
                       <span className="font-mono text-sm">{formatMoney(p.result.fev)} ({p.result.grade})</span>
                     ) : (
-                      <span className="text-text-muted text-sm">???</span>
+                      <span className="text-text-muted text-sm">Submitted</span>
                     )}
                   </div>
                 </div>
@@ -265,20 +250,6 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
                 </div>
               )}
             </div>
-
-            {/* Host reveal button */}
-            {amHost && status.participantCount >= 2 && (
-              <div className="mb-3">
-                <button
-                  onClick={handleReveal}
-                  disabled={revealing}
-                  className="btn-primary w-full text-sm min-h-[44px]"
-                >
-                  {revealing ? 'Revealing...' : 'Reveal Scores'}
-                </button>
-                {revealError && <p className="text-danger text-xs mt-2">{revealError}</p>}
-              </div>
-            )}
 
             <div className="flex items-center justify-between text-xs text-text-muted pt-2 border-t border-white/10">
               <span>{status.participantCount} player{status.participantCount !== 1 ? 's' : ''}</span>
@@ -317,25 +288,4 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
   );
 }
 
-function ScoreboardRow({
-  label,
-  values,
-  highlight,
-  colorFn,
-}: {
-  label: string;
-  values: string[];
-  highlight?: boolean;
-  colorFn?: (value: string) => string;
-}) {
-  return (
-    <tr className={`border-b border-white/5 ${highlight ? 'bg-white/5' : ''}`}>
-      <td className="py-2 text-text-muted">{label}</td>
-      {values.map((value, i) => (
-        <td key={i} className={`py-2 text-right whitespace-nowrap ${colorFn ? colorFn(value) : 'text-text-primary'}`}>
-          {value}
-        </td>
-      ))}
-    </tr>
-  );
-}
+// ScoreboardRow extracted to shared component

@@ -103,23 +103,3 @@ export async function getChallengeStatus(
   }
 }
 
-export async function revealChallengeScores(
-  code: string,
-  hostToken: string,
-  hostPlayerToken: string,
-): Promise<{ success: boolean; error?: string }> {
-  try {
-    const res = await fetch(`${BASE}reveal`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, hostToken, hostPlayerToken }),
-    });
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      return { success: false, error: data.error || 'Failed to reveal' };
-    }
-    return { success: true };
-  } catch {
-    return { success: false, error: 'Network error' };
-  }
-}

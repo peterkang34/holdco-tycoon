@@ -3,6 +3,7 @@ import { SECTORS } from '../../data/sectors';
 import { formatMoney, formatPercent, formatMultiple } from '../../engine/types';
 import {
   calculateAnnualFcf,
+  calculateExitValuation,
   calculatePortfolioTax,
   calculateSharedServicesBenefits,
   TAX_RATE,
@@ -85,7 +86,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
       <span className={`text-sm ${isTotal ? 'text-text-primary' : 'text-text-secondary'}`}>
         {isSubtract && !isTotal ? '− ' : ''}{label}
       </span>
-      <span className={`font-mono text-sm ${isTotal ? 'text-accent' : isSubtract ? 'text-danger' : ''}`}>
+      <span className={`font-mono text-sm shrink-0 ${isTotal ? 'text-accent' : isSubtract ? 'text-danger' : ''}`}>
         {isSubtract && value > 0 ? `(${formatMoney(value)})` : formatMoney(value)}
       </span>
     </div>
@@ -173,7 +174,8 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
     );
   }
 
-  function renderNetFcf() {
+  // Shared waterfall computation used by renderNetFcf, renderFcfShare, and renderLeverage
+  function computeWaterfall() {
     const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
     const totalCapex = activeBusinesses.reduce((sum, b) => {
       const sector = SECTORS[b.sectorId];
@@ -181,31 +183,99 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
       return sum + b.ebitda * effectiveCapexRate;
     }, 0);
 
-    const holdcoInterest = Math.round(state.holdcoLoanBalance * (state.holdcoLoanRate + distressRestrictionsTop.interestPenalty));
-    const opcoInterest = activeBusinesses.reduce(
-      (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate), 0
-    );
+    // Holdco loan P&I (matches CollectPhase waterfall)
+    const holdcoLoanInterest = Math.round(state.holdcoLoanBalance * (state.holdcoLoanRate + distressRestrictionsTop.interestPenalty));
+    const holdcoLoanPrincipal = (state.holdcoLoanRoundsRemaining ?? 0) > 0
+      ? Math.round(state.holdcoLoanBalance / state.holdcoLoanRoundsRemaining)
+      : 0;
+    const holdcoPI = holdcoLoanInterest + holdcoLoanPrincipal;
+
+    // OpCo debt service: seller note P&I + bank debt P&I for active + integrated businesses
+    let opcoSellerNoteService = 0;
+    let opcoBankDebtService = 0;
+    for (const b of allDebtBusinessesTop) {
+      if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
+        opcoSellerNoteService += Math.round(b.sellerNoteBalance * b.sellerNoteRate);
+        opcoSellerNoteService += Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
+      }
+      if (b.bankDebtBalance > 0 && b.bankDebtRoundsRemaining > 0) {
+        opcoBankDebtService += Math.round(b.bankDebtBalance * (b.bankDebtRate || 0));
+        opcoBankDebtService += Math.round(b.bankDebtBalance / b.bankDebtRoundsRemaining);
+      }
+    }
+    const opcoDebtService = opcoSellerNoteService + opcoBankDebtService;
+
+    // Earn-out payments (active + integrated — matches CollectPhase)
+    let earnoutPayments = 0;
+    for (const b of allDebtBusinessesTop) {
+      if (b.earnoutRemaining <= 0 || b.earnoutTarget <= 0) continue;
+      if (state.round > 0 && state.round - b.acquisitionRound > EARNOUT_EXPIRATION_YEARS) continue;
+      if (b.status === 'active' && b.acquisitionEbitda > 0) {
+        const growth = (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda;
+        if (growth >= b.earnoutTarget) earnoutPayments += b.earnoutRemaining;
+      } else if (b.status === 'integrated' && b.parentPlatformId) {
+        const platform = state.businesses.find(p => p.id === b.parentPlatformId && p.status === 'active');
+        if (platform && platform.acquisitionEbitda > 0) {
+          const growth = (platform.ebitda - platform.acquisitionEbitda) / platform.acquisitionEbitda;
+          if (growth >= b.earnoutTarget) earnoutPayments += b.earnoutRemaining;
+        }
+      }
+    }
+
+    // Turnaround costs
+    const turnaroundTierCost = getTurnaroundTierAnnualCost(state.turnaroundTier ?? 0);
+    const turnaroundProgramCosts = (state.activeTurnarounds ?? [])
+      .filter(t => t.status === 'active')
+      .reduce((sum, t) => {
+        const prog = getProgramById(t.programId);
+        return sum + (prog ? prog.annualCost : 0);
+      }, 0);
+    const turnaroundCost = turnaroundTierCost + turnaroundProgramCosts;
 
     const preTaxFcf = activeBusinesses.reduce(
       (sum, b) => sum + calculateAnnualFcf(b, ssBenefits.capexReduction, ssBenefits.cashConversionBonus), 0
     );
-    const netFcf = preTaxFcf - taxBreakdown.taxAmount - holdcoInterest - opcoInterest - sharedServicesCost;
+
+    // Net FCF matching CollectPhase waterfall
+    const netFcf = preTaxFcf - taxBreakdown.taxAmount - holdcoPI - opcoDebtService
+      - earnoutPayments - sharedServicesCost - maSourcingCost - turnaroundCost;
+
+    return {
+      totalEbitda, totalCapex, holdcoLoanInterest, holdcoLoanPrincipal, holdcoPI,
+      opcoDebtService, earnoutPayments, turnaroundCost, preTaxFcf, netFcf,
+    };
+  }
+
+  function renderNetFcf() {
+    const {
+      totalEbitda, totalCapex, holdcoLoanInterest, holdcoLoanPrincipal, holdcoPI,
+      opcoDebtService, earnoutPayments, turnaroundCost, netFcf,
+    } = computeWaterfall();
 
     return (
       <>
-        <SectionHeader title="Net FCF" formula="EBITDA − CapEx − Taxes − Interest − Shared Services" />
+        <SectionHeader title="Net FCF" formula="EBITDA − CapEx − Tax − Debt Service − Holdco Costs" />
         <div className="bg-white/5 rounded-lg p-3 space-y-0 mb-4">
           <WaterfallRow label="Total EBITDA" value={totalEbitda} />
           <WaterfallRow label={`CapEx${ssBenefits.capexReduction > 0 ? ' (reduced by procurement)' : ''}`} value={Math.round(totalCapex)} isSubtract />
           <WaterfallRow label={`Taxes (${(taxBreakdown.effectiveTaxRate * 100).toFixed(1)}% effective)`} value={taxBreakdown.taxAmount} isSubtract />
-          {holdcoInterest > 0 && (
-            <WaterfallRow label="Holdco Interest" value={holdcoInterest} isSubtract />
+          {holdcoPI > 0 && (
+            <WaterfallRow label={`Holdco Loan P&I${holdcoLoanPrincipal > 0 ? ` (${formatMoney(holdcoLoanInterest)} int + ${formatMoney(holdcoLoanPrincipal)} prin)` : ''}`} value={holdcoPI} isSubtract />
           )}
-          {opcoInterest > 0 && (
-            <WaterfallRow label="Opco Interest (seller notes)" value={opcoInterest} isSubtract />
+          {opcoDebtService > 0 && (
+            <WaterfallRow label="OpCo Debt Service (notes + bank)" value={opcoDebtService} isSubtract />
+          )}
+          {earnoutPayments > 0 && (
+            <WaterfallRow label="Earn-out Payments" value={earnoutPayments} isSubtract />
           )}
           {sharedServicesCost > 0 && (
             <WaterfallRow label="Shared Services" value={sharedServicesCost} isSubtract />
+          )}
+          {maSourcingCost > 0 && (
+            <WaterfallRow label="M&A Sourcing" value={maSourcingCost} isSubtract />
+          )}
+          {turnaroundCost > 0 && (
+            <WaterfallRow label="Turnaround Programs" value={turnaroundCost} isSubtract />
           )}
           <WaterfallRow label="Net FCF" value={netFcf} isTotal />
         </div>
@@ -257,14 +327,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
   }
 
   function renderFcfShare() {
-    const holdcoInterest = Math.round(state.holdcoLoanBalance * (state.holdcoLoanRate + distressRestrictionsTop.interestPenalty));
-    const opcoInterest = activeBusinesses.reduce(
-      (sum, b) => sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate), 0
-    );
-    const preTaxFcf = activeBusinesses.reduce(
-      (sum, b) => sum + calculateAnnualFcf(b, ssBenefits.capexReduction, ssBenefits.cashConversionBonus), 0
-    );
-    const netFcf = preTaxFcf - taxBreakdown.taxAmount - holdcoInterest - opcoInterest - sharedServicesCost;
+    const { netFcf } = computeWaterfall();
     const fcfPerShare = state.sharesOutstanding > 0 ? netFcf / state.sharesOutstanding : 0;
 
     return (
@@ -289,7 +352,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
           </div>
           <div className="flex justify-between py-1.5 text-sm">
             <span className="text-text-secondary">Your Ownership</span>
-            <span className="font-mono">{(state.founderShares / state.sharesOutstanding * 100).toFixed(1)}%</span>
+            <span className="font-mono">{(state.sharesOutstanding > 0 ? (state.founderShares / state.sharesOutstanding * 100).toFixed(1) : '0.0')}%</span>
           </div>
           {state.equityRaisesUsed > 0 && (
             <div className="flex justify-between py-1.5 text-sm">
@@ -456,10 +519,10 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
   }
 
   function renderMoic() {
+    // Use actual exit valuations — matches calculateMetrics() in simulation.ts
     const portfolioValue = activeBusinesses.reduce((sum, b) => {
-      const sector = SECTORS[b.sectorId];
-      const avgMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
-      return sum + b.ebitda * avgMultiple;
+      const valuation = calculateExitValuation(b, state.round, undefined, undefined, state.integratedPlatforms);
+      return sum + b.ebitda * valuation.totalMultiple;
     }, 0);
 
     const opcoDebt = activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
@@ -490,9 +553,8 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
         <BusinessTable
           headers={['Business', 'Invested', 'Current Value', 'Biz MOIC']}
           rows={activeBusinesses.map(b => {
-            const sector = SECTORS[b.sectorId];
-            const avgMult = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
-            const currentValue = b.ebitda * avgMult;
+            const valuation = calculateExitValuation(b, state.round, undefined, undefined, state.integratedPlatforms);
+            const currentValue = b.ebitda * valuation.totalMultiple;
             const invested = b.totalAcquisitionCost || b.acquisitionPrice;
             const bizMoic = invested > 0 ? currentValue / invested : 0;
             return [
