@@ -158,7 +158,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **Leaderboard FEV**: All tabs show `Adj FEV` consistently using `DIFFICULTY_CONFIG` multiplier
 
 - **Seeded RNG**: All engine functions accept optional `rng?: SeededRng` last param; when omitted, falls back to `Math.random()`. RNG is NOT in Zustand (non-serializable) — reconstruct from `state.seed + state.round`. 5 streams: deals, events, simulation, market, cosmetic. NEVER pass RNG to async functions (AI generation).
-- **Challenge mode**: URL format `?c=SEED.DIFF.DUR` (challenge) + `&r=NAME.FEV.SCORE...` (result). Base36-encoded for compact URLs. Comparison supports 2-4 players.
+- **Challenge mode**: URL format `?c=SEED.DIFF.DUR` (challenge) + `&r=NAME.FEV.SCORE...` (result). Base36-encoded for compact URLs. Comparison supports 2-4 players. Ranked by FEV (not composite score); tiebreaker is TSR (FEV + distributions).
 - **Fisher-Yates shuffle**: All shuffles use `fisherYatesShuffle()` or `rng.shuffle()` — NEVER use `sort(() => Math.random() - 0.5)` (biased, browser-dependent)
 
 ## Known Remaining Issues (Low Severity)

@@ -267,6 +267,9 @@ function RankBadge({ rank }: { rank: number }) {
 function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEntry; rank: number; showWealth: boolean; tab: LeaderboardTab }) {
   const displayValue = getDisplayValue(entry, tab);
   const displayLabel = showWealth ? 'Wealth' : 'Adj FEV';
+  const rawFEV = entry.founderEquityValue ?? entry.enterpriseValue;
+  const adjFEV = getAdjustedFEV(entry);
+  const showRaw = !showWealth && rawFEV > 0 && adjFEV !== rawFEV;
 
   return (
     <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
@@ -284,6 +287,9 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
             {formatMoney(displayValue)}
             {entry.hasRestructured && <span className="text-red-400 text-[10px] ml-1" title="Restructured — 20% FEV penalty">(R)</span>}
           </p>
+          {showRaw && (
+            <p className="text-[11px] text-text-secondary font-mono tabular-nums whitespace-nowrap">Raw: {formatMoney(rawFEV)}</p>
+          )}
         </div>
         <div className="min-w-[3.5rem]">
           <p className="text-xs text-text-muted">Score</p>

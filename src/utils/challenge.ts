@@ -176,12 +176,12 @@ export interface ComparisonEntry {
   isYou: boolean;
 }
 
-/** Compare 2-4 players, sorted by composite score (descending) */
+/** Compare 2-4 players, sorted by FEV (descending) */
 export function compareResults(entries: ComparisonEntry[]): ComparisonEntry[] {
   return [...entries].sort((a, b) => {
-    // Primary: composite score
-    if (b.result.score !== a.result.score) return b.result.score - a.result.score;
-    // Tiebreaker: FEV + distributions (total shareholder return)
+    // Primary: Founder Equity Value
+    if (b.result.fev !== a.result.fev) return b.result.fev - a.result.fev;
+    // Tiebreaker: total shareholder return (FEV + distributions)
     const aTSR = a.result.fev + a.result.totalDistributions;
     const bTSR = b.result.fev + b.result.totalDistributions;
     return bTSR - aTSR;
@@ -190,7 +190,7 @@ export function compareResults(entries: ComparisonEntry[]): ComparisonEntry[] {
 
 /** Determine if results are tied */
 export function isTied(a: PlayerResult, b: PlayerResult): boolean {
-  return a.score === b.score &&
+  return a.fev === b.fev &&
     (a.fev + a.totalDistributions) === (b.fev + b.totalDistributions);
 }
 

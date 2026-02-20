@@ -197,23 +197,22 @@ export function ChallengeComparison({ challengeParams, myResult, initialOpponent
                 <tbody>
                   <ComparisonRow label="Holdco" values={sorted.map(e => e.result.name)} />
                   <ComparisonRow
+                    label="FEV"
+                    values={sorted.map(e => formatMoney(e.result.fev))}
+                    highlight
+                  />
+                  <ComparisonRow
+                    label="Total Return"
+                    values={sorted.map(e => formatMoney(e.result.fev + e.result.totalDistributions))}
+                  />
+                  <ComparisonRow
                     label="Score"
                     values={sorted.map(e => `${e.result.score}/100`)}
-                    highlight
                   />
                   <ComparisonRow
                     label="Grade"
                     values={sorted.map(e => e.result.grade)}
                     colorFn={(v) => getGradeColor(v as 'S' | 'A' | 'B' | 'C' | 'D' | 'F')}
-                  />
-                  <ComparisonRow
-                    label="FEV"
-                    values={sorted.map(e => formatMoney(e.result.fev))}
-                  />
-                  <ComparisonRow
-                    label="Total Return"
-                    values={sorted.map(e => formatMoney(e.result.fev + e.result.totalDistributions))}
-                    highlight
                   />
                   <ComparisonRow
                     label="Distributions"

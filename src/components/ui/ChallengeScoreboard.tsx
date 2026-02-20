@@ -251,10 +251,10 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
               </tr>
             </thead>
             <tbody>
-              <ScoreboardRow label="Score" values={results.map(e => `${e.score}/100`)} highlight />
+              <ScoreboardRow label="FEV" values={results.map(e => formatMoney(e.fev))} highlight />
+              <ScoreboardRow label="Total Return" values={results.map(e => formatMoney(e.fev + e.totalDistributions))} />
+              <ScoreboardRow label="Score" values={results.map(e => `${e.score}/100`)} />
               <ScoreboardRow label="Grade" values={results.map(e => e.grade)} colorFn={(v) => getGradeColor(v as 'S' | 'A' | 'B' | 'C' | 'D' | 'F')} />
-              <ScoreboardRow label="FEV" values={results.map(e => formatMoney(e.fev))} />
-              <ScoreboardRow label="Total Return" values={results.map(e => formatMoney(e.fev + e.totalDistributions))} highlight />
               <ScoreboardRow label="Distributions" values={results.map(e => formatMoney(e.totalDistributions))} />
               <ScoreboardRow label="Businesses" values={results.map(e => String(e.businesses))} />
               <ScoreboardRow label="Sectors" values={results.map(e => String(e.sectors))} />
@@ -313,7 +313,7 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
             <div className="text-right">
               {p.isYou && p.result ? (
                 <span className="font-mono text-sm">
-                  {p.result.score}/100 ({p.result.grade})
+                  {formatMoney(p.result.fev)} ({p.result.grade})
                 </span>
               ) : (
                 <span className="text-text-muted text-sm">???</span>

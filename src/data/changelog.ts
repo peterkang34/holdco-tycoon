@@ -12,6 +12,25 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 19, 2025',
+    title: 'Challenge Mode: FEV Ranking',
+    sections: [
+      {
+        heading: 'Challenge Mode',
+        items: [
+          'Challenge scoreboard now ranks players by Founder Equity Value (FEV) instead of composite score — the number that actually matters.',
+          'FEV is the hero metric on all scoreboards: highlighted first in comparison tables, shown in the waiting room while scores are hidden.',
+        ],
+      },
+      {
+        heading: 'Leaderboard',
+        items: [
+          'Leaderboard entries now show raw FEV alongside adjusted FEV so you can see the effect of difficulty multipliers and restructuring penalties.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 19, 2025',
     title: 'Manual Transparency Update',
     sections: [
       {

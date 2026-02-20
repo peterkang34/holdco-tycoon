@@ -178,13 +178,13 @@ async function handleStatus(req: VercelRequest, res: VercelResponse) {
     const resultsMap = (allResults || {}) as Record<string, string | SubmittedResult>;
 
     if (meta.revealed) {
-      // Revealed: return full results sorted by score
+      // Revealed: return full results sorted by FEV (descending), TSR tiebreaker
       const results = Object.entries(resultsMap).map(([token, raw]) => {
         const r: SubmittedResult = typeof raw === 'string' ? JSON.parse(raw) : raw;
         return { ...r, isYou: token === playerToken };
       });
       results.sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score;
+        if (b.fev !== a.fev) return b.fev - a.fev;
         return (b.fev + b.totalDistributions) - (a.fev + a.totalDistributions);
       });
       return res.status(200).json({
