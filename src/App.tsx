@@ -91,7 +91,9 @@ function App() {
     if (holdcoName && round > 0 && !gameOver) {
       setScreen('game');
     } else if (gameOver) {
-      setScreen('gameOver');
+      // Don't trap players on the Game Over screen on refresh — show intro instead.
+      // Game data stays in localStorage and is overwritten cleanly on next startGame().
+      setScreen('intro');
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -108,6 +110,7 @@ function App() {
   };
 
   const handleGameOver = () => {
+    window.scrollTo(0, 0);
     setScreen('gameOver');
   };
 

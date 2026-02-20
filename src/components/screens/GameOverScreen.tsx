@@ -385,6 +385,9 @@ export function GameOverScreen({
             </span>
           </div>
         )}
+        <button onClick={onPlayAgain} className="btn-primary text-lg py-3 mt-6 w-full">
+          Play Again
+        </button>
       </div>
       )}
 

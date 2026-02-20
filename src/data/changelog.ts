@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 20, 2025',
+    title: 'Game Over Screen Navigation',
+    sections: [
+      {
+        heading: 'Navigation',
+        items: [
+          'Added a "Play Again" button at the top of the Game Over screen so you can start a new game without scrolling.',
+          'Refreshing the page after a game ends now returns you to the start screen instead of trapping you on the results page.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 20, 2025',
     title: 'Bug Fixes & Polish',
     sections: [
       {
