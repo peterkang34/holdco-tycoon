@@ -72,12 +72,16 @@
     border-radius: 8px;
     border: none;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s ease, transform 0.15s ease;
   }
 
   .btn-primary:hover {
     transform: translateY(-2px);
     box-shadow: 0 4px 20px rgba(78, 205, 196, 0.3);
+  }
+
+  .btn-primary:active {
+    transform: scale(0.97);
   }
 
   .btn-primary:disabled {
@@ -94,12 +98,16 @@
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: all 0.2s ease, transform 0.15s ease;
   }
 
   .btn-secondary:hover {
     background: var(--color-bg-card-hover);
     border-color: var(--color-accent);
+  }
+
+  .btn-secondary:active {
+    transform: scale(0.97);
   }
 
   .metric-positive {
@@ -163,4 +171,13 @@
 
 .animate-slide-in-right {
   animation: slideInRight 0.25s ease-out;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
 }

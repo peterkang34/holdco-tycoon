@@ -12,9 +12,12 @@ interface DealCardProps {
   availablePlatforms?: Business[]; // Platforms in the same sector that can receive this as a tuck-in
   isPassed?: boolean;
   onPass?: () => void;
+  collapsible?: boolean;
+  isExpanded?: boolean;
+  onToggle?: () => void;
 }
 
-export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlatforms = [], isPassed, onPass }: DealCardProps) {
+export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlatforms = [], isPassed, onPass, collapsible, isExpanded, onToggle }: DealCardProps) {
   const [showStory, setShowStory] = useState(false);
   const sector = SECTORS[deal.business.sectorId];
   const { dueDiligence, qualityRating } = deal.business;
@@ -78,6 +81,43 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
     return 'text-text-secondary';
   };
 
+  // Collapsible: collapsed state — compact one-line summary
+  if (collapsible && !isExpanded) {
+    return (
+      <div
+        className={`card flex items-center gap-2 py-2 cursor-pointer hover:border-accent/50 transition-colors ${disabled ? 'opacity-50' : unaffordable ? 'opacity-65' : ''}`}
+        style={{ borderLeftColor: sector.color, borderLeftWidth: '3px' }}
+        onClick={onToggle}
+      >
+        <span className="text-xl shrink-0">{sector.emoji}</span>
+        <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+          <span className="font-medium truncate">{deal.business.name}</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${acquisitionBadge.color}`}>
+            {acquisitionBadge.label}
+          </span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${heatBadge.color}`}>
+            {heatBadge.label}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <span className="font-mono text-sm font-bold">{formatMoney(deal.effectivePrice)}</span>
+          <span className="text-xs text-text-muted font-mono">{formatMoney(deal.business.ebitda)}</span>
+          <span className={`text-[10px] font-mono font-bold px-1 py-0.5 rounded ${
+            qualityRating >= 4 ? 'bg-accent/20 text-accent' :
+            qualityRating === 3 ? 'bg-yellow-500/20 text-yellow-400' :
+            'bg-danger/20 text-danger'
+          }`}>Q{qualityRating}</span>
+          <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
+            deal.freshness === 1 ? 'bg-warning/20 text-warning' : 'bg-white/10 text-text-muted'
+          }`}>
+            {deal.freshness === 1 ? '!' : `${deal.freshness}y`}
+          </span>
+          <span className="text-text-muted text-xs">▼</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`card transition-all ${disabled ? 'opacity-50' : unaffordable ? 'opacity-65 cursor-pointer hover:border-accent/50' : 'cursor-pointer hover:border-accent'}`}
@@ -86,6 +126,18 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
+          {collapsible && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggle?.();
+              }}
+              className="text-text-muted hover:text-text-secondary transition-colors shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center -ml-2"
+              aria-label="Collapse card"
+            >
+              ▲
+            </button>
+          )}
           <span className="text-2xl">{sector.emoji}</span>
           <div>
             <h3 className="font-bold truncate">{deal.business.name}</h3>

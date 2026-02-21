@@ -26,6 +26,9 @@ interface BusinessCardProps {
   activeTurnaround?: ActiveTurnaround | null;
   onStartTurnaround?: () => void;
   turnaroundEligible?: boolean;
+  collapsible?: boolean;
+  isExpanded?: boolean;
+  onToggle?: () => void;
 }
 
 export function BusinessCard({
@@ -47,6 +50,9 @@ export function BusinessCard({
   activeTurnaround = null,
   onStartTurnaround,
   turnaroundEligible = false,
+  collapsible,
+  isExpanded,
+  onToggle,
 }: BusinessCardProps) {
   const [showValuation, setShowValuation] = useState(false);
   const sector = SECTORS[business.sectorId];
@@ -69,7 +75,7 @@ export function BusinessCard({
   const isGrowing = business.ebitda > business.acquisitionEbitda;
   const isDeclining = business.ebitda < business.peakEbitda * 0.7;
 
-  if (compact) {
+  if (compact && !collapsible) {
     return (
       <div
         className="card flex items-center gap-3 py-2"
@@ -95,6 +101,35 @@ export function BusinessCard({
     );
   }
 
+  // Collapsible: collapsed state — show compact summary with toggle chevron
+  if (collapsible && !isExpanded) {
+    return (
+      <div
+        className="card flex items-center gap-3 py-2 cursor-pointer hover:border-accent/50 transition-colors"
+        style={{ borderLeftColor: sector.color, borderLeftWidth: '3px' }}
+        onClick={onToggle}
+      >
+        <span className="text-xl">{sector.emoji}</span>
+        <div className="flex-1 min-w-0">
+          <div className="font-medium truncate">{business.name}</div>
+          <div className="text-xs text-text-muted">{sector.name}</div>
+        </div>
+        <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
+          business.qualityRating >= 4 ? 'bg-accent/20 text-accent' :
+          business.qualityRating === 3 ? 'bg-yellow-500/20 text-yellow-400' :
+          'bg-danger/20 text-danger'
+        }`}>Q{business.qualityRating}</span>
+        <div className="text-right">
+          <div className="font-mono font-bold">{formatMoney(business.ebitda)}</div>
+          <div className={`text-xs ${isGrowing ? 'text-accent' : isDeclining ? 'text-danger' : 'text-text-muted'}`}>
+            {isGrowing ? '▲' : isDeclining ? '▼' : '–'} FCF: {formatMoney(annualFcf)}/y
+          </div>
+        </div>
+        <span className="text-text-muted text-xs ml-1 shrink-0">▼</span>
+      </div>
+    );
+  }
+
   return (
     <div
       className="card"
@@ -102,6 +137,15 @@ export function BusinessCard({
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2 min-w-0">
+          {collapsible && (
+            <button
+              onClick={onToggle}
+              className="text-text-muted hover:text-text-secondary transition-colors shrink-0 min-h-[44px] min-w-[44px] flex items-center justify-center -ml-2"
+              aria-label="Collapse card"
+            >
+              ▲
+            </button>
+          )}
           <span className="text-2xl shrink-0">{sector.emoji}</span>
           <div className="min-w-0">
             <h3 className="font-bold truncate">{business.name}</h3>

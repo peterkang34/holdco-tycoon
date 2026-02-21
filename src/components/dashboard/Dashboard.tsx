@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Metrics, DistressLevel, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
 import { getDistressLabel } from '../../engine/distress';
 import { MetricCard } from '../ui/MetricCard';
@@ -60,6 +61,8 @@ export function Dashboard({
     return 'negative';
   };
 
+  const [showAllMetrics, setShowAllMetrics] = useState(false);
+
   // Calculate net cash position
   const isNetCash = metrics.netDebtToEbitda < 0;
 
@@ -91,8 +94,83 @@ export function Dashboard({
         </div>
       </div>
 
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-1 sm:gap-1.5 md:gap-3">
+      {/* Metrics Grid — Mobile: priority 4 + expandable 5 */}
+      <div className="md:hidden">
+        <div className="grid grid-cols-2 gap-1">
+          <MetricCard
+            label="Cash"
+            value={formatMoney(liveCash)}
+            status={getCashStatus()}
+            onClick={() => onMetricClick?.('cash')}
+          />
+          <MetricCard
+            label="EBITDA"
+            value={formatMoney(metrics.totalEbitda)}
+            onClick={() => onMetricClick?.('ebitda')}
+          />
+          <MetricCard
+            label="Net FCF"
+            value={formatMoney(metrics.totalFcf)}
+            status={metrics.totalFcf > 0 ? 'positive' : metrics.totalFcf < 0 ? 'negative' : 'neutral'}
+            onClick={() => onMetricClick?.('netfcf')}
+          />
+          <MetricCard
+            label="Leverage"
+            value={isNetCash ? 'Net Cash' : formatMultiple(metrics.netDebtToEbitda)}
+            subValue={
+              metrics.totalDebt > 0
+                ? `${formatMoney(metrics.totalDebt)} debt`
+                : isNetCash ? 'No debt' : 'Net Debt/EBITDA'
+            }
+            status={getLeverageStatus()}
+            onClick={() => onMetricClick?.('leverage')}
+          />
+        </div>
+        {showAllMetrics && (
+          <div className="grid grid-cols-2 gap-1 mt-1">
+            <MetricCard
+              label="FCF/Share"
+              value={`$${metrics.fcfPerShare.toFixed(0)}`}
+              subValue={`${sharesOutstanding.toFixed(0)} shares`}
+              status={metrics.fcfPerShare > 0 ? 'positive' : 'negative'}
+              onClick={() => onMetricClick?.('fcfshare')}
+            />
+            <MetricCard
+              label="ROIC"
+              value={formatPercent(metrics.portfolioRoic)}
+              status={getRoicStatus()}
+              onClick={() => onMetricClick?.('roic')}
+            />
+            <MetricCard
+              label="ROIIC"
+              value={formatPercent(metrics.roiic)}
+              status={getRoiicStatus()}
+              onClick={() => onMetricClick?.('roiic')}
+            />
+            <MetricCard
+              label="MOIC"
+              value={formatMultiple(metrics.portfolioMoic)}
+              status={getMoicStatus()}
+              onClick={() => onMetricClick?.('moic')}
+            />
+            <MetricCard
+              label="Cash Conv."
+              value={formatPercent(metrics.cashConversion)}
+              status={getCashConversionStatus()}
+              onClick={() => onMetricClick?.('cashconv')}
+            />
+          </div>
+        )}
+        <button
+          onClick={() => setShowAllMetrics(!showAllMetrics)}
+          className="w-full mt-1.5 py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
+        >
+          {showAllMetrics ? 'Show less \u25B2' : 'Show 5 more \u25BC'}
+        </button>
+      </div>
+
+      {/* Metrics Grid — Desktop: unchanged */}
+      <div className="hidden md:grid md:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-1 md:gap-1.5 lg:gap-3">
         <MetricCard
           label="Cash"
           value={formatMoney(liveCash)}

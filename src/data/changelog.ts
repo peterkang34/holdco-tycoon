@@ -11,6 +11,32 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'February 21, 2026',
+    title: 'Mobile Experience Overhaul',
+    sections: [
+      {
+        heading: 'Mobile UX',
+        items: [
+          'Collapsible business and deal cards on mobile — tap to expand, see key info at a glance without scrolling.',
+          'Sticky "End Year" button on mobile with live cash readout — no more scrolling to the bottom.',
+          'Sort your portfolio by EBITDA, FCF, MOIC, Quality, Growth, Sector, or Name.',
+          'Sort and filter deals by freshness, price, EBITDA, quality, heat, multiple, sector, and affordability.',
+          'Expand All / Collapse All toggle for both portfolio and deal pipeline.',
+          'Dashboard shows 4 priority metrics on mobile with a toggle to reveal the remaining 5.',
+          'Scroll-to-top button appears when scrolling down on mobile.',
+          'Deal structuring and other modals now slide up as bottom sheets on mobile.',
+        ],
+      },
+      {
+        heading: 'Polish',
+        items: [
+          'Button press feedback on all primary and secondary buttons.',
+          'Improved touch targets across filter chips, sort controls, and card toggles.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 20, 2026',
     title: 'Deal Generation & Challenge Links',
     sections: [

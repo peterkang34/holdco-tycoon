@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo } from 'react';
+import { useState, useRef, useMemo, useCallback } from 'react';
 import {
   Business,
   Deal,
@@ -41,6 +41,10 @@ import { getEligiblePrograms, canUnlockTier } from '../../engine/turnarounds';
 import { TURNAROUND_TIER_CONFIG, getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
 import { TURNAROUND_FATIGUE_THRESHOLD } from '../../data/gameConfig';
 import { DEBT_LABELS, DEBT_EXPLAINER } from '../../data/mechanicsCopy';
+import { useIsMobile } from '../../hooks/useMediaQuery';
+import { CardListControls } from '../ui/CardListControls';
+import { ScrollToTop } from '../ui/ScrollToTop';
+import { Modal } from '../ui/Modal';
 
 const STARTING_SHARES = 1000;
 
@@ -181,6 +185,8 @@ export function AllocatePhase({
   onUnlockTurnaroundTier,
   onStartTurnaround,
 }: AllocatePhaseProps) {
+  const isMobile = useIsMobile();
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [activeTab, setActiveTab] = useState<AllocateTab>('portfolio');
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [selectedBusinessForImprovement, setSelectedBusinessForImprovement] = useState<Business | null>(null);
@@ -218,7 +224,141 @@ export function AllocatePhase({
   const [turnaroundBusiness, setTurnaroundBusiness] = useState<Business | null>(null);
   const [showTurnaroundSummary, setShowTurnaroundSummary] = useState(false);
 
+  // Portfolio sort + expand/collapse
+  const [portfolioSort, setPortfolioSort] = useState('ebitda');
+  const [expandedBusinessIds, setExpandedBusinessIds] = useState<Set<string>>(() => new Set());
+
+  // Deal sort + filter + expand/collapse
+  const [dealSort, setDealSort] = useState('freshness');
+  const [dealFilters, setDealFilters] = useState<string[]>([]);
+  const [expandedDealIds, setExpandedDealIds] = useState<Set<string>>(() => new Set());
+
   const activeBusinesses = businesses.filter(b => b.status === 'active');
+
+  // Portfolio sort
+  const sortedBusinesses = useMemo(() => {
+    const standalone = activeBusinesses.filter(b => !b.parentPlatformId);
+    // Pre-compute MOIC values to avoid O(n log n) calculateExitValuation calls in comparator
+    let moicMap: Map<string, number> | undefined;
+    if (portfolioSort === 'moic') {
+      moicMap = new Map();
+      for (const biz of standalone) {
+        const ev = calculateExitValuation(biz, round, lastEventType, undefined, integratedPlatforms);
+        moicMap.set(biz.id, ev.netProceeds / (biz.totalAcquisitionCost || biz.acquisitionPrice));
+      }
+    }
+    return [...standalone].sort((a, b) => {
+      switch (portfolioSort) {
+        case 'ebitda': return b.ebitda - a.ebitda;
+        case 'fcf': {
+          const sA = SECTORS[a.sectorId]; const sB = SECTORS[b.sectorId];
+          return Math.round(b.ebitda * (1 - sB.capexRate)) - Math.round(a.ebitda * (1 - sA.capexRate));
+        }
+        case 'moic': return (moicMap!.get(b.id) ?? 0) - (moicMap!.get(a.id) ?? 0);
+        case 'quality': return b.qualityRating - a.qualityRating;
+        case 'growth': return b.organicGrowthRate - a.organicGrowthRate;
+        case 'sector': return a.sectorId.localeCompare(b.sectorId);
+        case 'name': return a.name.localeCompare(b.name);
+        default: return 0;
+      }
+    });
+  }, [activeBusinesses, portfolioSort, round, lastEventType, integratedPlatforms]);
+
+  // Derive allExpanded from actual set sizes (not independent state)
+  const allBusinessesExpanded = expandedBusinessIds.size >= sortedBusinesses.length && sortedBusinesses.length > 0;
+
+  const toggleBusiness = useCallback((id: string) => {
+    setExpandedBusinessIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAllBusinesses = useCallback(() => {
+    const standalone = activeBusinesses.filter(b => !b.parentPlatformId);
+    setExpandedBusinessIds(prev =>
+      prev.size >= standalone.length ? new Set() : new Set(standalone.map(b => b.id))
+    );
+  }, [activeBusinesses]);
+
+  // Deal sort + filter
+  const dealFilterOptions = useMemo(() => {
+    const opts: { value: string; label: string; group?: string }[] = [];
+    const sectors = new Set(dealPipeline.map(d => d.business.sectorId));
+    sectors.forEach(sid => {
+      const s = SECTORS[sid];
+      if (s) opts.push({ value: `sector:${sid}`, label: `${s.emoji} ${s.name}`, group: 'Sector' });
+    });
+    opts.push({ value: 'heat:cold', label: 'Cold', group: 'Heat' });
+    opts.push({ value: 'heat:warm', label: 'Warm', group: 'Heat' });
+    opts.push({ value: 'heat:hot', label: 'Hot', group: 'Heat' });
+    opts.push({ value: 'heat:contested', label: 'Contested', group: 'Heat' });
+    opts.push({ value: 'affordable', label: 'Can Afford', group: 'Budget' });
+    opts.push({ value: 'quality:3+', label: 'Q3+', group: 'Quality' });
+    opts.push({ value: 'quality:4+', label: 'Q4+', group: 'Quality' });
+    return opts;
+  }, [dealPipeline]);
+
+  const filteredSortedDeals = useMemo(() => {
+    let deals = dealPipeline.filter(deal => showPassedDeals || !passedDealIdSet.has(deal.id));
+
+    // Apply filters
+    if (dealFilters.length > 0) {
+      deals = deals.filter(deal => {
+        // Group filters by type, then OR within group, AND between groups
+        const sectorFilters = dealFilters.filter(f => f.startsWith('sector:'));
+        const heatFilters = dealFilters.filter(f => f.startsWith('heat:'));
+        const qualityFilters = dealFilters.filter(f => f.startsWith('quality:'));
+        const hasAffordable = dealFilters.includes('affordable');
+
+        if (sectorFilters.length > 0 && !sectorFilters.some(f => deal.business.sectorId === f.slice(7))) return false;
+        if (heatFilters.length > 0 && !heatFilters.some(f => deal.heat === f.slice(5))) return false;
+        if (qualityFilters.length > 0 && !qualityFilters.some(f => {
+          if (f === 'quality:3+') return deal.business.qualityRating >= 3;
+          if (f === 'quality:4+') return deal.business.qualityRating >= 4;
+          return false;
+        })) return false;
+        if (hasAffordable && cash < Math.round(deal.effectivePrice * 0.25)) return false;
+        return true;
+      });
+    }
+
+    // Sort
+    return [...deals].sort((a, b) => {
+      switch (dealSort) {
+        case 'freshness': return a.freshness - b.freshness;
+        case 'price_low': return a.effectivePrice - b.effectivePrice;
+        case 'price_high': return b.effectivePrice - a.effectivePrice;
+        case 'ebitda': return b.business.ebitda - a.business.ebitda;
+        case 'quality': return b.business.qualityRating - a.business.qualityRating;
+        case 'heat': {
+          const heatOrder = { cold: 0, warm: 1, hot: 2, contested: 3 };
+          return heatOrder[b.heat] - heatOrder[a.heat];
+        }
+        case 'multiple': return a.business.acquisitionMultiple - b.business.acquisitionMultiple;
+        default: return 0;
+      }
+    });
+  }, [dealPipeline, showPassedDeals, passedDealIdSet, dealFilters, dealSort, cash]);
+
+  const allDealsExpanded = expandedDealIds.size >= filteredSortedDeals.length && filteredSortedDeals.length > 0;
+
+  const toggleDeal = useCallback((id: string) => {
+    setExpandedDealIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const toggleAllDeals = useCallback(() => {
+    setExpandedDealIds(prev => {
+      const visibleIds = filteredSortedDeals.map(d => d.id);
+      return prev.size >= visibleIds.length ? new Set() : new Set(visibleIds);
+    });
+  }, [filteredSortedDeals]);
+
   const distressRestrictions = getDistressRestrictions(distressLevel);
   const dealSourcingCost = (maSourcing.active && maSourcing.tier >= 1) ? DEAL_SOURCING_COST_TIER1 : DEAL_SOURCING_COST_BASE;
 
@@ -379,58 +519,49 @@ export function AllocatePhase({
     const canTuckIn = availablePlatformsForDeal.length > 0;
 
     return (
-      <div className="fixed inset-0 bg-black/80 flex items-start sm:items-center justify-center p-4 pt-8 sm:pt-4 z-50 overflow-y-auto">
-        <div className="bg-bg-primary border border-white/10 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h3 className="text-xl font-bold">{selectedDeal.business.name}</h3>
-              <p className="text-text-muted">
-                {SECTORS[selectedDeal.business.sectorId].emoji} {selectedDeal.business.subType}
-              </p>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="relative group/modalheat">
-                  <span className={`text-xs px-2 py-1 rounded inline-block cursor-help ${
-                    selectedDeal.heat === 'cold' ? 'bg-blue-500/20 text-blue-400' :
-                    selectedDeal.heat === 'warm' ? 'bg-yellow-500/20 text-yellow-400' :
-                    selectedDeal.heat === 'hot' ? 'bg-orange-500/20 text-orange-400' :
-                    'bg-red-500/20 text-red-400 animate-pulse'
-                  }`}>
-                    {selectedDeal.heat.charAt(0).toUpperCase() + selectedDeal.heat.slice(1)}
-                  </span>
-                  <span className="absolute left-0 top-full mt-1 w-56 p-2 bg-bg-primary border border-white/20 rounded-lg shadow-xl text-xs text-text-secondary opacity-0 invisible group-hover/modalheat:opacity-100 group-hover/modalheat:visible transition-all z-50">
-                    {selectedDeal.heat === 'cold' && 'Low buyer interest. No premium over base price.'}
-                    {selectedDeal.heat === 'warm' && 'Moderate competition. 10-15% premium over base.'}
-                    {selectedDeal.heat === 'hot' && 'Multiple competing offers. 20-30% premium.'}
-                    {selectedDeal.heat === 'contested' && 'Bidding war. 30-50% premium and 40% chance a rival snatches it.'}
-                  </span>
-                </span>
-                <span className={`text-xs px-2 py-1 rounded inline-block ${
-                  selectedDeal.acquisitionType === 'tuck_in' ? 'bg-accent-secondary/20 text-accent-secondary' :
-                  selectedDeal.acquisitionType === 'platform' ? 'bg-accent/20 text-accent' :
-                  'bg-white/10 text-text-muted'
-                }`}>
-                  {selectedDeal.acquisitionType === 'tuck_in' ? 'Tuck-In Opportunity' :
-                   selectedDeal.acquisitionType === 'platform' ? 'Platform Opportunity' : 'Standalone'}
-                </span>
-              </div>
-              {selectedDeal.effectivePrice > selectedDeal.askingPrice && (
-                <p className="text-xs text-text-muted mt-1">
-                  Base price {formatMoney(selectedDeal.askingPrice)} + {Math.round(((selectedDeal.effectivePrice / selectedDeal.askingPrice) - 1) * 100)}% competitive premium = <span className="font-bold text-text-primary">{formatMoney(selectedDeal.effectivePrice)}</span>
-                </p>
-              )}
-            </div>
-            <button
-              onClick={() => {
-                setSelectedDeal(null);
-                setSelectedTuckInPlatform(null);
-                setModalEquityAmount('');
-                setShowModalEquityRaise(false);
-              }}
-              className="text-text-muted hover:text-text-primary text-2xl"
-            >
-              ×
-            </button>
+      <Modal
+        isOpen={!!selectedDeal}
+        onClose={() => {
+          setSelectedDeal(null);
+          setSelectedTuckInPlatform(null);
+          setModalEquityAmount('');
+          setShowModalEquityRaise(false);
+        }}
+        title={selectedDeal.business.name}
+        subtitle={`${SECTORS[selectedDeal.business.sectorId].emoji} ${selectedDeal.business.subType}`}
+        size="lg"
+      >
+          <div className="flex items-center gap-2 mb-3">
+            <span className="relative group/modalheat">
+              <span className={`text-xs px-2 py-1 rounded inline-block cursor-help ${
+                selectedDeal.heat === 'cold' ? 'bg-blue-500/20 text-blue-400' :
+                selectedDeal.heat === 'warm' ? 'bg-yellow-500/20 text-yellow-400' :
+                selectedDeal.heat === 'hot' ? 'bg-orange-500/20 text-orange-400' :
+                'bg-red-500/20 text-red-400 animate-pulse'
+              }`}>
+                {selectedDeal.heat.charAt(0).toUpperCase() + selectedDeal.heat.slice(1)}
+              </span>
+              <span className="absolute left-0 top-full mt-1 w-56 p-2 bg-bg-primary border border-white/20 rounded-lg shadow-xl text-xs text-text-secondary opacity-0 invisible group-hover/modalheat:opacity-100 group-hover/modalheat:visible transition-all z-50">
+                {selectedDeal.heat === 'cold' && 'Low buyer interest. No premium over base price.'}
+                {selectedDeal.heat === 'warm' && 'Moderate competition. 10-15% premium over base.'}
+                {selectedDeal.heat === 'hot' && 'Multiple competing offers. 20-30% premium.'}
+                {selectedDeal.heat === 'contested' && 'Bidding war. 30-50% premium and 40% chance a rival snatches it.'}
+              </span>
+            </span>
+            <span className={`text-xs px-2 py-1 rounded inline-block ${
+              selectedDeal.acquisitionType === 'tuck_in' ? 'bg-accent-secondary/20 text-accent-secondary' :
+              selectedDeal.acquisitionType === 'platform' ? 'bg-accent/20 text-accent' :
+              'bg-white/10 text-text-muted'
+            }`}>
+              {selectedDeal.acquisitionType === 'tuck_in' ? 'Tuck-In Opportunity' :
+               selectedDeal.acquisitionType === 'platform' ? 'Platform Opportunity' : 'Standalone'}
+            </span>
           </div>
+          {selectedDeal.effectivePrice > selectedDeal.askingPrice && (
+            <p className="text-xs text-text-muted mb-3">
+              Base price {formatMoney(selectedDeal.askingPrice)} + {Math.round(((selectedDeal.effectivePrice / selectedDeal.askingPrice) - 1) * 100)}% competitive premium = <span className="font-bold text-text-primary">{formatMoney(selectedDeal.effectivePrice)}</span>
+            </p>
+          )}
 
           {/* Tuck-in / Platform Integration Selection */}
           {canTuckIn && (
@@ -784,8 +915,7 @@ export function AllocatePhase({
             <p className="font-medium text-text-secondary mb-1">Deal Structuring Tip</p>
             <p>The best holdcos push debt as close to the asset as possible, avoiding parent guarantees unless necessary. Seller notes align incentives; bank debt amplifies returns but amplifies risk too.</p>
           </div>
-        </div>
-      </div>
+      </Modal>
     );
   };
 
@@ -808,7 +938,7 @@ export function AllocatePhase({
   };
 
   return (
-    <div className="px-4 sm:px-6 py-6 pb-8">
+    <div ref={scrollContainerRef} className="px-4 sm:px-6 py-6 pb-20 md:pb-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
         <div>
@@ -1165,8 +1295,30 @@ export function AllocatePhase({
             )}
 
 
+            {activeBusinesses.length > 0 && (
+              <div className="mb-3">
+                <CardListControls
+                  count={sortedBusinesses.length}
+                  itemLabel="businesses"
+                  sortOptions={[
+                    { value: 'ebitda', label: 'EBITDA' },
+                    { value: 'fcf', label: 'FCF' },
+                    { value: 'moic', label: 'MOIC' },
+                    { value: 'quality', label: 'Quality' },
+                    { value: 'growth', label: 'Growth' },
+                    { value: 'sector', label: 'Sector' },
+                    { value: 'name', label: 'Name' },
+                  ]}
+                  currentSort={portfolioSort}
+                  onSortChange={setPortfolioSort}
+                  allExpanded={allBusinessesExpanded}
+                  onToggleExpand={toggleAllBusinesses}
+                />
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {activeBusinesses.filter(b => !b.parentPlatformId).map(business => (
+              {sortedBusinesses.map(business => (
                 <BusinessCard
                   key={business.id}
                   business={business}
@@ -1185,6 +1337,9 @@ export function AllocatePhase({
                   activeTurnaround={activeTurnarounds.find(t => t.businessId === business.id && t.status === 'active') ?? null}
                   turnaroundEligible={turnaroundTier > 0 && getEligiblePrograms(business, turnaroundTier, activeTurnarounds).length > 0}
                   onStartTurnaround={turnaroundTier > 0 ? () => setTurnaroundBusiness(business) : undefined}
+                  collapsible={isMobile}
+                  isExpanded={!isMobile || expandedBusinessIds.has(business.id)}
+                  onToggle={() => toggleBusiness(business.id)}
                 />
               ))}
               {activeBusinesses.length === 0 && (
@@ -1383,11 +1538,35 @@ export function AllocatePhase({
               </div>
             )}
 
+            {/* Deal sort/filter controls */}
+            {dealPipeline.length > 0 && (
+              <div className="mb-3">
+                <CardListControls
+                  count={filteredSortedDeals.length}
+                  itemLabel="deals"
+                  sortOptions={[
+                    { value: 'freshness', label: 'Freshness' },
+                    { value: 'price_low', label: 'Price Low→High' },
+                    { value: 'price_high', label: 'Price High→Low' },
+                    { value: 'ebitda', label: 'EBITDA' },
+                    { value: 'quality', label: 'Quality' },
+                    { value: 'heat', label: 'Heat' },
+                    { value: 'multiple', label: 'Multiple' },
+                  ]}
+                  currentSort={dealSort}
+                  onSortChange={setDealSort}
+                  filterOptions={dealFilterOptions}
+                  activeFilters={dealFilters}
+                  onFilterChange={setDealFilters}
+                  allExpanded={allDealsExpanded}
+                  onToggleExpand={toggleAllDeals}
+                />
+              </div>
+            )}
+
             {/* Deals Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {dealPipeline
-                .filter(deal => showPassedDeals || !passedDealIdSet.has(deal.id))
-                .map(deal => (
+              {filteredSortedDeals.map(deal => (
                 <DealCard
                   key={deal.id}
                   deal={deal}
@@ -1397,6 +1576,9 @@ export function AllocatePhase({
                   availablePlatforms={getPlatformsForSector(deal.business.sectorId)}
                   isPassed={passedDealIdSet.has(deal.id)}
                   onPass={() => onPassDeal(deal.id)}
+                  collapsible={isMobile}
+                  isExpanded={!isMobile || expandedDealIds.has(deal.id)}
+                  onToggle={() => toggleDeal(deal.id)}
                 />
               ))}
               {dealPipeline.length === 0 && (
@@ -1405,16 +1587,25 @@ export function AllocatePhase({
                   <p className="text-sm mt-2">New opportunities will appear next year.</p>
                 </div>
               )}
-              {dealPipeline.length > 0 && dealPipeline.every(d => passedDealIdSet.has(d.id)) && !showPassedDeals && (
+              {dealPipeline.length > 0 && filteredSortedDeals.length === 0 && !showPassedDeals && (
                 <div className="col-span-full card text-center text-text-muted py-12">
-                  <p>All deals passed on.</p>
+                  <p>{dealFilters.length > 0 ? 'No deals match your filters.' : 'All deals passed on.'}</p>
                   <p className="text-sm mt-2">
-                    <button
-                      onClick={() => setShowPassedDeals(true)}
-                      className="text-accent hover:underline"
-                    >
-                      Show passed deals
-                    </button>
+                    {dealFilters.length > 0 ? (
+                      <button
+                        onClick={() => setDealFilters([])}
+                        className="text-accent hover:underline"
+                      >
+                        Clear filters
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => setShowPassedDeals(true)}
+                        className="text-accent hover:underline"
+                      >
+                        Show passed deals
+                      </button>
+                    )}
                     {' '}or source new ones above.
                   </p>
                 </div>
@@ -2303,12 +2494,22 @@ export function AllocatePhase({
         </div>
       )}
 
-      {/* End Round Button */}
-      <div className="flex justify-end">
+      {/* End Round Button (desktop) */}
+      <div className="hidden md:flex justify-end">
         <button onClick={() => setShowEndTurnConfirm(true)} className="btn-primary text-lg px-8">
           End Year →
         </button>
       </div>
+
+      {/* Sticky End Year bar (mobile) */}
+      <div className="fixed bottom-0 left-0 right-0 md:hidden bg-bg-primary/95 backdrop-blur-sm border-t border-white/10 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex items-center justify-between">
+        <span className="text-sm font-mono text-text-secondary">Cash: <span className="text-accent font-bold">{formatMoney(cash)}</span></span>
+        <button onClick={() => setShowEndTurnConfirm(true)} className="btn-primary text-sm px-4 py-2">
+          End Year {round} →
+        </button>
+      </div>
+
+      <ScrollToTop scrollContainerRef={scrollContainerRef} />
 
       {/* Deal Structuring Modal */}
       {selectedDeal && renderDealStructuring()}
