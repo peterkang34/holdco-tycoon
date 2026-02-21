@@ -178,7 +178,10 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
     } else if (business.status === 'active') {
       // Use full valuation engine for current value
       const valuation = calculateExitValuation(business, maxRounds, undefined, undefined, state.integratedPlatforms);
-      returns = business.ebitda * valuation.totalMultiple;
+      const grossValue = business.ebitda * valuation.totalMultiple;
+      // Net out business-level debt for realistic MOIC
+      const bizDebt = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining;
+      returns = Math.max(0, grossValue - bizDebt);
     }
 
     totalMoicWeighted += returns;
@@ -225,7 +228,7 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   } else if (metrics.netDebtToEbitda < 3.5) {
     balanceSheetHealth = 5 + ((3.5 - metrics.netDebtToEbitda) / 1.0) * 5;
   } else {
-    balanceSheetHealth = Math.max(0, 5 - (metrics.netDebtToEbitda - 3.5) * 2);
+    balanceSheetHealth = Math.max(0, 5 - (metrics.netDebtToEbitda - 3.5) * 3);
   }
 
   // Penalty for ever going above 4x

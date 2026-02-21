@@ -195,7 +195,7 @@ export function BusinessCard({
               width="w-56 md:w-64"
             >
               <p className="text-sm text-text-secondary font-normal">This is a roll-up hub. Tuck-in bolt-on acquisitions or merge with another business to increase scale and unlock synergies + exit multiple expansion.</p>
-              <p className="text-xs text-text-muted mt-2 font-normal">Multiple expansion caps at Scale 3 (+1.0x). Exit premium caps at Scale 5 (+1.0x). Merges add more scale than tuck-ins.</p>
+              <p className="text-xs text-text-muted mt-2 font-normal">Multiple expansion and exit premiums grow logarithmically with scale (diminishing returns). Merges add more scale than tuck-ins.</p>
               <p className="text-xs text-accent mt-1 font-normal">Current: Scale {platformScale}, {boltOnCount} bolt-on{boltOnCount !== 1 ? 's' : ''}</p>
             </Tooltip>
           )}

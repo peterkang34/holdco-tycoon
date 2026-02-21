@@ -23,6 +23,7 @@ import {
   createStartingBusiness,
   generateDealPipeline,
   resetBusinessIdCounter,
+  restoreBusinessIdCounter,
   generateBusinessId,
   determineIntegrationOutcome,
   calculateSynergies,
@@ -37,7 +38,7 @@ import {
   pickWeightedSector,
   generateDistressedDeals,
 } from '../engine/businesses';
-import { generateBuyerProfile } from '../engine/buyers';
+import { generateBuyerProfile, calculateSizeTierPremium } from '../engine/buyers';
 import {
   generateEventNarrative,
   getFallbackEventNarrative,
@@ -73,6 +74,56 @@ function computeTotalDebt(businesses: Business[], holdcoLoanBalance: number): nu
   return holdcoLoanBalance + businesses
     .filter(b => b.status === 'active' || b.status === 'integrated')
     .reduce((sum, b) => sum + b.bankDebtBalance, 0);
+}
+
+/**
+ * Run a final collection pass (debt P&I, seller notes, bank debt, earnouts)
+ * to deduct all outstanding obligations from cash before scoring.
+ * This prevents year-10 leverage exploits where debt is never repaid.
+ */
+function runFinalCollection(state: GameState): { cash: number; businesses: Business[]; holdcoLoanBalance: number } {
+  let cash = state.cash;
+  let holdcoLoanBalance = state.holdcoLoanBalance;
+
+  // Holdco loan: pay all remaining principal + one round of interest
+  if (holdcoLoanBalance > 0) {
+    const holdcoInterest = Math.round(holdcoLoanBalance * (state.holdcoLoanRate || 0));
+    cash -= holdcoInterest + holdcoLoanBalance;
+    holdcoLoanBalance = 0;
+  }
+
+  // OpCo-level debt: pay all remaining seller notes, bank debt, and earnouts
+  const businesses = state.businesses.map(b => {
+    if (b.status !== 'active' && b.status !== 'integrated') return b;
+    const updated = { ...b };
+
+    // Seller note: pay remaining balance + one round of interest
+    if (b.sellerNoteBalance > 0) {
+      const interest = Math.round(b.sellerNoteBalance * b.sellerNoteRate);
+      cash -= interest + b.sellerNoteBalance;
+      updated.sellerNoteBalance = 0;
+      updated.sellerNoteRoundsRemaining = 0;
+    }
+
+    // Bank debt: pay remaining balance + one round of interest
+    if (b.bankDebtBalance > 0) {
+      const interest = Math.round(b.bankDebtBalance * (b.bankDebtRate || 0));
+      cash -= interest + b.bankDebtBalance;
+      updated.bankDebtBalance = 0;
+      updated.bankDebtRoundsRemaining = 0;
+    }
+
+    // Earnout: pay all remaining
+    if (b.earnoutRemaining > 0) {
+      cash -= b.earnoutRemaining;
+      updated.earnoutRemaining = 0;
+      updated.earnoutTarget = 0;
+    }
+
+    return updated;
+  });
+
+  return { cash, businesses, holdcoLoanBalance };
 }
 
 // Capital structure constants (defaults for Easy mode — overridden by DIFFICULTY_CONFIG)
@@ -931,12 +982,13 @@ export const useGameStore = create<GameStore>()(
             lastIntegrationOutcome: null,
           });
         } else {
-          // Game over — all debt P&I already settled in last advanceToEvent
-          const gameOverDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
-          const gameOverMetrics = calculateMetrics({ ...state, businesses: updatedBusinesses, totalDebt: gameOverDebt });
+          // Game over — run final collection to settle all remaining debt before scoring
+          const finalState = runFinalCollection({ ...state, businesses: updatedBusinesses } as GameState);
+          const gameOverDebt = computeTotalDebt(finalState.businesses, finalState.holdcoLoanBalance);
+          const gameOverMetrics = calculateMetrics({ ...state, businesses: finalState.businesses, cash: finalState.cash, totalDebt: gameOverDebt, holdcoLoanBalance: finalState.holdcoLoanBalance });
 
           set({
-            businesses: updatedBusinesses,
+            businesses: finalState.businesses,
             round: newRound,
             metricsHistory: [...state.metricsHistory, historyEntry],
             roundHistory: newRoundHistory,
@@ -947,10 +999,11 @@ export const useGameStore = create<GameStore>()(
             phase: 'collect' as GamePhase,
             currentEvent: null,
             yearChronicle: null,
-            cash: state.cash,
+            cash: finalState.cash,
+            holdcoLoanBalance: finalState.holdcoLoanBalance,
             totalDebt: gameOverDebt,
             metrics: gameOverMetrics,
-            focusBonus: calculateSectorFocusBonus(updatedBusinesses),
+            focusBonus: calculateSectorFocusBonus(finalState.businesses),
           });
         }
       },
@@ -1307,8 +1360,12 @@ export const useGameStore = create<GameStore>()(
           peakEbitda: combinedEbitda,
           acquisitionEbitda: biz1.acquisitionEbitda + biz2.acquisitionEbitda,
           acquisitionPrice: combinedTotalCost,
-          acquisitionRound: Math.max(biz1.acquisitionRound, biz2.acquisitionRound),
-          acquisitionMultiple: ((biz1.acquisitionMultiple + biz2.acquisitionMultiple) / 2) + multipleExpansion,
+          acquisitionRound: (biz1.ebitda + biz2.ebitda) > 0
+            ? Math.round((biz1.ebitda * biz1.acquisitionRound + biz2.ebitda * biz2.acquisitionRound) / (biz1.ebitda + biz2.ebitda))
+            : Math.min(biz1.acquisitionRound, biz2.acquisitionRound),
+          acquisitionMultiple: (biz1.ebitda + biz2.ebitda) > 0
+            ? (biz1.ebitda * biz1.acquisitionMultiple + biz2.ebitda * biz2.acquisitionMultiple) / (biz1.ebitda + biz2.ebitda) + multipleExpansion
+            : ((biz1.acquisitionMultiple + biz2.acquisitionMultiple) / 2) + multipleExpansion,
           organicGrowthRate: (biz1.organicGrowthRate + biz2.organicGrowthRate) / 2 + (subTypeAffinity === 'match' ? 0.015 : subTypeAffinity === 'related' ? 0.010 : 0.005) + mergeGrowthDrag,
           revenue: combinedRevenue,
           ebitdaMargin: clampMargin(mergedMargin),
@@ -1367,8 +1424,8 @@ export const useGameStore = create<GameStore>()(
           integrationOutcome: outcome,
           synergiesRealized: (biz1.synergiesRealized || 0) + (biz2.synergiesRealized || 0) + synergies,
           totalAcquisitionCost: combinedTotalCost,
-          // Use higher baseline to prevent gaming (buy standalone, merge to bypass tuck-in penalties)
-          acquisitionSizeTierPremium: Math.max(biz1.acquisitionSizeTierPremium ?? 0, biz2.acquisitionSizeTierPremium ?? 0),
+          // Recalculate size tier for merged EBITDA (not Math.max of originals)
+          acquisitionSizeTierPremium: calculateSizeTierPremium(combinedEbitda).premium,
           wasMerged: true,
           mergerBalanceRatio: mergerBalanceRatio,
         };
@@ -1468,7 +1525,10 @@ export const useGameStore = create<GameStore>()(
       designatePlatform: (businessId: string) => {
         const state = get();
         const business = state.businesses.find(b => b.id === businessId && b.status === 'active');
-        if (!business) return;
+        if (!business) {
+          useToastStore.getState().addToast({ message: 'Action failed: business no longer available', type: 'warning' });
+          return;
+        }
 
         // Already a platform
         if (business.isPlatform) return;
@@ -1511,7 +1571,10 @@ export const useGameStore = create<GameStore>()(
       improveBusiness: (businessId: string, improvementType: OperationalImprovementType) => {
         const state = get();
         const business = state.businesses.find(b => b.id === businessId);
-        if (!business || business.status !== 'active') return;
+        if (!business || business.status !== 'active') {
+          useToastStore.getState().addToast({ message: 'Action failed: business no longer available', type: 'warning' });
+          return;
+        }
 
         // M-3: Prevent applying the same improvement type twice to the same business
         if (business.improvements.some(i => i.type === improvementType)) return;
@@ -1735,7 +1798,11 @@ export const useGameStore = create<GameStore>()(
       payDownBankDebt: (businessId: string, amount: number) => {
         const state = get();
         const business = state.businesses.find(b => b.id === businessId);
-        if (!business || business.status !== 'active' || business.bankDebtBalance <= 0) return;
+        if (!business || business.status !== 'active') {
+          useToastStore.getState().addToast({ message: 'Action failed: business no longer available', type: 'warning' });
+          return;
+        }
+        if (business.bankDebtBalance <= 0) return;
 
         const actualPayment = Math.min(amount, business.bankDebtBalance, state.cash);
         if (actualPayment <= 0) return;
@@ -1885,7 +1952,10 @@ export const useGameStore = create<GameStore>()(
       sellBusiness: (businessId: string) => {
         const state = get();
         const business = state.businesses.find(b => b.id === businessId);
-        if (!business || business.status !== 'active') return;
+        if (!business || business.status !== 'active') {
+          useToastStore.getState().addToast({ message: 'Action failed: business no longer available', type: 'warning' });
+          return;
+        }
 
         // L-1: Use shared calculateExitValuation instead of duplicated logic
         const lastEvent = state.eventHistory[state.eventHistory.length - 1];
@@ -2497,7 +2567,10 @@ export const useGameStore = create<GameStore>()(
       distressedSale: (businessId: string) => {
         const state = get();
         const business = state.businesses.find(b => b.id === businessId);
-        if (!business || business.status !== 'active') return;
+        if (!business || business.status !== 'active') {
+          useToastStore.getState().addToast({ message: 'Action failed: business no longer available', type: 'warning' });
+          return;
+        }
 
         // Fire sale at 70% of normal exit valuation
         const lastEvent = state.eventHistory[state.eventHistory.length - 1];
@@ -3027,7 +3100,10 @@ export const useGameStore = create<GameStore>()(
         if (state.phase !== 'allocate') return;
 
         const business = state.businesses.find(b => b.id === businessId && b.status === 'active');
-        if (!business) return;
+        if (!business) {
+          useToastStore.getState().addToast({ message: 'Action failed: business no longer available', type: 'warning' });
+          return;
+        }
 
         const program = getProgramById(programId);
         if (!program) return;
@@ -3348,6 +3424,10 @@ export const useGameStore = create<GameStore>()(
             // Backwards compat: initialize passedDealIds if missing
             if (!Array.isArray(state.passedDealIds)) {
               (state as any).passedDealIds = [];
+            }
+            // Restore business ID counter to avoid collisions after save/load
+            if (Array.isArray(state.businesses)) {
+              restoreBusinessIdCounter(state.businesses);
             }
             // Ensure pipeline deals have heat fields
             if (Array.isArray(state.dealPipeline)) {

@@ -100,8 +100,10 @@ export function calculateExitValuation(
   // Quality premium: higher quality businesses command higher multiples
   const qualityPremium = (business.qualityRating - 3) * 0.4;
 
-  // Platform premium: reduced since size tier now does the heavy lifting
-  const platformPremium = business.isPlatform ? (Math.min(business.platformScale, 5) * 0.2) : 0;
+  // Platform premium: logarithmic curve — scale 5 ~1.0x, scale 10 ~1.4x, scale 19 ~1.7x
+  const platformPremium = business.isPlatform && business.platformScale > 0
+    ? Math.log2(business.platformScale + 1) * 0.4
+    : 0;
 
   // Hold period premium: longer holds show stability (max +0.5x for 5+ years)
   const yearsHeld = currentRound - business.acquisitionRound;
@@ -168,9 +170,9 @@ export function calculateExitValuation(
     ruleOf40Premium + marginExpansionPremium + mergerPremium + turnaroundPremium;
 
   // Cap earned premiums to prevent runaway multiples
-  // Floor of 10x ensures well-built platforms still get rewarded;
-  // 1.5× base keeps premium proportional to sector baseline
-  const premiumCap = Math.max(10, baseMultiple * 1.5);
+  // Floor scales with platform scale — platforms get more headroom
+  const platformHeadroom = business.isPlatform ? business.platformScale * 0.3 : 0;
+  const premiumCap = Math.max(10 + platformHeadroom, baseMultiple * 1.5);
   const cappedEarnedPremiums = rawEarnedPremiums > 0
     ? Math.min(rawEarnedPremiums, premiumCap)
     : rawEarnedPremiums;

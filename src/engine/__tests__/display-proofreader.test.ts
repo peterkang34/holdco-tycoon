@@ -786,36 +786,41 @@ describe('Display Proofreader', () => {
 
     // ── Multiple Expansion (Strategy A) ──
 
-    it('Multiple expansion: Scale 0=0, 1=+0.3x, 2=+0.6x, 3+=+1.0x (capped)', () => {
+    it('Multiple expansion: logarithmic curve — scale 3 ~1.0x, scale 10 ~1.7x, cap at 2.0x', () => {
       expect(calculateMultipleExpansion(0, 1000)).toBe(0);
-      expect(calculateMultipleExpansion(1, 1000)).toBe(0.3);
-      expect(calculateMultipleExpansion(2, 1000)).toBe(0.6);
-      expect(calculateMultipleExpansion(3, 1000)).toBe(1.0);
-      // Cap: scales above 3 return same as scale 3
-      expect(calculateMultipleExpansion(4, 1000)).toBe(1.0);
-      expect(calculateMultipleExpansion(8, 1000)).toBe(1.0);
+      // log2(2) * 0.5 = 0.5
+      expect(calculateMultipleExpansion(1, 1000)).toBeCloseTo(0.5, 1);
+      // log2(3) * 0.5 ≈ 0.79
+      expect(calculateMultipleExpansion(2, 1000)).toBeCloseTo(Math.log2(3) * 0.5, 1);
+      // log2(4) * 0.5 = 1.0
+      expect(calculateMultipleExpansion(3, 1000)).toBeCloseTo(1.0, 1);
+      // Scales above 3 continue to grow (logarithmically)
+      expect(calculateMultipleExpansion(10, 1000)).toBeGreaterThan(calculateMultipleExpansion(3, 1000));
+      // Cap at 2.0x
+      expect(calculateMultipleExpansion(100, 1000)).toBeCloseTo(2.0, 1);
     });
 
     it('Multiple expansion size bonus: >$5M=+0.3x, >$3M=+0.15x', () => {
-      // Scale 1 with $6M EBITDA: 0.3 + 0.3 = 0.6
-      expect(calculateMultipleExpansion(1, 6000)).toBeCloseTo(0.6);
-      // Scale 1 with $4M EBITDA: 0.3 + 0.15 = 0.45
-      expect(calculateMultipleExpansion(1, 4000)).toBeCloseTo(0.45);
-      // Scale 1 with $2M EBITDA: 0.3 + 0 = 0.3
-      expect(calculateMultipleExpansion(1, 2000)).toBeCloseTo(0.3);
+      const scale1Bonus = Math.log2(2) * 0.5; // 0.5
+      // Scale 1 with $6M EBITDA: scale bonus + 0.3
+      expect(calculateMultipleExpansion(1, 6000)).toBeCloseTo(scale1Bonus + 0.3);
+      // Scale 1 with $4M EBITDA: scale bonus + 0.15
+      expect(calculateMultipleExpansion(1, 4000)).toBeCloseTo(scale1Bonus + 0.15);
+      // Scale 1 with $2M EBITDA: scale bonus + 0
+      expect(calculateMultipleExpansion(1, 2000)).toBeCloseTo(scale1Bonus);
     });
 
     // ── Platform Premium at Exit (Strategy A) ──
 
-    it('Platform premium: +0.2x per scale, capped at Scale 5 (+1.0x)', () => {
+    it('Platform premium: logarithmic curve — scale 5 ~1.0x, scale 10 ~1.4x', () => {
       const sim = readComponent('engine/simulation.ts');
-      expect(sim).toContain('Math.min(business.platformScale, 5) * 0.2');
+      expect(sim).toContain("Math.log2(business.platformScale + 1) * 0.4");
       // Verify formula produces correct values
-      const premiumAt = (scale: number) => Math.min(scale, 5) * 0.2;
-      expect(premiumAt(1)).toBeCloseTo(0.2);
-      expect(premiumAt(3)).toBeCloseTo(0.6);
-      expect(premiumAt(5)).toBeCloseTo(1.0);
-      expect(premiumAt(8)).toBeCloseTo(1.0); // capped
+      const premiumAt = (scale: number) => scale > 0 ? Math.log2(scale + 1) * 0.4 : 0;
+      expect(premiumAt(0)).toBe(0);
+      expect(premiumAt(1)).toBeCloseTo(0.4);
+      expect(premiumAt(5)).toBeCloseTo(Math.log2(6) * 0.4, 1);
+      expect(premiumAt(10)).toBeGreaterThan(premiumAt(5)); // continues growing
     });
 
     // ── Merge Scale Formula (Strategy B) ──
@@ -842,12 +847,12 @@ describe('Display Proofreader', () => {
 
     // ── RollUpGuideModal Copy (Strategy B) ──
 
-    it('RollUpGuideModal scale bonuses: +0.3x, +0.6x, +1.0x (not +0.9x)', () => {
+    it('RollUpGuideModal scale bonuses: logarithmic +0.4x, +1.0x, +1.4x (no hard cap)', () => {
       const guide = readComponent('components/ui/RollUpGuideModal.tsx');
-      expect(guide).toContain('+0.3x');
-      expect(guide).toContain('+0.6x');
-      expect(guide).toContain('+1.0x (cap)');
-      expect(guide).not.toContain('+0.9x');
+      expect(guide).toContain('+0.4x');
+      expect(guide).toContain('+1.0x');
+      expect(guide).toContain('+1.4x');
+      expect(guide).not.toContain('+0.3x');
     });
 
     it('RollUpGuideModal merge cost: 15% of smaller (not 10% of combined)', () => {
@@ -858,14 +863,16 @@ describe('Display Proofreader', () => {
 
     // ── UserManualModal Platform Copy (Strategy B) ──
 
-    it('UserManualModal documents platform premium cap at Scale 5', () => {
+    it('UserManualModal documents logarithmic platform premium curve', () => {
       const manual = readComponent('components/ui/UserManualModal.tsx');
-      expect(manual).toContain('capped at Scale 5');
+      expect(manual).toContain('logarithmic curve');
+      expect(manual).toContain('continues growing');
     });
 
-    it('UserManualModal documents multiple expansion values +0.3x/+0.6x/+1.0x', () => {
+    it('UserManualModal documents logarithmic multiple expansion', () => {
       const manual = readComponent('components/ui/UserManualModal.tsx');
-      expect(manual).toContain('+0.3x/+0.6x/+1.0x');
+      expect(manual).toContain('logarithmic');
+      expect(manual).toContain('up to +2.0x');
     });
 
     it('UserManualModal explains merges start at Scale 2', () => {
@@ -875,10 +882,10 @@ describe('Display Proofreader', () => {
 
     // ── BusinessCard Tooltip (Strategy B) ──
 
-    it('BusinessCard tooltip documents both caps: Scale 3 (expansion) and Scale 5 (exit)', () => {
+    it('BusinessCard tooltip documents logarithmic scale growth', () => {
       const card = readComponent('components/cards/BusinessCard.tsx');
-      expect(card).toContain('Multiple expansion caps at Scale 3 (+1.0x)');
-      expect(card).toContain('Exit premium caps at Scale 5 (+1.0x)');
+      expect(card).toContain('grow logarithmically with scale');
+      expect(card).toContain('diminishing returns');
     });
   });
 
@@ -974,10 +981,10 @@ describe('Display Proofreader', () => {
       expect(Math.min(1.0, 5 / 2)).toBe(1.0);
     });
 
-    it('Aggregate premium cap: min(earnedPremiums, max(10, base * 1.5)) + structural platform premium (Strategy B)', () => {
-      // simulation.ts: premiumCap = Math.max(10, baseMultiple * 1.5)
+    it('Aggregate premium cap: min(earnedPremiums, max(10 + platformHeadroom, base * 1.5)) + structural platform premium (Strategy B)', () => {
+      // simulation.ts: premiumCap = Math.max(10 + platformHeadroom, baseMultiple * 1.5)
       const sim = readComponent('engine/simulation.ts');
-      expect(sim).toContain('Math.max(10, baseMultiple * 1.5)');
+      expect(sim).toContain('Math.max(10 + platformHeadroom, baseMultiple * 1.5)');
       // Earned premiums are capped, then structural platform premium added after
       expect(sim).toContain('Math.min(rawEarnedPremiums, premiumCap)');
       expect(sim).toContain('cappedEarnedPremiums + integratedPlatformPremium');

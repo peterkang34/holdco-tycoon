@@ -12,6 +12,36 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 21, 2026',
+    title: 'Balance & Scoring Fixes',
+    sections: [
+      {
+        heading: 'Platform Building',
+        items: [
+          'Platform premiums now scale logarithmically beyond Scale 5 — large platform builders are properly rewarded instead of hitting a hard cap.',
+          'Multiple expansion continues growing past Scale 3 (up to +2.0x for massive platforms).',
+          'Merging businesses now uses EBITDA-weighted acquisition multiples and recalculates size tier premium for the combined entity.',
+        ],
+      },
+      {
+        heading: 'Scoring & Leverage',
+        items: [
+          'MOIC now nets out business-level debt — leveraged MOIC reflects true equity returns, not gross asset value.',
+          'All remaining debt (holdco loans, seller notes, bank debt, earnouts) is settled before final scoring — no more free leverage in the last round.',
+          'Balance sheet penalty is steeper above 3.5x net debt/EBITDA — aggressive leverage strategies face meaningful scoring consequences.',
+        ],
+      },
+      {
+        heading: 'Stability',
+        items: [
+          'Fixed business ID collisions on mobile reload (iOS Safari tab kill) that caused wrong names, failed improvements, and broken platform merges.',
+          'Business-targeted actions now show a warning toast if the business is no longer available, instead of silently failing.',
+          'Cash flow forecast no longer double-counts seller note payments.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 21, 2026',
     title: 'Mobile Experience Overhaul',
     sections: [
       {

@@ -102,21 +102,28 @@ export function RollUpGuideModal({ onClose }: RollUpGuideModalProps) {
                     <span className="bg-accent/20 text-accent px-2 py-1 rounded text-xs font-medium">Scale 1</span>
                   </td>
                   <td className="py-3 text-text-secondary">Designate as platform</td>
-                  <td className="py-3 text-right font-mono">+0.3x</td>
+                  <td className="py-3 text-right font-mono">+0.4x</td>
                 </tr>
                 <tr className="border-b border-white/10">
                   <td className="py-3">
-                    <span className="bg-accent/20 text-accent px-2 py-1 rounded text-xs font-medium">Scale 2</span>
+                    <span className="bg-accent/20 text-accent px-2 py-1 rounded text-xs font-medium">Scale 3</span>
                   </td>
-                  <td className="py-3 text-text-secondary">Merge two companies or 1 tuck-in</td>
-                  <td className="py-3 text-right font-mono">+0.6x</td>
+                  <td className="py-3 text-text-secondary">Merge two companies or 2 tuck-ins</td>
+                  <td className="py-3 text-right font-mono">+1.0x</td>
+                </tr>
+                <tr className="border-b border-white/10">
+                  <td className="py-3">
+                    <span className="bg-accent/20 text-accent px-2 py-1 rounded text-xs font-medium">Scale 5</span>
+                  </td>
+                  <td className="py-3 text-text-secondary">Multiple tuck-ins or merges</td>
+                  <td className="py-3 text-right font-mono">+1.0x</td>
                 </tr>
                 <tr>
                   <td className="py-3">
-                    <span className="bg-accent/20 text-accent px-2 py-1 rounded text-xs font-medium">Scale 3+</span>
+                    <span className="bg-accent/20 text-accent px-2 py-1 rounded text-xs font-medium">Scale 10+</span>
                   </td>
-                  <td className="py-3 text-text-secondary">2+ tuck-ins or merge + tuck-in</td>
-                  <td className="py-3 text-right font-mono">+1.0x (cap)</td>
+                  <td className="py-3 text-text-secondary">Large roll-up (diminishing returns)</td>
+                  <td className="py-3 text-right font-mono">+1.4x</td>
                 </tr>
               </tbody>
             </table>

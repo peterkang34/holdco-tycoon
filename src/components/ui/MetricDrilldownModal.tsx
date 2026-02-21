@@ -615,14 +615,6 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
           return sum + (prog ? prog.annualCost : 0);
         }, 0);
 
-    // Seller note P&I for all active + integrated businesses
-    const sellerNoteServiceEst = allDebtBusinesses.reduce((sum, b) => {
-      if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
-        return sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate) + Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
-      }
-      return sum;
-    }, 0);
-
     // Earnout estimate (current growth as proxy)
     const earnoutEst = state.businesses.reduce((sum, b) => {
       if (b.earnoutRemaining <= 0 || b.earnoutTarget <= 0) return sum;
@@ -644,8 +636,8 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
     const taxEstLeverage = calculatePortfolioTax(activeBusinesses, state.holdcoLoanBalance, state.holdcoLoanRate + distressRestrictions.interestPenalty, sharedServicesCost + maSourcingCost);
 
     // Net FCF after tax, operating costs, and opco-level debt service
-    // NOTE: holdco P&I and bank debt P&I are computed inside calculateCovenantHeadroom — do NOT include here
-    const estimatedNetFcf = preTaxFcfEst - taxEstLeverage.taxAmount - sharedServicesCost - maSourcingCost - turnaroundCostAnnual - sellerNoteServiceEst - earnoutEst;
+    // NOTE: holdco P&I, bank debt P&I, and seller note P&I are computed inside calculateCovenantHeadroom — do NOT include here
+    const estimatedNetFcf = preTaxFcfEst - taxEstLeverage.taxAmount - sharedServicesCost - maSourcingCost - turnaroundCostAnnual - earnoutEst;
 
     const covenantHeadroom = calculateCovenantHeadroom(
       state.cash,

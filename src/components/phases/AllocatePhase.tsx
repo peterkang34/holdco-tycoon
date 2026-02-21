@@ -403,13 +403,7 @@ export function AllocatePhase({
           return sum + (prog ? prog.annualCost : 0);
         }, 0);
 
-    // Seller note P&I for all active + integrated businesses
-    const sellerNoteServiceEst = allBusinesses.reduce((sum, b) => {
-      if ((b.status === 'active' || b.status === 'integrated') && b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
-        return sum + Math.round(b.sellerNoteBalance * b.sellerNoteRate) + Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining);
-      }
-      return sum;
-    }, 0);
+    // Seller note P&I is computed inside calculateCovenantHeadroom — not included here
 
     // Earnout estimate (current growth as proxy)
     const earnoutEst = allBusinesses.reduce((sum, b) => {
@@ -432,8 +426,8 @@ export function AllocatePhase({
     const taxEst = calculatePortfolioTax(activeBusinesses, holdcoLoanBalance, holdcoLoanRate + distressRestrictions.interestPenalty, sharedServicesCostAnnual + maCostAnnual);
 
     // Net FCF after tax, operating costs, and opco-level debt service
-    // NOTE: holdco P&I and bank debt P&I are computed inside calculateCovenantHeadroom — do NOT include here
-    const estimatedNetFcf = preTaxFcf - taxEst.taxAmount - sharedServicesCostAnnual - maCostAnnual - turnaroundCostAnnual - sellerNoteServiceEst - earnoutEst;
+    // NOTE: holdco P&I, bank debt P&I, and seller note P&I are computed inside calculateCovenantHeadroom — do NOT include here
+    const estimatedNetFcf = preTaxFcf - taxEst.taxAmount - sharedServicesCostAnnual - maCostAnnual - turnaroundCostAnnual - earnoutEst;
 
     return calculateCovenantHeadroom(
       cash,

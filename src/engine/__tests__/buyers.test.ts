@@ -117,7 +117,7 @@ describe('calculateDeRiskingPremium', () => {
     expect(premium).toBeCloseTo(0.3, 1);
   });
 
-  it('should add up to +0.6x for platform scale', () => {
+  it('should add logarithmic premium for platform scale', () => {
     const business = createMockBusiness({
       dueDiligence: createMockDueDiligence({ revenueConcentration: 'high', operatorQuality: 'weak', customerRetention: 70 }),
       isPlatform: true,
@@ -125,7 +125,8 @@ describe('calculateDeRiskingPremium', () => {
       improvements: [],
     });
     const premium = calculateDeRiskingPremium(business);
-    expect(premium).toBeCloseTo(0.6, 1);
+    // log2(3+1) * 0.35 = 2.0 * 0.35 = 0.7
+    expect(premium).toBeCloseTo(0.7, 1);
   });
 
   it('should add +0.2x for 2+ improvements', () => {

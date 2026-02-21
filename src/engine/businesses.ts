@@ -624,9 +624,8 @@ export function calculateSynergies(
 
 // Calculate multiple expansion based on platform scale
 export function calculateMultipleExpansion(platformScale: number, totalEbitda: number): number {
-  // Larger platforms command higher multiples (the roll-up premium)
-  // Scale 1: +0.3x, Scale 2: +0.6x, Scale 3+: +1.0x (capped)
-  const scaleBonus = [0, 0.3, 0.6, 1.0][Math.min(platformScale, 3)] ?? 0;
+  // Logarithmic scale bonus — scale 3 ~1.0x (same as before), scale 10 ~1.4x, scale 19 ~1.7x
+  const scaleBonus = platformScale > 0 ? Math.min(2.0, Math.log2(platformScale + 1) * 0.5) : 0;
 
   // Additional bonus for very large platforms (>$5M combined EBITDA)
   const sizeBonus = totalEbitda > 5000 ? 0.3 : totalEbitda > 3000 ? 0.15 : 0;

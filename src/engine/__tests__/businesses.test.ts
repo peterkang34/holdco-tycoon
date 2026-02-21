@@ -459,11 +459,13 @@ describe('calculateMultipleExpansion', () => {
     expect(largePlatform).toBeGreaterThan(smallPlatform);
   });
 
-  it('should cap multiple expansion bonus at scale 3 for scale 4+', () => {
+  it('should use logarithmic curve for multiple expansion', () => {
     const result = calculateMultipleExpansion(5, 1000);
     expect(Number.isNaN(result)).toBe(false);
-    // Scale 5 is capped at scale 3's bonus (1.0x) via Math.min(platformScale, 3)
-    expect(result).toBe(1.0); // scaleBonus = 1.0 (capped at scale 3)
+    // log2(5+1) * 0.5 = 2.585 * 0.5 ≈ 1.29
+    expect(result).toBeCloseTo(Math.log2(6) * 0.5, 1);
+    // Scale 10 should be higher than scale 5 (no longer capped at 3)
+    expect(calculateMultipleExpansion(10, 1000)).toBeGreaterThan(result);
   });
 });
 

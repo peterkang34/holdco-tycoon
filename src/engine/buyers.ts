@@ -57,9 +57,9 @@ export function calculateDeRiskingPremium(business: Business): number {
     premium += 0.3;
   }
 
-  // Platform with bolt-ons: +0.2x per scale tier (up to +0.6x)
+  // Platform with bolt-ons: logarithmic, caps at ~1.2x for very large platforms
   if (business.isPlatform && business.platformScale > 0) {
-    premium += Math.min(0.6, business.platformScale * 0.2);
+    premium += Math.min(1.2, Math.log2(business.platformScale + 1) * 0.35);
   }
 
   // 2+ improvements: +0.2x

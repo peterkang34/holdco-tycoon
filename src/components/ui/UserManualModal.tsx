@@ -683,7 +683,7 @@ function PlatformsContent() {
         tuck-in acquisitions (bolt-ons) at a quality-dependent price discount (5-25%). Each tuck-in adds +1 scale.
         Alternatively, merging two companies jumps straight to Scale 2 (combining both scales + 2),
         reflecting the greater complexity of combining two businesses. Scale provides an exit multiple premium
-        (+0.2x per scale level, capped at Scale 5) and multiple expansion (+0.3x/+0.6x/+1.0x at Scale 1/2/3+).
+        (logarithmic curve — ~+0.4x at Scale 1, ~+1.0x at Scale 5, continues growing) and multiple expansion (logarithmic — ~+0.5x at Scale 1, ~+1.0x at Scale 3, up to +2.0x for very large platforms).
       </P>
 
       <SubHeading>Integrated Platforms</SubHeading>
@@ -936,14 +936,15 @@ function SellingContent() {
         <><strong>Hold Period Premium:</strong> +0.1x per year held, capped at +0.5x (5+ years)</>,
         <><strong>Improvements Premium:</strong> Based on operational improvements applied (capped at +1.0x total)</>,
         <><strong>Size Tier Premium:</strong> Larger EBITDA businesses attract larger buyer pools and higher multiples</>,
-        <><strong>Platform Premium:</strong> +0.2x per platform scale level (capped at Scale 5 = +1.0x)</>,
+        <><strong>Platform Premium:</strong> Logarithmic curve based on platform scale (~+1.0x at Scale 5, continues growing for larger platforms)</>,
         <><strong>Integrated Platform Premium:</strong> +1.0 to +2.0x for businesses in forged platforms</>,
         <><strong>Turnaround Premium:</strong> +0.25x for businesses improved 2+ quality tiers</>,
         <><strong>Market Conditions:</strong> +0.5x during bull markets, -0.5x during recessions</>,
       ]} />
       <HighlightBox>
-        <strong>Premium Cap:</strong> Earned premiums (growth, quality, improvements, etc.) are capped at the higher of <strong>10x</strong> or{' '}
-        <strong>1.5× the base multiple</strong>. The integrated platform premium is structural and added on top of this cap,
+        <strong>Premium Cap:</strong> Earned premiums (growth, quality, improvements, etc.) are capped at the higher of <strong>10x + platform headroom</strong> or{' '}
+        <strong>1.5× the base multiple</strong>. Platform headroom scales with platform scale (+0.3x per level),
+        so larger platforms have more room for premium stacking. The integrated platform premium is structural and added on top of this cap,
         so forging a platform always provides its full multiple expansion benefit.
       </HighlightBox>
       <HighlightBox>
@@ -1066,8 +1067,8 @@ function ScoringContent() {
           ['Value Creation', '20', 'FEV as a multiple of initial raise (target: 10x for 20yr, 5x for 10yr)'],
           ['FCF/Share Growth', '20', 'How much free cash flow per share grew over the game (target: 4x for 20yr, 2x for 10yr)'],
           ['Portfolio ROIC', '15', 'Return on invested capital — are you earning above your cost of capital? (target: 25%+ for 20yr, 20%+ for 10yr)'],
-          ['Capital Deployment', '15', 'Average MOIC across investments + Return on Incremental Invested Capital (ROIIC)'],
-          ['Balance Sheet Health', '15', 'Ending leverage ratio, with penalties for over-leveraging, covenant breaches, and restructuring'],
+          ['Capital Deployment', '15', 'Average MOIC across investments (net of business debt) + Return on Incremental Invested Capital (ROIIC)'],
+          ['Balance Sheet Health', '15', 'Ending leverage ratio with steep penalties above 3.5x, plus penalties for over-leveraging, covenant breaches, and restructuring'],
           ['Strategic Discipline', '15', 'Sector focus, shared services usage, capital return discipline, deal quality'],
         ]}
       />
@@ -1234,8 +1235,8 @@ function GlossaryContent() {
         </div>
         <div>
           <strong className="text-white">MOIC (Multiple on Invested Capital)</strong> &mdash;
-          Total value returned divided by total capital invested. A 2.5x MOIC means you got
-          $2.50 back for every $1.00 invested.
+          Total value returned (net of business-level debt) divided by total capital invested. A 2.5x MOIC means you got
+          $2.50 back for every $1.00 invested. Leverage reduces MOIC because outstanding debt is deducted from business value.
         </div>
         <div>
           <strong className="text-white">ROIC (Return on Invested Capital)</strong> &mdash;
