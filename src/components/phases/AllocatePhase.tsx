@@ -36,7 +36,7 @@ import { ImprovementModal } from '../modals/ImprovementModal';
 import { TurnaroundModal } from '../modals/TurnaroundModal';
 import { isAIEnabled } from '../../services/aiGeneration';
 import { checkPlatformEligibility, calculateIntegrationCost, getEligibleBusinessesForExistingPlatform, calculateAddToPlatformCost } from '../../engine/platforms';
-import { PLATFORM_SALE_BONUS } from '../../data/gameConfig';
+import { getPlatformSaleBonus } from '../../data/gameConfig';
 import { getEligiblePrograms, canUnlockTier } from '../../engine/turnarounds';
 import { TURNAROUND_TIER_CONFIG, getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
 import { TURNAROUND_FATIGUE_THRESHOLD } from '../../data/gameConfig';
@@ -1206,7 +1206,7 @@ export function AllocatePhase({
                           onClick={() => setSellPlatformConfirm(ip)}
                           className="mt-3 text-xs font-semibold bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg border border-purple-500/50 hover:border-purple-400 shadow-sm hover:shadow-md hover:shadow-purple-500/20 cursor-pointer transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
                         >
-                          Sell Platform (+{PLATFORM_SALE_BONUS.toFixed(1)}x bonus)
+                          Sell Platform (+{getPlatformSaleBonus(ip.bonuses.multipleExpansion).toFixed(1)}x bonus)
                         </button>
                       </div>
                     );
@@ -2862,10 +2862,11 @@ export function AllocatePhase({
           .filter((b): b is Business => b != null);
         if (constituents.length === 0) return null;
 
+        const saleBonus = getPlatformSaleBonus(ip.bonuses.multipleExpansion);
         const constituentDetails = constituents.map(biz => {
           const val = calculateExitValuation(biz, round, lastEventType, undefined, integratedPlatforms);
           const baseExitMultiple = val.totalMultiple;
-          const withBonus = baseExitMultiple + PLATFORM_SALE_BONUS;
+          const withBonus = baseExitMultiple + saleBonus;
           const exitPrice = Math.round(biz.ebitda * Math.max(2.0, withBonus));
           const boltOnDebt = (biz.boltOnIds || [])
             .map(id => allBusinesses.find(b => b.id === id))
@@ -2886,7 +2887,7 @@ export function AllocatePhase({
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
             <div className="bg-bg-primary border border-purple-500/30 rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-4 sm:p-6">
               <h3 className="text-lg sm:text-xl font-bold text-purple-400 mb-2">Sell {sectorEmojis} {ip.name}?</h3>
-              <p className="text-xs text-text-muted mb-4">Sell all constituent businesses as a single platform. Includes a +{PLATFORM_SALE_BONUS.toFixed(1)}x multiple bonus for selling as a unit.</p>
+              <p className="text-xs text-text-muted mb-4">Sell all constituent businesses as a single platform. Includes a +{saleBonus.toFixed(1)}x multiple bonus for selling as a unit.</p>
 
               <div className="mb-4 space-y-1">
                 {constituentDetails.map(({ biz, exitPrice, multiple }) => (
@@ -2900,7 +2901,7 @@ export function AllocatePhase({
               <div className="space-y-2 mb-4 text-sm">
                 <div className="flex justify-between">
                   <span className="text-text-muted">Platform Sale Bonus</span>
-                  <span className="font-mono text-purple-400">+{PLATFORM_SALE_BONUS.toFixed(1)}x per business</span>
+                  <span className="font-mono text-purple-400">+{saleBonus.toFixed(1)}x per business</span>
                 </div>
                 <div className="flex justify-between font-bold">
                   <span>Total Exit Price</span>

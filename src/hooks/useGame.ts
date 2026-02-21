@@ -133,14 +133,14 @@ const STARTING_SHARES = 1000;
 const FOUNDER_SHARES = 800;
 const STARTING_INTEREST_RATE = 0.07;
 import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, IMPROVEMENT_COST_FLOOR, QUALITY_IMPROVEMENT_MULTIPLIER, MIN_FOUNDER_OWNERSHIP } from '../data/gameConfig';
-import { clampMargin } from '../engine/helpers';
+import { clampMargin, capGrowthRate } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
 import { buildChronicleContext } from '../services/chronicleContext';
 import { useToastStore } from './useToast';
 import { calculateIntegrationCost, forgePlatform, checkPlatformDissolution, calculateAddToPlatformCost } from '../engine/platforms';
 import { getRecipeById } from '../data/platformRecipes';
 import {
-  PLATFORM_SALE_BONUS, COVENANT_BREACH_ROUNDS_THRESHOLD, EARNOUT_EXPIRATION_YEARS,
+  getPlatformSaleBonus, COVENANT_BREACH_ROUNDS_THRESHOLD, EARNOUT_EXPIRATION_YEARS,
   KEY_MAN_GOLDEN_HANDCUFFS_COST_PCT, KEY_MAN_GOLDEN_HANDCUFFS_RESTORE_CHANCE,
   KEY_MAN_SUCCESSION_COST_MIN, KEY_MAN_SUCCESSION_COST_MAX, KEY_MAN_SUCCESSION_ROUNDS,
   EARNOUT_SETTLE_PCT, EARNOUT_FIGHT_LEGAL_COST_MIN, EARNOUT_FIGHT_LEGAL_COST_MAX,
@@ -1451,7 +1451,10 @@ export const useGameStore = create<GameStore>()(
           // Check dissolution: if merge reduces sub-type diversity below recipe minimum
           const platform = updatedIntegratedPlatforms.find(ip => ip.id === mergedIntegratedPlatformId);
           if (platform && checkPlatformDissolution(platform, [...updatedBusinesses, mergedBusiness])) {
-            // Dissolve: remove platform, clear integratedPlatformId
+            // Dissolve: remove platform, clear integratedPlatformId.
+            // Margin/growth mutations are intentionally preserved — they were one-time boosts paid
+            // for via integration cost. Dynamic bonuses (multipleExpansion, recessionResistance)
+            // DO disappear since they rely on integratedPlatformId lookup at runtime.
             updatedIntegratedPlatforms = updatedIntegratedPlatforms.filter(ip => ip.id !== mergedIntegratedPlatformId);
             mergedBusiness.integratedPlatformId = undefined;
             updatedBusinesses = updatedBusinesses.map(b =>
@@ -1670,8 +1673,8 @@ export const useGameStore = create<GameStore>()(
             ebitdaMargin: newMargin,
             ebitda: newEbitda,
             peakRevenue: Math.max(b.peakRevenue, newRevenue),
-            organicGrowthRate: b.organicGrowthRate + growthBoost,
-            revenueGrowthRate: b.revenueGrowthRate + growthBoost,
+            organicGrowthRate: capGrowthRate(b.organicGrowthRate + growthBoost),
+            revenueGrowthRate: capGrowthRate(b.revenueGrowthRate + growthBoost),
             totalAcquisitionCost: b.totalAcquisitionCost + cost,
             dueDiligence: updatedDueDiligence,
             marginDriftRate: updatedMarginDriftRate,
@@ -2016,7 +2019,10 @@ export const useGameStore = create<GameStore>()(
           const platform = state.integratedPlatforms.find(p => p.id === business.integratedPlatformId);
           if (platform) {
             if (checkPlatformDissolution(platform, updatedBusinesses)) {
-              // Dissolve: remove platform, clear integratedPlatformId from remaining constituents
+              // Dissolve: remove platform, clear integratedPlatformId from remaining constituents.
+              // Margin/growth mutations are intentionally preserved — they were one-time boosts paid
+              // for via integration cost. Dynamic bonuses (multipleExpansion, recessionResistance)
+              // DO disappear since they rely on integratedPlatformId lookup at runtime.
               updatedPlatforms = updatedPlatforms.filter(p => p.id !== platform.id);
               updatedBusinesses = updatedBusinesses.map(b =>
                 b.integratedPlatformId === platform.id ? { ...b, integratedPlatformId: undefined } : b
@@ -2863,12 +2869,15 @@ export const useGameStore = create<GameStore>()(
 
         const updatedBusinesses = state.businesses.map(b => {
           if (!businessIds.includes(b.id)) return b;
+          const newMargin = clampMargin(b.ebitdaMargin + recipe.bonuses.marginBoost);
           return {
             ...b,
             integratedPlatformId: platform.id,
-            ebitdaMargin: b.ebitdaMargin + recipe.bonuses.marginBoost,
-            revenueGrowthRate: b.revenueGrowthRate + recipe.bonuses.growthBoost,
-            ebitda: Math.round(b.revenue * (b.ebitdaMargin + recipe.bonuses.marginBoost)),
+            ebitdaMargin: newMargin,
+            revenueGrowthRate: capGrowthRate(b.revenueGrowthRate + recipe.bonuses.growthBoost),
+            organicGrowthRate: capGrowthRate(b.organicGrowthRate + recipe.bonuses.growthBoost),
+            // Growth boost is forward-looking only — EBITDA recalc uses new margin but current revenue
+            ebitda: Math.round(b.revenue * newMargin),
           };
         });
 
@@ -2922,12 +2931,15 @@ export const useGameStore = create<GameStore>()(
         // Apply one-time bonuses (same as forge)
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id !== businessId) return b;
+          const newMargin = clampMargin(b.ebitdaMargin + recipe.bonuses.marginBoost);
           return {
             ...b,
             integratedPlatformId: platform.id,
-            ebitdaMargin: b.ebitdaMargin + recipe.bonuses.marginBoost,
-            revenueGrowthRate: b.revenueGrowthRate + recipe.bonuses.growthBoost,
-            ebitda: Math.round(b.revenue * (b.ebitdaMargin + recipe.bonuses.marginBoost)),
+            ebitdaMargin: newMargin,
+            revenueGrowthRate: capGrowthRate(b.revenueGrowthRate + recipe.bonuses.growthBoost),
+            organicGrowthRate: capGrowthRate(b.organicGrowthRate + recipe.bonuses.growthBoost),
+            // Growth boost is forward-looking only — EBITDA recalc uses new margin but current revenue
+            ebitda: Math.round(b.revenue * newMargin),
           };
         });
 
@@ -2994,8 +3006,9 @@ export const useGameStore = create<GameStore>()(
 
         for (const biz of constituents) {
           const valuation = calculateExitValuation(biz, state.round, lastEvent?.type, undefined, state.integratedPlatforms);
-          // Apply platform sale bonus + strategic premium + market variance
-          let effectiveMultiple = valuation.totalMultiple + PLATFORM_SALE_BONUS;
+          // Apply tiered platform sale bonus + strategic premium + market variance
+          const platformSaleBonus = getPlatformSaleBonus(platform.bonuses.multipleExpansion);
+          let effectiveMultiple = valuation.totalMultiple + platformSaleBonus;
           if (buyerProfile.isStrategic) effectiveMultiple += buyerProfile.strategicPremium;
           const bizSellRng = platStreams.market.fork(biz.id + '_sell');
           const marketVariance = lastEvent?.type === 'global_bull_market' ? bizSellRng.next() * 0.3
@@ -3073,7 +3086,7 @@ export const useGameStore = create<GameStore>()(
                 totalDebtPayoff,
                 totalRolloverDeduction,
                 businessCount: constituents.length,
-                platformSaleBonus: PLATFORM_SALE_BONUS,
+                platformSaleBonus: getPlatformSaleBonus(platform.bonuses.multipleExpansion),
                 buyerName: buyerProfile.name,
                 buyerType: buyerProfile.type,
               },

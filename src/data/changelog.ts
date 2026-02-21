@@ -12,6 +12,26 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 21, 2026',
+    title: 'Platform Integration Robustness',
+    sections: [
+      {
+        heading: 'Bug Fixes',
+        items: [
+          'Platform margin bonuses are now properly clamped at the 80% ceiling — previously a high-margin business could briefly exceed the cap.',
+          'Growth rate bonuses from platform forging now correctly sync both organic and revenue growth rates.',
+          'Operational improvement growth boosts are now capped at the 20% growth ceiling.',
+        ],
+      },
+      {
+        heading: 'Balance',
+        items: [
+          'Platform sale bonus is now tiered by recipe strength — top-tier recipes (2.0x multiple expansion) get a +0.3x sale bonus instead of the old flat +0.8x, preventing excessive stacking.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 21, 2026',
     title: 'Analytics & Admin Dashboard',
     sections: [
       {

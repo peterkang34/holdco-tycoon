@@ -70,7 +70,13 @@ export const ROLLOVER_EXCLUDED_ARCHETYPES: string[] = ['distressed_seller', 'bur
 
 // ── Platform Sale Constants ──
 
-export const PLATFORM_SALE_BONUS = 0.8;  // +0.8x multiple for selling entire platform as a unit
+/** Tiered platform sale bonus — scales inversely with multipleExpansion to prevent stacking */
+export function getPlatformSaleBonus(multipleExpansion: number): number {
+  if (multipleExpansion >= 2.0) return 0.3;
+  return 0.5;
+}
+// Legacy constant kept for display-proofreader backward compat — max possible bonus
+export const PLATFORM_SALE_BONUS = 0.5;
 
 // ── Turnaround Constants ──
 

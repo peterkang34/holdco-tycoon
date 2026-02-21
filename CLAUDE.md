@@ -71,7 +71,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
 - **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v25`
-- **Tests**: Vitest in `src/engine/__tests__/` — 932 tests across 18 suites (incl. display-proofreader)
+- **Tests**: Vitest in `src/engine/__tests__/` — 955 tests across 18 suites (incl. display-proofreader)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Rollover Equity**: 6th deal structure — seller reinvests ~25% (standard) or ~20% (quick) as equity; gated behind M&A Tier 2+, Q3+, non-distressed archetypes, noNewDebt; exit split applied AFTER debt payoff; FEV deducts rollover claims; note rate 5%
@@ -135,7 +135,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **Earn-out display must cap at available cash** — store uses `Math.min(earnoutRemaining, available)`, display must match
 - **Race conditions in async AI calls** — always check state is still current before setting narrative/storyBeats
 - **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety
-- **Integrated platforms**: Margin/growth bonuses are ONE-TIME mutations at forge time (not recurring); multiple expansion + recession resistance are automatic via engine
+- **Integrated platforms**: Margin/growth bonuses are ONE-TIME mutations at forge time (clamped via `clampMargin`/`capGrowthRate`); multiple expansion + recession resistance are automatic via engine; platform sale bonus is tiered by `multipleExpansion` (0.3x for 2.0x+, 0.5x otherwise) via `getPlatformSaleBonus()`
 - **15 sectors, ~93 sub-types**: Overlaps resolved (no cross-sector sub-type duplication); sectors.ts is authoritative
 - **Platform thresholds scale by mode**: `INTEGRATION_THRESHOLD_MULTIPLIER` in gameConfig.ts (Easy-Std 1.0, Easy-Quick 0.7, Normal-Std 0.7, Normal-Quick 0.5)
 - **Turnaround quality improvements are permanent mutations** — qualityRating changes at resolution; qualityImprovedTiers tracks cumulative tiers for exit premium

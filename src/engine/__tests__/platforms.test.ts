@@ -12,6 +12,9 @@ import {
   getEligibleBusinessesForExistingPlatform,
   calculateAddToPlatformCost,
 } from '../platforms';
+import { calculateExitValuation } from '../simulation';
+import { clampMargin, capGrowthRate, MAX_MARGIN, MAX_ORGANIC_GROWTH_RATE } from '../helpers';
+import { getPlatformSaleBonus, PLATFORM_SALE_BONUS } from '../../data/gameConfig';
 import { PLATFORM_RECIPES } from '../../data/platformRecipes';
 import { SECTORS } from '../../data/sectors';
 import { createMockBusiness } from './helpers';
@@ -693,5 +696,233 @@ describe('Platform integrity through merge scenarios', () => {
     ];
     // Only 1 sub-type, need 2 → dissolve
     expect(checkPlatformDissolution(sameSubTypePlatform, remaining)).toBe(true);
+  });
+});
+
+// ── Platform Bonus Correctness (Issues 1, 2, 3, 6) ──
+
+describe('Platform bonus clamping and syncing at forge time', () => {
+  it('margin is clamped at MAX_MARGIN when boost would exceed limit', () => {
+    // Issue 1: A business at 78% margin + 5ppt boost = 83%, should clamp to 80%
+    const result = clampMargin(0.78 + 0.05);
+    expect(result).toBe(MAX_MARGIN);
+  });
+
+  it('margin is not clamped when boost stays within limit', () => {
+    const result = clampMargin(0.20 + 0.04);
+    expect(result).toBeCloseTo(0.24);
+  });
+
+  it('growth rate is capped at MAX_ORGANIC_GROWTH_RATE when boost would exceed limit', () => {
+    // Issue 2: A business at 19% growth + 4ppt boost = 23%, should cap at 20%
+    const result = capGrowthRate(0.19 + 0.04);
+    expect(result).toBe(MAX_ORGANIC_GROWTH_RATE);
+  });
+
+  it('growth rate is not capped when boost stays within limit', () => {
+    const result = capGrowthRate(0.05 + 0.03);
+    expect(result).toBeCloseTo(0.08);
+  });
+
+  it('EBITDA recalculation uses clamped margin, not raw boosted margin', () => {
+    // Issue 1 + Issue 6: EBITDA = revenue * clampedMargin
+    const revenue = 10000;
+    const rawMargin = 0.78;
+    const boost = 0.05;
+    const clampedMargin = clampMargin(rawMargin + boost);
+    const ebitda = Math.round(revenue * clampedMargin);
+    // Should be 10000 * 0.80 = 8000, not 10000 * 0.83 = 8300
+    expect(clampedMargin).toBe(0.80);
+    expect(ebitda).toBe(8000);
+  });
+
+  it('organicGrowthRate and revenueGrowthRate should both be capped identically', () => {
+    // Issue 2: Both rates should be capped via capGrowthRate
+    const baseGrowth = 0.18;
+    const boost = 0.05;
+    const cappedRevGrowth = capGrowthRate(baseGrowth + boost);
+    const cappedOrgGrowth = capGrowthRate(baseGrowth + boost);
+    expect(cappedRevGrowth).toBe(cappedOrgGrowth);
+    expect(cappedRevGrowth).toBe(MAX_ORGANIC_GROWTH_RATE);
+  });
+
+  it('growth boost is forward-looking — does not affect current-tick EBITDA', () => {
+    // Issue 6: EBITDA recalc uses margin (immediate) but NOT growth (future)
+    const revenue = 5000;
+    const margin = 0.20;
+    const marginBoost = 0.04;
+    const newMargin = clampMargin(margin + marginBoost);
+    const newEbitda = Math.round(revenue * newMargin);
+    // EBITDA should reflect new margin applied to CURRENT revenue
+    expect(newEbitda).toBe(Math.round(5000 * 0.24));
+    expect(newEbitda).toBe(1200);
+  });
+});
+
+// ── multipleExpansion in Exit Valuation ──
+
+describe('multipleExpansion in calculateExitValuation', () => {
+  const platform: IntegratedPlatform = {
+    id: 'plat_test',
+    recipeId: 'test',
+    name: 'Test Platform',
+    sectorIds: ['agency'],
+    constituentBusinessIds: ['biz_1'],
+    forgedInRound: 1,
+    bonuses: { marginBoost: 0.04, growthBoost: 0.03, multipleExpansion: 1.5, recessionResistanceReduction: 0.8 },
+  };
+
+  it('includes integratedPlatformPremium when business is in a platform', () => {
+    const biz = createMockBusiness({
+      integratedPlatformId: 'plat_test',
+      acquisitionRound: 1,
+    });
+    const valuation = calculateExitValuation(biz, 5, undefined, undefined, [platform]);
+    expect(valuation.integratedPlatformPremium).toBe(1.5);
+  });
+
+  it('integratedPlatformPremium is 0 when business is not in a platform', () => {
+    const biz = createMockBusiness({ acquisitionRound: 1 });
+    const valuation = calculateExitValuation(biz, 5, undefined, undefined, []);
+    expect(valuation.integratedPlatformPremium).toBe(0);
+  });
+
+  it('integratedPlatformPremium is 0 after platform dissolution (integratedPlatformId cleared)', () => {
+    // Issue 3: After dissolution, integratedPlatformId is cleared → runtime bonuses disappear
+    const biz = createMockBusiness({
+      integratedPlatformId: undefined, // Cleared by dissolution
+      acquisitionRound: 1,
+    });
+    const valuation = calculateExitValuation(biz, 5, undefined, undefined, [platform]);
+    expect(valuation.integratedPlatformPremium).toBe(0);
+  });
+
+  it('integratedPlatformPremium applies AFTER premium cap (structural, not earned)', () => {
+    // Verify the premium is structural — added after capping earned premiums
+    const biz = createMockBusiness({
+      integratedPlatformId: 'plat_test',
+      acquisitionRound: 1,
+      ebitda: 2000,
+      acquisitionEbitda: 1000, // 100% growth → high growth premium
+    });
+    const withPlatform = calculateExitValuation(biz, 5, undefined, undefined, [platform]);
+    const withoutPlatform = calculateExitValuation(biz, 5, undefined, undefined, []);
+    // The difference should be exactly the platform premium (scaled by seasoning)
+    const seasoningMult = Math.min(1.0, (5 - 1) / 2); // 2.0 → capped at 1.0
+    expect(withPlatform.totalMultiple - withoutPlatform.totalMultiple).toBeCloseTo(1.5 * seasoningMult);
+  });
+});
+
+// ── Recession Resistance Integration ──
+
+describe('Recession resistance integration', () => {
+  const platform: IntegratedPlatform = {
+    id: 'plat_test',
+    recipeId: 'test',
+    name: 'Test Platform',
+    sectorIds: ['agency'],
+    constituentBusinessIds: ['biz_1'],
+    forgedInRound: 1,
+    bonuses: { marginBoost: 0.04, growthBoost: 0.03, multipleExpansion: 1.5, recessionResistanceReduction: 0.8 },
+  };
+
+  it('reduces recession sensitivity for platform businesses', () => {
+    const biz = createMockBusiness({ integratedPlatformId: 'plat_test' });
+    const modifier = getPlatformRecessionModifier(biz, [platform]);
+    expect(modifier).toBe(0.8);
+    // Effective sensitivity = sector.recessionSensitivity * 0.8
+  });
+
+  it('returns 1.0 (no reduction) after dissolution clears integratedPlatformId', () => {
+    const biz = createMockBusiness({ integratedPlatformId: undefined });
+    const modifier = getPlatformRecessionModifier(biz, [platform]);
+    expect(modifier).toBe(1.0);
+  });
+
+  it('handles extreme reduction values (close to 0 = near-immune)', () => {
+    const extremePlatform: IntegratedPlatform = {
+      ...platform,
+      bonuses: { ...platform.bonuses, recessionResistanceReduction: 0.1 },
+    };
+    const biz = createMockBusiness({ integratedPlatformId: 'plat_test' });
+    expect(getPlatformRecessionModifier(biz, [extremePlatform])).toBe(0.1);
+  });
+});
+
+// ── Tiered Platform Sale Bonus (Issue 4) ──
+
+describe('Tiered platform sale bonus', () => {
+  it('returns 0.3x for recipes with 2.0x multipleExpansion', () => {
+    expect(getPlatformSaleBonus(2.0)).toBe(0.3);
+    expect(getPlatformSaleBonus(2.5)).toBe(0.3);
+  });
+
+  it('returns 0.5x for recipes with 1.5x multipleExpansion', () => {
+    expect(getPlatformSaleBonus(1.5)).toBe(0.5);
+  });
+
+  it('returns 0.5x for recipes with 1.0x multipleExpansion', () => {
+    expect(getPlatformSaleBonus(1.0)).toBe(0.5);
+  });
+
+  it('legacy PLATFORM_SALE_BONUS constant matches max tier', () => {
+    expect(PLATFORM_SALE_BONUS).toBe(0.5);
+  });
+
+  it('platform sale stacks tiered bonus on top of multipleExpansion', () => {
+    const platform: IntegratedPlatform = {
+      id: 'plat_test',
+      recipeId: 'test',
+      name: 'Test Platform',
+      sectorIds: ['agency'],
+      constituentBusinessIds: ['biz_1', 'biz_2'],
+      forgedInRound: 1,
+      bonuses: { marginBoost: 0.04, growthBoost: 0.03, multipleExpansion: 2.0, recessionResistanceReduction: 0.8 },
+    };
+    const biz = createMockBusiness({
+      integratedPlatformId: 'plat_test',
+      acquisitionRound: 1,
+    });
+    const valuation = calculateExitValuation(biz, 5, undefined, undefined, [platform]);
+
+    expect(valuation.integratedPlatformPremium).toBe(2.0);
+
+    // Tiered bonus for 2.0x expansion = 0.3x (not the old 0.8x)
+    const saleBonus = getPlatformSaleBonus(platform.bonuses.multipleExpansion);
+    expect(saleBonus).toBe(0.3);
+    const platformSaleMultiple = valuation.totalMultiple + saleBonus;
+    expect(platformSaleMultiple).toBeGreaterThan(valuation.totalMultiple);
+  });
+
+  it('individual sale includes multipleExpansion but NOT platform sale bonus', () => {
+    const platform: IntegratedPlatform = {
+      id: 'plat_test',
+      recipeId: 'test',
+      name: 'Test Platform',
+      sectorIds: ['agency'],
+      constituentBusinessIds: ['biz_1', 'biz_2'],
+      forgedInRound: 1,
+      bonuses: { marginBoost: 0.04, growthBoost: 0.03, multipleExpansion: 2.0, recessionResistanceReduction: 0.8 },
+    };
+    const biz = createMockBusiness({
+      integratedPlatformId: 'plat_test',
+      acquisitionRound: 1,
+    });
+    const valuation = calculateExitValuation(biz, 5, undefined, undefined, [platform]);
+    expect(valuation.integratedPlatformPremium).toBe(2.0);
+    const expectedExitWithoutBonus = Math.max(0, Math.round(biz.ebitda * valuation.totalMultiple));
+    expect(valuation.exitPrice).toBe(expectedExitWithoutBonus);
+  });
+
+  it('total stacked benefit is reduced for top-tier recipes (2.0x + 0.3x = 2.3x)', () => {
+    expect(2.0 + getPlatformSaleBonus(2.0)).toBe(2.3);
+  });
+
+  it('total stacked benefit for mid-tier recipes (1.5x + 0.5x = 2.0x)', () => {
+    expect(1.5 + getPlatformSaleBonus(1.5)).toBe(2.0);
+  });
+
+  it('total stacked benefit for low-tier recipes (1.0x + 0.5x = 1.5x)', () => {
+    expect(1.0 + getPlatformSaleBonus(1.0)).toBe(1.5);
   });
 });

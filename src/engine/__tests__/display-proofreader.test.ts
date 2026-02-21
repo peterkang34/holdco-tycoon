@@ -30,7 +30,7 @@ import {
   EQUITY_DILUTION_STEP,
   EQUITY_DILUTION_FLOOR,
   EQUITY_BUYBACK_COOLDOWN,
-  PLATFORM_SALE_BONUS,
+  PLATFORM_SALE_BONUS, getPlatformSaleBonus,
   TURNAROUND_FATIGUE_THRESHOLD,
   TURNAROUND_FATIGUE_PENALTY,
   TURNAROUND_EXIT_PREMIUM,
@@ -780,8 +780,11 @@ describe('Display Proofreader', () => {
       expect(INTEGRATION_THRESHOLD_MULTIPLIER.normal.quick).toBe(0.5);
     });
 
-    it('Platform sale bonus = 0.8x', () => {
-      expect(PLATFORM_SALE_BONUS).toBe(0.8);
+    it('Platform sale bonus: tiered by multipleExpansion (0.3x for 2.0+, 0.5x otherwise)', () => {
+      expect(getPlatformSaleBonus(2.0)).toBe(0.3);
+      expect(getPlatformSaleBonus(1.5)).toBe(0.5);
+      expect(getPlatformSaleBonus(1.0)).toBe(0.5);
+      expect(PLATFORM_SALE_BONUS).toBe(0.5); // legacy max constant
     });
 
     // ── Multiple Expansion (Strategy A) ──
