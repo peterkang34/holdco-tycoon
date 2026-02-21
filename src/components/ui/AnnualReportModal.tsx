@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { RoundHistoryEntry, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
+import { trackFeatureUsed } from '../../services/telemetry';
 
 interface AnnualReportModalProps {
   roundHistory: RoundHistoryEntry[];
@@ -48,6 +49,10 @@ function MetricDelta({ current, previous, format, inverted }: {
 
 export function AnnualReportModal({ roundHistory, onClose }: AnnualReportModalProps) {
   const [expandedRound, setExpandedRound] = useState<number | null>(null);
+
+  useEffect(() => {
+    trackFeatureUsed('chronicle_view', roundHistory.length);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">

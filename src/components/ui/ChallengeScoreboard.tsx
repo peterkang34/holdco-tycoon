@@ -6,6 +6,7 @@ import {
   getChallengeStatus,
   type ChallengeStatus,
 } from '../../services/challengeApi';
+import { trackChallengeShare } from '../../services/telemetry';
 import { formatMoney } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
 import { ScoreboardRow } from './ScoreboardRow';
@@ -109,9 +110,11 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
   }, [submitState, fetchStatus, startPolling]);
 
   const handleCopyScoreboardLink = async () => {
+    const code = encodeChallengeParams(challengeParams);
     const url = buildScoreboardUrl(challengeParams);
     const shared = await shareChallenge(url, 'Holdco Tycoon Challenge Results');
     if (shared) {
+      trackChallengeShare(code, 'share' in navigator ? 'native_share' : 'clipboard');
       setScoreboardCopied(true);
       setTimeout(() => setScoreboardCopied(false), 2000);
     }

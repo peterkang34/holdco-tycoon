@@ -8,6 +8,7 @@ import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../../data/gameConfig';
 import type { ChallengeParams } from '../../utils/challenge';
 import { generateRandomSeed } from '../../engine/rng';
 import { buildChallengeUrl, shareChallenge, encodeChallengeParams, generateToken, setHostToken } from '../../utils/challenge';
+import { trackChallengeCreate, trackChallengeShare } from '../../services/telemetry';
 
 interface IntroScreenProps {
   onStart: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty, duration: GameDuration, seed?: number) => void;
@@ -79,12 +80,15 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
     const seed = generateRandomSeed();
     setCreatedChallengeSeed(seed);
     const params = { seed, difficulty: challengeDifficulty, duration: challengeDuration };
+    const code = encodeChallengeParams(params);
     const url = buildChallengeUrl(params);
     // Save host token so this browser can reveal scores later
     const hostToken = generateToken();
-    setHostToken(encodeChallengeParams(params), hostToken);
+    setHostToken(code, hostToken);
+    trackChallengeCreate(code);
     const shared = await shareChallenge(url, 'Challenge me in Holdco Tycoon!');
     if (shared) {
+      trackChallengeShare(code, 'share' in navigator ? 'native_share' : 'clipboard');
       setChallengeCopied(true);
       setTimeout(() => setChallengeCopied(false), 2500);
     }

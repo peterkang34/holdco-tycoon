@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import { LEADERBOARD_KEY } from '../_lib/leaderboard.js';
 import { verifyAdminToken } from '../_lib/adminAuth.js';
+import { getWeekKey } from '../_lib/telemetry.js';
 
 interface MonthData {
   month: string;
@@ -14,6 +15,34 @@ interface MonthData {
   gradeDistribution: Record<string, number>;
   fevDistribution: Record<string, number>;
   abandonByRound: Record<string, number>;
+  // Phase 1
+  deviceBreakdown: Record<string, number>;
+  deviceComplete: Record<string, number>;
+  deviceAbandon: Record<string, number>;
+  returningBreakdown: Record<string, number>;
+  durationDistribution: Record<string, number>;
+  pageViews: number;
+  viewsByDevice: Record<string, number>;
+  startByNth: Record<string, number>;
+  completeByNth: Record<string, number>;
+  // Phase 2
+  archetypeDistribution: Record<string, number>;
+  antiPatternDistribution: Record<string, number>;
+  sophisticationDistribution: Record<string, number>;
+  dealStructureDistribution: Record<string, number>;
+  platformsForgedDistribution: Record<string, number>;
+  // Phase 3
+  challengeMetrics: {
+    created: number;
+    shared: number;
+    joined: number;
+    started: number;
+    completed: number;
+    scoreboardViews: number;
+  };
+  // Phase 4
+  featureAdoption: Record<string, number>;
+  eventChoices: Record<string, number>;
 }
 
 /**
@@ -27,6 +56,19 @@ function getLastNMonthKeys(n: number): string[] {
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, '0');
     keys.push(`${year}-${month}`);
+  }
+  return keys;
+}
+
+/**
+ * Generate the last N week keys in YYYY-Www format.
+ */
+function getLastNWeekKeys(n: number): string[] {
+  const keys: string[] = [];
+  const now = new Date();
+  for (let i = 0; i < n; i++) {
+    const d = new Date(now.getTime() - i * 7 * 86400000);
+    keys.push(getWeekKey(d));
   }
   return keys;
 }
@@ -47,24 +89,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const pipe = kv.pipeline();
 
     for (const mk of monthKeys) {
-      pipe.get(`t:started:${mk}`);       // index 0, 9, 18, ...
-      pipe.get(`t:completed:${mk}`);      // index 1, 10, 19, ...
-      pipe.scard(`t:uv:${mk}`);           // index 2, 11, 20, ...
-      pipe.hgetall(`t:cfg:${mk}`);        // index 3, 12, 21, ...
-      pipe.hgetall(`t:sector:${mk}`);     // index 4, 13, 22, ...
-      pipe.hgetall(`t:rounds:${mk}`);     // index 5, 14, 23, ...
-      pipe.hgetall(`t:grades:${mk}`);     // index 6, 15, 24, ...
-      pipe.hgetall(`t:fev:${mk}`);        // index 7, 16, 25, ...
-      pipe.hgetall(`t:abandon:${mk}`);    // index 8, 17, 26, ...
+      // Original (0-8)
+      pipe.get(`t:started:${mk}`);              // 0
+      pipe.get(`t:completed:${mk}`);             // 1
+      pipe.scard(`t:uv:${mk}`);                  // 2
+      pipe.hgetall(`t:cfg:${mk}`);               // 3
+      pipe.hgetall(`t:sector:${mk}`);            // 4
+      pipe.hgetall(`t:rounds:${mk}`);            // 5
+      pipe.hgetall(`t:grades:${mk}`);            // 6
+      pipe.hgetall(`t:fev:${mk}`);               // 7
+      pipe.hgetall(`t:abandon:${mk}`);           // 8
+      // Phase 1 (9-17)
+      pipe.hgetall(`t:device:${mk}`);            // 9
+      pipe.hgetall(`t:device:complete:${mk}`);   // 10
+      pipe.hgetall(`t:device:abandon:${mk}`);    // 11
+      pipe.hgetall(`t:returning:${mk}`);         // 12
+      pipe.hgetall(`t:duration:${mk}`);          // 13
+      pipe.get(`t:views:${mk}`);                 // 14
+      pipe.hgetall(`t:views:device:${mk}`);      // 15
+      pipe.hgetall(`t:start_by_nth:${mk}`);      // 16
+      pipe.hgetall(`t:complete_by_nth:${mk}`);   // 17
+      // Phase 2 (18-22)
+      pipe.hgetall(`t:archetype:${mk}`);         // 18
+      pipe.hgetall(`t:antipattern:${mk}`);       // 19
+      pipe.hgetall(`t:sophistication:${mk}`);    // 20
+      pipe.hgetall(`t:structures:${mk}`);        // 21
+      pipe.hgetall(`t:platforms_forged:${mk}`);  // 22
+      // Phase 3 challenge (23-28)
+      pipe.get(`t:challenge:${mk}:created`);     // 23
+      pipe.get(`t:challenge:${mk}:shared`);      // 24
+      pipe.get(`t:challenge:${mk}:joined`);      // 25
+      pipe.get(`t:challenge:${mk}:started`);     // 26
+      pipe.get(`t:challenge:${mk}:completed`);   // 27
+      pipe.get(`t:challenge:${mk}:scoreboard_views`); // 28
+      // Phase 4 (29-30)
+      pipe.hgetall(`t:features:${mk}`);          // 29
+      pipe.hgetall(`t:choices:${mk}`);           // 30
     }
 
     // All-time totals
-    pipe.get('t:started');                 // index: monthKeys.length * 9
-    pipe.get('t:completed');               // index: monthKeys.length * 9 + 1
+    pipe.get('t:started');
+    pipe.get('t:completed');
 
     const results = await pipe.exec();
 
-    const FIELDS_PER_MONTH = 9;
+    const FIELDS_PER_MONTH = 31;
     const months: MonthData[] = monthKeys.map((mk, i) => {
       const offset = i * FIELDS_PER_MONTH;
       return {
@@ -78,6 +147,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         gradeDistribution: toNumberRecord(results[offset + 6]),
         fevDistribution: toNumberRecord(results[offset + 7]),
         abandonByRound: toNumberRecord(results[offset + 8]),
+        // Phase 1
+        deviceBreakdown: toNumberRecord(results[offset + 9]),
+        deviceComplete: toNumberRecord(results[offset + 10]),
+        deviceAbandon: toNumberRecord(results[offset + 11]),
+        returningBreakdown: toNumberRecord(results[offset + 12]),
+        durationDistribution: toNumberRecord(results[offset + 13]),
+        pageViews: Number(results[offset + 14]) || 0,
+        viewsByDevice: toNumberRecord(results[offset + 15]),
+        startByNth: toNumberRecord(results[offset + 16]),
+        completeByNth: toNumberRecord(results[offset + 17]),
+        // Phase 2
+        archetypeDistribution: toNumberRecord(results[offset + 18]),
+        antiPatternDistribution: toNumberRecord(results[offset + 19]),
+        sophisticationDistribution: toNumberRecord(results[offset + 20]),
+        dealStructureDistribution: toNumberRecord(results[offset + 21]),
+        platformsForgedDistribution: toNumberRecord(results[offset + 22]),
+        // Phase 3
+        challengeMetrics: {
+          created: Number(results[offset + 23]) || 0,
+          shared: Number(results[offset + 24]) || 0,
+          joined: Number(results[offset + 25]) || 0,
+          started: Number(results[offset + 26]) || 0,
+          completed: Number(results[offset + 27]) || 0,
+          scoreboardViews: Number(results[offset + 28]) || 0,
+        },
+        // Phase 4
+        featureAdoption: toNumberRecord(results[offset + 29]),
+        eventChoices: toNumberRecord(results[offset + 30]),
       };
     });
 
@@ -102,8 +199,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Non-critical — continue without leaderboard data
     }
 
+    // Phase 5: Cohort retention data
+    let cohortRetention: { cohortWeek: string; weekData: Record<string, number> }[] = [];
+    try {
+      const weekKeys = getLastNWeekKeys(8);
+      const cohortPipe = kv.pipeline();
+      // For each cohort week, check activity in each subsequent week
+      for (const cohortWeek of weekKeys) {
+        for (const activityWeek of weekKeys) {
+          cohortPipe.scard(`t:cohort:${cohortWeek}:active:${activityWeek}`);
+        }
+      }
+      const cohortResults = await cohortPipe.exec();
+      let idx = 0;
+      cohortRetention = weekKeys.map((cohortWeek) => {
+        const weekData: Record<string, number> = {};
+        for (const activityWeek of weekKeys) {
+          weekData[activityWeek] = Number(cohortResults[idx]) || 0;
+          idx++;
+        }
+        return { cohortWeek, weekData };
+      });
+    } catch {
+      // Non-critical
+    }
+
     res.setHeader('Cache-Control', 'private, no-cache');
-    return res.status(200).json({ allTime, months, leaderboardEntries });
+    return res.status(200).json({ allTime, months, leaderboardEntries, cohortRetention });
   } catch (error) {
     console.error('Analytics error:', error);
     return res.status(500).json({ error: 'Failed to fetch analytics' });

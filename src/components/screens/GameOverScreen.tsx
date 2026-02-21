@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration, IntegratedPlatform } from '../../engine/types';
+import { useGameStore } from '../../hooks/useGame';
 import { SECTORS } from '../../data/sectors';
 import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLeaderboardRankFromList } from '../../engine/scoring';
 import { calculateExitValuation } from '../../engine/simulation';
@@ -9,7 +10,7 @@ import { EV_WATERFALL_LABELS } from '../../data/mechanicsCopy';
 import { getGradeColor, getRankColor } from '../../utils/gradeColors';
 import { TABS, filterAndSort, getDisplayValue } from '../ui/LeaderboardModal';
 import type { LeaderboardTab } from '../ui/LeaderboardModal';
-import { trackGameComplete } from '../../services/telemetry';
+import { trackGameComplete, trackChallengeCreate, trackChallengeShare, type GameCompleteSnapshot } from '../../services/telemetry';
 import {
   type ChallengeParams,
   type PlayerResult,
@@ -17,9 +18,27 @@ import {
   buildResultUrl,
   buildScoreboardUrl,
   shareChallenge,
+  encodeChallengeParams,
 } from '../../utils/challenge';
 import { ChallengeComparison } from '../ui/ChallengeComparison';
 import { ChallengeScoreboard } from '../ui/ChallengeScoreboard';
+
+/** Heuristic archetype classification based on game actions */
+function computeArchetype(
+  activeCount: number, platformCount: number, totalAcquisitions: number,
+  totalSells: number, turnaroundsStarted: number, totalDistributions: number,
+  _equityRaisesUsed: number,
+): string {
+  if (platformCount >= 3) return 'platform_builder';
+  if (turnaroundsStarted >= 3) return 'turnaround_specialist';
+  if (totalDistributions > 0 && totalSells >= 3) return 'dividend_cow';
+  if (totalAcquisitions >= 8 && activeCount >= 5) return 'serial_acquirer';
+  if (totalAcquisitions >= 6 && platformCount >= 1) return 'roll_up_machine';
+  if (activeCount <= 3 && totalSells <= 1) return 'focused_operator';
+  if (activeCount >= 6) return 'conglomerate';
+  if (totalAcquisitions <= 3) return 'value_investor';
+  return 'balanced';
+}
 
 interface GameOverScreenProps {
   holdcoName: string;
@@ -119,17 +138,22 @@ export function GameOverScreen({
 
   const handleChallengeShare = async () => {
     const url = buildChallengeUrl(currentChallengeParams);
+    const code = encodeChallengeParams(currentChallengeParams);
+    trackChallengeCreate(code);
     const shared = await shareChallenge(url, `Challenge me in Holdco Tycoon!`);
     if (shared) {
+      trackChallengeShare(code, 'share' in navigator ? 'native_share' : 'clipboard');
       setChallengeCopied(true);
       setTimeout(() => setChallengeCopied(false), 2000);
     }
   };
 
   const handleShareResult = async () => {
+    const code = encodeChallengeParams(currentChallengeParams);
     const url = buildResultUrl(currentChallengeParams, myResult);
     const shared = await shareChallenge(url, 'My Holdco Tycoon result');
     if (shared) {
+      trackChallengeShare(code, 'share' in navigator ? 'native_share' : 'clipboard');
       setChallengeCopied(true);
       setTimeout(() => setChallengeCopied(false), 2000);
     }
@@ -144,10 +168,122 @@ export function GameOverScreen({
     }
   };
 
-  // Fire telemetry on game completion
+  // Fire telemetry on game completion — full snapshot
   useEffect(() => {
     const sector = businesses[0]?.sectorId || exitedBusinesses[0]?.sectorId || 'agency';
-    trackGameComplete(maxRounds, maxRounds, difficulty, duration, sector, score.grade, founderEquityValue);
+    const state = useGameStore.getState();
+    const allActions = state.roundHistory.flatMap(r => r.actions);
+
+    // Count acquisitions, sells, turnarounds
+    const acquireTypes = new Set(['acquire', 'acquire_tuck_in']);
+    const sellTypes = new Set(['sell', 'sell_platform', 'accept_offer']);
+    const totalAcquisitions = allActions.filter(a => acquireTypes.has(a.type)).length;
+    const totalSells = allActions.filter(a => sellTypes.has(a.type)).length;
+    const turnaroundsStarted = allActions.filter(a => a.type === 'start_turnaround').length;
+
+    // Turnaround outcomes
+    const resolvedTurnarounds = allActions.filter(a => a.type === 'turnaround_resolved');
+    const turnaroundsSucceeded = resolvedTurnarounds.filter(a => (a.details as any)?.outcome === 'success').length;
+    const turnaroundsFailed = resolvedTurnarounds.filter(a => (a.details as any)?.outcome !== 'success').length;
+
+    // Peak leverage from metricsHistory
+    const peakLeverage = metricsHistory.length > 0
+      ? Math.max(...metricsHistory.map(m => m.metrics.netDebtToEbitda))
+      : 0;
+
+    // Peak distress level (map string to number)
+    const distressMap: Record<string, number> = { comfortable: 0, elevated: 1, stressed: 2, breach: 3 };
+    const peakDistressLevel = metricsHistory.length > 0
+      ? Math.max(...metricsHistory.map(m => distressMap[m.metrics.distressLevel] ?? 0))
+      : 0;
+
+    // Unique sectors
+    const allBiz = [...businesses, ...exitedBusinesses];
+    const sectorIds = [...new Set(allBiz.map(b => b.sectorId))];
+
+    // Deal structure histogram
+    const dealStructureTypes: Record<string, number> = {};
+    for (const a of allActions) {
+      if (acquireTypes.has(a.type) && (a.details as any)?.dealStructure) {
+        const st = String((a.details as any).dealStructure);
+        dealStructureTypes[st] = (dealStructureTypes[st] || 0) + 1;
+      }
+    }
+
+    // Rollover equity count
+    const rolloverEquityCount = allActions.filter(a =>
+      acquireTypes.has(a.type) && (a.details as any)?.dealStructure === 'rollover_equity'
+    ).length;
+
+    // Strategy archetype heuristic
+    const activeCount = businesses.filter(b => b.status === 'active').length;
+    const platformCount = integratedPlatforms.length;
+    const archetype = computeArchetype(activeCount, platformCount, totalAcquisitions, totalSells, turnaroundsStarted, totalDistributions, equityRaisesUsed);
+
+    // Anti-patterns
+    const antiPatterns: string[] = [];
+    if (peakLeverage > 6) antiPatterns.push('over_leveraged');
+    if (hasRestructured) antiPatterns.push('serial_restructurer');
+    if (equityRaisesUsed >= 4) antiPatterns.push('dilution_spiral');
+    if (totalDistributions === 0 && maxRounds >= 10) antiPatterns.push('no_distributions');
+    if (turnaroundsFailed >= 3) antiPatterns.push('turnaround_graveyard');
+    if (totalAcquisitions >= 8 && sectorIds.length >= 5) antiPatterns.push('spray_and_pray');
+
+    // Sophistication score (0-100)
+    let sophisticationScore = 0;
+    if (platformCount > 0) sophisticationScore += 15;
+    if (turnaroundsStarted > 0) sophisticationScore += 10;
+    if (state.maSourcing.tier >= 2) sophisticationScore += 10;
+    if (sharedServicesActive >= 2) sophisticationScore += 10;
+    if (rolloverEquityCount > 0) sophisticationScore += 10;
+    if (totalSells >= 2) sophisticationScore += 10;
+    if (totalDistributions > 0) sophisticationScore += 10;
+    if (equityRaisesUsed > 0 && equityRaisesUsed <= 2) sophisticationScore += 5;
+    if (activeCount >= 3 && sectorIds.length <= 2) sophisticationScore += 10; // sector focus
+    if (score.total >= 60) sophisticationScore += 10;
+    sophisticationScore = Math.min(100, sophisticationScore);
+
+    const snapshot: GameCompleteSnapshot = {
+      round: maxRounds,
+      maxRounds,
+      difficulty,
+      duration,
+      sector,
+      grade: score.grade,
+      fev: Math.round(founderEquityValue),
+      isChallenge: !!challengeData,
+      score: score.total,
+      scoreBreakdown: {
+        valueCreation: score.valueCreation,
+        fcfShareGrowth: score.fcfShareGrowth,
+        portfolioRoic: score.portfolioRoic,
+        capitalDeployment: score.capitalDeployment,
+        balanceSheetHealth: score.balanceSheetHealth,
+        strategicDiscipline: score.strategicDiscipline,
+      },
+      businessCount: activeCount,
+      totalAcquisitions,
+      totalSells,
+      totalDistributions,
+      totalBuybacks,
+      equityRaisesUsed,
+      peakLeverage: Math.round(peakLeverage * 10) / 10,
+      hasRestructured,
+      peakDistressLevel,
+      platformsForged: platformCount,
+      turnaroundsStarted,
+      turnaroundsSucceeded,
+      turnaroundsFailed,
+      sharedServicesActive,
+      maSourcingTier: state.maSourcing.tier,
+      sectorIds,
+      dealStructureTypes: Object.keys(dealStructureTypes).length > 0 ? dealStructureTypes : undefined,
+      rolloverEquityCount,
+      strategyArchetype: archetype,
+      antiPatterns: antiPatterns.length > 0 ? antiPatterns : undefined,
+      sophisticationScore,
+    };
+    trackGameComplete(snapshot);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Deduplicate: exitedBusinesses wins over businesses (a sold biz exists in both)

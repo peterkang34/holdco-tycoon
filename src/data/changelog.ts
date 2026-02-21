@@ -12,6 +12,28 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 21, 2026',
+    title: 'Analytics & Admin Dashboard',
+    sections: [
+      {
+        heading: 'Under the Hood',
+        items: [
+          'Completely overhauled telemetry — the game now tracks device type, session duration, and player identity across sessions for better insights.',
+          'Challenge mode virality tracking — we can now see how challenges spread from creation through sharing, joining, and completion.',
+          'Feature adoption tracking helps us understand which game mechanics players discover and use.',
+        ],
+      },
+      {
+        heading: 'Admin Dashboard',
+        items: [
+          'Redesigned admin dashboard with 7 specialized tabs: Overview, Funnel, Retention, Engagement, Balance, Challenge, and Devices.',
+          'New cohort retention table shows weekly player return rates.',
+          'Health alerts flag potential issues like dominant strategies, low completion rates, or mobile divergence.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 21, 2026',
     title: 'Challenge Mode Reliability',
     sections: [
       {

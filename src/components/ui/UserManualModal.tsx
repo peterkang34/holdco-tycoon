@@ -1,5 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Modal } from './Modal';
+import { trackFeatureUsed } from '../../services/telemetry';
 
 type ManualSection =
   | 'getting-started'
@@ -1344,6 +1345,8 @@ export function UserManualModal({ onClose }: UserManualModalProps) {
   const [activeSection, setActiveSection] = useState<ManualSection>('getting-started');
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => { trackFeatureUsed('manual_view', 0); }, []);
 
   // Filter sections by search query
   const filteredSections = useMemo(() => {

@@ -47,7 +47,7 @@ import {
   generateYearChronicle,
 } from '../services/aiGeneration';
 import { resetUsedNames } from '../data/names';
-import { trackGameStart, trackGameAbandon } from '../services/telemetry';
+import { trackGameStart, trackGameAbandon, trackFeatureUsed } from '../services/telemetry';
 import { initializeSharedServices, MIN_OPCOS_FOR_SHARED_SERVICES, getMASourcingAnnualCost, MA_SOURCING_CONFIG } from '../data/sharedServices';
 import {
   calculatePortfolioFcf,
@@ -387,14 +387,14 @@ export const useGameStore = create<GameStore>()(
         });
 
         // Fire telemetry (fire-and-forget)
-        trackGameStart(difficulty, duration, startingSector, maxRounds);
+        trackGameStart(difficulty, duration, startingSector, maxRounds, seed != null);
       },
 
       resetGame: () => {
         // Send abandon telemetry if mid-game
         const state = get();
         if (state.round > 0 && !state.gameOver) {
-          trackGameAbandon(state.round, state.maxRounds, state.difficulty, state.duration, state.businesses[0]?.sectorId || 'agency');
+          trackGameAbandon(state.round, state.maxRounds, state.difficulty, state.duration, state.businesses[0]?.sectorId || 'agency', state.isChallenge);
         }
 
         resetBusinessIdCounter();
@@ -1730,6 +1730,8 @@ export const useGameStore = create<GameStore>()(
         if (opcoCount < MIN_OPCOS_FOR_SHARED_SERVICES) return;
         if (state.cash < service.unlockCost) return;
 
+        trackFeatureUsed('shared_service', state.round);
+
         const updatedServices = state.sharedServices.map(s =>
           s.type === serviceType ? { ...s, active: true, unlockedRound: state.round } : s
         );
@@ -1855,6 +1857,8 @@ export const useGameStore = create<GameStore>()(
         // Must maintain majority control (51%+)
         if (newFounderOwnership < MIN_FOUNDER_OWNERSHIP) return;
 
+        trackFeatureUsed('equity_raise', state.round);
+
         const issueState = {
           ...state,
           cash: state.cash + amount,
@@ -1882,6 +1886,8 @@ export const useGameStore = create<GameStore>()(
 
         // Cooldown: blocked if equity was raised within EQUITY_BUYBACK_COOLDOWN rounds
         if (state.lastEquityRaiseRound > 0 && state.round - state.lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN) return;
+
+        trackFeatureUsed('buyback', state.round);
 
         const metrics = calculateMetrics(state);
         // Enforce distress restrictions — covenant breach blocks buybacks
@@ -1930,6 +1936,8 @@ export const useGameStore = create<GameStore>()(
         const restrictions = getDistressRestrictions(calculateMetrics(state).distressLevel);
         if (!restrictions.canDistribute) return;
 
+        trackFeatureUsed('distribution', state.round);
+
         // Track founder's portion of distribution incrementally (at current ownership %)
         const founderPortion = Math.round(amount * (state.founderShares / state.sharesOutstanding));
 
@@ -1956,6 +1964,8 @@ export const useGameStore = create<GameStore>()(
           useToastStore.getState().addToast({ message: 'Action failed: business no longer available', type: 'warning' });
           return;
         }
+
+        trackFeatureUsed('sell_business', state.round);
 
         // L-1: Use shared calculateExitValuation instead of duplicated logic
         const lastEvent = state.eventHistory[state.eventHistory.length - 1];
@@ -2756,6 +2766,8 @@ export const useGameStore = create<GameStore>()(
         const opcoCount = state.businesses.filter(b => b.status === 'active').length;
         if (opcoCount < config.requiredOpcos) return;
 
+        trackFeatureUsed('ma_sourcing', state.round);
+
         const newMASourcing: MASourcingState = {
           tier: nextTier,
           active: true,
@@ -2844,6 +2856,8 @@ export const useGameStore = create<GameStore>()(
 
         const integrationCost = calculateIntegrationCost(recipe, selectedBusinesses);
         if (state.cash < integrationCost) return;
+
+        trackFeatureUsed('platform_forge', state.round);
 
         const platform = forgePlatform(recipe, businessIds, state.round);
 
@@ -3117,6 +3131,8 @@ export const useGameStore = create<GameStore>()(
 
         const upfrontCost = calculateTurnaroundCost(program, business);
         if (state.cash < upfrontCost) return;
+
+        trackFeatureUsed('turnaround', state.round);
 
         const duration = getTurnaroundDuration(program, state.duration);
         const turnaround: ActiveTurnaround = {

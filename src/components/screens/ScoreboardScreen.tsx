@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import type { ChallengeParams } from '../../utils/challenge';
 import { encodeChallengeParams, getPlayerToken, buildScoreboardUrl, shareChallenge, isTied } from '../../utils/challenge';
 import { getChallengeStatus, type ChallengeStatus } from '../../services/challengeApi';
+import { trackScoreboardView } from '../../services/telemetry';
 import { formatMoney } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
 import { ScoreboardRow } from '../ui/ScoreboardRow';
@@ -69,10 +70,11 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
   useEffect(() => {
     fetchStatus();
     startPolling();
+    trackScoreboardView(code);
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [fetchStatus, startPolling]);
+  }, [fetchStatus, startPolling]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pause/resume polling on tab visibility
   useEffect(() => {

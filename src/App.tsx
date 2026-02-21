@@ -7,6 +7,7 @@ import { GameOverScreen } from './components/screens/GameOverScreen';
 import { ScoreboardScreen } from './components/screens/ScoreboardScreen';
 import { SectorId, GameDifficulty, GameDuration } from './engine/types';
 import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, replaceUrlWithChallenge, type ChallengeParams, type PlayerResult } from './utils/challenge';
+import { trackPageView } from './services/telemetry';
 
 type Screen = 'intro' | 'game' | 'gameOver' | 'scoreboard';
 
@@ -18,6 +19,9 @@ function App() {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
+
+  // Fire page view telemetry once on mount
+  useEffect(() => { trackPageView(); }, []);
 
   const [screen, setScreen] = useState<Screen>('intro');
   const [isNewGame, setIsNewGame] = useState(false);

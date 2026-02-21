@@ -20,7 +20,7 @@ import { MetricDrilldownModal } from '../ui/MetricDrilldownModal';
 import { ToastContainer } from '../ui/ToastContainer';
 import { calculateFounderEquityValue, calculateFounderPersonalWealth } from '../../engine/scoring';
 import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
-import { updateSessionRound } from '../../services/telemetry';
+import { updateSessionRound, trackEventChoice } from '../../services/telemetry';
 import { buildChallengeUrl, copyToClipboard } from '../../utils/challenge';
 
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
@@ -173,6 +173,11 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   const handleEventChoice = (action: string) => {
     // Locked choices are no-ops
     if (action.endsWith('Locked')) return;
+
+    // Track event choice for analytics
+    if (currentEvent) {
+      trackEventChoice(currentEvent.type, action, round);
+    }
 
     switch (action) {
       case 'acceptOffer': acceptOffer(); break;
