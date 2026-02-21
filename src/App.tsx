@@ -66,13 +66,14 @@ function App() {
 
     const { challenge, result } = parseChallengeFromUrl();
     if (challenge) {
-      // If a saved game is in progress with a DIFFERENT seed, ignore the challenge
-      // to prevent seed mismatch poisoning the GameOverScreen
-      const hasSavedGame = holdcoName && round > 0;
-      const seedMatches = hasSavedGame && seed === challenge.seed;
+      // If a game is actively IN PROGRESS with a DIFFERENT seed, ignore the challenge
+      // to prevent seed mismatch poisoning the GameOverScreen.
+      // Completed games (gameOver) don't count — stale save data shouldn't block new challenge links.
+      const hasActiveGame = holdcoName && round > 0 && !gameOver;
+      const seedMatches = hasActiveGame && seed === challenge.seed;
 
-      if (hasSavedGame && !seedMatches) {
-        // Saved game has different seed — clean challenge URL and keep saved game
+      if (hasActiveGame && !seedMatches) {
+        // Active game has different seed — clean challenge URL and keep the game
         cleanChallengeUrl();
         return;
       }

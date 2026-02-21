@@ -224,7 +224,7 @@ export function generateBusiness(
   const acquisitionPrice = Math.round(ebitda * multiple);
 
   return {
-    name: getRandomBusinessName(sectorId, subType),
+    name: getRandomBusinessName(sectorId, subType, rng),
     sectorId,
     subType,
     ebitda,

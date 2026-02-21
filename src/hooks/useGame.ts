@@ -2644,6 +2644,9 @@ export const useGameStore = create<GameStore>()(
           .filter(b => b.status === 'active')
           .reduce((sum, b) => sum + b.ebitda, 0);
 
+        // Count prior source_deals actions this round to vary the RNG fork key —
+        // without this, every sourcing call in the same round gets the same seed
+        const priorSourceCount = state.actionsThisRound.filter(a => a.type === 'source_deals').length;
         const srcStreams = createRngStreams(state.seed, state.round);
         const newDeals = generateSourcedDeals(
           state.round,
@@ -2653,7 +2656,7 @@ export const useGameStore = create<GameStore>()(
           state.maSourcing.active ? state.maSourcing.tier : 0,
           state.maxRounds,
           state.creditTighteningRoundsRemaining > 0,
-          srcStreams.deals.fork('source')
+          srcStreams.deals.fork(`source-${priorSourceCount}`)
         );
 
         set({
@@ -2735,6 +2738,7 @@ export const useGameStore = create<GameStore>()(
           .filter(b => b.status === 'active')
           .reduce((sum, b) => sum + b.ebitda, 0);
 
+        const priorOutreachCount = state.actionsThisRound.filter(a => a.type === 'proactive_outreach').length;
         const outStreams = createRngStreams(state.seed, state.round);
         const newDeals = generateProactiveOutreachDeals(
           state.round,
@@ -2742,7 +2746,7 @@ export const useGameStore = create<GameStore>()(
           totalPortfolioEbitda,
           state.maxRounds,
           state.creditTighteningRoundsRemaining > 0,
-          outStreams.deals.fork('outreach')
+          outStreams.deals.fork(`outreach-${priorOutreachCount}`)
         );
 
         set({

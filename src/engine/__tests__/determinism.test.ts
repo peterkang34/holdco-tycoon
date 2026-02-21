@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createRngStreams, SeededRng, deriveRoundSeed, deriveStreamSeed } from '../rng';
 import { generateBusiness, generateDealPipeline, createStartingBusiness, resetBusinessIdCounter } from '../businesses';
+import { resetUsedNames } from '../../data/names';
 import { generateEvent, applyOrganicGrowth, applyEventEffects } from '../simulation';
 import { resolveTurnaround } from '../turnarounds';
 import { getAvailablePrograms } from '../../data/turnaroundPrograms';
@@ -90,7 +91,9 @@ describe('Deal generation determinism', () => {
     const streams1 = createRngStreams(seed, round);
     const streams2 = createRngStreams(seed, round);
 
+    resetBusinessIdCounter(); resetUsedNames();
     const pipeline1 = generateDealPipeline([], round, undefined, undefined, undefined, 0, 0, false, undefined, 20, false, streams1.deals);
+    resetBusinessIdCounter(); resetUsedNames();
     const pipeline2 = generateDealPipeline([], round, undefined, undefined, undefined, 0, 0, false, undefined, 20, false, streams2.deals);
 
     expect(pipeline1.length).toBe(pipeline2.length);
@@ -125,7 +128,9 @@ describe('Business generation determinism', () => {
     const streams1 = createRngStreams(42, 1);
     const streams2 = createRngStreams(42, 1);
 
+    resetBusinessIdCounter(); resetUsedNames();
     const biz1 = generateBusiness(sectorId, 1, undefined, undefined, streams1.deals);
+    resetBusinessIdCounter(); resetUsedNames();
     const biz2 = generateBusiness(sectorId, 1, undefined, undefined, streams2.deals);
 
     expect(biz1.ebitda).toBe(biz2.ebitda);
@@ -220,11 +225,11 @@ describe('createStartingBusiness determinism (challenge-mode critical)', () => {
     // FIX: pass rng from round1Streams.cosmetic
     const seed = 42;
 
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const streams1 = createRngStreams(seed, 1);
     const biz1 = createStartingBusiness('agency', 1000, 8, streams1.cosmetic);
 
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const streams2 = createRngStreams(seed, 1);
     const biz2 = createStartingBusiness('agency', 1000, 8, streams2.cosmetic);
 
@@ -248,11 +253,11 @@ describe('createStartingBusiness determinism (challenge-mode critical)', () => {
   });
 
   it('different seeds produce different starting businesses', () => {
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const streams1 = createRngStreams(42, 1);
     const biz1 = createStartingBusiness('agency', 1000, 8, streams1.cosmetic);
 
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const streams2 = createRngStreams(99, 1);
     const biz2 = createStartingBusiness('agency', 1000, 8, streams2.cosmetic);
 
@@ -269,11 +274,11 @@ describe('createStartingBusiness determinism (challenge-mode critical)', () => {
   it('works across all sectors', () => {
     // Verify determinism holds for every sector, not just agency
     for (const sector of SECTOR_LIST) {
-      resetBusinessIdCounter();
+      resetBusinessIdCounter(); resetUsedNames();
       const streams1 = createRngStreams(42, 1);
       const biz1 = createStartingBusiness(sector.id, 1000, undefined, streams1.cosmetic);
 
-      resetBusinessIdCounter();
+      resetBusinessIdCounter(); resetUsedNames();
       const streams2 = createRngStreams(42, 1);
       const biz2 = createStartingBusiness(sector.id, 1000, undefined, streams2.cosmetic);
 
@@ -291,12 +296,12 @@ describe('generateEvent determinism with seeded starting business', () => {
     // This test ensures the FULL pipeline is deterministic.
     const seed = 42;
 
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const streams1 = createRngStreams(seed, 1);
     const biz1 = createStartingBusiness('agency', 1000, 8, streams1.cosmetic);
     const state1 = makeGameState([biz1], 5);
 
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const streams2 = createRngStreams(seed, 1);
     const biz2 = createStartingBusiness('agency', 1000, 8, streams2.cosmetic);
     const state2 = makeGameState([biz2], 5);
@@ -321,11 +326,11 @@ describe('applyOrganicGrowth determinism with seeded business', () => {
   it('same seeded business + same RNG produces identical growth', () => {
     const seed = 42;
 
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const streams1 = createRngStreams(seed, 1);
     const biz1 = createStartingBusiness('agency', 1000, 8, streams1.cosmetic);
 
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const streams2 = createRngStreams(seed, 1);
     const biz2 = createStartingBusiness('agency', 1000, 8, streams2.cosmetic);
 
@@ -345,11 +350,11 @@ describe('applyOrganicGrowth determinism with seeded business', () => {
   it('growth with margin drift active is deterministic', () => {
     const seed = 42;
 
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const streams1 = createRngStreams(seed, 1);
     const biz1 = createStartingBusiness('agency', 1000, 8, streams1.cosmetic);
 
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const streams2 = createRngStreams(seed, 1);
     const biz2 = createStartingBusiness('agency', 1000, 8, streams2.cosmetic);
 
@@ -519,7 +524,7 @@ describe('Full round determinism (challenge-mode end-to-end)', () => {
     const seed = 12345;
 
     // --- Player A ---
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const streamsA = createRngStreams(seed, 1);
     const sectorIdx = Math.abs(seed) % SECTOR_LIST.length;
     const sectorId = SECTOR_LIST[sectorIdx].id;
@@ -529,7 +534,7 @@ describe('Full round determinism (challenge-mode end-to-end)', () => {
     const eventA = generateEvent(stateA, streamsA.events);
 
     // --- Player B (same seed, fresh state) ---
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const streamsB = createRngStreams(seed, 1);
     const bizB = createStartingBusiness(sectorId, 1000, 8, streamsB.cosmetic);
     const dealsB = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, 20, false, streamsB.deals);
@@ -562,7 +567,7 @@ describe('Full round determinism (challenge-mode end-to-end)', () => {
     const seed = 7777;
 
     function simulateRounds(gameSeed: number): Business {
-      resetBusinessIdCounter();
+      resetBusinessIdCounter(); resetUsedNames();
       const startStreams = createRngStreams(gameSeed, 1);
       let biz = createStartingBusiness('agency', 1000, 8, startStreams.cosmetic);
 
@@ -611,7 +616,7 @@ describe('applyEventEffects determinism', () => {
   it('same event + same RNG produces identical state changes', () => {
     const seed = 42;
 
-    resetBusinessIdCounter();
+    resetBusinessIdCounter(); resetUsedNames();
     const startStreams = createRngStreams(seed, 1);
     const biz = createStartingBusiness('agency', 1000, 8, startStreams.cosmetic);
     const state = makeGameState([biz], 3);

@@ -11,6 +11,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'February 20, 2026',
+    title: 'Deal Generation & Challenge Links',
+    sections: [
+      {
+        heading: 'Fixes',
+        items: [
+          'Fixed a bug where sourcing additional deals with sub-sector targeting could produce duplicate deals with identical financials but different names.',
+          'Fixed challenge links not working for players who had previously completed a game — links were silently discarded instead of loading the challenge.',
+        ],
+      },
+      {
+        heading: 'Under the Hood',
+        items: [
+          'Business names are now part of the deterministic seed system for more consistent challenge mode experiences.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 20, 2025',
     title: 'Game Over Screen Navigation',
     sections: [
