@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { PlayerResult, ChallengeParams } from '../../utils/challenge';
-import { encodeChallengeParams, getPlayerToken, isTied, buildScoreboardUrl, shareChallenge } from '../../utils/challenge';
+import { encodeChallengeParams, getPlayerToken, getHostToken, isTied, buildScoreboardUrl, shareChallenge } from '../../utils/challenge';
 import {
   submitChallengeResult,
   getChallengeStatus,
@@ -36,7 +36,8 @@ export function ChallengeScoreboard({ challengeParams, myResult, onFallbackToMan
   // Submit result (called on mount + retry)
   const doSubmit = useCallback(async () => {
     setSubmitState('pending');
-    const res = await submitChallengeResult(code, playerToken, myResult);
+    const hostToken = getHostToken(code);
+    const res = await submitChallengeResult(code, playerToken, myResult, hostToken ?? undefined);
     if (res.success) {
       setSubmitState('success');
     } else {

@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 21, 2026',
+    title: 'Challenge Mode Reliability',
+    sections: [
+      {
+        heading: 'Challenge Mode',
+        items: [
+          'Refreshing during or after a challenge no longer loses your scoreboard — challenge context is now properly restored from your save.',
+          'Refreshing on the game-over screen of a challenge now returns you to the scoreboard instead of dumping you back to the intro.',
+          'Host identity is now correctly sent when auto-submitting challenge results, so the scoreboard properly recognizes the challenge creator.',
+          'Passed deal history now survives page refreshes during the allocate phase.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 21, 2026',
     title: 'Balance & Scoring Fixes',
     sections: [
       {

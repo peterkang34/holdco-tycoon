@@ -3339,6 +3339,7 @@ export const useGameStore = create<GameStore>()(
         lastBuybackRound: state.lastBuybackRound,
         sharedServices: state.sharedServices,
         dealPipeline: state.dealPipeline,
+        passedDealIds: state.passedDealIds,
         maFocus: state.maFocus,
         maSourcing: state.maSourcing,
         integratedPlatforms: state.integratedPlatforms,

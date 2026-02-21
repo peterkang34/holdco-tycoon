@@ -50,6 +50,7 @@ function App() {
     totalDebt,
     hasRestructured,
     integratedPlatforms,
+    isChallenge,
     startGame,
     resetGame,
   } = useGameStore();
@@ -82,8 +83,10 @@ function App() {
       if (result) {
         setIncomingResult(result);
       }
+    } else if (isChallenge && seed) {
+      // No URL params — reconstruct challenge context from persisted store
+      setChallengeData({ seed, difficulty, duration });
     }
-    // No fallback from persisted isChallenge — URL is the source of truth for challenge context
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Check if there's a saved game on mount (skip if scoreboard URL already set screen)
@@ -91,8 +94,11 @@ function App() {
     if (scoreboardParams) return;
     if (holdcoName && round > 0 && !gameOver) {
       setScreen('game');
+    } else if (gameOver && isChallenge) {
+      // Challenge game over — route to GameOverScreen so scoreboard can mount and auto-submit
+      setScreen('gameOver');
     } else if (gameOver) {
-      // Don't trap players on the Game Over screen on refresh — show intro instead.
+      // Non-challenge game over — show intro instead of trapping on dead GameOver screen.
       // Game data stays in localStorage and is overwritten cleanly on next startGame().
       setScreen('intro');
     }
