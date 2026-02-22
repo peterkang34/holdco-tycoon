@@ -5,6 +5,7 @@ export interface Toast {
   message: string;
   detail?: string;
   type: 'success' | 'info' | 'warning' | 'danger';
+  action?: { label: string; onClick: () => void };
 }
 
 interface ToastState {

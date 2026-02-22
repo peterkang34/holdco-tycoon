@@ -11,6 +11,29 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'February 22, 2026',
+    title: 'Swipe-to-Pass on Mobile',
+    sections: [
+      {
+        heading: 'New',
+        items: [
+          'Swipe deal cards left to pass on mobile — no need to expand the card first.',
+          'Swipe passed cards right to restore them.',
+          'Undo toast appears after each swipe-pass so you can reverse a hasty dismissal.',
+          'First-time players see a subtle nudge animation showing that cards can be swiped.',
+        ],
+      },
+      {
+        heading: 'Improved',
+        items: [
+          'Collapsed deal cards now show EBITDA on mobile for better at-a-glance evaluation.',
+          'Tighter card layout fits all key metrics on smaller screens.',
+          'Heat premium indicator is now compact — look for the arrow on the multiple.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 21, 2026',
     title: 'Platform Integration Robustness',
     sections: [

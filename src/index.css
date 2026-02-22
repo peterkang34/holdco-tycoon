@@ -181,3 +181,19 @@
 .animate-slide-up {
   animation: slideUp 0.3s ease-out;
 }
+
+@keyframes swipe-hint {
+  0%, 100% { transform: translateX(0); }
+  40% { transform: translateX(-20px); }
+  70% { transform: translateX(4px); }
+}
+
+.animate-swipe-hint {
+  animation: swipe-hint 0.8s ease-in-out 0.5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-swipe-hint {
+    animation: none;
+  }
+}

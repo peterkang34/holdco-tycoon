@@ -43,7 +43,6 @@ import { TURNAROUND_FATIGUE_THRESHOLD } from '../../data/gameConfig';
 import { DEBT_LABELS, DEBT_EXPLAINER } from '../../data/mechanicsCopy';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { CardListControls } from '../ui/CardListControls';
-import { ScrollToTop } from '../ui/ScrollToTop';
 import { Modal } from '../ui/Modal';
 
 const STARTING_SHARES = 1000;
@@ -187,6 +186,7 @@ export function AllocatePhase({
 }: AllocatePhaseProps) {
   const isMobile = useIsMobile();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const swipeHintCount = useRef(parseInt(localStorage.getItem('holdco-swipe-hint-count') || '0'));
   const [activeTab, setActiveTab] = useState<AllocateTab>('portfolio');
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [selectedBusinessForImprovement, setSelectedBusinessForImprovement] = useState<Business | null>(null);
@@ -641,11 +641,17 @@ export function AllocatePhase({
             </div>
             <div className="card text-center px-2 sm:px-4">
               <p className="text-text-muted text-xs sm:text-sm">Price</p>
-              <p className="text-lg sm:text-2xl font-bold font-mono">{formatMoney(selectedDeal.askingPrice)}</p>
+              <p className="text-lg sm:text-2xl font-bold font-mono">{formatMoney(selectedDeal.effectivePrice)}</p>
+              {selectedDeal.effectivePrice > selectedDeal.askingPrice && (
+                <p className="text-xs text-text-muted"><span className="line-through">{formatMoney(selectedDeal.askingPrice)}</span></p>
+              )}
             </div>
             <div className="card text-center px-2 sm:px-4">
               <p className="text-text-muted text-xs sm:text-sm">Multiple</p>
-              <p className="text-lg sm:text-2xl font-bold font-mono">{selectedDeal.business.acquisitionMultiple.toFixed(1)}x</p>
+              <p className="text-lg sm:text-2xl font-bold font-mono">{(selectedDeal.effectivePrice / selectedDeal.business.ebitda).toFixed(1)}x</p>
+              {selectedDeal.effectivePrice > selectedDeal.askingPrice && (
+                <p className="text-xs text-text-muted"><span className="line-through">{selectedDeal.business.acquisitionMultiple.toFixed(1)}x</span></p>
+              )}
             </div>
           </div>
 
@@ -1560,7 +1566,7 @@ export function AllocatePhase({
 
             {/* Deals Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredSortedDeals.map(deal => (
+              {filteredSortedDeals.map((deal, index) => (
                 <DealCard
                   key={deal.id}
                   deal={deal}
@@ -1573,6 +1579,13 @@ export function AllocatePhase({
                   collapsible={isMobile}
                   isExpanded={!isMobile || expandedDealIds.has(deal.id)}
                   onToggle={() => toggleDeal(deal.id)}
+                  showSwipeHint={index === 0 && isMobile && swipeHintCount.current < 3}
+                  onSwipeUsed={() => {
+                    if (swipeHintCount.current < 3) {
+                      swipeHintCount.current++;
+                      localStorage.setItem('holdco-swipe-hint-count', String(swipeHintCount.current));
+                    }
+                  }}
                 />
               ))}
               {dealPipeline.length === 0 && (
@@ -2497,13 +2510,20 @@ export function AllocatePhase({
 
       {/* Sticky End Year bar (mobile) */}
       <div className="fixed bottom-0 left-0 right-0 md:hidden bg-bg-primary/95 backdrop-blur-sm border-t border-white/10 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex items-center justify-between">
-        <span className="text-sm font-mono text-text-secondary">Cash: <span className="text-accent font-bold">{formatMoney(cash)}</span></span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => (scrollContainerRef.current ?? window).scrollTo({ top: 0, behavior: 'smooth' })}
+            className="min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary transition-colors rounded-lg bg-white/5"
+            aria-label="Scroll to top"
+          >
+            ▲
+          </button>
+          <span className="text-sm font-mono text-text-secondary">Cash: <span className="text-accent font-bold">{formatMoney(cash)}</span></span>
+        </div>
         <button onClick={() => setShowEndTurnConfirm(true)} className="btn-primary text-sm px-4 py-2">
           End Year {round} →
         </button>
       </div>
-
-      <ScrollToTop scrollContainerRef={scrollContainerRef} />
 
       {/* Deal Structuring Modal */}
       {selectedDeal && renderDealStructuring()}

@@ -1,8 +1,11 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Deal, DealHeat, SellerArchetype, formatMoney, Business } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { getSizeRatioTier } from '../../engine/businesses';
 import { Tooltip } from '../ui/Tooltip';
+import { useSwipe } from '../../hooks/useSwipe';
+import { useToastStore } from '../../hooks/useToast';
+import { useGameStore } from '../../hooks/useGame';
 
 interface DealCardProps {
   deal: Deal;
@@ -15,12 +18,15 @@ interface DealCardProps {
   collapsible?: boolean;
   isExpanded?: boolean;
   onToggle?: () => void;
+  showSwipeHint?: boolean;
+  onSwipeUsed?: () => void;
 }
 
-export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlatforms = [], isPassed, onPass, collapsible, isExpanded, onToggle }: DealCardProps) {
+export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlatforms = [], isPassed, onPass, collapsible, isExpanded, onToggle, showSwipeHint, onSwipeUsed }: DealCardProps) {
   const [showStory, setShowStory] = useState(false);
   const sector = SECTORS[deal.business.sectorId];
   const { dueDiligence, qualityRating } = deal.business;
+  const addToast = useToastStore((s) => s.addToast);
 
   const freshnessLabel = deal.freshness === 1 ? 'Expires next year' : `${deal.freshness} years left`;
 
@@ -64,6 +70,7 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
 
   const hasHeatPremium = deal.effectivePrice > deal.askingPrice;
   const premiumPct = hasHeatPremium ? Math.round(((deal.effectivePrice / deal.askingPrice) - 1) * 100) : 0;
+  const effectiveMultiple = deal.effectivePrice / deal.business.ebitda;
 
   const getSignalColor = (type: string, value: string) => {
     if (type === 'concentration') {
@@ -81,38 +88,92 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
     return 'text-text-secondary';
   };
 
+  // Swipe-to-pass handler with undo toast
+  const handleSwipePass = useCallback(() => {
+    if (!isPassed && onPass) {
+      onPass();
+      onSwipeUsed?.();
+      addToast({
+        message: `Passed on ${deal.business.name}`,
+        type: 'info',
+        action: {
+          label: 'Undo',
+          onClick: () => {
+            // Only restore if still passed (idempotent — prevents stale undo from re-passing)
+            if (useGameStore.getState().passedDealIds.includes(deal.id)) {
+              onPass();
+            }
+          },
+        },
+      });
+    }
+  }, [isPassed, onPass, onSwipeUsed, addToast, deal.business.name]);
+
+  const handleSwipeRestore = useCallback(() => {
+    if (isPassed && onPass) {
+      onPass();
+      onSwipeUsed?.();
+    }
+  }, [isPassed, onPass, onSwipeUsed]);
+
+  const swipe = useSwipe({
+    onSwipeLeft: isPassed ? undefined : handleSwipePass,
+    onSwipeRight: isPassed ? handleSwipeRestore : undefined,
+    threshold: Math.min(80, window.innerWidth * 0.2),
+    disabled: !collapsible || isExpanded || !onPass,
+  });
+
   // Collapsible: collapsed state — compact one-line summary
   if (collapsible && !isExpanded) {
     return (
-      <div
-        className={`card flex items-center gap-2 py-2 cursor-pointer hover:border-accent/50 transition-colors ${disabled ? 'opacity-50' : unaffordable ? 'opacity-65' : ''}`}
-        style={{ borderLeftColor: sector.color, borderLeftWidth: '3px' }}
-        onClick={onToggle}
-      >
-        <span className="text-xl shrink-0">{sector.emoji}</span>
-        <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-          <span className="font-medium truncate">{deal.business.name}</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${acquisitionBadge.color}`}>
-            {acquisitionBadge.label}
-          </span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${heatBadge.color}`}>
-            {heatBadge.label}
-          </span>
+      <div className="relative overflow-hidden rounded-xl">
+        {/* Reveal layer — always mounted, hidden when not swiping */}
+        <div
+          className={`absolute inset-0 flex items-center px-4 transition-opacity ${
+            swipe.swiping ? 'opacity-100' : 'opacity-0'
+          } ${swipe.offset < 0 ? 'bg-warning/20 justify-end' : 'bg-accent/20 justify-start'}`}
+        >
+          <div className="text-sm font-bold">
+            {swipe.offset < 0 ? 'PASS' : 'RESTORE'}
+            <span className="font-mono ml-2">{effectiveMultiple.toFixed(1)}x</span>
+            {hasHeatPremium && <span className="text-warning ml-1">(+{premiumPct}%)</span>}
+          </div>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <span className="font-mono text-sm font-bold">{formatMoney(deal.effectivePrice)}</span>
-          <span className="text-xs text-text-muted font-mono">{formatMoney(deal.business.ebitda)}</span>
-          <span className={`text-[10px] font-mono font-bold px-1 py-0.5 rounded ${
-            qualityRating >= 4 ? 'bg-accent/20 text-accent' :
-            qualityRating === 3 ? 'bg-yellow-500/20 text-yellow-400' :
-            'bg-danger/20 text-danger'
-          }`}>Q{qualityRating}</span>
-          <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
-            deal.freshness === 1 ? 'bg-warning/20 text-warning' : 'bg-white/10 text-text-muted'
-          }`}>
-            {deal.freshness === 1 ? '!' : `${deal.freshness}y`}
-          </span>
-          <span className="text-text-muted text-xs">▼</span>
+
+        {/* Card — slides with finger */}
+        <div
+          ref={swipe.ref}
+          className={`card flex items-center gap-1.5 py-2 cursor-pointer hover:border-accent/50 transition-colors relative ${disabled ? 'opacity-50' : unaffordable ? 'opacity-65' : ''} ${showSwipeHint ? 'animate-swipe-hint' : ''}`}
+          style={{ borderLeftColor: sector.color, borderLeftWidth: '3px' }}
+          onClick={swipe.swiping || swipe.recentlySwiped ? undefined : onToggle}
+        >
+          <span className="text-xl shrink-0">{sector.emoji}</span>
+          <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+            <span className="font-medium truncate">{deal.business.name}</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${acquisitionBadge.color}`}>
+              {acquisitionBadge.label}
+            </span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${heatBadge.color}`}>
+              {heatBadge.label}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <span className="font-mono text-sm font-bold">{formatMoney(deal.effectivePrice)}</span>
+            <span className="text-xs text-text-muted font-mono">{formatMoney(deal.business.ebitda)}</span>
+            <span className="text-xs text-text-muted font-mono">
+              {effectiveMultiple.toFixed(1)}x{hasHeatPremium && <span className="text-warning">&#x2B06;</span>}
+            </span>
+            <span className={`text-[10px] font-mono font-bold px-1 py-0.5 rounded ${
+              qualityRating >= 4 ? 'bg-accent/20 text-accent' :
+              qualityRating === 3 ? 'bg-yellow-500/20 text-yellow-400' :
+              'bg-danger/20 text-danger'
+            }`}>Q{qualityRating}</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${
+              deal.freshness === 1 ? 'bg-warning/20 text-warning' : 'bg-white/10 text-text-muted'
+            }`}>
+              {deal.freshness === 1 ? '!' : `${deal.freshness}y`}
+            </span>
+          </div>
         </div>
       </div>
     );
@@ -268,20 +329,14 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
         <div>
           <p className="text-xs text-text-muted">Asking Price</p>
           <p className="font-mono font-bold text-base sm:text-lg">{formatMoney(deal.effectivePrice)}</p>
-          <p className="text-xs text-text-muted">{deal.business.acquisitionMultiple.toFixed(1)}x EBITDA</p>
+          <p className="text-xs text-text-muted">
+            {effectiveMultiple.toFixed(1)}x EBITDA
+            {hasHeatPremium && (
+              <span className="line-through ml-1">{deal.business.acquisitionMultiple.toFixed(1)}x</span>
+            )}
+          </p>
           {hasHeatPremium && (
-            <Tooltip
-              trigger={
-                <span className="text-xs text-text-muted inline-flex items-center gap-1">
-                  <span className="line-through">{formatMoney(deal.askingPrice)}</span>
-                  <span className="text-warning">+{premiumPct}%</span>
-                </span>
-              }
-              align="left"
-              width="w-52"
-            >
-              Competitive premium: other buyers are bidding up the price. Sourced and off-market deals face less competition.
-            </Tooltip>
+            <span className="text-warning text-xs">+{premiumPct}% heat premium</span>
           )}
         </div>
         <div>
@@ -319,23 +374,25 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
       </div>
 
       {/* Due Diligence Signals */}
-      <div className="space-y-1.5 text-xs border-t border-white/10 pt-3">
+      <div className="text-xs border-t border-white/10 pt-3">
         <p className="text-text-muted font-medium mb-2">Due Diligence Notes:</p>
-        <p className={getSignalColor('concentration', dueDiligence.revenueConcentration)}>
-          {dueDiligence.revenueConcentrationText}
-        </p>
-        <p className={getSignalColor('operator', dueDiligence.operatorQuality)}>
-          {dueDiligence.operatorQualityText}
-        </p>
-        <p className={getSignalColor('trend', dueDiligence.trend)}>
-          {dueDiligence.trendText}
-        </p>
-        <p className="text-text-secondary">
-          {dueDiligence.customerRetentionText}
-        </p>
-        <p className={getSignalColor('position', dueDiligence.competitivePosition)}>
-          {dueDiligence.competitivePositionText}
-        </p>
+        <div className="grid grid-cols-2 gap-x-3 gap-y-1">
+          <p className={getSignalColor('concentration', dueDiligence.revenueConcentration)}>
+            {dueDiligence.revenueConcentrationText}
+          </p>
+          <p className={getSignalColor('operator', dueDiligence.operatorQuality)}>
+            {dueDiligence.operatorQualityText}
+          </p>
+          <p className={getSignalColor('trend', dueDiligence.trend)}>
+            {dueDiligence.trendText}
+          </p>
+          <p className="text-text-secondary">
+            {dueDiligence.customerRetentionText}
+          </p>
+          <p className={getSignalColor('position', dueDiligence.competitivePosition)}>
+            {dueDiligence.competitivePositionText}
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 mt-4 pt-3 border-t border-white/10">
