@@ -563,8 +563,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       return;
     }
 
-    // Priority 2: Browse deals (Round 2, still only 1 business)
-    if (round >= 2 && active.length === 1 && dealPipeline.length > 0 && !hasSeenNudge('second-deal')) {
+    // Priority 2: Browse deals (still only 1 business)
+    if (round >= 1 && active.length === 1 && dealPipeline.length > 0 && !hasSeenNudge('second-deal')) {
       lastNudgeRound.current = round;
       dismissNudge('second-deal');
       addToast({ type: 'nudge', message: 'Tip: Grow Your Portfolio', detail: 'Check the Deals tab — you have cash to acquire a second business.' });
