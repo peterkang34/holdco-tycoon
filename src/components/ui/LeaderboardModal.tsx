@@ -213,7 +213,7 @@ export function LeaderboardModal({
       </div>
 
       {loading && (
-        <div className="space-y-2">
+        <div className="space-y-2 min-h-[300px] sm:min-h-[400px]">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="h-14 bg-white/5 rounded-lg animate-pulse" />
           ))}
@@ -221,7 +221,7 @@ export function LeaderboardModal({
       )}
 
       {error && (
-        <div className="card text-center text-text-muted py-8">
+        <div className="card text-center text-text-muted py-8 min-h-[300px] sm:min-h-[400px] flex flex-col items-center justify-center">
           <p>Failed to load leaderboard.</p>
           <button onClick={fetchLeaderboard} className="btn-secondary text-sm mt-3">
             Retry
@@ -230,14 +230,14 @@ export function LeaderboardModal({
       )}
 
       {!loading && !error && filtered.length === 0 && ghostRank === -1 ? (
-        <div className="card text-center text-text-muted py-8">
+        <div className="card text-center text-text-muted py-8 min-h-[300px] sm:min-h-[400px] flex flex-col items-center justify-center">
           <p>No scores yet{activeTab !== 'overall' ? ' in this category' : ''}.</p>
           <p className="text-sm mt-2">Complete a game to set your first record.</p>
         </div>
       ) : null}
 
       {!loading && !error && (filtered.length > 0 || ghostRank !== -1) && (
-        <div className="space-y-2">
+        <div className="space-y-2 min-h-[300px] sm:min-h-[400px]">
           {filtered.map((entry, index) => (
             <Fragment key={entry.id}>
               {ghostRank === index && (

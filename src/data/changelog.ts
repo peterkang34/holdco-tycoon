@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 22, 2026',
+    title: 'Leaderboard Stability',
+    sections: [
+      {
+        heading: 'Fixed',
+        items: [
+          'Switching between leaderboard tabs no longer causes layout jank on mobile — tabs with fewer entries now maintain consistent height.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 22, 2026',
     title: 'Smarter AI Narratives',
     sections: [
       {
