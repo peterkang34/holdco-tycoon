@@ -938,7 +938,7 @@ export function AllocatePhase({
   };
 
   return (
-    <div ref={scrollContainerRef} className="px-4 sm:px-6 py-6 pb-20 md:pb-8">
+    <div ref={scrollContainerRef} className="px-4 sm:px-6 py-6 pb-20 md:pb-8" style={{ overscrollBehavior: 'none' }}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
         <div>
