@@ -2509,7 +2509,7 @@ export function AllocatePhase({
       </div>
 
       {/* Sticky End Year bar (mobile) */}
-      <div className="fixed bottom-0 left-0 right-0 md:hidden bg-bg-primary/95 backdrop-blur-sm border-t border-white/10 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex items-center justify-between">
+      <div className="fixed bottom-0 left-0 right-0 md:hidden bg-bg-primary/95 backdrop-blur-sm border-t border-white/10 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex items-center justify-between" style={{ touchAction: 'none' }}>
         <div className="flex items-center gap-1">
           <button
             onClick={() => (scrollContainerRef.current ?? window).scrollTo({ top: 0, behavior: 'smooth' })}
