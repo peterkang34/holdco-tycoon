@@ -1356,28 +1356,33 @@ export function AllocatePhase({
           <div>
             {/* M&A Focus Settings */}
             <div className="card mb-6">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-2 sm:gap-0">
-                <div>
-                  <h3 className="font-bold">M&A Focus</h3>
-                  <p className="text-sm text-text-muted">Set your acquisition preferences to see more relevant deals</p>
+              <div className="flex items-start justify-between mb-3 sm:mb-4 gap-2">
+                <div className="min-w-0">
+                  <h3 className="font-bold flex items-center gap-2">
+                    M&A Focus
+                    {aiEnabled && (
+                      <span className="text-[10px] text-accent px-1.5 py-0.5 bg-accent/10 rounded sm:hidden">AI</span>
+                    )}
+                  </h3>
+                  <p className="text-sm text-text-muted hidden sm:block">Set your acquisition preferences to see more relevant deals</p>
                 </div>
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-2 items-center shrink-0">
                   <button
                     onClick={() => setShowMarketGuide(true)}
-                    className="btn-secondary text-sm flex items-center gap-2"
+                    className="btn-secondary text-xs sm:text-sm flex items-center gap-1 sm:gap-2 min-h-[36px] sm:min-h-0 px-2 sm:px-3"
                   >
-                    <span>📊</span> Market Guide
+                    <span>📊</span><span className="hidden sm:inline"> Market Guide</span>
                   </button>
                   {aiEnabled && (
-                    <span className="text-xs text-accent flex items-center gap-1 px-2 py-1 bg-accent/10 rounded">
+                    <span className="text-xs text-accent items-center gap-1 px-2 py-1 bg-accent/10 rounded hidden sm:flex">
                       <span>🤖</span> AI Enhanced
                     </span>
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-sm text-text-muted mb-2">Target Sector</label>
+                  <label className="block text-sm text-text-muted mb-1 sm:mb-2 hidden sm:block">Target Sector</label>
                   <select
                     value={maFocus.sectorId || ''}
                     onChange={(e) => onSetMAFocus(
@@ -1395,7 +1400,7 @@ export function AllocatePhase({
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm text-text-muted mb-2">Target Size</label>
+                  <label className="block text-sm text-text-muted mb-1 sm:mb-2 hidden sm:block">Target Size</label>
                   <select
                     value={maFocus.sizePreference}
                     onChange={(e) => onSetMAFocus(
@@ -1405,9 +1410,9 @@ export function AllocatePhase({
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   >
                     <option value="any">Any Size</option>
-                    <option value="small">Small ($500k-$1.5M EBITDA)</option>
-                    <option value="medium">Medium ($1.5M-$3M EBITDA)</option>
-                    <option value="large">Large ($3M+ EBITDA)</option>
+                    <option value="small">Small ($500k-$1.5M)</option>
+                    <option value="medium">Medium ($1.5M-$3M)</option>
+                    <option value="large">Large ($3M+)</option>
                   </select>
                 </div>
               </div>
