@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Business,
   OperationalImprovementType,
@@ -35,6 +36,7 @@ export function ImprovementModal({
   onImprove,
   onClose,
 }: ImprovementModalProps) {
+  const [showExplainer, setShowExplainer] = useState(false);
   const sector = SECTORS[business.sectorId];
   const appliedTypes = new Set(business.improvements.map(i => i.type));
   const remainingYears = maxRounds - round;
@@ -175,19 +177,28 @@ export function ImprovementModal({
 
         {/* How Improvements Work */}
         <div className="bg-accent/5 border border-accent/20 rounded-lg p-4 mb-6">
-          <p className="font-bold text-sm mb-2">How Improvements Work</p>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-text-secondary">
-            <div>
-              <p className="text-text-primary font-medium mb-1">Immediate EBITDA Boost</p>
-              <p>One-time cost produces an instant, permanent EBITDA increase that compounds with organic growth.</p>
-            </div>
-            <div>
-              <p className="text-text-primary font-medium mb-1">Exit Multiple Impact</p>
-              <p>Variable exit premium per improvement (0.15x-0.50x, max 1.0x total). At 2+ improvements, an additional +0.2x de-risking premium kicks in.</p>
-            </div>
-            <div>
-              <p className="text-text-primary font-medium mb-1">One Per Business</p>
-              <p>Each improvement type can only be applied once. All effects are permanent — they never expire.</p>
+          <button
+            className="font-bold text-sm w-full text-left flex items-center justify-between md:cursor-default min-h-[44px] md:min-h-0"
+            onClick={() => setShowExplainer(!showExplainer)}
+            aria-expanded={showExplainer}
+          >
+            <span>How Improvements Work</span>
+            <span className="md:hidden text-text-muted text-xs">{showExplainer ? '▲' : '▼'}</span>
+          </button>
+          <div className={`${showExplainer ? 'block' : 'hidden'} md:block mt-2`}>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-text-secondary">
+              <div>
+                <p className="text-text-primary font-medium mb-1">Immediate EBITDA Boost</p>
+                <p>One-time cost produces an instant, permanent EBITDA increase that compounds with organic growth.</p>
+              </div>
+              <div>
+                <p className="text-text-primary font-medium mb-1">Exit Multiple Impact</p>
+                <p>Variable exit premium per improvement (0.15x-0.50x, max 1.0x total). At 2+ improvements, an additional +0.2x de-risking premium kicks in.</p>
+              </div>
+              <div>
+                <p className="text-text-primary font-medium mb-1">One Per Business</p>
+                <p>Each improvement type can only be applied once. All effects are permanent — they never expire.</p>
+              </div>
             </div>
           </div>
         </div>
@@ -245,7 +256,7 @@ export function ImprovementModal({
                 <h5 className="font-bold mb-2">{improvement.name}</h5>
                 <p className="text-sm text-text-secondary mb-3">{improvement.description}</p>
 
-                <div className="space-y-2 text-sm">
+                <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-sm">
                   <div className="flex justify-between">
                     <span className="text-text-muted">Cost</span>
                     <span className={`font-mono ${!canAfford ? 'text-danger' : ''}`}>
@@ -253,18 +264,18 @@ export function ImprovementModal({
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-text-muted">EBITDA Boost</span>
+                    <span className="text-text-muted">EBITDA</span>
                     <span className="font-mono text-accent">
                       {boostIsRange
-                        ? `+${formatMoney(Math.round(business.ebitda * improvement.ebitdaBoostMin))} to ${formatMoney(Math.round(business.ebitda * improvement.ebitdaBoostMax))}`
+                        ? `+${formatMoney(Math.round(business.ebitda * improvement.ebitdaBoostMin))}-${formatMoney(Math.round(business.ebitda * improvement.ebitdaBoostMax))}`
                         : `+${formatMoney(ebitdaGainPerYear)}`
                       }/yr
                     </span>
                   </div>
                   {improvement.growthBoost > 0 && (
                     <div className="flex justify-between">
-                      <span className="text-text-muted">Growth Rate</span>
-                      <span className="font-mono text-accent">+{(improvement.growthBoost * 100).toFixed(0)}%/yr (permanent)</span>
+                      <span className="text-text-muted">Growth</span>
+                      <span className="font-mono text-accent">+{(improvement.growthBoost * 100).toFixed(0)}%/yr</span>
                     </div>
                   )}
                   {improvement.extraBenefit && (
@@ -273,31 +284,22 @@ export function ImprovementModal({
                       <span className="text-text-secondary">{improvement.extraBenefit}</span>
                     </div>
                   )}
-                  <div className="border-t border-white/10 pt-2 mt-2 space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-text-muted">Exit Multiple</span>
-                      <span className="font-mono text-accent">
-                        +{exitMultipleGain.toFixed(2)}x
-                        {nextImprovementCount === 2 && ' (incl. de-risk bonus)'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-text-muted">Payback</span>
-                      <span className="font-mono">
-                        {paybackYears <= 1 ? '< 1 year' : paybackYears < 10 ? `~${paybackYears.toFixed(1)} years` : 'N/A'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between text-xs">
-                      <span className="text-text-muted">Est. ROI ({remainingYears}yr)</span>
-                      <span className={`font-mono font-bold ${roiMultiple >= 2 ? 'text-accent' : roiMultiple >= 1 ? 'text-text-primary' : 'text-warning'}`}>
-                        {roiMultiple.toFixed(1)}x
-                      </span>
-                    </div>
+                  <div className="col-span-2 border-t border-white/10 pt-2 mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+                    <span className="text-text-muted">
+                      Exit <span className="font-mono text-accent">+{exitMultipleGain.toFixed(2)}x</span>
+                      {nextImprovementCount === 2 && ' (de-risk)'}
+                    </span>
+                    <span className="text-text-muted">
+                      Payback <span className="font-mono">{paybackYears <= 1 ? '<1yr' : paybackYears < 10 ? `~${paybackYears.toFixed(1)}yr` : 'N/A'}</span>
+                    </span>
+                    <span className={`font-mono font-bold ${roiMultiple >= 2 ? 'text-accent' : roiMultiple >= 1 ? 'text-text-primary' : 'text-warning'}`}>
+                      ROI {roiMultiple.toFixed(1)}x <span className="font-normal text-text-muted">({remainingYears}yr)</span>
+                    </span>
                   </div>
                 </div>
 
                 <button
-                  className={`w-full mt-4 text-sm ${disabled ? 'btn-secondary opacity-50 cursor-not-allowed' : 'btn-primary'}`}
+                  className={`w-full col-span-2 mt-2 text-sm ${disabled ? 'btn-secondary opacity-50 cursor-not-allowed' : 'btn-primary'}`}
                   disabled={disabled}
                 >
                   {!improvement.available
@@ -311,7 +313,7 @@ export function ImprovementModal({
           })}
         </div>
 
-        <div className="mt-6 p-4 bg-white/5 rounded-lg text-sm text-text-muted">
+        <div className="hidden md:block mt-6 p-4 bg-white/5 rounded-lg text-sm text-text-muted">
           <p className="font-medium text-text-secondary mb-1">Operational Improvement Tip</p>
           <p>Improvements are the highest-ROI capital allocation move: the EBITDA boost compounds every year through organic growth, and each improvement increases your exit multiple. Danaher's DBS proves this — operational improvement is reinvestment that never depreciates.</p>
         </div>

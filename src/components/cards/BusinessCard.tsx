@@ -483,14 +483,14 @@ export function BusinessCard({
 
           {(onSell || onImprove || onDesignatePlatform || onStartTurnaround) && (
             <div className="flex flex-col gap-2 mt-3">
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-wrap gap-2">
                 {onStartTurnaround && turnaroundEligible && !activeTurnaround && (
                   <button onClick={onStartTurnaround} className="btn-secondary text-xs flex-1 min-h-[44px] border-amber-500/30 text-amber-400 hover:bg-amber-500/10">
                     Turnaround
                   </button>
                 )}
                 {onImprove && (
-                  <button onClick={onImprove} className="btn-secondary text-xs flex-1">
+                  <button onClick={onImprove} className="btn-secondary text-xs flex-1 min-h-[44px]">
                     Improve
                   </button>
                 )}
@@ -500,7 +500,7 @@ export function BusinessCard({
                       trigger={
                         <button
                           onClick={onSell}
-                          className={`btn-secondary text-xs flex-1 ${moic >= 2 ? 'border-accent' : moic < 1 ? 'border-danger' : ''}`}
+                          className={`btn-secondary text-xs flex-1 min-h-[44px] ${moic >= 2 ? 'border-accent' : moic < 1 ? 'border-danger' : ''}`}
                         >
                           Sell for {formatMoney(exitValuation.netProceeds)}
                         </button>
@@ -520,7 +520,7 @@ export function BusinessCard({
                   ) : (
                     <button
                       onClick={onSell}
-                      className={`btn-secondary text-xs flex-1 ${moic >= 2 ? 'border-accent' : moic < 1 ? 'border-danger' : ''}`}
+                      className={`btn-secondary text-xs flex-1 min-h-[44px] ${moic >= 2 ? 'border-accent' : moic < 1 ? 'border-danger' : ''}`}
                     >
                       Sell for {formatMoney(exitValuation.netProceeds)}
                     </button>
