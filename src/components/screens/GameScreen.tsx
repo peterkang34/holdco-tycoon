@@ -555,8 +555,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     if (phase !== 'allocate' || lastNudgeRound.current === round) return;
     const active = businesses.filter(b => b.status === 'active');
 
-    // Priority 1: Improve your business (Round 2)
-    if (round === 2 && active.length >= 1 && !hasSeenNudge('improve')) {
+    // Priority 1: Improve your business (Round 1)
+    if (round >= 1 && active.length >= 1 && !hasSeenNudge('improve')) {
       lastNudgeRound.current = round;
       dismissNudge('improve');
       addToast({ type: 'nudge', message: 'Tip: Improve Your Businesses', detail: 'Tap any business in the Portfolio tab, then hit "Improve" to boost margins or growth.' });
