@@ -12,6 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 22, 2026',
+    title: 'Smarter AI Narratives',
+    sections: [
+      {
+        heading: 'Improved',
+        items: [
+          'AI-generated narratives now use a more capable model — deal stories, year chronicles, and post-game analysis should feel sharper and more nuanced.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 22, 2026',
     title: 'Swipe-to-Pass on Mobile',
     sections: [
       {
