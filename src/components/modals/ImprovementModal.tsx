@@ -158,7 +158,8 @@ export function ImprovementModal({
       }
       size="xl"
     >
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-4 mb-4 sm:mb-6">
+        {/* Summary stats — single row on mobile, 3 cards on desktop */}
+        <div className="hidden sm:grid grid-cols-3 gap-4 mb-6">
           <div className="card text-center">
             <p className="text-text-muted text-sm">Current EBITDA</p>
             <p className="text-2xl font-bold font-mono">{formatMoney(business.ebitda)}</p>
@@ -170,6 +171,22 @@ export function ImprovementModal({
           <div className="card text-center">
             <p className="text-text-muted text-sm">Exit Multiple Bonus</p>
             <p className="text-2xl font-bold font-mono text-accent">
+              +{(currentImprovementMultiple + (hasDeRiskingBonus ? 0.2 : 0)).toFixed(1)}x
+            </p>
+          </div>
+        </div>
+        <div className="sm:hidden card flex items-center justify-between gap-3 mb-4 py-2.5">
+          <div className="text-center">
+            <p className="text-[10px] text-text-muted">EBITDA</p>
+            <p className="text-sm font-bold font-mono">{formatMoney(business.ebitda)}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-[10px] text-text-muted">Applied</p>
+            <p className="text-sm font-bold font-mono">{business.improvements.length}/{totalImprovementTypes}</p>
+          </div>
+          <div className="text-center">
+            <p className="text-[10px] text-text-muted">Exit Bonus</p>
+            <p className="text-sm font-bold font-mono text-accent">
               +{(currentImprovementMultiple + (hasDeRiskingBonus ? 0.2 : 0)).toFixed(1)}x
             </p>
           </div>
