@@ -1773,7 +1773,7 @@ export function AllocatePhase({
                 </div>
 
                 {/* Tier Progress — 3-tier horizontal bar */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+                <div className="flex items-center gap-3 mb-4">
                   {([1, 2, 3] as const).map(tier => {
                     const config = TURNAROUND_TIER_CONFIG[tier];
                     const isUnlocked = turnaroundTier >= tier;
