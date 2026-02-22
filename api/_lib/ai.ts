@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkAIRateLimit, isBodyTooLarge } from './rateLimit.js';
 
-export const AI_MODEL = 'claude-3-haiku-20240307';
+export const AI_MODEL = 'claude-haiku-4-5-20251001';
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 /**

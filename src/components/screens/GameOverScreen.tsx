@@ -243,6 +243,28 @@ export function GameOverScreen({
     if (score.total >= 60) sophisticationScore += 10;
     sophisticationScore = Math.min(100, sophisticationScore);
 
+    // Ending business profile: sub-types, avg EBITDA, construction
+    const activeBiz = businesses.filter(b => b.status === 'active');
+    const endingSubTypes: Record<string, number> = {};
+    for (const b of activeBiz) {
+      const key = `${b.sectorId}:${b.subType}`;
+      endingSubTypes[key] = (endingSubTypes[key] || 0) + 1;
+    }
+    const avgEndingEbitda = activeBiz.length > 0
+      ? Math.round(activeBiz.reduce((s, b) => s + b.ebitda, 0) / activeBiz.length)
+      : 0;
+    const endingConstruction: Record<string, number> = {};
+    for (const b of activeBiz) {
+      if (b.isPlatform) {
+        endingConstruction['roll_up'] = (endingConstruction['roll_up'] || 0) + 1;
+      } else {
+        endingConstruction['standalone'] = (endingConstruction['standalone'] || 0) + 1;
+      }
+    }
+    if (integratedPlatforms.length > 0) {
+      endingConstruction['integrated_platform'] = integratedPlatforms.length;
+    }
+
     const snapshot: GameCompleteSnapshot = {
       round: maxRounds,
       maxRounds,
@@ -282,6 +304,9 @@ export function GameOverScreen({
       strategyArchetype: archetype,
       antiPatterns: antiPatterns.length > 0 ? antiPatterns : undefined,
       sophisticationScore,
+      endingSubTypes: Object.keys(endingSubTypes).length > 0 ? endingSubTypes : undefined,
+      avgEndingEbitda: avgEndingEbitda > 0 ? avgEndingEbitda : undefined,
+      endingConstruction: Object.keys(endingConstruction).length > 0 ? endingConstruction : undefined,
     };
     trackGameComplete(snapshot);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

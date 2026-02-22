@@ -160,6 +160,10 @@ export interface GameCompleteSnapshot {
   strategyArchetype?: string;
   antiPatterns?: string[];
   sophisticationScore?: number;
+  // Phase 5 ending business profile
+  endingSubTypes?: Record<string, number>;
+  avgEndingEbitda?: number;
+  endingConstruction?: Record<string, number>;
 }
 
 export function trackGameComplete(snapshot: GameCompleteSnapshot): void {

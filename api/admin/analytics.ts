@@ -31,6 +31,11 @@ interface MonthData {
   sophisticationDistribution: Record<string, number>;
   dealStructureDistribution: Record<string, number>;
   platformsForgedDistribution: Record<string, number>;
+  // Phase 5 ending business profile
+  endingSubTypes: Record<string, number>;
+  endingEbitdaSum: number;
+  endingEbitdaCount: number;
+  endingConstruction: Record<string, number>;
   // Phase 3
   challengeMetrics: {
     created: number;
@@ -125,6 +130,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Phase 4 (29-30)
       pipe.hgetall(`t:features:${mk}`);          // 29
       pipe.hgetall(`t:choices:${mk}`);           // 30
+      // Phase 5 ending business profile (31-33)
+      pipe.hgetall(`t:ending_subtypes:${mk}`);   // 31
+      pipe.hgetall(`t:ending_ebitda:${mk}:sum`); // 32
+      pipe.hgetall(`t:ending_construction:${mk}`); // 33
     }
 
     // All-time totals
@@ -133,9 +142,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const results = await pipe.exec();
 
-    const FIELDS_PER_MONTH = 31;
+    const FIELDS_PER_MONTH = 34;
     const months: MonthData[] = monthKeys.map((mk, i) => {
       const offset = i * FIELDS_PER_MONTH;
+      // Phase 5: raw sum/count for proper weighted averaging in dashboard
+      const ebitdaSumRecord = toNumberRecord(results[offset + 32]);
       return {
         month: mk,
         started: Number(results[offset]) || 0,
@@ -175,6 +186,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Phase 4
         featureAdoption: toNumberRecord(results[offset + 29]),
         eventChoices: toNumberRecord(results[offset + 30]),
+        // Phase 5
+        endingSubTypes: toNumberRecord(results[offset + 31]),
+        endingEbitdaSum: ebitdaSumRecord['total'] || 0,
+        endingEbitdaCount: ebitdaSumRecord['count'] || 0,
+        endingConstruction: toNumberRecord(results[offset + 33]),
       };
     });
 

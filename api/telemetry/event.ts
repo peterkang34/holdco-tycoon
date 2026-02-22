@@ -41,6 +41,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Phase 2
     strategyArchetype, antiPatterns, sophisticationScore, platformsForged,
     dealStructureTypes,
+    // Phase 5 ending business profile
+    endingSubTypes, avgEndingEbitda, endingConstruction,
     // Phase 3
     challengeCode, shareMethod,
     // Phase 4
@@ -153,6 +155,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
       if (platformsForged != null) {
         pipe.hincrby(`t:platforms_forged:${monthKey}`, String(platformsForged), 1);
+      }
+
+      // Phase 5: ending business profile
+      if (endingSubTypes) {
+        for (const [subType, count] of Object.entries(endingSubTypes)) {
+          pipe.hincrby(`t:ending_subtypes:${monthKey}`, subType, count);
+        }
+      }
+      if (avgEndingEbitda != null && avgEndingEbitda > 0) {
+        pipe.hincrby(`t:ending_ebitda:${monthKey}:sum`, 'total', avgEndingEbitda);
+        pipe.hincrby(`t:ending_ebitda:${monthKey}:sum`, 'count', 1);
+      }
+      if (endingConstruction) {
+        for (const [type, count] of Object.entries(endingConstruction)) {
+          pipe.hincrby(`t:ending_construction:${monthKey}`, type, count);
+        }
       }
 
       await pipe.exec();

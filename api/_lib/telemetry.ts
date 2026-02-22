@@ -85,14 +85,14 @@ export function getSophisticationBucket(score: number): string {
  * All values in thousands (game convention: 1000 = $1M).
  */
 export function getFevBucket(fev: number): string {
-  if (fev < 5000) return '0-5000';
-  if (fev < 10000) return '5000-10000';
-  if (fev < 20000) return '10000-20000';
-  if (fev < 50000) return '20000-50000';
+  if (fev < 10000) return '0-10000';
+  if (fev < 50000) return '10000-50000';
   if (fev < 100000) return '50000-100000';
-  if (fev < 200000) return '100000-200000';
-  if (fev < 500000) return '200000-500000';
-  return '500000+';
+  if (fev < 250000) return '100000-250000';
+  if (fev < 500000) return '250000-500000';
+  if (fev < 1000000) return '500000-1000000';
+  if (fev < 2500000) return '1000000-2500000';
+  return '2500000+';
 }
 
 interface ValidatedPayload {
@@ -138,6 +138,10 @@ interface ValidatedPayload {
   strategyArchetype?: string;
   antiPatterns?: string[];
   sophisticationScore?: number;
+  // Phase 5 ending business profile
+  endingSubTypes?: Record<string, number>;
+  avgEndingEbitda?: number;
+  endingConstruction?: Record<string, number>;
   // Phase 3 challenge fields
   challengeCode?: string;
   shareMethod?: string;
@@ -234,6 +238,11 @@ export function validateTelemetryPayload(body: any): ValidatedPayload {
   const antiPatterns = optionalStringArray(body.antiPatterns, 10);
   const sophisticationScore = optionalPositiveNumber(body.sophisticationScore, 100);
 
+  // Phase 5 ending business profile
+  const endingSubTypes = optionalRecord(body.endingSubTypes);
+  const avgEndingEbitda = optionalPositiveNumber(body.avgEndingEbitda, 500000000);
+  const endingConstruction = optionalRecord(body.endingConstruction);
+
   // Phase 3 challenge fields
   const challengeCode = optionalString(body.challengeCode, 30);
   const shareMethod = optionalEnum(body.shareMethod, VALID_SHARE_METHODS);
@@ -261,6 +270,7 @@ export function validateTelemetryPayload(body: any): ValidatedPayload {
     turnaroundsStarted, turnaroundsSucceeded, turnaroundsFailed,
     sharedServicesActive, maSourcingTier, sectorIds, dealStructureTypes,
     rolloverEquityCount, strategyArchetype, antiPatterns, sophisticationScore,
+    endingSubTypes, avgEndingEbitda, endingConstruction,
     challengeCode, shareMethod, feature, eventType, choiceAction,
   };
 }

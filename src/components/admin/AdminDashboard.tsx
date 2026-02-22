@@ -43,6 +43,10 @@ interface MonthData {
   sophisticationDistribution: Record<string, number>;
   dealStructureDistribution: Record<string, number>;
   platformsForgedDistribution: Record<string, number>;
+  endingSubTypes: Record<string, number>;
+  endingEbitdaSum: number;
+  endingEbitdaCount: number;
+  endingConstruction: Record<string, number>;
   challengeMetrics: ChallengeMetrics;
   featureAdoption: Record<string, number>;
   eventChoices: Record<string, number>;
@@ -119,7 +123,7 @@ function HorizontalBar({ items, colorFn }: { items: { label: string; value: numb
     <div className="space-y-1.5">
       {items.map(item => (
         <div key={item.label} className="flex items-center gap-2">
-          <span className="text-[11px] text-text-secondary w-24 truncate text-right">{item.label}</span>
+          <span className="text-[11px] text-text-secondary w-24 truncate text-right" title={item.label}>{item.label}</span>
           <div className="flex-1 h-4 bg-bg-primary rounded overflow-hidden">
             <div
               className="h-full rounded transition-all duration-500"
@@ -145,7 +149,7 @@ function DonutChart({ items, size = 80 }: { items: { label: string; value: numbe
 
   return (
     <div className="flex items-center gap-3">
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
         {items.map((item) => {
           const pct = item.value / total;
           const dashLength = pct * circumference;
@@ -305,6 +309,7 @@ export function AdminDashboard() {
       allReturning: EMPTY_RECORD, allDuration: EMPTY_RECORD, allFeatures: EMPTY_RECORD,
       allChoices: EMPTY_RECORD, allArchetypes: EMPTY_RECORD, allAntiPatterns: EMPTY_RECORD,
       allSophistication: EMPTY_RECORD, allStructures: EMPTY_RECORD,
+      allEndingSubTypes: EMPTY_RECORD, allEndingConstruction: EMPTY_RECORD, avgEndingEbitda: 0,
       totalUnique: 0, totalViews: 0, completionRate: '0%', avgFev: 0, topFev: 0,
       normalPct: '0%', quickPct: '0%', mobileSharePct: '0%',
       totalChallenge: { created: 0, shared: 0, joined: 0, started: 0, completed: 0, scoreboardViews: 0 },
@@ -328,8 +333,12 @@ export function AdminDashboard() {
     const allAntiPatterns: Record<string, number> = {};
     const allSophistication: Record<string, number> = {};
     const allStructures: Record<string, number> = {};
+    const allEndingSubTypes: Record<string, number> = {};
+    const allEndingConstruction: Record<string, number> = {};
     let totalUnique = 0;
     let totalViews = 0;
+    let ebitdaTotalSum = 0;
+    let ebitdaTotalCount = 0;
     const totalChallenge = { created: 0, shared: 0, joined: 0, started: 0, completed: 0, scoreboardViews: 0 };
 
     const merge = (target: Record<string, number>, source: Record<string, number>) => {
@@ -356,6 +365,10 @@ export function AdminDashboard() {
       merge(allAntiPatterns, m.antiPatternDistribution);
       merge(allSophistication, m.sophisticationDistribution);
       merge(allStructures, m.dealStructureDistribution);
+      merge(allEndingSubTypes, m.endingSubTypes);
+      merge(allEndingConstruction, m.endingConstruction);
+      ebitdaTotalSum += m.endingEbitdaSum;
+      ebitdaTotalCount += m.endingEbitdaCount;
       totalChallenge.created += m.challengeMetrics.created;
       totalChallenge.shared += m.challengeMetrics.shared;
       totalChallenge.joined += m.challengeMetrics.joined;
@@ -369,10 +382,15 @@ export function AdminDashboard() {
       : '0%';
 
     const bucketMidpoints: Record<string, number> = {
+      // Legacy buckets
       '0-5000': 2500, '5000-10000': 7500, '10000-20000': 15000,
       '20000-50000': 35000, '50000-100000': 75000,
       '100000+': 150000,
       '100000-200000': 150000, '200000-500000': 350000, '500000+': 750000,
+      // New wider buckets
+      '0-10000': 5000, '10000-50000': 30000,
+      '100000-250000': 175000, '250000-500000': 375000,
+      '500000-1000000': 750000, '1000000-2500000': 1750000, '2500000+': 3750000,
     };
     let fevSum = 0, fevCount = 0;
     for (const [bucket, count] of Object.entries(allFev)) {
@@ -428,10 +446,13 @@ export function AdminDashboard() {
       ? ((secondGameStarts / firstGameStarts) * 100).toFixed(0) + '%'
       : '—';
 
+    const avgEndingEbitda = ebitdaTotalCount > 0 ? Math.round(ebitdaTotalSum / ebitdaTotalCount) : 0;
+
     return {
       allConfig, allSectors, allGrades, allFev, allAbandon, allRounds,
       allDevice, allDeviceComplete, allDeviceAbandon, allReturning, allDuration,
       allFeatures, allChoices, allArchetypes, allAntiPatterns, allSophistication, allStructures,
+      allEndingSubTypes, allEndingConstruction, avgEndingEbitda,
       totalUnique, totalViews, completionRate, avgFev, topFev, normalPct, quickPct,
       mobileSharePct, totalChallenge, avgSessionDuration, newVsReturning, visitStartRate, secondGameRate,
     };
@@ -476,15 +497,23 @@ export function AdminDashboard() {
 
   const fevItems = useMemo(() => {
     const order = [
-      '0-5000', '5000-10000', '10000-20000', '20000-50000', '50000-100000',
-      '100000+',
-      '100000-200000', '200000-500000', '500000+',
+      // Legacy buckets (shown only if data exists)
+      '0-5000', '5000-10000', '10000-20000', '20000-50000',
+      '100000+', '100000-200000', '200000-500000', '500000+',
+      // Current buckets
+      '0-10000', '10000-50000', '50000-100000',
+      '100000-250000', '250000-500000', '500000-1000000',
+      '1000000-2500000', '2500000+',
     ];
     const labels: Record<string, string> = {
-      '0-5000': '$0-5M', '5000-10000': '$5-10M', '10000-20000': '$10-20M',
-      '20000-50000': '$20-50M', '50000-100000': '$50-100M',
-      '100000+': '$100M+ (old)',
-      '100000-200000': '$100-200M', '200000-500000': '$200-500M', '500000+': '$500M+',
+      // Legacy
+      '0-5000': '$0-5M (old)', '5000-10000': '$5-10M (old)', '10000-20000': '$10-20M (old)',
+      '20000-50000': '$20-50M (old)', '100000+': '$100M+ (old)',
+      '100000-200000': '$100-200M (old)', '200000-500000': '$200-500M (old)', '500000+': '$500M+ (old)',
+      // Current
+      '0-10000': '$0-10M', '10000-50000': '$10-50M', '50000-100000': '$50-100M',
+      '100000-250000': '$100-250M', '250000-500000': '$250-500M', '500000-1000000': '$500M-1B',
+      '1000000-2500000': '$1-2.5B', '2500000+': '$2.5B+',
     };
     return order
       .map(k => ({ label: labels[k] || k, value: totals.allFev[k] || 0 }))
@@ -871,6 +900,51 @@ export function AdminDashboard() {
                 </div>
               </div>
               <AdminBarChart title="FEV Distribution" items={fevItems} />
+            </div>
+          </div>
+
+          {/* Completion Profile: Ending Businesses */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+            {/* Portfolio Construction */}
+            <div className="card p-4 min-w-0">
+              <SectionHeader title="Portfolio Construction" />
+              {Object.keys(totals.allEndingConstruction).length > 0 ? (
+                <>
+                  <DonutChart items={[
+                    { label: 'Standalone', value: totals.allEndingConstruction['standalone'] || 0, color: 'var(--color-accent)' },
+                    { label: 'Roll-Up', value: totals.allEndingConstruction['roll_up'] || 0, color: '#a78bfa' },
+                    { label: 'Integrated Platform', value: totals.allEndingConstruction['integrated_platform'] || 0, color: '#facc15' },
+                  ].filter(i => i.value > 0)} />
+                  <p className="text-[10px] text-text-muted mt-2">Distribution of ending business types across completions</p>
+                </>
+              ) : <p className="text-xs text-text-muted">No data yet</p>}
+            </div>
+
+            {/* Avg Ending Business Size */}
+            <div className="card p-4 min-w-0 flex flex-col justify-center">
+              <SectionHeader title="Avg Ending Business EBITDA" />
+              <div className="text-center py-4">
+                <p className="text-3xl font-bold text-accent">{totals.avgEndingEbitda > 0 ? formatMoney(totals.avgEndingEbitda) : '—'}</p>
+                <p className="text-xs text-text-muted mt-1">Average EBITDA of active businesses at game end</p>
+              </div>
+            </div>
+
+            {/* Top Ending Sub-Sectors */}
+            <div className="card p-4 min-w-0">
+              <SectionHeader title="Top Ending Sub-Sectors" />
+              {Object.keys(totals.allEndingSubTypes).length > 0 ? (
+                <HorizontalBar
+                  items={Object.entries(totals.allEndingSubTypes)
+                    .map(([k, v]) => {
+                      const parts = k.split(':');
+                      const sectorEmoji = SECTORS[parts[0]]?.emoji || '';
+                      return { label: `${sectorEmoji} ${(parts[1] || k).replace(/_/g, ' ')}`, value: v };
+                    })
+                    .sort((a, b) => b.value - a.value)
+                    .slice(0, 12)}
+                  colorFn={() => '#34d399'}
+                />
+              ) : <p className="text-xs text-text-muted">No data yet</p>}
             </div>
           </div>
         </>
