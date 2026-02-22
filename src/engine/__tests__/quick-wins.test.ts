@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateEvent, applyEventEffects } from '../simulation';
 import { generateRecessionDeals, calculateDealHeat } from '../businesses';
-import type { GameState, Business, QualityRating, MASourcingTier } from '../types';
+import type { GameState, Business, MASourcingTier } from '../types';
 import { generateRandomSeed, createRngStreams } from '../rng';
 import {
   SELLER_DECEPTION_REVENUE_HIT,
@@ -509,7 +509,6 @@ describe('Seller Deception Edge Cases', () => {
       sellerNoteBalance: 500,
     });
 
-    const state = createTestState({ round: 1, businesses: [startingBiz] });
     // In generateEvent, the filter requires acquisitionRound > 0
     expect(startingBiz.acquisitionRound).toBe(0);
     // This business should NOT be eligible for seller deception
@@ -558,13 +557,11 @@ describe('Working Capital Crunch Edge Cases', () => {
     const state = createTestState({ round: 3, businesses: [bigBiz] });
 
     // Try many seeds to get a working capital crunch event
-    let foundEvent = false;
     for (let seed = 1; seed < 5000; seed++) {
       const testState = { ...state, seed };
       const rng = createRngStreams(seed, 3).events;
       const event = generateEvent(testState, rng);
       if (event && event.type === 'portfolio_working_capital_crunch') {
-        foundEvent = true;
         // Injection cost should be scaled by sizeScaler (2000/1000 = 2.0)
         const injectionChoice = event.choices?.find(c => c.action === 'workingCapitalInject');
         expect(injectionChoice).toBeDefined();
@@ -721,7 +718,6 @@ describe('Seller Deception Event Generation', () => {
       sellerNoteBalance: 500,
     });
 
-    let found = false;
     for (let seed = 1; seed < 10000; seed++) {
       const state = createTestState({
         seed,
@@ -731,7 +727,6 @@ describe('Seller Deception Event Generation', () => {
       const rng = createRngStreams(seed, 3).events;
       const event = generateEvent(state, rng);
       if (event && event.type === 'portfolio_seller_deception') {
-        found = true;
         expect(event.affectedBusinessId).toBe('eligible');
         expect(event.choices).toBeDefined();
         expect(event.choices!.length).toBe(3);

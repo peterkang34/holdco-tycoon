@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useGameStore } from '../../hooks/useGame';
 import { useToastStore } from '../../hooks/useToast';
 import { getDistressRestrictions } from '../../engine/distress';
@@ -21,6 +21,8 @@ import { ToastContainer } from '../ui/ToastContainer';
 import { calculateFounderEquityValue, calculateFounderPersonalWealth } from '../../engine/scoring';
 import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
 import { updateSessionRound, trackEventChoice } from '../../services/telemetry';
+import { hasSeenNudge, dismissNudge } from '../../hooks/useNudges';
+import { MIN_OPCOS_FOR_SHARED_SERVICES } from '../../data/sharedServices';
 import { buildChallengeUrl, copyToClipboard } from '../../utils/challenge';
 
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
@@ -544,6 +546,59 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   useEffect(() => {
     updateSessionRound(round);
   }, [round]);
+
+  // Track which allocate phase entry we've shown a nudge for
+  const lastNudgeRound = useRef(0);
+
+  // Contextual nudges — fire once per mechanic, at most one per allocate phase entry
+  useEffect(() => {
+    if (phase !== 'allocate' || lastNudgeRound.current === round) return;
+    const active = businesses.filter(b => b.status === 'active');
+
+    // Priority 1: Improve your business (Round 2)
+    if (round === 2 && active.length >= 1 && !hasSeenNudge('improve')) {
+      lastNudgeRound.current = round;
+      dismissNudge('improve');
+      addToast({ type: 'nudge', message: 'Tip: Improve Your Businesses', detail: 'Tap any business in the Portfolio tab, then hit "Improve" to boost margins or growth.' });
+      return;
+    }
+
+    // Priority 2: Browse deals (Round 2, still only 1 business)
+    if (round >= 2 && active.length === 1 && dealPipeline.length > 0 && !hasSeenNudge('second-deal')) {
+      lastNudgeRound.current = round;
+      dismissNudge('second-deal');
+      addToast({ type: 'nudge', message: 'Tip: Grow Your Portfolio', detail: 'Check the Deals tab — you have cash to acquire a second business.' });
+      return;
+    }
+
+    // Priority 3: Shared Services (3+ businesses)
+    if (active.length >= MIN_OPCOS_FOR_SHARED_SERVICES && !hasSeenNudge('shared-services')) {
+      lastNudgeRound.current = round;
+      dismissNudge('shared-services');
+      addToast({ type: 'nudge', message: 'Tip: Shared Services Unlocked', detail: `With ${active.length} businesses, you can unlock shared services to cut costs across your whole portfolio.` });
+      return;
+    }
+
+    // Priority 4: Roll-up / Platform designation (2+ in same sector)
+    const sectorCounts = new Map<string, number>();
+    for (const b of active) sectorCounts.set(b.sectorId, (sectorCounts.get(b.sectorId) || 0) + 1);
+    const hasTwoInSameSector = [...sectorCounts.values()].some(c => c >= 2);
+    if (hasTwoInSameSector && !active.some(b => b.isPlatform) && !hasSeenNudge('platform-designate')) {
+      lastNudgeRound.current = round;
+      dismissNudge('platform-designate');
+      addToast({ type: 'nudge', message: 'Tip: Roll-Up Strategy Available', detail: 'You own 2+ businesses in the same sector. Designate one as a platform — smaller add-on deals become available and your valuation gets a boost.' });
+      return;
+    }
+
+    // Priority 5: Sell at peak value (Round 4+, seasoned business)
+    if (round >= 4 && active.some(b => round - b.acquisitionRound >= 2) && !hasSeenNudge('sell-seasoned')) {
+      lastNudgeRound.current = round;
+      dismissNudge('sell-seasoned');
+      addToast({ type: 'nudge', message: 'Tip: Sell High, Buy Better', detail: 'Businesses held 2+ years sell for a bonus. Consider selling strong performers to free up cash for new deals.' });
+      return;
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, round]);
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
   const lastEventType = eventHistory.length > 0 ? eventHistory[eventHistory.length - 1].type : undefined;

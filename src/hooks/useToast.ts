@@ -4,7 +4,7 @@ export interface Toast {
   id: string;
   message: string;
   detail?: string;
-  type: 'success' | 'info' | 'warning' | 'danger';
+  type: 'success' | 'info' | 'warning' | 'danger' | 'nudge';
   action?: { label: string; onClick: () => void };
 }
 
@@ -27,7 +27,7 @@ export const useToastStore = create<ToastState>((set) => ({
       set((state) => ({
         toasts: state.toasts.filter((t) => t.id !== id),
       }));
-    }, 3500);
+    }, toast.type === 'nudge' ? 7000 : 3500);
   },
   removeToast: (id) =>
     set((state) => ({

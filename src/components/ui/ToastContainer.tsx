@@ -5,6 +5,7 @@ const TYPE_STYLES: Record<Toast['type'], string> = {
   info: 'border-blue-400/60 bg-blue-400/10',
   warning: 'border-warning/60 bg-warning/10',
   danger: 'border-red-500/60 bg-red-500/10',
+  nudge: 'border-purple-400/60 bg-purple-400/10',
 };
 
 const TYPE_ICONS: Record<Toast['type'], string> = {
@@ -12,6 +13,7 @@ const TYPE_ICONS: Record<Toast['type'], string> = {
   info: 'ℹ',
   warning: '⚠',
   danger: '🚨',
+  nudge: '💡',
 };
 
 const ICON_COLORS: Record<Toast['type'], string> = {
@@ -19,6 +21,7 @@ const ICON_COLORS: Record<Toast['type'], string> = {
   info: 'text-blue-400',
   warning: 'text-warning',
   danger: 'text-red-400',
+  nudge: 'text-purple-400',
 };
 
 export function ToastContainer() {

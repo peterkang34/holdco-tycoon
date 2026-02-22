@@ -12,6 +12,24 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 22, 2026',
+    title: 'Onboarding Nudges & Narrative Fix',
+    sections: [
+      {
+        heading: 'New',
+        items: [
+          'Contextual tips now appear as you play — learn about Improve, Shared Services, Roll-Up Strategy, and Selling at the right moment.',
+        ],
+      },
+      {
+        heading: 'Fixed',
+        items: [
+          'Event narratives no longer show recession-themed text on positive events. All 26 event types now have sentiment-matched fallback copy.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 22, 2026',
     title: '5 Quick-Win Features',
     sections: [
       {

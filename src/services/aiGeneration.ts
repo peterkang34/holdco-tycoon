@@ -1,4 +1,4 @@
-import { SectorId, AIGeneratedContent, QualityRating, Business, BuyerProfile, ScoreBreakdown, SellerArchetype } from '../engine/types';
+import { SectorId, AIGeneratedContent, QualityRating, Business, BuyerProfile, ScoreBreakdown, SellerArchetype, EventType } from '../engine/types';
 import { SECTORS } from '../data/sectors';
 
 // Cache the AI status to avoid repeated requests
@@ -533,7 +533,9 @@ export async function generateYearChronicle(
 }
 
 // Fallback narratives for when AI is not available
-export const FALLBACK_EVENT_NARRATIVES: Record<string, string[]> = {
+// Keys MUST match EventType union in types.ts exactly
+export const FALLBACK_EVENT_NARRATIVES: Partial<Record<EventType, string[]>> = {
+  // ── Global events ──
   global_recession: [
     'Markets tumbled as recession fears gripped Wall Street. CFOs across the country began tightening budgets.',
     'The economic downturn arrived swiftly. Businesses that had overextended found themselves scrambling.',
@@ -544,45 +546,140 @@ export const FALLBACK_EVENT_NARRATIVES: Record<string, string[]> = {
     'The bull market roared on. Multiples expanded as investors competed for quality assets.',
     'Main Street caught the fever as the longest expansion in decades continued unabated.',
   ],
-  interest_rate_hike: [
+  global_interest_hike: [
     'The Fed raised rates again, sending leveraged buyers back to their spreadsheets.',
     'Higher rates meant tighter terms. The era of cheap debt was fading fast.',
     'Borrowing costs climbed as the central bank moved to cool an overheating economy.',
   ],
-  credit_tightening: [
+  global_interest_cut: [
+    'The Fed eased rates, and deal desks hummed back to life. Cheap capital was back on the menu.',
+    'Lower borrowing costs brought a wave of refinancing activity. Leveraged buyers began circling again.',
+    'Rate cuts signaled confidence. Entrepreneurs who had been on the sidelines started talking to bankers.',
+  ],
+  global_inflation: [
+    'Input costs crept higher month after month. Margins that once seemed safe were under pressure.',
+    'Inflation ate into purchasing power. Businesses scrambled to pass costs to customers — not all could.',
+    'The cost-of-everything era had arrived. Operators who had locked in contracts early breathed easier.',
+  ],
+  global_credit_tightening: [
     'Banks pulled back, their risk committees suddenly cautious. Credit became a precious commodity.',
     'Loan committees tightened their criteria. Deals that would have sailed through last year now stalled.',
     'The credit window narrowed. Only the strongest borrowers could access capital.',
   ],
-  sector_boom: [
-    'The sector caught fire as new demand drivers emerged. Valuations soared.',
-    'Investors piled into the space, sensing a generational opportunity.',
-    'What was once overlooked became the hottest sector in M&A.',
+  global_financial_crisis: [
+    'Markets seized up overnight. What had been a correction became a full-blown crisis.',
+    'The financial system buckled. Credit froze, multiples collapsed, and the phone stopped ringing — except for the distressed.',
+    'Panic spread through the markets. But for those with cash, the crisis of a generation was also the opportunity of a lifetime.',
   ],
-  sector_disruption: [
-    'A new technology threatened to upend the industry. Incumbents scrambled to adapt.',
-    'Disruption arrived faster than anyone predicted. Some businesses would never recover.',
-    'The old playbook no longer worked. Only the agile would survive.',
+  global_quiet: [
+    'The year passed without major disruption. Sometimes the best news is no news.',
+    'A quiet year in the markets. The holding company executed its plan without external drama.',
+    'No headlines, no crises — just steady execution. The team used the calm to strengthen operations.',
   ],
-  key_employee_departure: [
+  // ── Positive portfolio events ──
+  portfolio_star_joins: [
+    'Word had spread about the holding company\'s operator-friendly culture. A top talent came knocking.',
+    'A seasoned executive joined the team, bringing a rolodex and a track record that spoke for itself.',
+    'The new hire was the kind of leader competitors dreaded losing. Operations improved almost immediately.',
+  ],
+  portfolio_client_signs: [
+    'The contract arrived by email on a Tuesday afternoon. A major new customer had signed on.',
+    'Months of relationship-building paid off. A marquee client chose them over three competitors.',
+    'The new account was the kind of deal that changes a business\'s trajectory. Revenue projections moved up.',
+  ],
+  portfolio_breakthrough: [
+    'A process innovation unlocked efficiency gains nobody had thought possible. Margins jumped.',
+    'The R&D investment paid off. A breakthrough positioned the business ahead of the competition.',
+    'What started as a small experiment became a company-wide transformation. The numbers told the story.',
+  ],
+  portfolio_referral_deal: [
+    'A portfolio CEO made a call. "I know someone who might want to sell." That\'s how the best deals happen.',
+    'The referral came through the network. No banker, no auction — just a warm introduction.',
+    'Reputation in the industry opened a door. A proprietary deal landed on the desk.',
+  ],
+  // ── Negative portfolio events ──
+  portfolio_talent_leaves: [
     'The departure sent shockwaves through the organization. Institutional knowledge walked out the door.',
     'After years of loyal service, a key leader moved on. The transition would be rocky.',
     'The resignation caught everyone off guard. Clients started asking questions.',
   ],
-  major_customer_loss: [
+  portfolio_client_churns: [
     'The call came on a Monday morning. Their biggest customer was leaving.',
     'After a decade of partnership, the relationship ended. Revenue projections needed revising.',
     'Losing the anchor account forced a painful strategic pivot.',
   ],
-  regulatory_change: [
+  portfolio_compliance: [
     'New regulations landed with the force of law. Compliance costs would eat into margins.',
-    'Washington had spoken. The industry would never operate the same way.',
-    'The regulatory environment shifted. Those who had prepared would thrive.',
+    'The regulatory environment shifted. Those who had prepared would thrive; those who hadn\'t would pay.',
+    'An audit uncovered gaps. The remediation would be expensive but necessary.',
+  ],
+  // ── Choice-based portfolio events ──
+  portfolio_key_man_risk: [
+    'The CEO\'s resignation letter was brief. Twenty years of relationships were about to walk out the door.',
+    'Succession planning moved from "someday" to "right now." The board convened an emergency meeting.',
+    'Without the founder, could the business sustain its magic? The holding company faced a defining test.',
+  ],
+  portfolio_earnout_dispute: [
+    'The earn-out clause, once a handshake away from resolution, was now a legal battleground.',
+    'Revenue had missed the target. The seller wanted their money anyway. Lawyers got involved.',
+    'Post-close friction over the earn-out threatened to sour a relationship years in the making.',
+  ],
+  portfolio_supplier_shift: [
+    'The supplier\'s new pricing landed like a gut punch. Margins that seemed locked in evaporated.',
+    'Consolidation upstream meant fewer suppliers and less leverage. The new terms were non-negotiable.',
+    'Cost pressures from a key supplier forced a strategic rethink. The status quo was no longer affordable.',
+  ],
+  portfolio_seller_deception: [
+    'The numbers told a different story than the seller had. Due diligence, it turned out, had missed something big.',
+    'Post-close discovery: the seller had painted a rosier picture than reality. Revenue was softer than reported.',
+    'Trust but verify. The verification came too late — the business was not what it had been sold as.',
+  ],
+  portfolio_working_capital_crunch: [
+    'The cash register was emptier than expected. Working capital needs had been severely understated.',
+    'Month-end payables piled up. The new acquisition needed more cash than anyone had budgeted.',
+    'The post-close surprise every acquirer dreads: "We need more working capital. Immediately."',
+  ],
+  // ── Special events ──
+  portfolio_equity_demand: [
+    'The board meeting took an unexpected turn. A key executive wanted equity — and was willing to walk.',
+    'Talent retention required more than a bonus. The equity conversation had finally arrived.',
+    'Share the upside or risk losing the people who create it. A familiar holdco dilemma surfaced.',
+  ],
+  portfolio_seller_note_renego: [
+    'The seller picked up the phone. "We need to talk about the note." The renegotiation had begun.',
+    'Performance shortfalls gave the seller grounds to revisit terms. The note was on the table.',
+    'A polite but firm letter arrived: the seller wanted to renegotiate their note — on terms less favorable to you.',
+  ],
+  mbo_proposal: [
+    'The CEO walked into the boardroom with a proposal. "What if I bought it myself?"',
+    'A management buyout offer. The CEO believed the business was worth more under their ownership.',
+    'The MBO proposal was flattering — it meant the operator loved the business. But was the price right?',
+  ],
+  unsolicited_offer: [
+    'The call came out of nowhere. "We\'d like to acquire one of your portfolio companies."',
+    'A strategic buyer had been watching from the sidelines. Now they were ready to make a move.',
+    'An unsolicited offer landed on the desk. Sometimes the best exits find you.',
+  ],
+  sector_event: [
+    'Industry dynamics shifted. The ripple effects would be felt across every player in the space.',
+    'A sector-wide development changed the competitive landscape. Adaptability would be key.',
+    'The trade press buzzed with the news. An industry turning point had arrived.',
+  ],
+  sector_consolidation_boom: [
+    'M&A frenzy swept the sector. Every business in the space had a suitor — and prices reflected it.',
+    'Consolidation accelerated as strategic buyers competed for market share. The boom was on.',
+    'The sector was rolling up fast. Well-positioned platforms had the advantage; everyone else paid up.',
   ],
 };
 
-export function getFallbackEventNarrative(eventType: string): string {
-  const narratives = FALLBACK_EVENT_NARRATIVES[eventType] || FALLBACK_EVENT_NARRATIVES.global_recession;
+const FALLBACK_NEUTRAL_NARRATIVES: string[] = [
+  'Another year in the annals of the holding company. The board reviewed developments with measured interest.',
+  'The year brought its share of developments. As always, execution would determine outcomes.',
+  'News arrived at the quarterly review. The team assessed the implications and prepared to act.',
+];
+
+export function getFallbackEventNarrative(eventType: EventType | string): string {
+  const narratives = FALLBACK_EVENT_NARRATIVES[eventType as EventType] || FALLBACK_NEUTRAL_NARRATIVES;
   return narratives[Math.floor(Math.random() * narratives.length)];
 }
 
