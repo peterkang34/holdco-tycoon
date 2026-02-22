@@ -909,7 +909,7 @@ function SharedServicesContent() {
         headers={['Tier', 'Name', 'Upgrade Cost', 'Annual Cost', 'Min Businesses', 'Key Benefits']}
         rows={[
           ['1', 'Deal Sourcing Team', '$800K', '$350K/yr', '2+', '+2 focus-sector deals, Source Deals costs $300K (was $500K), acquisition capacity: 3/year'],
-          ['2', 'Industry Specialists', '$1.2M', '$550K/yr', '3+', 'Sub-type targeting, quality floor of 2, acquisition capacity: 4/year'],
+          ['2', 'Industry Specialists', '$1.2M', '$550K/yr', '3+', 'Sub-type targeting, quality floor of 2, sourced deals get -1 heat tier (less competition), acquisition capacity: 4/year'],
           ['3', 'Proprietary Network', '$1.5M', '$800K/yr', '4+', '2 off-market deals (15% discount), quality floor of 3, Proactive Outreach ($400K for 2 targeted deals), acquisition capacity: 4/year'],
         ]}
       />
@@ -994,7 +994,7 @@ function EventsContent() {
         headers={['Event', 'Effect']}
         rows={[
           ['Bull Market', 'EBITDA boost across portfolio; +0.5x exit multiples'],
-          ['Recession', 'Revenue and EBITDA decline (scaled by sector sensitivity); -0.5x exit multiples'],
+          ['Recession', 'Revenue and EBITDA decline (scaled by sector sensitivity); -0.5x exit multiples. 1-2 discounted deals appear at 15-25% off (quality capped at 3).'],
           ['Interest Rate Hike', 'Base rate increases +0.5%; debt becomes more expensive'],
           ['Interest Rate Cut', 'Base rate decreases -0.5%; debt becomes cheaper'],
           ['Inflation', 'Margin compression across portfolio; costs rise faster than revenue'],
@@ -1034,6 +1034,8 @@ function EventsContent() {
           ['Management Buyout', 'CEO offers 85-90% of fair value; accept to sell, decline risks CEO departure (quality -1)'],
           ['Equity Demand', 'A key employee demands equity; grant or risk losing them'],
           ['Seller Note Renegotiation', 'A seller asks to renegotiate their note terms'],
+          ['Seller Deception Discovered', 'Revenue drops 25%, quality -1 on a recently acquired business. Choose how to respond.'],
+          ['Working Capital Crunch', 'A newly acquired business needs $200-600K in working capital. Inject cash or accept revenue penalty.'],
         ]}
       />
 
@@ -1049,7 +1051,9 @@ function EventsContent() {
           ['Key-Man Risk', 'Quality 4+ business, no active turnaround', 'Golden Handcuffs (15% EBITDA, 55% restore chance) · Succession Plan ($200-400K, restores quality after 2 years) · Accept Hit (free, quality stays dropped)'],
           ['Earn-Out Dispute', 'Business with earn-out that has underperformed', 'Settle (pay 50%, obligation cleared) · Fight (70% win, 30% pay full + legal) · Renegotiate (reduce to 55%, no cash cost)'],
           ['Supplier Pricing Power Shift', 'Below-median-margin business', 'Absorb (recover 2 of 3ppt) · Switch Suppliers (full recovery, -5% revenue) · Vertical Integration (full +1ppt bonus, requires 2+ same-sector businesses)'],
-          ['Consolidation Boom', '3% random, targets specific sector', 'No choice — all deals in the booming sector cost 20% more. Own 2+ businesses in that sector? You get an exclusive tuck-in at normal price.'],
+          ['Consolidation Boom', '3% random, targets specific sector (or any sector with 3+ businesses)', 'No choice — all deals in the booming sector cost 20% more. Own 2+ businesses in that sector? You get an exclusive tuck-in at normal price.'],
+          ['Seller Deception', 'Business acquired within 2 rounds (non-cash structure)', 'Invest in Turnaround (20% EBITDA, 65% restore chance) · Fire Sale (sell at 60% fair value) · Absorb Hit (free, stays dropped)'],
+          ['Working Capital Crunch', 'Business acquired in the previous round', 'Inject Cash (full cost, no penalty) · Emergency Credit ($50% cost, +1% interest) · Absorb Hit (-10% revenue for 2 rounds)'],
         ]}
       />
     </>

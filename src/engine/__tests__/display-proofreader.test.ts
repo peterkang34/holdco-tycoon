@@ -41,6 +41,20 @@ import {
   ROLLOVER_EQUITY_CONFIG,
   ROLLOVER_MIN_QUALITY,
   ROLLOVER_MIN_MA_TIER,
+  SELLER_DECEPTION_PROB,
+  SELLER_DECEPTION_REVENUE_HIT,
+  SELLER_DECEPTION_QUALITY_DROP,
+  SELLER_DECEPTION_TURNAROUND_COST_PCT,
+  SELLER_DECEPTION_TURNAROUND_RESTORE_CHANCE,
+  SELLER_DECEPTION_FIRE_SALE_PCT,
+  SELLER_DECEPTION_MAX_AGE,
+  WORKING_CAPITAL_CRUNCH_PROB,
+  WORKING_CAPITAL_CRUNCH_MIN,
+  WORKING_CAPITAL_CRUNCH_MAX,
+  WORKING_CAPITAL_CRUNCH_REVENUE_PENALTY,
+  WORKING_CAPITAL_CRUNCH_PENALTY_ROUNDS,
+  WORKING_CAPITAL_CRUNCH_MAX_AGE,
+  CONSOLIDATION_BOOM_DYNAMIC_MIN_OPCOS,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
 import {
@@ -1451,6 +1465,73 @@ describe('Display Proofreader', () => {
       it('Strategy D: earnoutCountdownLabel(0) returns "overdue"', () => {
         expect(earnoutCountdownLabel(0)).toBe('overdue');
       });
+    });
+  });
+
+  // ── Seller Deception Event ──
+
+  describe('Seller Deception Event', () => {
+    it('Seller Deception constants are calibrated correctly (Strategy A)', () => {
+      expect(SELLER_DECEPTION_PROB).toBe(0.05);
+      expect(SELLER_DECEPTION_REVENUE_HIT).toBe(0.25);
+      expect(SELLER_DECEPTION_QUALITY_DROP).toBe(1);
+      expect(SELLER_DECEPTION_TURNAROUND_COST_PCT).toBe(0.20);
+      expect(SELLER_DECEPTION_TURNAROUND_RESTORE_CHANCE).toBe(0.65);
+      expect(SELLER_DECEPTION_FIRE_SALE_PCT).toBe(0.60);
+      expect(SELLER_DECEPTION_MAX_AGE).toBe(2);
+    });
+
+    it('events.ts contains portfolio_seller_deception event definition (Strategy B)', () => {
+      const events = readComponent('data/events.ts');
+      expect(events).toContain("type: 'portfolio_seller_deception'");
+      expect(events).toContain('probability: 0.05');
+      expect(events).toContain('Seller Deception Discovered');
+    });
+
+    it('UserManualModal documents Seller Deception event (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Seller Deception');
+      expect(manual).toContain('65%');
+      expect(manual).toContain('60%');
+    });
+  });
+
+  // ── Working Capital Crunch Event ──
+
+  describe('Working Capital Crunch Event', () => {
+    it('Working Capital Crunch constants are calibrated correctly (Strategy A)', () => {
+      expect(WORKING_CAPITAL_CRUNCH_PROB).toBe(0.08);
+      expect(WORKING_CAPITAL_CRUNCH_MIN).toBe(200);
+      expect(WORKING_CAPITAL_CRUNCH_MAX).toBe(600);
+      expect(WORKING_CAPITAL_CRUNCH_REVENUE_PENALTY).toBe(0.10);
+      expect(WORKING_CAPITAL_CRUNCH_PENALTY_ROUNDS).toBe(2);
+      expect(WORKING_CAPITAL_CRUNCH_MAX_AGE).toBe(1);
+    });
+
+    it('events.ts contains portfolio_working_capital_crunch event definition (Strategy B)', () => {
+      const events = readComponent('data/events.ts');
+      expect(events).toContain("type: 'portfolio_working_capital_crunch'");
+      expect(events).toContain('probability: 0.08');
+      expect(events).toContain('Working Capital Crunch');
+    });
+
+    it('UserManualModal documents Working Capital Crunch event (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Working Capital Crunch');
+      expect(manual).toContain('$200-600K');
+    });
+  });
+
+  // ── Dynamic Consolidation Boom ──
+
+  describe('Dynamic Consolidation Boom', () => {
+    it('CONSOLIDATION_BOOM_DYNAMIC_MIN_OPCOS = 3 (Strategy A)', () => {
+      expect(CONSOLIDATION_BOOM_DYNAMIC_MIN_OPCOS).toBe(3);
+    });
+
+    it('UserManualModal mentions dynamic consolidation boom with 3+ businesses (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('3+ businesses');
     });
   });
 });

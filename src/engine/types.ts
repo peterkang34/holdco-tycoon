@@ -335,6 +335,8 @@ export type EventType =
   | 'portfolio_key_man_risk'
   | 'portfolio_earnout_dispute'
   | 'portfolio_supplier_shift'
+  | 'portfolio_seller_deception'
+  | 'portfolio_working_capital_crunch'
   | 'sector_consolidation_boom';
 
 export interface EventChoice {

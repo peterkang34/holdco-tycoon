@@ -12,6 +12,27 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 22, 2026',
+    title: '5 Quick-Win Features',
+    sections: [
+      {
+        heading: 'New Events',
+        items: [
+          'Seller Deception Discovered — post-acquisition surprise when due diligence missed critical issues. Revenue drops, quality falls. Choose: invest in turnaround, fire sale, or absorb the hit.',
+          'Working Capital Crunch — first-year cash surprise on new acquisitions. Inject cash, take an emergency credit line, or accept a revenue penalty.',
+        ],
+      },
+      {
+        heading: 'Improved',
+        items: [
+          'Recessions now spawn 1-2 discounted deals at 15-25% off — rewards keeping cash reserves during downturns.',
+          'Consolidation booms can now trigger in any sector where you own 3+ businesses, not just the 4 base sectors.',
+          'M&A Sourcing Tier 2+ sourced deals get cooler heat (less competition), making the investment more impactful.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 22, 2026',
     title: 'Leaderboard Stability',
     sections: [
       {

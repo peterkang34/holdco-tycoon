@@ -354,7 +354,8 @@ export function calculateDealHeat(
   sellerArchetype?: SellerArchetype,
   maxRounds: number = 20,
   creditTighteningActive: boolean = false,
-  rng?: SeededRng
+  rng?: SeededRng,
+  maSourcingTier?: MASourcingTier
 ): DealHeat {
   // Base distribution: cold 25%, warm 35%, hot 30%, contested 10%
   const roll = rng ? rng.next() : Math.random();
@@ -384,6 +385,8 @@ export function calculateDealHeat(
   let negativeModifiers = 0;
   if (source === 'proprietary') negativeModifiers -= 2;
   if (source === 'sourced') negativeModifiers -= 1;
+  // M&A Sourcing Tier 2+ sourced deals get additional -1 heat
+  if (source === 'sourced' && maSourcingTier && maSourcingTier >= 2) negativeModifiers -= 1;
   if (sellerArchetype) {
     const archetypeMod = getArchetypeHeatModifier(sellerArchetype);
     if (archetypeMod < 0) negativeModifiers += archetypeMod;
@@ -777,6 +780,7 @@ export interface DealGenerationOptions {
   lastEventType?: EventType; // for deal heat calculation
   maxRounds?: number; // 20 or 10 — for scaling heat/weights
   creditTighteningActive?: boolean; // reduces deal heat by 1 tier
+  maSourcingTier?: MASourcingTier; // Tier 2+ sourced deals get additional -1 heat
 }
 
 // Generate a deal with size preference
@@ -910,7 +914,7 @@ export function generateDealWithSize(
   const dealSource = options.source ?? ((rng ? rng.next() : Math.random()) > 0.4 ? 'inbound' : 'brokered');
 
   // Calculate deal heat and effective price (pass archetype for heat modifier)
-  const heat = calculateDealHeat(quality, dealSource, round, options.lastEventType, sellerArchetype, options.maxRounds ?? 20, options.creditTighteningActive ?? false, rng);
+  const heat = calculateDealHeat(quality, dealSource, round, options.lastEventType, sellerArchetype, options.maxRounds ?? 20, options.creditTighteningActive ?? false, rng, options.maSourcingTier);
   const heatPremium = calculateHeatPremium(heat, rng);
   let effectivePrice = Math.round(finalAskingPrice * heatPremium);
 
@@ -1006,6 +1010,7 @@ export function generateDealPipeline(
       lastEventType,
       maxRounds,
       creditTighteningActive,
+      maSourcingTier: maSourcingTier as MASourcingTier,
     };
 
     // Tier 2+: sub-type targeting + quality floor
@@ -1156,6 +1161,46 @@ export function generateDistressedDeals(
   }));
 }
 
+// Generate distressed deals during Recession (1-2 deals at 15-25% off, Q3 cap)
+export function generateRecessionDeals(
+  round: number,
+  maxRounds: number = 20,
+  rng?: SeededRng
+): Deal[] {
+  const deals: Deal[] = [];
+  const count = randomInt(1, 2, rng);
+
+  for (let i = 0; i < count; i++) {
+    const sectorId = pickWeightedSector(round, maxRounds, rng);
+    const multipleDiscount = 0.15 + (rng ? rng.next() : Math.random()) * 0.10; // 15-25% off
+
+    deals.push(generateDealWithSize(
+      sectorId,
+      round,
+      'any',
+      0,
+      {
+        qualityFloor: 2 as QualityRating,
+        source: 'brokered',
+        freshnessBonus: 1,
+        multipleDiscount,
+        maxRounds,
+        lastEventType: 'global_recession',
+      },
+      rng
+    ));
+  }
+
+  // Cap quality at 3 (same as financial crisis deals)
+  return deals.map(deal => ({
+    ...deal,
+    business: {
+      ...deal.business,
+      qualityRating: Math.min(3, deal.business.qualityRating) as QualityRating,
+    },
+  }));
+}
+
 // Generate additional deals through investment banker sourcing
 // More expensive but higher chance of getting deals in your focus sector
 export function generateSourcedDeals(
@@ -1171,7 +1216,7 @@ export function generateSourcedDeals(
   const deals: Deal[] = [];
 
   // Build options based on MA sourcing tier
-  const sourcingOptions: DealGenerationOptions = { source: 'sourced', maxRounds, creditTighteningActive };
+  const sourcingOptions: DealGenerationOptions = { source: 'sourced', maxRounds, creditTighteningActive, maSourcingTier: maSourcingTier as MASourcingTier };
   if (maSourcingTier >= 2) {
     sourcingOptions.qualityFloor = 2;
     if (maFocus?.subType) sourcingOptions.subType = maFocus.subType;

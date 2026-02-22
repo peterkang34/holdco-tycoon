@@ -130,11 +130,29 @@ export const SUPPLIER_VERTICAL_COST = 400;              // $K
 export const SUPPLIER_VERTICAL_BONUS_PPT = 0.01;        // +1ppt bonus above full recovery
 export const SUPPLIER_VERTICAL_MIN_SAME_SECTOR = 2;     // need 2+ same-sector businesses
 
+// Seller Deception
+export const SELLER_DECEPTION_PROB = 0.05;
+export const SELLER_DECEPTION_REVENUE_HIT = 0.25;        // -25% revenue
+export const SELLER_DECEPTION_QUALITY_DROP = 1;           // -1 quality tier
+export const SELLER_DECEPTION_TURNAROUND_COST_PCT = 0.20; // 20% of EBITDA to fix
+export const SELLER_DECEPTION_TURNAROUND_RESTORE_CHANCE = 0.65;
+export const SELLER_DECEPTION_FIRE_SALE_PCT = 0.60;       // sell at 60% of fair value
+export const SELLER_DECEPTION_MAX_AGE = 2;                // only businesses acquired within 2 rounds
+
+// Working Capital Crunch
+export const WORKING_CAPITAL_CRUNCH_PROB = 0.08;
+export const WORKING_CAPITAL_CRUNCH_MIN = 200;            // $200K min
+export const WORKING_CAPITAL_CRUNCH_MAX = 600;            // $600K max
+export const WORKING_CAPITAL_CRUNCH_REVENUE_PENALTY = 0.10;  // -10% revenue for 2 rounds if not paid
+export const WORKING_CAPITAL_CRUNCH_PENALTY_ROUNDS = 2;
+export const WORKING_CAPITAL_CRUNCH_MAX_AGE = 1;          // only businesses acquired previous round
+
 // Industry Consolidation Boom
 export const CONSOLIDATION_BOOM_PROB = 0.03;
 export const CONSOLIDATION_BOOM_PRICE_PREMIUM = 0.20;       // +20% price premium on deals
 export const CONSOLIDATION_BOOM_EXCLUSIVE_MIN_OPCOS = 2;     // need 2+ in sector for exclusive tuck-in
 export const CONSOLIDATION_BOOM_SECTORS = ['environmental', 'homeServices', 'autoServices', 'industrial'] as const;
+export const CONSOLIDATION_BOOM_DYNAMIC_MIN_OPCOS = 3;
 
 // Type helpers for consumers
 export type DifficultyConfig = typeof DIFFICULTY_CONFIG;

@@ -34,6 +34,19 @@ import {
   applyEbitdaFloor,
 } from './helpers';
 import {
+  SELLER_DECEPTION_MAX_AGE,
+  SELLER_DECEPTION_REVENUE_HIT,
+  SELLER_DECEPTION_QUALITY_DROP,
+  SELLER_DECEPTION_TURNAROUND_COST_PCT,
+  SELLER_DECEPTION_TURNAROUND_RESTORE_CHANCE,
+  SELLER_DECEPTION_FIRE_SALE_PCT,
+  WORKING_CAPITAL_CRUNCH_MAX_AGE,
+  WORKING_CAPITAL_CRUNCH_MIN,
+  WORKING_CAPITAL_CRUNCH_MAX,
+  WORKING_CAPITAL_CRUNCH_REVENUE_PENALTY,
+  WORKING_CAPITAL_CRUNCH_PENALTY_ROUNDS,
+  CONSOLIDATION_BOOM_DYNAMIC_MIN_OPCOS,
+  CONSOLIDATION_BOOM_EXCLUSIVE_MIN_OPCOS,
   KEY_MAN_QUALITY_DROP,
   KEY_MAN_GOLDEN_HANDCUFFS_COST_PCT,
   KEY_MAN_GOLDEN_HANDCUFFS_RESTORE_CHANCE,
@@ -685,6 +698,37 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
         });
         if (eligible.length === 0) adjustedProb = 0;
       }
+      // Seller Deception: recently acquired businesses, exclude all_cash structures
+      if (eventDef.type === 'portfolio_seller_deception') {
+        const eligible = activeBusinesses.filter(b =>
+          (state.round - b.acquisitionRound) <= SELLER_DECEPTION_MAX_AGE &&
+          b.acquisitionRound > 0 // not the starting business
+        );
+        if (eligible.length === 0) {
+          adjustedProb = 0;
+        } else {
+          // all_cash structures have zero debt — these get excluded (more diligence implied)
+          const nonCashEligible = eligible.filter(b =>
+            b.sellerNoteBalance > 0 || b.bankDebtBalance > 0 || b.earnoutRemaining > 0 || b.rolloverEquityPct > 0
+          );
+          if (nonCashEligible.length === 0) adjustedProb = 0;
+        }
+      }
+      // Working Capital Crunch: businesses acquired in the previous round
+      if (eventDef.type === 'portfolio_working_capital_crunch') {
+        const eligible = activeBusinesses.filter(b =>
+          (state.round - b.acquisitionRound) === WORKING_CAPITAL_CRUNCH_MAX_AGE
+        );
+        if (eligible.length === 0) {
+          adjustedProb = 0;
+        } else {
+          // 1.5x probability for construction, manufacturing, industrial sectors
+          const hasHighWCNeeds = eligible.some(b =>
+            b.sectorId === 'industrial' || b.sectorId === 'homeServices' || b.sectorId === 'distribution'
+          );
+          if (hasHighWCNeeds) adjustedProb *= 1.5;
+        }
+      }
 
       // Adjust talent events based on shared services
       // H-1: Clamp adjusted probabilities to prevent exceeding 1.0
@@ -822,6 +866,59 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
             affectedBusinessId: affectedBusiness.id,
             choices,
           };
+        } else if (eventDef.type === 'portfolio_seller_deception') {
+          // Seller Deception: recently acquired non-cash businesses
+          const eligible = activeBusinesses.filter(b =>
+            (state.round - b.acquisitionRound) <= SELLER_DECEPTION_MAX_AGE &&
+            b.acquisitionRound > 0 &&
+            (b.sellerNoteBalance > 0 || b.bankDebtBalance > 0 || b.earnoutRemaining > 0 || b.rolloverEquityPct > 0)
+          );
+          affectedBusiness = pickRandom(eligible, rng) || affectedBusiness;
+          const turnaroundCost = Math.round(affectedBusiness.ebitda * SELLER_DECEPTION_TURNAROUND_COST_PCT);
+          const valuation = calculateExitValuation(affectedBusiness, state.round, undefined, undefined, state.integratedPlatforms);
+          const fireSalePrice = Math.round(affectedBusiness.ebitda * valuation.totalMultiple * SELLER_DECEPTION_FIRE_SALE_PCT);
+          choices = [
+            { label: `Invest in Turnaround (${formatMoney(turnaroundCost)})`, description: `Pay ${Math.round(SELLER_DECEPTION_TURNAROUND_COST_PCT * 100)}% of EBITDA. ${Math.round(SELLER_DECEPTION_TURNAROUND_RESTORE_CHANCE * 100)}% chance quality restores next round.`, action: 'sellerDeceptionTurnaround', variant: 'positive', cost: turnaroundCost },
+            { label: `Fire Sale (${formatMoney(fireSalePrice)})`, description: `Sell immediately at ${Math.round(SELLER_DECEPTION_FIRE_SALE_PCT * 100)}% of fair value`, action: 'sellerDeceptionFireSale', variant: 'negative' },
+            { label: 'Absorb the Hit', description: 'No cost. Quality and revenue stay dropped.', action: 'sellerDeceptionAbsorb', variant: 'neutral' },
+          ];
+          return {
+            id: `event_${state.round}_${eventDef.type}`,
+            type: eventDef.type,
+            title: eventDef.title,
+            description: `Due diligence missed critical issues at ${affectedBusiness.name}. Revenue has dropped ${Math.round(SELLER_DECEPTION_REVENUE_HIT * 100)}% and quality has fallen.`,
+            effect: eventDef.effectDescription,
+            tip: eventDef.tip,
+            tipSource: eventDef.tipSource,
+            affectedBusinessId: affectedBusiness.id,
+            choices,
+          };
+        } else if (eventDef.type === 'portfolio_working_capital_crunch') {
+          // Working Capital Crunch: businesses acquired in the previous round
+          const eligible = activeBusinesses.filter(b =>
+            (state.round - b.acquisitionRound) === WORKING_CAPITAL_CRUNCH_MAX_AGE
+          );
+          affectedBusiness = pickRandom(eligible, rng) || affectedBusiness;
+          // Scale injection cost by business size (EBITDA / 1000 as a scaler, min 1.0)
+          const sizeScaler = Math.max(1.0, affectedBusiness.ebitda / 1000);
+          const injectionCost = Math.round(randomInt(WORKING_CAPITAL_CRUNCH_MIN, WORKING_CAPITAL_CRUNCH_MAX, rng) * sizeScaler);
+          const creditCost = Math.round(injectionCost * 0.5);
+          choices = [
+            { label: `Inject Cash (${formatMoney(injectionCost)})`, description: 'Full injection — no further penalty', action: 'workingCapitalInject', variant: 'positive', cost: injectionCost },
+            { label: `Emergency Line of Credit (${formatMoney(creditCost)})`, description: `Pay ${formatMoney(creditCost)} upfront, ${formatMoney(creditCost)} becomes bank debt at +1% rate`, action: 'workingCapitalCredit', variant: 'neutral', cost: creditCost },
+            { label: 'Absorb Revenue Hit', description: `-${Math.round(WORKING_CAPITAL_CRUNCH_REVENUE_PENALTY * 100)}% revenue for ${WORKING_CAPITAL_CRUNCH_PENALTY_ROUNDS} rounds`, action: 'workingCapitalAbsorb', variant: 'negative' },
+          ];
+          return {
+            id: `event_${state.round}_${eventDef.type}`,
+            type: eventDef.type,
+            title: eventDef.title,
+            description: `${affectedBusiness.name} needs ${formatMoney(injectionCost)} in additional working capital — more than expected at acquisition.`,
+            effect: eventDef.effectDescription,
+            tip: eventDef.tip,
+            tipSource: eventDef.tipSource,
+            affectedBusinessId: affectedBusiness.id,
+            choices,
+          };
         } else if (eventDef.type === 'portfolio_referral_deal') {
           // Referral deal — no affectedBusiness needed, deal injected in applyEventEffects
           affectedBusiness = undefined as unknown as typeof affectedBusiness;
@@ -874,11 +971,17 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
 
   // Roll for consolidation boom (inline, same pattern as unsolicited offer)
   if ((rng ? rng.next() : Math.random()) < CONSOLIDATION_BOOM_PROB) {
-    const boomSector = pickRandom([...CONSOLIDATION_BOOM_SECTORS], rng);
+    // Dynamic: base sectors + any sector with CONSOLIDATION_BOOM_DYNAMIC_MIN_OPCOS+ player businesses
+    const dynamicSectors = new Set<string>([...CONSOLIDATION_BOOM_SECTORS]);
+    for (const b of activeBusinesses) {
+      const sectorCount = activeBusinesses.filter(x => x.sectorId === b.sectorId).length;
+      if (sectorCount >= CONSOLIDATION_BOOM_DYNAMIC_MIN_OPCOS) dynamicSectors.add(b.sectorId);
+    }
+    const boomSector = pickRandom([...dynamicSectors], rng) as import('./types').SectorId | undefined;
     if (boomSector) {
       const sectorDef = SECTORS[boomSector];
       const playerOwnsInSector = activeBusinesses.filter(b => b.sectorId === boomSector).length;
-      const qualifiesForExclusive = playerOwnsInSector >= 2;
+      const qualifiesForExclusive = playerOwnsInSector >= CONSOLIDATION_BOOM_EXCLUSIVE_MIN_OPCOS;
       const exclusiveNote = qualifiesForExclusive
         ? ` You own ${playerOwnsInSector} businesses in ${sectorDef.name} — an exclusive tuck-in opportunity will appear.`
         : '';
@@ -1402,6 +1505,35 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
       break;
     }
 
+    // Seller Deception: apply revenue -25%, quality -1 immediately (choices are recovery responses)
+    case 'portfolio_seller_deception': {
+      if (event.affectedBusinessId) {
+        newState.businesses = newState.businesses.map(b => {
+          if (b.id !== event.affectedBusinessId) return b;
+          const newQuality = Math.max(1, b.qualityRating - SELLER_DECEPTION_QUALITY_DROP) as 1 | 2 | 3 | 4 | 5;
+          const newRevenue = Math.round(b.revenue * (1 - SELLER_DECEPTION_REVENUE_HIT));
+          const newMargin = b.ebitdaMargin; // margin unchanged, EBITDA drops via revenue
+          const newEbitda = Math.round(newRevenue * newMargin);
+          const floored = applyEbitdaFloor(newEbitda, newRevenue, newMargin, b.acquisitionEbitda);
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'revenue',
+            before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: -SELLER_DECEPTION_REVENUE_HIT,
+          });
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'ebitda',
+            before: b.ebitda, after: floored.ebitda, delta: floored.ebitda - b.ebitda,
+            deltaPercent: b.ebitda > 0 ? (floored.ebitda - b.ebitda) / b.ebitda : 0,
+          });
+          return { ...b, qualityRating: newQuality, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
+        });
+      }
+      break;
+    }
+
+    // Working Capital Crunch: no immediate effect — choices resolve everything
+    case 'portfolio_working_capital_crunch':
+      break;
+
     // Earn-Out Dispute: no immediate effect — choices resolve everything
     case 'portfolio_earnout_dispute':
       break;
@@ -1422,7 +1554,8 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
   // Events with choices should pass through with choices preserved
   const hasChoices = event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand'
     || event.type === 'portfolio_seller_note_renego' || event.type === 'portfolio_key_man_risk'
-    || event.type === 'portfolio_earnout_dispute' || event.type === 'portfolio_supplier_shift';
+    || event.type === 'portfolio_earnout_dispute' || event.type === 'portfolio_supplier_shift'
+    || event.type === 'portfolio_seller_deception' || event.type === 'portfolio_working_capital_crunch';
 
   // Attach impacts to the event in state
   newState.currentEvent = !hasChoices && impacts.length > 0

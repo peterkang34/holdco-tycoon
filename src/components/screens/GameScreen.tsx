@@ -120,6 +120,12 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     supplierAbsorb,
     supplierSwitch,
     supplierVerticalIntegration,
+    sellerDeceptionTurnaround,
+    sellerDeceptionFireSale,
+    sellerDeceptionAbsorb,
+    workingCapitalInject,
+    workingCapitalCredit,
+    workingCapitalAbsorb,
     maFocus,
     setMAFocus,
     maSourcing,
@@ -197,6 +203,12 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       case 'supplierAbsorb': supplierAbsorb(); break;
       case 'supplierSwitch': supplierSwitch(); break;
       case 'supplierVerticalIntegration': supplierVerticalIntegration(); break;
+      case 'sellerDeceptionTurnaround': sellerDeceptionTurnaround(); break;
+      case 'sellerDeceptionFireSale': sellerDeceptionFireSale(); break;
+      case 'sellerDeceptionAbsorb': sellerDeceptionAbsorb(); break;
+      case 'workingCapitalInject': workingCapitalInject(); break;
+      case 'workingCapitalCredit': workingCapitalCredit(); break;
+      case 'workingCapitalAbsorb': workingCapitalAbsorb(); break;
     }
     // Only advance if the action succeeded (cleared currentEvent)
     // If it failed (e.g., insufficient cash), event stays on screen

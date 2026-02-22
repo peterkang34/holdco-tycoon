@@ -37,6 +37,7 @@ import {
   generateDealWithSize,
   pickWeightedSector,
   generateDistressedDeals,
+  generateRecessionDeals,
 } from '../engine/businesses';
 import { generateBuyerProfile, calculateSizeTierPremium } from '../engine/buyers';
 import {
@@ -133,7 +134,7 @@ const STARTING_SHARES = 1000;
 const FOUNDER_SHARES = 800;
 const STARTING_INTEREST_RATE = 0.07;
 import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, IMPROVEMENT_COST_FLOOR, QUALITY_IMPROVEMENT_MULTIPLIER, MIN_FOUNDER_OWNERSHIP } from '../data/gameConfig';
-import { clampMargin, capGrowthRate } from '../engine/helpers';
+import { clampMargin, capGrowthRate, applyEbitdaFloor } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
 import { buildChronicleContext } from '../services/chronicleContext';
 import { useToastStore } from './useToast';
@@ -149,6 +150,9 @@ import {
   SUPPLIER_SWITCH_REVENUE_PENALTY, SUPPLIER_VERTICAL_COST, SUPPLIER_VERTICAL_BONUS_PPT,
   SUPPLIER_VERTICAL_MIN_SAME_SECTOR, SUPPLIER_SHIFT_MARGIN_HIT,
   CONSOLIDATION_BOOM_PRICE_PREMIUM, CONSOLIDATION_BOOM_EXCLUSIVE_MIN_OPCOS,
+  SELLER_DECEPTION_TURNAROUND_COST_PCT, SELLER_DECEPTION_TURNAROUND_RESTORE_CHANCE,
+  SELLER_DECEPTION_FIRE_SALE_PCT, SELLER_DECEPTION_QUALITY_DROP,
+  WORKING_CAPITAL_CRUNCH_REVENUE_PENALTY, WORKING_CAPITAL_CRUNCH_PENALTY_ROUNDS,
 } from '../data/gameConfig';
 import {
   canUnlockTier,
@@ -209,6 +213,12 @@ interface GameStore extends GameState {
   supplierAbsorb: () => void;
   supplierSwitch: () => void;
   supplierVerticalIntegration: () => void;
+  sellerDeceptionTurnaround: () => void;
+  sellerDeceptionFireSale: () => void;
+  sellerDeceptionAbsorb: () => void;
+  workingCapitalInject: () => void;
+  workingCapitalCredit: () => void;
+  workingCapitalAbsorb: () => void;
 
   setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference, subType?: string | null) => void;
 
@@ -795,7 +805,13 @@ export const useGameStore = create<GameStore>()(
         let finalPipeline = newPipeline;
         if (state.currentEvent?.type === 'global_financial_crisis') {
           const distressedDeals = generateDistressedDeals(state.round, state.maxRounds, roundStreams.deals);
-          finalPipeline = [...newPipeline, ...distressedDeals];
+          finalPipeline = [...finalPipeline, ...distressedDeals];
+        }
+
+        // Inject lighter discounted deals during Recession (1-2 at 15-25% off)
+        if (state.currentEvent?.type === 'global_recession') {
+          const recessionDeals = generateRecessionDeals(state.round, state.maxRounds, roundStreams.deals);
+          finalPipeline = [...finalPipeline, ...recessionDeals];
         }
 
         // Consolidation boom: apply price premium to sector deals + inject exclusive tuck-in
@@ -2577,6 +2593,186 @@ export const useGameStore = create<GameStore>()(
         };
         set({ ...newState, metrics: calculateMetrics(newState) });
         useToastStore.getState().addToast({ message: `Vertically integrated — margin restored +${Math.round(SUPPLIER_VERTICAL_BONUS_PPT * 100)}ppt bonus`, type: 'success' });
+      },
+
+      // ── Seller Deception choices ──
+      sellerDeceptionTurnaround: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_seller_deception' || !event.affectedBusinessId) return;
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+        const cost = event.choices?.find(c => c.action === 'sellerDeceptionTurnaround')?.cost ?? Math.round(business.ebitda * SELLER_DECEPTION_TURNAROUND_COST_PCT);
+        if (state.cash < cost) return;
+        const sdStreams = createRngStreams(state.seed, state.round);
+        const restored = sdStreams.events.fork('seller_deception_turnaround').next() < SELLER_DECEPTION_TURNAROUND_RESTORE_CHANCE;
+        const newState = {
+          ...state,
+          cash: state.cash - cost,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            if (restored) {
+              const restoredQuality = Math.min(5, b.qualityRating + SELLER_DECEPTION_QUALITY_DROP) as 1 | 2 | 3 | 4 | 5;
+              return { ...b, qualityRating: restoredQuality };
+            }
+            return b;
+          }),
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        const addToast = useToastStore.getState().addToast;
+        if (restored) {
+          addToast({ message: `Turnaround investment worked — ${business.name} quality restored`, type: 'success' });
+        } else {
+          addToast({ message: `Turnaround invested but ${business.name} quality stays dropped`, type: 'warning' });
+        }
+      },
+
+      sellerDeceptionFireSale: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_seller_deception' || !event.affectedBusinessId) return;
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+        const valuation = calculateExitValuation(business, state.round, undefined, undefined, state.integratedPlatforms);
+        const fireSalePrice = Math.round(business.ebitda * valuation.totalMultiple * SELLER_DECEPTION_FIRE_SALE_PCT);
+        // Deduct debt obligations
+        const boltOnIds = new Set(business.boltOnIds || []);
+        const boltOnDebt = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0);
+        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
+        const netProceeds = Math.max(0, fireSalePrice - debtPayoff);
+        const rolloverPct = business.rolloverEquityPct || 0;
+        const playerProceeds = rolloverPct > 0 ? Math.round(netProceeds * (1 - rolloverPct)) : netProceeds;
+        let updatedBusinesses = state.businesses.map(b => {
+          if (b.id === event.affectedBusinessId) return { ...b, status: 'sold' as const, exitPrice: fireSalePrice, exitRound: state.round, earnoutRemaining: 0 };
+          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 };
+          return b;
+        });
+        // Platform dissolution check: if sold business was part of an integrated platform
+        let updatedPlatforms = state.integratedPlatforms;
+        if (business.integratedPlatformId) {
+          const platform = state.integratedPlatforms.find(p => p.id === business.integratedPlatformId);
+          if (platform) {
+            if (checkPlatformDissolution(platform, updatedBusinesses)) {
+              updatedPlatforms = updatedPlatforms.filter(p => p.id !== platform.id);
+              updatedBusinesses = updatedBusinesses.map(b =>
+                b.integratedPlatformId === platform.id ? { ...b, integratedPlatformId: undefined } : b
+              );
+            } else {
+              updatedPlatforms = updatedPlatforms.map(p =>
+                p.id === platform.id
+                  ? { ...p, constituentBusinessIds: p.constituentBusinessIds.filter(id => id !== business.id) }
+                  : p
+              );
+            }
+          }
+        }
+        // Auto-deactivate shared services if opco count drops below minimum
+        const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
+        const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
+          ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
+          : state.sharedServices;
+        // Collect bolt-on businesses for exitedBusinesses
+        const exitedBoltOns = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 }));
+        const newState = {
+          ...state,
+          cash: state.cash + playerProceeds,
+          businesses: updatedBusinesses,
+          exitedBusinesses: [
+            ...state.exitedBusinesses,
+            { ...business, status: 'sold' as const, exitPrice: fireSalePrice, exitRound: state.round, earnoutRemaining: 0 },
+            ...exitedBoltOns,
+          ],
+          totalExitProceeds: state.totalExitProceeds + playerProceeds,
+          totalDebt: computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance),
+          integratedPlatforms: updatedPlatforms,
+          sharedServices: updatedServices,
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Fire-sold ${business.name} for ${formatMoney(playerProceeds)} net proceeds`, type: 'warning' });
+      },
+
+      sellerDeceptionAbsorb: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_seller_deception' || !event.affectedBusinessId) return;
+        // No additional action — damage already applied in applyEventEffects
+        const newState = { ...state, currentEvent: null };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: 'Absorbed the hit — revenue and quality stay dropped', type: 'warning' });
+      },
+
+      // ── Working Capital Crunch choices ──
+      workingCapitalInject: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_working_capital_crunch' || !event.affectedBusinessId) return;
+        const cost = event.choices?.find(c => c.action === 'workingCapitalInject')?.cost ?? 0;
+        if (state.cash < cost) return;
+        const newState = {
+          ...state,
+          cash: state.cash - cost,
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Injected ${formatMoney(cost)} working capital — business continues normally`, type: 'success' });
+      },
+
+      workingCapitalCredit: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_working_capital_crunch' || !event.affectedBusinessId) return;
+        const cost = event.choices?.find(c => c.action === 'workingCapitalCredit')?.cost ?? 0;
+        if (state.cash < cost) return;
+        // The remaining 50% (same as upfront cost) becomes bank debt on the business
+        const remainingDebt = cost;
+        const updatedBusinesses = state.businesses.map(b => {
+          if (b.id !== event.affectedBusinessId) return b;
+          return {
+            ...b,
+            bankDebtBalance: (b.bankDebtBalance || 0) + remainingDebt,
+            bankDebtRate: Math.max((b.bankDebtRate || state.interestRate), state.interestRate) + 0.01,
+            bankDebtRoundsRemaining: Math.max(b.bankDebtRoundsRemaining || 0, 5),
+          };
+        });
+        const newState = {
+          ...state,
+          cash: state.cash - cost,
+          businesses: updatedBusinesses,
+          totalDebt: computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance),
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Emergency credit line — paid ${formatMoney(cost)} upfront, ${formatMoney(remainingDebt)} added as bank debt (+1% rate)`, type: 'warning' });
+      },
+
+      workingCapitalAbsorb: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_working_capital_crunch' || !event.affectedBusinessId) return;
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+        // Apply -10% revenue immediately (the "2 rounds" effect is simplified to a one-time larger hit)
+        const totalPenalty = WORKING_CAPITAL_CRUNCH_REVENUE_PENALTY * WORKING_CAPITAL_CRUNCH_PENALTY_ROUNDS;
+        const newState = {
+          ...state,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            const newRevenue = Math.round(b.revenue * (1 - totalPenalty));
+            const floored = applyEbitdaFloor(
+              Math.round(newRevenue * b.ebitdaMargin), newRevenue, b.ebitdaMargin, b.acquisitionEbitda
+            );
+            return { ...b, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
+          }),
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Absorbed working capital hit — ${Math.round(totalPenalty * 100)}% revenue penalty`, type: 'warning' });
       },
 
       // Restructuring actions
