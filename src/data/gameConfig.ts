@@ -39,6 +39,17 @@ export const INTEGRATION_THRESHOLD_MULTIPLIER = {
   normal: { standard: 0.7, quick: 0.5 },
 } as const;
 
+// ── Integration Failure Growth Drag ──
+
+export const INTEGRATION_DRAG_BASE_RATE = 0.030;       // 3.0ppt at 1:1 EBITDA ratio
+export const INTEGRATION_DRAG_FLOOR = -0.005;          // -0.5ppt min (tiny tuck-ins)
+export const INTEGRATION_DRAG_CAP = -0.030;            // -3.0ppt max
+export const INTEGRATION_DRAG_MERGER_FACTOR = 0.67;    // mergers get 67% of tuck-in penalty
+export const INTEGRATION_DRAG_DECAY_RATE = { standard: 0.50, quick: 0.65 } as const;
+export const INTEGRATION_DRAG_EPSILON = 0.0005;        // below this, zero out
+export const INTEGRATION_RESTRUCTURING_PCT = 0.15;     // bumped from 0.07
+export const INTEGRATION_RESTRUCTURING_MERGER_PCT = 0.12; // mergers gentler
+
 // ── Covenant / Bankruptcy Constants ──
 
 export const COVENANT_BREACH_ROUNDS_THRESHOLD = 2; // breach years before restructuring/bankruptcy

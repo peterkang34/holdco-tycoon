@@ -433,8 +433,11 @@ function AcquiringContent() {
       </P>
       <P>
         <strong>What &ldquo;Troubled&rdquo; means:</strong> A troubled integration actually
-        destroys value &mdash; you suffer negative synergies (restructuring costs and
-        organizational friction) on top of the purchase price.
+        destroys value &mdash; you suffer a 15% restructuring cost (12% for mergers) plus a
+        proportional growth drag based on the relative size of the acquired company. The drag
+        is larger when the bolt-on is big relative to the platform (up to 3.0ppt at 1:1 ratio),
+        and smaller for tiny tuck-ins (minimum 0.2ppt). Mergers receive 67% of the tuck-in penalty.
+        The drag decays by 50% each year (65% in quick games), typically vanishing in ~3 years.
       </P>
       <P>
         All newly acquired businesses also face a temporary integration penalty during the

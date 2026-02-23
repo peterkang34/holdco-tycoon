@@ -38,6 +38,7 @@ import {
   pickWeightedSector,
   generateDistressedDeals,
   generateRecessionDeals,
+  calculateIntegrationGrowthPenalty,
 } from '../engine/businesses';
 import { generateBuyerProfile, calculateSizeTierPremium } from '../engine/buyers';
 import {
@@ -153,6 +154,7 @@ import {
   SELLER_DECEPTION_TURNAROUND_COST_PCT, SELLER_DECEPTION_TURNAROUND_RESTORE_CHANCE,
   SELLER_DECEPTION_FIRE_SALE_PCT, SELLER_DECEPTION_QUALITY_DROP,
   WORKING_CAPITAL_CRUNCH_REVENUE_PENALTY, WORKING_CAPITAL_CRUNCH_PENALTY_ROUNDS,
+  INTEGRATION_RESTRUCTURING_PCT, INTEGRATION_RESTRUCTURING_MERGER_PCT,
 } from '../data/gameConfig';
 import {
   canUnlockTier,
@@ -895,7 +897,8 @@ export const useGameStore = create<GameStore>()(
             state.round,
             sharedBenefits.marginDefense,
             state.maxRounds,
-            roundStreams.simulation
+            roundStreams.simulation,
+            state.duration,
           );
         });
 
@@ -1175,6 +1178,7 @@ export const useGameStore = create<GameStore>()(
           qualityRating: deal.business.qualityRating,
           dueDiligence: deal.business.dueDiligence,
           integrationRoundsRemaining: 1, // Tuck-ins integrate faster
+          integrationGrowthDrag: 0,
           improvements: [],
           sellerNoteBalance: structure.sellerNote?.amount ?? 0,
           sellerNoteRate: structure.sellerNote?.rate ?? 0,
@@ -1198,9 +1202,11 @@ export const useGameStore = create<GameStore>()(
           integratedPlatformId: platform.integratedPlatformId,
         };
 
-        // Failed integration: restructuring cost + growth drag on platform
-        const restructuringCost = outcome === 'failure' ? Math.round(Math.abs(deal.business.ebitda) * 0.07) : 0;
-        const growthDragPenalty = outcome === 'failure' ? -0.010 : 0;
+        // Failed integration: restructuring cost + proportional decaying growth drag on platform
+        const restructuringCost = outcome === 'failure'
+          ? Math.round(Math.abs(deal.business.ebitda) * INTEGRATION_RESTRUCTURING_PCT) : 0;
+        const growthDragPenalty = outcome === 'failure'
+          ? calculateIntegrationGrowthPenalty(deal.business.ebitda, platform.ebitda, false) : 0;
 
         // Update the platform with new bolt-on (uncapped — multiple expansion bonus caps at scale 3)
         const newPlatformScale = platform.platformScale + 1;
@@ -1229,8 +1235,9 @@ export const useGameStore = create<GameStore>()(
               synergiesRealized: b.synergiesRealized + synergies,
               totalAcquisitionCost: b.totalAcquisitionCost + deal.effectivePrice,
               acquisitionMultiple: b.acquisitionMultiple + multipleExpansion, // Multiple expansion!
-              organicGrowthRate: b.organicGrowthRate + growthDragPenalty, // Growth drag on failure
-              revenueGrowthRate: b.revenueGrowthRate + growthDragPenalty,
+              organicGrowthRate: b.organicGrowthRate, // no longer mutated — drag is on separate field
+              revenueGrowthRate: b.revenueGrowthRate,
+              integrationGrowthDrag: (b.integrationGrowthDrag ?? 0) + growthDragPenalty,
             };
           }
           return b;
@@ -1335,9 +1342,11 @@ export const useGameStore = create<GameStore>()(
         // Synergy base: smaller EBITDA (prevents combined-EBITDA exploit)
         const synergies = calculateSynergies(outcome, smallerEbitda, false, subTypeAffinity, mergerSizeRatioTier, true);
 
-        // Failed integration: restructuring cost + growth drag
-        const mergeRestructuringCost = outcome === 'failure' ? Math.round(smallerEbitda * 0.07) : 0;
-        const mergeGrowthDrag = outcome === 'failure' ? -0.010 : 0;
+        // Failed integration: restructuring cost + proportional decaying growth drag
+        const mergeRestructuringCost = outcome === 'failure'
+          ? Math.round(smallerEbitda * INTEGRATION_RESTRUCTURING_MERGER_PCT) : 0;
+        const mergeGrowthDrag = outcome === 'failure'
+          ? calculateIntegrationGrowthPenalty(smallerEbitda, largerEbitda, true) : 0;
 
         // Combined entity
         const combinedEbitda = biz1.ebitda + biz2.ebitda + synergies;
@@ -1382,7 +1391,7 @@ export const useGameStore = create<GameStore>()(
           acquisitionMultiple: (biz1.ebitda + biz2.ebitda) > 0
             ? (biz1.ebitda * biz1.acquisitionMultiple + biz2.ebitda * biz2.acquisitionMultiple) / (biz1.ebitda + biz2.ebitda) + multipleExpansion
             : ((biz1.acquisitionMultiple + biz2.acquisitionMultiple) / 2) + multipleExpansion,
-          organicGrowthRate: (biz1.organicGrowthRate + biz2.organicGrowthRate) / 2 + (subTypeAffinity === 'match' ? 0.015 : subTypeAffinity === 'related' ? 0.010 : 0.005) + mergeGrowthDrag,
+          organicGrowthRate: (biz1.organicGrowthRate + biz2.organicGrowthRate) / 2 + (subTypeAffinity === 'match' ? 0.015 : subTypeAffinity === 'related' ? 0.010 : 0.005),
           revenue: combinedRevenue,
           ebitdaMargin: clampMargin(mergedMargin),
           acquisitionRevenue: biz1.acquisitionRevenue + biz2.acquisitionRevenue,
@@ -1390,11 +1399,12 @@ export const useGameStore = create<GameStore>()(
             ? (biz1.acquisitionEbitda + biz2.acquisitionEbitda) / (biz1.acquisitionRevenue + biz2.acquisitionRevenue)
             : mergedMargin,
           peakRevenue: combinedRevenue,
-          revenueGrowthRate: (biz1.revenueGrowthRate + biz2.revenueGrowthRate) / 2 + (subTypeAffinity === 'match' ? 0.015 : subTypeAffinity === 'related' ? 0.010 : 0.005) + mergeGrowthDrag,
+          revenueGrowthRate: (biz1.revenueGrowthRate + biz2.revenueGrowthRate) / 2 + (subTypeAffinity === 'match' ? 0.015 : subTypeAffinity === 'related' ? 0.010 : 0.005),
           marginDriftRate: (biz1.marginDriftRate + biz2.marginDriftRate) / 2,
           qualityRating: bestQuality,
           dueDiligence: biz1.dueDiligence, // Keep first business's DD
           integrationRoundsRemaining: 2, // Mergers take longer to fully integrate
+          integrationGrowthDrag: ((biz1.integrationGrowthDrag ?? 0) + (biz2.integrationGrowthDrag ?? 0)) + mergeGrowthDrag,
           improvements: (() => {
             const all = [...biz1.improvements, ...biz2.improvements];
             const best = new Map<string, typeof all[0]>();
@@ -3537,7 +3547,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v25', // v25: seeded RNG + challenge mode
+      name: 'holdco-tycoon-save-v26', // v26: proportional decaying integration growth drag
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

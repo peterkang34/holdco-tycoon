@@ -20,6 +20,12 @@ import {
 } from './types';
 import type { SeededRng } from './rng';
 import { clampMargin } from './helpers';
+import {
+  INTEGRATION_DRAG_BASE_RATE,
+  INTEGRATION_DRAG_FLOOR,
+  INTEGRATION_DRAG_CAP,
+  INTEGRATION_DRAG_MERGER_FACTOR,
+} from '../data/gameConfig';
 import { SECTORS, SECTOR_LIST } from '../data/sectors';
 import { getRandomBusinessName } from '../data/names';
 import { calculateSizeTierPremium } from './buyers';
@@ -244,6 +250,7 @@ export function generateBusiness(
     qualityRating: quality,
     dueDiligence,
     integrationRoundsRemaining: 2,
+    integrationGrowthDrag: 0,
     sellerNoteBalance: 0,
     sellerNoteRate: 0,
     sellerNoteRoundsRemaining: 0,
@@ -623,6 +630,21 @@ export function calculateSynergies(
   }
 
   return Math.round(acquiredEbitda * synergyRate);
+}
+
+// Calculate proportional growth penalty from a failed integration
+export function calculateIntegrationGrowthPenalty(
+  acquiredEbitda: number,
+  platformEbitda: number,
+  isMerger: boolean,
+): number {
+  if (platformEbitda <= 0) return isMerger ? INTEGRATION_DRAG_CAP * INTEGRATION_DRAG_MERGER_FACTOR : INTEGRATION_DRAG_CAP;
+  const ratio = Math.abs(acquiredEbitda) / Math.abs(platformEbitda);
+  let rawPenalty = -(ratio * INTEGRATION_DRAG_BASE_RATE);
+  if (isMerger) rawPenalty *= INTEGRATION_DRAG_MERGER_FACTOR;
+  const floor = isMerger ? INTEGRATION_DRAG_FLOOR * INTEGRATION_DRAG_MERGER_FACTOR : INTEGRATION_DRAG_FLOOR;
+  const cap = isMerger ? INTEGRATION_DRAG_CAP * INTEGRATION_DRAG_MERGER_FACTOR : INTEGRATION_DRAG_CAP;
+  return Math.max(cap, Math.min(floor, rawPenalty));
 }
 
 // Calculate multiple expansion based on platform scale

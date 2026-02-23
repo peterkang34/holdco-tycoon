@@ -16,6 +16,7 @@ import {
   randomInt,
   pickRandom,
   formatMoney,
+  GameDuration,
 } from './types';
 import type { SeededRng } from './rng';
 import { SECTORS } from '../data/sectors';
@@ -69,6 +70,8 @@ import {
   CONSOLIDATION_BOOM_PROB,
   CONSOLIDATION_BOOM_SECTORS,
   EARNOUT_EXPIRATION_YEARS,
+  INTEGRATION_DRAG_DECAY_RATE,
+  INTEGRATION_DRAG_EPSILON,
 } from '../data/gameConfig';
 import { getPlatformMultipleExpansion, getPlatformRecessionModifier } from './platforms';
 import { getTurnaroundExitPremium } from './turnarounds';
@@ -508,7 +511,8 @@ export function applyOrganicGrowth(
   currentRound?: number, // For progressive onboarding of margin drift
   sharedServicesMarginDefense?: number, // ppt offset to margin drift from shared services
   maxRounds?: number, // 20 or 10 — scales margin drift start
-  rng?: SeededRng
+  rng?: SeededRng,
+  duration?: GameDuration, // For integration drag decay rate
 ): Business {
   const sector = SECTORS[business.sectorId];
 
@@ -559,6 +563,11 @@ export function applyOrganicGrowth(
     revenueGrowth -= 0.03;
   }
 
+  // Integration failure growth drag (decaying)
+  if (business.integrationGrowthDrag && business.integrationGrowthDrag < 0) {
+    revenueGrowth += business.integrationGrowthDrag;
+  }
+
   const newRevenue = Math.round(business.revenue * (1 + revenueGrowth));
 
   // --- Margin Drift ---
@@ -603,6 +612,11 @@ export function applyOrganicGrowth(
   // Cap stored growth rates
   const newGrowthRate = capGrowthRate(business.revenueGrowthRate);
 
+  // Decay integration growth drag for next year
+  const decayRate = INTEGRATION_DRAG_DECAY_RATE[duration ?? 'standard'];
+  let newDrag = (business.integrationGrowthDrag ?? 0) * (1 - decayRate);
+  if (Math.abs(newDrag) < INTEGRATION_DRAG_EPSILON) newDrag = 0;
+
   return {
     ...business,
     revenue: newRevenue,
@@ -613,6 +627,7 @@ export function applyOrganicGrowth(
     integrationRoundsRemaining: newIntegration,
     organicGrowthRate: newGrowthRate,
     revenueGrowthRate: newGrowthRate,
+    integrationGrowthDrag: newDrag,
   };
 }
 

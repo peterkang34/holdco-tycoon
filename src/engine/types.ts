@@ -113,6 +113,7 @@ export interface Business {
   qualityRating: QualityRating;
   dueDiligence: DueDiligenceSignals;
   integrationRoundsRemaining: number;
+  integrationGrowthDrag: number; // Decaying penalty from failed integrations (negative)
   improvements: OperationalImprovement[];
   sellerNoteBalance: number;
   sellerNoteRate: number;

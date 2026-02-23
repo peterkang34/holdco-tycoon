@@ -11,6 +11,26 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'February 23, 2026',
+    title: 'Smarter Integration Penalties',
+    sections: [
+      {
+        heading: 'Improved',
+        items: [
+          'Failed integration penalties now scale with acquisition size — a tiny bolt-on failing no longer cripples a large platform.',
+          'Integration growth drag decays over ~3 years instead of lasting forever.',
+          'Mergers receive a gentler penalty (67% of tuck-in rate) since both businesses have existing management.',
+        ],
+      },
+      {
+        heading: 'Balance',
+        items: [
+          'Restructuring costs increased to 15% (tuck-ins) and 12% (mergers) to compensate for the removal of permanent penalties.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 22, 2026',
     title: 'Onboarding Nudges & Narrative Fix',
     sections: [

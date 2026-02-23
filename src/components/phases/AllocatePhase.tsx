@@ -1109,9 +1109,9 @@ export function AllocatePhase({
                   if (a.type === 'acquire_tuck_in') {
                     const platform = businesses.find(b => b.id === d.platformId);
                     const boltOn = businesses.find(b => b.id === d.businessId);
-                    description = `Tuck-in of ${boltOn?.name ?? 'bolt-on'} into ${platform?.name ?? 'platform'} was troubled. ${formatMoney(cost)} restructuring cost deducted and ${platform?.name ?? 'platform'}'s growth permanently reduced by ${drag.toFixed(1)}%.`;
+                    description = `Tuck-in of ${boltOn?.name ?? 'bolt-on'} into ${platform?.name ?? 'platform'} was troubled. ${formatMoney(cost)} restructuring cost deducted and ${platform?.name ?? 'platform'}'s growth reduced by ${drag.toFixed(1)}% (decays over ~3 years).`;
                   } else {
-                    description = `Merger into ${d.newName as string} was troubled. ${formatMoney(cost)} restructuring cost deducted and growth permanently reduced by ${drag.toFixed(1)}%.`;
+                    description = `Merger into ${d.newName as string} was troubled. ${formatMoney(cost)} restructuring cost deducted and growth reduced by ${drag.toFixed(1)}% (decays over ~3 years).`;
                   }
                 } else {
                   // partial = rocky

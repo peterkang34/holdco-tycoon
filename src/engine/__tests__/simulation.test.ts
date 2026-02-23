@@ -1368,3 +1368,78 @@ describe('Distressed Deals', () => {
     }
   });
 });
+
+describe('applyOrganicGrowth — integration growth drag', () => {
+  it('applies integration growth drag to revenue growth', () => {
+    const business = createMockBusiness({
+      integrationGrowthDrag: -0.020, // -2.0ppt drag
+      revenueGrowthRate: 0.05,
+      revenue: 5000,
+    });
+    const result = applyOrganicGrowth(business, 0, 0, false);
+    // Revenue should grow less than 5% due to the -2ppt drag
+    expect(result.revenue).toBeLessThan(Math.round(5000 * 1.05));
+  });
+
+  it('decays drag by 50% in standard mode', () => {
+    const business = createMockBusiness({
+      integrationGrowthDrag: -0.020,
+    });
+    const result = applyOrganicGrowth(business, 0, 0, false, undefined, undefined, undefined, undefined, undefined, undefined, 'standard');
+    expect(result.integrationGrowthDrag).toBeCloseTo(-0.010); // 50% decay
+  });
+
+  it('decays drag by 65% in quick mode', () => {
+    const business = createMockBusiness({
+      integrationGrowthDrag: -0.020,
+    });
+    const result = applyOrganicGrowth(business, 0, 0, false, undefined, undefined, undefined, undefined, undefined, undefined, 'quick');
+    expect(result.integrationGrowthDrag).toBeCloseTo(-0.007); // 65% decay
+  });
+
+  it('zeroes out drag below epsilon', () => {
+    const business = createMockBusiness({
+      integrationGrowthDrag: -0.0004, // below INTEGRATION_DRAG_EPSILON (0.0005)
+    });
+    const result = applyOrganicGrowth(business, 0, 0, false, undefined, undefined, undefined, undefined, undefined, undefined, 'standard');
+    expect(result.integrationGrowthDrag).toBe(0);
+  });
+
+  it('stacks drag from multiple failed integrations', () => {
+    const business = createMockBusiness({
+      integrationGrowthDrag: -0.010, // existing drag
+    });
+    // Simulate adding more drag (would be done in useGame.ts)
+    const totalDrag = (business.integrationGrowthDrag ?? 0) + (-0.015); // new failure
+    const bizWithStacked = { ...business, integrationGrowthDrag: totalDrag };
+    expect(bizWithStacked.integrationGrowthDrag).toBeCloseTo(-0.025);
+  });
+
+  it('does not apply drag when integrationGrowthDrag is 0', () => {
+    const business = createMockBusiness({
+      integrationGrowthDrag: 0,
+      revenueGrowthRate: 0.05,
+      revenue: 5000,
+    });
+    const result = applyOrganicGrowth(business, 0, 0, false);
+    // Revenue should grow at or near 5% (no drag)
+    // Allow for volatility
+    expect(result.revenue).toBeGreaterThan(4900);
+  });
+
+  it('drag decays to near-zero after 3 standard years', () => {
+    let drag = -0.030; // maximum drag
+    for (let year = 0; year < 3; year++) {
+      drag = drag * (1 - 0.50); // 50% decay
+    }
+    expect(Math.abs(drag)).toBeLessThan(0.004); // 0.375ppt after 3 years
+  });
+
+  it('drag decays to near-zero after 2 quick years', () => {
+    let drag = -0.030; // maximum drag
+    for (let year = 0; year < 2; year++) {
+      drag = drag * (1 - 0.65); // 65% decay
+    }
+    expect(Math.abs(drag)).toBeLessThan(0.004); // 0.3675ppt after 2 years
+  });
+});

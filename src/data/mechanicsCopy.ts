@@ -65,4 +65,5 @@ export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   { pattern: /paid down voluntarily/i, reason: 'Changed to "paid down early" in v20. More concise.' },
   { pattern: /recurring.*bonus.*platform|platform.*recurring.*bonus/i, reason: 'Platform bonuses are ONE-TIME mutations at forge time.' },
   { pattern: /grace period/i, reason: 'Grace period not implemented in engine. Holdco amortizes from round 1.' },
+  { pattern: /growth permanently reduced/i, reason: 'Integration growth drag is now proportional and decaying, not permanent. Changed in v26.' },
 ];

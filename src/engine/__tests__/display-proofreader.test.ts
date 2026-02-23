@@ -55,6 +55,14 @@ import {
   WORKING_CAPITAL_CRUNCH_PENALTY_ROUNDS,
   WORKING_CAPITAL_CRUNCH_MAX_AGE,
   CONSOLIDATION_BOOM_DYNAMIC_MIN_OPCOS,
+  INTEGRATION_DRAG_BASE_RATE,
+  INTEGRATION_DRAG_FLOOR,
+  INTEGRATION_DRAG_CAP,
+  INTEGRATION_DRAG_MERGER_FACTOR,
+  INTEGRATION_DRAG_DECAY_RATE,
+  INTEGRATION_DRAG_EPSILON,
+  INTEGRATION_RESTRUCTURING_PCT,
+  INTEGRATION_RESTRUCTURING_MERGER_PCT,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
 import {
@@ -903,6 +911,39 @@ describe('Display Proofreader', () => {
       const card = readComponent('components/cards/BusinessCard.tsx');
       expect(card).toContain('grow logarithmically with scale');
       expect(card).toContain('diminishing returns');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // INTEGRATION GROWTH DRAG
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Integration Growth Drag', () => {
+    it('Constants are correctly defined', () => {
+      expect(INTEGRATION_DRAG_BASE_RATE).toBe(0.030);
+      expect(INTEGRATION_DRAG_FLOOR).toBe(-0.005);
+      expect(INTEGRATION_DRAG_CAP).toBe(-0.030);
+      expect(INTEGRATION_DRAG_MERGER_FACTOR).toBe(0.67);
+      expect(INTEGRATION_DRAG_DECAY_RATE.standard).toBe(0.50);
+      expect(INTEGRATION_DRAG_DECAY_RATE.quick).toBe(0.65);
+      expect(INTEGRATION_DRAG_EPSILON).toBe(0.0005);
+      expect(INTEGRATION_RESTRUCTURING_PCT).toBe(0.15);
+      expect(INTEGRATION_RESTRUCTURING_MERGER_PCT).toBe(0.12);
+    });
+
+    it('UserManualModal documents proportional decaying system', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('proportional growth drag');
+      expect(manual).toContain('decays by 50%');
+      expect(manual).toContain('65% in quick games');
+      expect(manual).toContain('15% restructuring cost');
+      expect(manual).toContain('12% for mergers');
+    });
+
+    it('AllocatePhase shows "decays over" instead of "permanently reduced"', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('decays over ~3 years');
+      expect(allocate).not.toContain('permanently reduced');
     });
   });
 

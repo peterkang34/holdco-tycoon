@@ -519,6 +519,38 @@ export function migrateV24ToV25(): void {
   }
 }
 
+// --- v25 → v26: proportional decaying integration growth drag ---
+
+export function migrateV25ToV26(): void {
+  try {
+    const v26Key = 'holdco-tycoon-save-v26';
+    const v25Key = 'holdco-tycoon-save-v25';
+    if (localStorage.getItem(v26Key)) return;
+    const v25Raw = localStorage.getItem(v25Key);
+    if (!v25Raw) return;
+    const v25Data = JSON.parse(v25Raw);
+    if (!v25Data?.state) return;
+
+    // Backfill integrationGrowthDrag on all businesses
+    const backfillBusiness = (b: any) => ({
+      ...b,
+      integrationGrowthDrag: b.integrationGrowthDrag ?? 0,
+    });
+
+    if (Array.isArray(v25Data.state.businesses)) {
+      v25Data.state.businesses = v25Data.state.businesses.map(backfillBusiness);
+    }
+    if (Array.isArray(v25Data.state.exitedBusinesses)) {
+      v25Data.state.exitedBusinesses = v25Data.state.exitedBusinesses.map(backfillBusiness);
+    }
+
+    localStorage.setItem(v26Key, JSON.stringify(v25Data));
+    localStorage.removeItem(v25Key);
+  } catch (e) {
+    console.error('v25→v26 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -540,4 +572,5 @@ export function runAllMigrations(): void {
   migrateV22ToV23();
   migrateV23ToV24();
   migrateV24ToV25();
+  migrateV25ToV26();
 }

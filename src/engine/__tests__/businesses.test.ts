@@ -11,6 +11,7 @@ import {
   getSectorWeightsForRound,
   determineIntegrationOutcome,
   calculateSynergies,
+  calculateIntegrationGrowthPenalty,
   getSubTypeAffinity,
   getSizeRatioTier,
   calculateMultipleExpansion,
@@ -1074,5 +1075,71 @@ describe('multiple-to-quality cohesion', () => {
     expect(q1Distressed / runs).toBeGreaterThan(q5Distressed / runs);
     expect(q1Distressed / runs).toBeGreaterThan(0.10); // At least 10%
     expect(q5Distressed / runs).toBeLessThan(0.10);     // Under 10%
+  });
+});
+
+describe('calculateIntegrationGrowthPenalty', () => {
+  it('applies floor for tiny tuck-ins', () => {
+    // $100K bolt-on into $2M platform — ratio 0.05 → raw -0.15ppt, clamped to floor -0.5ppt
+    const penalty = calculateIntegrationGrowthPenalty(100, 2000, false);
+    expect(penalty).toBeCloseTo(-0.005);
+  });
+
+  it('applies cap for equal-sized acquisitions', () => {
+    // $2M into $2M — ratio 1.0 → raw -3.0ppt, clamped to cap -3.0ppt
+    const penalty = calculateIntegrationGrowthPenalty(2000, 2000, false);
+    expect(penalty).toBeCloseTo(-0.030);
+  });
+
+  it('scales proportionally in the middle', () => {
+    // $500K into $2M — ratio 0.25 → raw -0.75ppt
+    const penalty = calculateIntegrationGrowthPenalty(500, 2000, false);
+    expect(penalty).toBeCloseTo(-0.0075);
+  });
+
+  it('caps at INTEGRATION_DRAG_CAP for oversized bolt-ons', () => {
+    // $5M into $2M — ratio 2.5 → raw -7.5ppt, clamped to cap -3.0ppt
+    const penalty = calculateIntegrationGrowthPenalty(5000, 2000, false);
+    expect(penalty).toBeCloseTo(-0.030);
+  });
+
+  it('applies merger discount (67%)', () => {
+    // $2M into $2M merger — cap -3.0ppt × 0.67 = -2.01ppt
+    const penalty = calculateIntegrationGrowthPenalty(2000, 2000, true);
+    expect(penalty).toBeCloseTo(-0.030 * 0.67);
+  });
+
+  it('applies merger floor correctly', () => {
+    const penalty = calculateIntegrationGrowthPenalty(100, 2000, true);
+    expect(penalty).toBeCloseTo(-0.005 * 0.67);
+  });
+
+  it('handles zero platform EBITDA', () => {
+    const penalty = calculateIntegrationGrowthPenalty(1000, 0, false);
+    expect(penalty).toBeCloseTo(-0.030); // cap
+  });
+
+  it('handles zero platform EBITDA for mergers', () => {
+    const penalty = calculateIntegrationGrowthPenalty(1000, 0, true);
+    expect(penalty).toBeCloseTo(-0.030 * 0.67);
+  });
+
+  it('always returns negative values', () => {
+    const scenarios = [
+      [100, 2000, false],
+      [500, 2000, false],
+      [1000, 2000, false],
+      [2000, 2000, false],
+      [100, 2000, true],
+      [2000, 2000, true],
+    ] as const;
+    for (const [acquired, platform, isMerger] of scenarios) {
+      expect(calculateIntegrationGrowthPenalty(acquired, platform, isMerger)).toBeLessThan(0);
+    }
+  });
+
+  it('generateBusiness includes integrationGrowthDrag: 0', () => {
+    const business = generateBusiness('agency', 1);
+    expect(business.integrationGrowthDrag).toBe(0);
   });
 });
