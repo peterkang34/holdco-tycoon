@@ -11,6 +11,8 @@ import { calculateMetrics, calculatePortfolioTax } from '../engine/simulation';
 import { calculateFounderEquityValue } from '../engine/scoring';
 import { SECTORS } from '../data/sectors';
 import { getMASourcingAnnualCost } from '../data/sharedServices';
+import { getNarrativePhase } from '../data/gameConfig';
+import type { NarrativePhaseId } from '../data/gameConfig';
 
 /** Human-readable labels for improvement type enums. */
 const IMPROVEMENT_LABELS: Record<string, string> = {
@@ -53,6 +55,11 @@ export interface ChronicleContext {
   avgMargin?: string;
   revenueGrowth?: string;
   marginChange?: string;
+  // Narrative tone
+  narrativePhase?: NarrativePhaseId;
+  narrativeToneGuidance?: string;
+  // Game progression
+  maxRounds?: number;
 }
 
 /**
@@ -322,5 +329,9 @@ export function buildChronicleContext(state: GameState): ChronicleContext {
     marginChange: prevMetrics
       ? `${((metrics.avgEbitdaMargin - prevMetrics.metrics.avgEbitdaMargin) * 100) >= 0 ? '+' : ''}${((metrics.avgEbitdaMargin - prevMetrics.metrics.avgEbitdaMargin) * 100).toFixed(1)} ppt`
       : undefined,
+    // Narrative tone
+    narrativePhase: getNarrativePhase(state.round, state.maxRounds).id,
+    narrativeToneGuidance: getNarrativePhase(state.round, state.maxRounds).toneGuidance,
+    maxRounds: state.maxRounds,
   };
 }

@@ -4,7 +4,7 @@ import { SECTOR_LIST } from '../../data/sectors';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { ChangelogModal } from '../ui/ChangelogModal';
 import { UserManualModal } from '../ui/UserManualModal';
-import { DIFFICULTY_CONFIG, DURATION_CONFIG } from '../../data/gameConfig';
+import { DIFFICULTY_CONFIG, DURATION_CONFIG, DURATION_SUBTITLE } from '../../data/gameConfig';
 import type { ChallengeParams } from '../../utils/challenge';
 import { generateRandomSeed } from '../../engine/rng';
 import { buildChallengeUrl, shareChallenge, encodeChallengeParams, generateToken, setHostToken } from '../../utils/challenge';
@@ -208,6 +208,7 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
                     }`}
                   >
                     <div className="font-medium text-sm">{config.label}</div>
+                    <div className="text-xs text-text-muted mt-1 italic">{DURATION_SUBTITLE[key]}</div>
                   </button>
                 ))}
               </div>

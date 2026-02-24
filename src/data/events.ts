@@ -207,6 +207,15 @@ export const PORTFOLIO_EVENTS: EventDefinition[] = [
     tipSource: 'Acquiring Minds',
   },
   {
+    type: 'portfolio_management_succession',
+    title: 'Management Succession Crisis',
+    description: 'The founding operator at one of your long-held businesses is ready to retire. Without a succession plan, the business will suffer.',
+    probability: 0,  // eligibility-gated in generateEvent (20yr mode, 8+ years held, Q3+, not resolved)
+    effectDescription: 'Quality drops -1 immediately. Choose: invest in external hire, promote from within, or sell the business.',
+    tip: 'Constellation Software always plans 2-3 years ahead for operator transitions. The best time to plan succession is before you need it.',
+    tipSource: 'Ch. VIII',
+  },
+  {
     type: 'portfolio_supplier_shift',
     title: 'Supplier Pricing Power Shift',
     description: 'A key supplier has consolidated and is now demanding significantly higher prices, compressing margins at one of your businesses.',

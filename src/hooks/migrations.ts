@@ -551,6 +551,49 @@ export function migrateV25ToV26(): void {
   }
 }
 
+// --- v26 → v27: 20-year mode upgrade (deal inflation, succession, IPO, family office) ---
+
+export function migrateV26ToV27(): void {
+  try {
+    const v27Key = 'holdco-tycoon-save-v27';
+    const v26Key = 'holdco-tycoon-save-v26';
+    if (localStorage.getItem(v27Key)) return;
+    const v26Raw = localStorage.getItem(v26Key);
+    if (!v26Raw) return;
+    const v26Data = JSON.parse(v26Raw);
+    if (!v26Data?.state) return;
+
+    // New GameState fields
+    if (v26Data.state.dealInflationState === undefined) {
+      v26Data.state.dealInflationState = { crisisResetRoundsRemaining: 0 };
+    }
+    if (v26Data.state.ipoState === undefined) {
+      v26Data.state.ipoState = null;
+    }
+    if (v26Data.state.familyOfficeState === undefined) {
+      v26Data.state.familyOfficeState = null;
+    }
+
+    // Backfill successionResolved on all businesses
+    const backfillBusiness = (b: any) => ({
+      ...b,
+      successionResolved: b.successionResolved ?? false,
+    });
+
+    if (Array.isArray(v26Data.state.businesses)) {
+      v26Data.state.businesses = v26Data.state.businesses.map(backfillBusiness);
+    }
+    if (Array.isArray(v26Data.state.exitedBusinesses)) {
+      v26Data.state.exitedBusinesses = v26Data.state.exitedBusinesses.map(backfillBusiness);
+    }
+
+    localStorage.setItem(v27Key, JSON.stringify(v26Data));
+    localStorage.removeItem(v26Key);
+  } catch (e) {
+    console.error('v26→v27 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -573,4 +616,5 @@ export function runAllMigrations(): void {
   migrateV23ToV24();
   migrateV24ToV25();
   migrateV25ToV26();
+  migrateV26ToV27();
 }

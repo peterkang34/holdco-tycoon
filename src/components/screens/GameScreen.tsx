@@ -128,6 +128,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     workingCapitalInject,
     workingCapitalCredit,
     workingCapitalAbsorb,
+    successionInvest,
+    successionPromote,
+    successionSell,
     maFocus,
     setMAFocus,
     maSourcing,
@@ -211,6 +214,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       case 'workingCapitalInject': workingCapitalInject(); break;
       case 'workingCapitalCredit': workingCapitalCredit(); break;
       case 'workingCapitalAbsorb': workingCapitalAbsorb(); break;
+      case 'successionInvest': successionInvest(); break;
+      case 'successionPromote': successionPromote(); break;
+      case 'successionSell': successionSell(); break;
     }
     // Only advance if the action succeeded (cleared currentEvent)
     // If it failed (e.g., insufficient cash), event stays on screen
@@ -541,6 +547,22 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       generateYearChronicleAction();
     }
   }, [phase, round, generateYearChronicleAction]);
+
+  // Business anniversaries (20yr mode, milestones 5/10/15)
+  useEffect(() => {
+    if (phase !== 'collect' || maxRounds !== 20) return;
+    const ANNIVERSARY_MILESTONES = [5, 10, 15] as const;
+    const activeBusinesses = businesses.filter(b => b.status === 'active');
+    for (const biz of activeBusinesses) {
+      const yearsHeld = round - biz.acquisitionRound;
+      if (ANNIVERSARY_MILESTONES.includes(yearsHeld as 5 | 10 | 15)) {
+        addToast({
+          message: `${biz.name} turns ${yearsHeld}. It was ${formatMoney(biz.acquisitionEbitda)} EBITDA — now ${formatMoney(biz.ebitda)}.`,
+          type: 'info',
+        });
+      }
+    }
+  }, [phase, round, businesses, maxRounds, addToast]);
 
   // Update telemetry session meta with current round
   useEffect(() => {

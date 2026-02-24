@@ -72,6 +72,17 @@ import {
   EARNOUT_EXPIRATION_YEARS,
   INTEGRATION_DRAG_DECAY_RATE,
   INTEGRATION_DRAG_EPSILON,
+  DEAL_INFLATION_CRISIS_DURATION,
+  SUCCESSION_MIN_YEARS_HELD,
+  SUCCESSION_INVEST_COST_MIN,
+  SUCCESSION_INVEST_COST_MAX,
+  SUCCESSION_INVEST_RESTORE,
+  SUCCESSION_PROMOTE_RESTORE,
+  SUCCESSION_PROMOTE_HR_BONUS,
+  SUCCESSION_PROMOTE_PLATFORM_BONUS,
+  SUCCESSION_QUALITY_DROP,
+  SUCCESSION_SELL_DISCOUNT,
+  SUCCESSION_PROB,
 } from '../data/gameConfig';
 import { getPlatformMultipleExpansion, getPlatformRecessionModifier } from './platforms';
 import { getTurnaroundExitPremium } from './turnarounds';
@@ -745,6 +756,20 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
         }
       }
 
+      // Management Succession: 20yr mode, 8+ years held, Q3+, not resolved
+      if (eventDef.type === 'portfolio_management_succession') {
+        if (state.duration !== 'standard') {
+          adjustedProb = 0;
+        } else {
+          const eligible = activeBusinesses.filter(b =>
+            (state.round - b.acquisitionRound) >= SUCCESSION_MIN_YEARS_HELD &&
+            b.qualityRating >= 3 &&
+            !b.successionResolved
+          );
+          adjustedProb = eligible.length > 0 ? SUCCESSION_PROB : 0;
+        }
+      }
+
       // Adjust talent events based on shared services
       // H-1: Clamp adjusted probabilities to prevent exceeding 1.0
       if (eventDef.type === 'portfolio_talent_leaves') {
@@ -928,6 +953,40 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
             type: eventDef.type,
             title: eventDef.title,
             description: `${affectedBusiness.name} needs ${formatMoney(injectionCost)} in additional working capital — more than expected at acquisition.`,
+            effect: eventDef.effectDescription,
+            tip: eventDef.tip,
+            tipSource: eventDef.tipSource,
+            affectedBusinessId: affectedBusiness.id,
+            choices,
+          };
+        } else if (eventDef.type === 'portfolio_management_succession') {
+          // Management Succession: 20yr mode, 8+ years held, Q3+, not resolved
+          const eligible = activeBusinesses.filter(b =>
+            (state.round - b.acquisitionRound) >= SUCCESSION_MIN_YEARS_HELD &&
+            b.qualityRating >= 3 &&
+            !b.successionResolved
+          );
+          affectedBusiness = pickRandom(eligible, rng) || affectedBusiness;
+          const investCost = randomInt(SUCCESSION_INVEST_COST_MIN, SUCCESSION_INVEST_COST_MAX, rng);
+          const valuation = calculateExitValuation(affectedBusiness, state.round, undefined, undefined, state.integratedPlatforms);
+          const fairValue = Math.round(affectedBusiness.ebitda * valuation.totalMultiple);
+          const sellPrice = Math.round(fairValue * (1 - SUCCESSION_SELL_DISCOUNT));
+          // Check shared services for promote bonus
+          const hrActive = state.sharedServices?.some(s => s.type === 'recruiting_hr' && s.active) ?? false;
+          let promoteChance = SUCCESSION_PROMOTE_RESTORE;
+          if (hrActive) promoteChance += SUCCESSION_PROMOTE_HR_BONUS;
+          if (affectedBusiness.isPlatform) promoteChance += SUCCESSION_PROMOTE_PLATFORM_BONUS;
+          promoteChance = Math.min(0.95, promoteChance);
+          choices = [
+            { label: `Invest in External Hire (${formatMoney(investCost)})`, description: `Pay ${formatMoney(investCost)}. ${Math.round(SUCCESSION_INVEST_RESTORE * 100)}% chance quality restores.`, action: 'successionInvest', variant: 'positive', cost: investCost },
+            { label: 'Promote from Within', description: `Free. ${Math.round(promoteChance * 100)}% chance quality restores${hrActive ? ' (HR bonus)' : ''}${affectedBusiness.isPlatform ? ' (platform bonus)' : ''}.`, action: 'successionPromote', variant: 'neutral' },
+            { label: `Sell Business (${formatMoney(sellPrice)})`, description: `Sell at ${Math.round((1 - SUCCESSION_SELL_DISCOUNT) * 100)}% of ${formatMoney(fairValue)} fair value`, action: 'successionSell', variant: 'negative' },
+          ];
+          return {
+            id: `event_${state.round}_${eventDef.type}`,
+            type: eventDef.type,
+            title: eventDef.title,
+            description: `${affectedBusiness.name}'s founding operator is retiring after ${state.round - affectedBusiness.acquisitionRound} years. Quality has dropped from Q${affectedBusiness.qualityRating} to Q${Math.max(1, affectedBusiness.qualityRating - SUCCESSION_QUALITY_DROP)}.`,
             effect: eventDef.effectDescription,
             tip: eventDef.tip,
             tipSource: eventDef.tipSource,
@@ -1226,6 +1285,14 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
       // 4. Exit multiple penalty
       newState.exitMultiplePenalty = 1.0;
 
+      // 5. Deal inflation crisis reset (20yr mode)
+      if (state.duration === 'standard') {
+        newState.dealInflationState = {
+          ...newState.dealInflationState,
+          crisisResetRoundsRemaining: DEAL_INFLATION_CRISIS_DURATION,
+        };
+      }
+
       break;
     }
 
@@ -1496,6 +1563,25 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
       break;
     }
 
+    // Management Succession: apply quality -1 immediately (choices are recovery responses)
+    case 'portfolio_management_succession': {
+      if (event.affectedBusinessId) {
+        newState.businesses = newState.businesses.map(b => {
+          if (b.id !== event.affectedBusinessId) return b;
+          const newQuality = Math.max(1, b.qualityRating - SUCCESSION_QUALITY_DROP) as 1 | 2 | 3 | 4 | 5;
+          const marginDelta = -0.015 * SUCCESSION_QUALITY_DROP;
+          const newMargin = clampMargin(b.ebitdaMargin + marginDelta);
+          const newEbitda = Math.round(b.revenue * newMargin);
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'margin',
+            before: b.ebitdaMargin, after: newMargin, delta: newMargin - b.ebitdaMargin,
+          });
+          return { ...b, qualityRating: newQuality, ebitdaMargin: newMargin, ebitda: newEbitda };
+        });
+      }
+      break;
+    }
+
     // Supplier Shift: apply -3ppt margin immediately (choices are how to respond)
     case 'portfolio_supplier_shift': {
       if (event.affectedBusinessId) {
@@ -1570,7 +1656,8 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
   const hasChoices = event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand'
     || event.type === 'portfolio_seller_note_renego' || event.type === 'portfolio_key_man_risk'
     || event.type === 'portfolio_earnout_dispute' || event.type === 'portfolio_supplier_shift'
-    || event.type === 'portfolio_seller_deception' || event.type === 'portfolio_working_capital_crunch';
+    || event.type === 'portfolio_seller_deception' || event.type === 'portfolio_working_capital_crunch'
+    || event.type === 'portfolio_management_succession';
 
   // Attach impacts to the event in state
   newState.currentEvent = !hasChoices && impacts.length > 0

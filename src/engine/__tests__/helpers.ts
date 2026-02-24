@@ -184,6 +184,9 @@ export function createMockGameState(overrides: Partial<GameState> = {}): GameSta
     founderDistributionsReceived: 0,
     isChallenge: false,
     seed: 42,
+    dealInflationState: { crisisResetRoundsRemaining: 0 },
+    ipoState: null,
+    familyOfficeState: null,
     ...overrides,
   };
 }

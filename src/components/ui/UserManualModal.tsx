@@ -14,6 +14,7 @@ type ManualSection =
   | 'shared-services'
   | 'selling'
   | 'events'
+  | 'twenty-year'
   | 'scoring'
   | 'sectors'
   | 'strategy'
@@ -37,6 +38,7 @@ const SECTIONS: SectionDef[] = [
   { id: 'shared-services', label: 'Shared Services', shortLabel: 'Services' },
   { id: 'selling', label: 'Selling & Exit', shortLabel: 'Exit' },
   { id: 'events', label: 'Events', shortLabel: 'Events' },
+  { id: 'twenty-year', label: '20-Year Mode', shortLabel: '20-Year' },
   { id: 'scoring', label: 'Scoring & Leaderboard', shortLabel: 'Scoring' },
   { id: 'sectors', label: 'The 15 Sectors', shortLabel: 'Sectors' },
   { id: 'strategy', label: 'Tips & Strategy', shortLabel: 'Tips' },
@@ -1057,6 +1059,7 @@ function EventsContent() {
           ['Consolidation Boom', '3% random, targets specific sector (or any sector with 3+ businesses)', 'No choice — all deals in the booming sector cost 20% more. Own 2+ businesses in that sector? You get an exclusive tuck-in at normal price.'],
           ['Seller Deception', 'Business acquired within 2 rounds (non-cash structure)', 'Invest in Turnaround (20% EBITDA, 65% restore chance) · Fire Sale (sell at 60% fair value) · Absorb Hit (free, stays dropped)'],
           ['Working Capital Crunch', 'Business acquired in the previous round', 'Inject Cash (full cost, no penalty) · Emergency Credit ($50% cost, +1% interest) · Absorb Hit (-10% revenue for 2 rounds)'],
+          ['Management Succession', '20yr mode, business held 8+ years, Q3+', 'Invest in External Hire ($300-500K, 75% restore) · Promote from Within (free, 50%+ restore) · Sell Business (85% fair value)'],
         ]}
       />
     </>
@@ -1326,6 +1329,168 @@ function GlossaryContent() {
   );
 }
 
+function TwentyYearContent() {
+  return (
+    <>
+      <SectionTitle>20-Year Mode (Full Game)</SectionTitle>
+      <P>
+        The Full Game (20-year) mode includes additional mechanics that create a richer
+        late-game experience. These features are exclusive to 20-year mode &mdash; Quick Play
+        (10-year) games are unaffected.
+      </P>
+
+      <SubHeading>Late-Game Deal Inflation</SubHeading>
+      <P>
+        Starting in year 11, asking multiples on new deals inflate by +0.5x per year,
+        capping at +3.0x above normal prices. This reflects market maturation and increased
+        competition for quality assets as your holdco grows.
+      </P>
+      <BulletList items={[
+        <>Year 11: +0.5x, Year 12: +1.0x, ... Year 16+: +3.0x (cap)</>,
+        <>A Financial Crisis resets inflation by -2.0x for 2 rounds, creating a window for bargain hunting</>,
+        <>Inflation applies after quality adjustment but before competitive positioning</>,
+      ]} />
+
+      <SubHeading>Management Succession Events</SubHeading>
+      <P>
+        Businesses held 8+ years with Q3+ quality may face an operator retirement event.
+        The founding manager is ready to step down &mdash; how you handle the transition
+        determines the business&apos;s future.
+      </P>
+      <DataTable
+        headers={['Choice', 'Cost', 'Success Rate', 'Outcome']}
+        rows={[
+          ['Invest in External Hire', '$300-500K', '75%', 'Quality restored if successful'],
+          ['Promote from Within', 'Free', '50% base', 'Quality restored; HR shared service +20%, platform +15% bonus (cap 95%)'],
+          ['Sell the Business', 'None', 'Guaranteed', 'Business sold at 85% of fair value'],
+        ]}
+      />
+      <P>
+        Quality drops by 1 tier immediately when the event fires. Each business can only
+        face this event once (it cannot repeat for the same business).
+      </P>
+      <HighlightBox variant="tip">
+        <strong>Tip:</strong> If you have Recruiting &amp; HR active, the promote path jumps
+        to 70% success rate for free &mdash; a strong option for cash-strapped operators.
+      </HighlightBox>
+
+      <SubHeading>IPO Pathway</SubHeading>
+      <P>
+        At round 16+, qualifying holdcos can take the company public. Going public opens
+        new capabilities but introduces Wall Street constraints.
+      </P>
+      <DataTable
+        headers={['Gate', 'Requirement']}
+        rows={[
+          ['Minimum EBITDA', '$75M+ portfolio EBITDA'],
+          ['Businesses', '6+ active businesses'],
+          ['Avg Quality', '4.0+ average quality rating'],
+          ['Platforms', '2+ forged platforms'],
+          ['Round', 'Year 16+'],
+        ]}
+      />
+
+      <P><strong>Post-IPO mechanics:</strong></P>
+      <BulletList items={[
+        <><strong>Stock price</strong> is derived from enterprise value: (Equity Value / Total Shares) &times; (1 + Market Sentiment)</>,
+        <><strong>Earnings expectations</strong> are set at prior EBITDA &times; 1.05 &mdash; analysts expect 5% growth every year</>,
+        <><strong>Beat earnings:</strong> +8% market sentiment. <strong>Miss earnings:</strong> -15% sentiment</>,
+        <><strong>2 consecutive misses:</strong> analyst downgrade (-10% additional sentiment)</>,
+        <><strong>Share-funded acquisitions:</strong> max 1 per round, each causes -5% FEV dilution penalty</>,
+      ]} />
+
+      <SubHeading>Stay Private Bonus</SubHeading>
+      <P>
+        Not every holdco should go public. If you meet IPO eligibility requirements but
+        choose to stay private, you earn a <strong>+5-10% FEV bonus</strong> at game end.
+        The bonus scales with how far above the EBITDA gate you are. This makes the
+        private path a viable strategic choice.
+      </P>
+
+      <SubHeading>Family Office Endgame</SubHeading>
+      <P>
+        The Family Office is a post-game 5-round mini-game unlocked after the main game
+        ends for exceptional players. It explores what happens after the fortune is made:
+        wealth preservation, philanthropy, and generational succession.
+      </P>
+      <DataTable
+        headers={['Gate', 'Requirement']}
+        rows={[
+          ['Distributions', '$1B+ in founder distributions received'],
+          ['Composite Grade', 'B or better'],
+          ['Quality Portfolio', '3+ businesses at Q4+ quality'],
+          ['Long-Held Businesses', '2+ businesses held for 10+ years'],
+        ]}
+      />
+
+      <P><strong>Family Office mechanics:</strong></P>
+      <BulletList items={[
+        <><strong>Reputation</strong> (0-100): starts at 50 (neutral), influenced by philanthropy and decisions</>,
+        <><strong>Philanthropy:</strong> irrevocable cash commitments that boost reputation and legacy score</>,
+        <><strong>Investments:</strong> portfolio allocations scored on diversification</>,
+        <><strong>Generational Succession</strong> (Round 3): choose Heir Apparent (risky but authentic), Professional CEO (safe but costly), or Family Council (moderate governance friction)</>,
+      ]} />
+
+      <SubHeading>Legacy Score</SubHeading>
+      <P>
+        At the end of the Family Office mini-game, you receive a Legacy Score (0-100)
+        composed of five equally-weighted components:
+      </P>
+      <DataTable
+        headers={['Component', 'Weight', 'What It Measures']}
+        rows={[
+          ['Wealth Preservation', '20%', 'Investment diversification and count'],
+          ['Reputation', '20%', 'Final reputation score'],
+          ['Philanthropy', '20%', 'Total committed to philanthropy'],
+          ['Succession Quality', '20%', 'Governance choice and execution'],
+          ['Permanent Hold Performance', '20%', 'Commitment count and depth'],
+        ]}
+      />
+      <DataTable
+        headers={['Grade', 'Score Range']}
+        rows={[
+          ['Enduring', '80-100'],
+          ['Influential', '60-79'],
+          ['Established', '40-59'],
+          ['Fragile', '0-39'],
+        ]}
+      />
+
+      <SubHeading>Narrative Evolution</SubHeading>
+      <P>
+        In 20-year mode, the AI chronicles shift voice across 5 narrative phases as your
+        holdco matures:
+      </P>
+      <DataTable
+        headers={['Phase', 'Rounds', 'Tone']}
+        rows={[
+          ['Scrappy Startup', '1-4', 'Hungry, uncertain, excited'],
+          ['Growing Operator', '5-8', 'Confident, expanding, learning'],
+          ['Seasoned Builder', '9-12', 'Commanding, strategic, measured'],
+          ['Adapting Veteran', '13-16', 'Reflective, adapting, selective'],
+          ['Legacy Architect', '17-20', 'Contemplative, philosophical, weighing permanence'],
+        ]}
+      />
+      <P>
+        10-year mode uses a compressed 3-phase version (Scrappy Startup rounds 1-3,
+        Growing Operator rounds 4-6, Seasoned Builder rounds 7-10).
+      </P>
+
+      <SubHeading>Business Anniversaries</SubHeading>
+      <P>
+        At years 5, 10, and 15 of ownership, you receive a commemorative toast celebrating
+        the milestone and showing how the business has grown since acquisition.
+      </P>
+
+      <SubHeading>Final Countdown</SubHeading>
+      <P>
+        Starting at year 18, a countdown badge appears showing how many years remain. This
+        creates urgency and helps frame final allocation decisions.
+      </P>
+    </>
+  );
+}
+
 // --- Section renderer map ---
 
 const SECTION_CONTENT: Record<ManualSection, () => React.ReactElement> = {
@@ -1340,6 +1505,7 @@ const SECTION_CONTENT: Record<ManualSection, () => React.ReactElement> = {
   'shared-services': SharedServicesContent,
   'selling': SellingContent,
   'events': EventsContent,
+  'twenty-year': TwentyYearContent,
   'scoring': ScoringContent,
   'sectors': SectorsContent,
   'strategy': StrategyContent,

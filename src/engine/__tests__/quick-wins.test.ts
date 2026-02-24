@@ -60,6 +60,7 @@ function createTestBusiness(overrides: Partial<Business> = {}): Business {
       competitivePositionText: 'Well-regarded',
     },
     integrationRoundsRemaining: 0,
+    integrationGrowthDrag: 0,
     improvements: [],
     sellerNoteBalance: 500,
     sellerNoteRate: 0.06,
@@ -135,6 +136,11 @@ function createTestState(overrides: Partial<GameState> = {}): GameState {
     lastIntegrationOutcome: null,
     founderDistributionsReceived: 0,
     isChallenge: false,
+    debtPaymentThisRound: 0,
+    cashBeforeDebtPayments: 0,
+    dealInflationState: { crisisResetRoundsRemaining: 0 },
+    ipoState: null,
+    familyOfficeState: null,
     ...overrides,
   };
 }

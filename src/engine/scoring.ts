@@ -9,6 +9,7 @@ import { calculateMetrics, calculateSectorFocusBonus, calculateExitValuation } f
 import { POST_GAME_INSIGHTS } from '../data/tips';
 import { getAllDedupedBusinesses } from './helpers';
 import { RESTRUCTURING_FEV_PENALTY } from '../data/gameConfig';
+import { calculateStayPrivateBonus } from './ipo';
 
 const LEADERBOARD_KEY = 'holdco-tycoon-leaderboard';
 const MAX_LEADERBOARD_ENTRIES = 10;
@@ -69,7 +70,13 @@ export function calculateEnterpriseValue(state: GameState): number {
   const totalDebt = state.totalDebt + opcoSellerNotes;
 
   // EV = Portfolio Value + Cash - All Debt - Rollover Claims (no distribution add-back)
-  const ev = portfolioValue + state.cash - totalDebt - rolloverClaims;
+  let ev = portfolioValue + state.cash - totalDebt - rolloverClaims;
+
+  // Stay-private bonus: rewards declining IPO when eligible (20yr mode only)
+  const stayPrivateBonus = calculateStayPrivateBonus(state);
+  if (stayPrivateBonus > 0) {
+    ev *= (1 + stayPrivateBonus);
+  }
 
   return Math.round(Math.max(0, ev));
 }

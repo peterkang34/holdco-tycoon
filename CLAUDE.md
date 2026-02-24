@@ -70,8 +70,8 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
-- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v26`
-- **Tests**: Vitest in `src/engine/__tests__/` — 1032 tests across 20 suites (incl. display-proofreader)
+- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v27`
+- **Tests**: Vitest in `src/engine/__tests__/` — 1152 tests across 21 suites (incl. display-proofreader)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Rollover Equity**: 6th deal structure — seller reinvests ~25% (standard) or ~20% (quick) as equity; gated behind M&A Tier 2+, Q3+, non-distressed archetypes, noNewDebt; exit split applied AFTER debt payoff; FEV deducts rollover claims; note rate 5%
@@ -82,7 +82,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 
 ## Key Files
 - `src/hooks/useGame.ts` — Zustand store (game actions, state transitions)
-- `src/hooks/migrations.ts` — Save migration logic (current: v26)
+- `src/hooks/migrations.ts` — Save migration logic (current: v27)
 - `src/hooks/chronicleContext.ts` — AI chronicle context builder
 - `src/engine/helpers.ts` — Shared helpers (clampMargin, capGrowthRate, applyEbitdaFloor)
 - `src/engine/__tests__/display-proofreader.test.ts` — 195 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
@@ -94,6 +94,8 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/components/modals/TurnaroundModal.tsx` — Turnaround program selection modal (per-business, opened from BusinessCard)
 - `src/data/turnaroundPrograms.ts` — 7 turnaround programs across 3 tiers, sector quality ceilings
 - `src/engine/turnarounds.ts` — Turnaround eligibility, cost, resolution, quality improvement, exit premium
+- `src/engine/ipo.ts` — IPO Pathway engine (eligibility, stock price, earnings, share-funded deals, stay-private bonus)
+- `src/engine/familyOffice.ts` — Family Office Endgame engine (eligibility, philanthropy, succession, legacy scoring)
 - `src/data/platformRecipes.ts` — 38 integrated platform recipes (32 within-sector + 6 cross-sector)
 - `src/engine/platforms.ts` — Platform eligibility, forging, bonus application
 - `src/components/ui/LeaderboardModal.tsx` — Tabbed leaderboard (exports filtering utils for GameOverScreen)
@@ -145,6 +147,11 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **Emergency equity raises**: flat 50% discount, NO escalating discount, but DO trigger cooldown
 - **Portfolio valuation uses quality-adjusted multiples**: `midpoint + (quality - 3) × 0.35`, floored at sector min — matches deal generation factor
 - **Rollover equity exit split**: Applied AFTER debt payoff (`playerProceeds = netProceeds * (1 - rolloverPct)`); merges use EBITDA-weighted average; tuck-ins have rolloverPct: 0 (parent's pct covers); platform sales use per-constituent split with `Math.max(0, ...)` floor; FEV deducts rollover claims from portfolio value; gated behind `!noNewDebt`
+- **20-Year Mode features are gated on `duration === 'standard'`** — Deal Inflation, Succession Events, IPO, Family Office all check mode. 10-year mode stays untouched except compressed narrative tone (3 phases instead of 5)
+- **Deal Inflation applies AFTER quality adjustment, BEFORE competitive position** — in `businesses.ts` deal generation. Financial Crisis resets inflation by -2.0x for 2 rounds via `dealInflationState.crisisResetRoundsRemaining`
+- **IPO stock price is derived, not random** — `EV / totalShares * (1 + marketSentiment)`. Earnings expectations = prior EBITDA * 1.05. 2 consecutive misses = analyst downgrade (-0.10 sentiment). Max 1 share-funded deal/round with -5% FEV dilution each
+- **Family Office is a post-game mini-game** — 5 rounds, triggered from GameOverScreen when player has $1B+ distributions + B+ grade + 3 Q4+ businesses + 2 businesses held 10+ years. Irrevocable philanthropy commitments. Succession choice at round 3. Legacy Score grades: Enduring/Influential/Established/Fragile
+- **Succession events fire once per business** — `successionResolved: boolean` prevents repeats. 8+ years held, Q3+, 20yr mode only. Quality drops immediately; 3 choices (invest, promote, sell) with shared services interaction on promote path
 - **Behavioral copy must come from `mechanicsCopy.ts`** — never hardcode debt descriptions directly in components; if changing mechanic behavior, update mechanicsCopy.ts AND add old description to BANNED_COPY_PATTERNS
 - **Integration failure growth drag is proportional and decaying** — `-(acquiredEbitda/platformEbitda) × 3.0ppt`, clamped [floor -0.5ppt, cap -3.0ppt]; mergers ×0.67 factor; decays 50%/yr (standard) or 65%/yr (quick); stored on `business.integrationGrowthDrag` (separate from base rates); restructuring cost 15% tuck-ins / 12% mergers
 

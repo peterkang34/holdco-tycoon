@@ -25,7 +25,12 @@ import {
   INTEGRATION_DRAG_FLOOR,
   INTEGRATION_DRAG_CAP,
   INTEGRATION_DRAG_MERGER_FACTOR,
+  DEAL_INFLATION_START_ROUND,
+  DEAL_INFLATION_RATE,
+  DEAL_INFLATION_CAP,
+  DEAL_INFLATION_CRISIS_RESET,
 } from '../data/gameConfig';
+import type { DealInflationState, GameDuration } from './types';
 import { SECTORS, SECTOR_LIST } from '../data/sectors';
 import { getRandomBusinessName } from '../data/names';
 import { calculateSizeTierPremium } from './buyers';
@@ -34,6 +39,31 @@ import {
   generateBusinessContent,
   generateFallbackContent,
 } from '../services/aiGeneration';
+
+/**
+ * Calculate deal price inflation for 20-year mode.
+ * Starting round 11, asking multiples inflate +0.5x/yr, cap +3.0x.
+ * Financial Crisis resets by -2.0x while active.
+ * Returns 0 for quick (10yr) mode.
+ */
+export function calculateDealInflation(
+  round: number,
+  duration: GameDuration,
+  inflationState: DealInflationState,
+): number {
+  if (duration === 'quick') return 0;
+  if (round < DEAL_INFLATION_START_ROUND) return 0;
+
+  const yearsActive = round - DEAL_INFLATION_START_ROUND;
+  let inflation = yearsActive * DEAL_INFLATION_RATE;
+
+  // Crisis reset reduces inflation while active
+  if (inflationState.crisisResetRoundsRemaining > 0) {
+    inflation = Math.max(0, inflation - DEAL_INFLATION_CRISIS_RESET);
+  }
+
+  return Math.min(inflation, DEAL_INFLATION_CAP);
+}
 
 let businessIdCounter = 0;
 
@@ -803,6 +833,7 @@ export interface DealGenerationOptions {
   maxRounds?: number; // 20 or 10 — for scaling heat/weights
   creditTighteningActive?: boolean; // reduces deal heat by 1 tier
   maSourcingTier?: MASourcingTier; // Tier 2+ sourced deals get additional -1 heat
+  dealInflation?: number; // multiple adder from late-game inflation (20yr mode)
 }
 
 // Generate a deal with size preference
@@ -862,7 +893,9 @@ export function generateDealWithSize(
     // (preserves the margin as a business characteristic)
     adjustedRevenue = Math.round(adjustedEbitda / business.ebitdaMargin);
   }
-  const adjustedPrice = Math.round(adjustedEbitda * business.acquisitionMultiple);
+  // Apply deal inflation to the asking multiple (20yr mode, round 11+)
+  const inflatedMultiple = business.acquisitionMultiple + (options.dealInflation ?? 0);
+  const adjustedPrice = Math.round(adjustedEbitda * inflatedMultiple);
   const acquisitionType = determineAcquisitionType(adjustedEbitda, rng);
   const tuckInDiscount = acquisitionType === 'tuck_in'
     ? calculateTuckInDiscount(quality)
@@ -989,7 +1022,8 @@ export function generateDealPipeline(
   lastEventType?: EventType,
   maxRounds: number = 20,
   creditTighteningActive: boolean = false,
-  rng?: SeededRng
+  rng?: SeededRng,
+  dealInflation: number = 0,
 ): Deal[] {
   // Deal index counter for deterministic IDs within a round
   let dealIdx = 0;
@@ -1010,8 +1044,8 @@ export function generateDealPipeline(
   const sectorsInPipeline = new Set(pipeline.map(d => d.business.sectorId));
   const allSectorIds = SECTOR_LIST.map(s => s.id);
 
-  // Shared options to pass lastEventType, maxRounds, and credit tightening for heat calculation
-  const heatOpts: DealGenerationOptions = { lastEventType, maxRounds, creditTighteningActive };
+  // Shared options to pass lastEventType, maxRounds, credit tightening, and deal inflation for pricing
+  const heatOpts: DealGenerationOptions = { lastEventType, maxRounds, creditTighteningActive, dealInflation };
 
   // 1. Generate deals based on M&A focus (if set)
   if (maFocus?.sectorId && pipeline.length < MAX_DEALS) {
@@ -1033,6 +1067,7 @@ export function generateDealPipeline(
       maxRounds,
       creditTighteningActive,
       maSourcingTier: maSourcingTier as MASourcingTier,
+      dealInflation,
     };
 
     // Tier 2+: sub-type targeting + quality floor
@@ -1081,6 +1116,7 @@ export function generateDealPipeline(
           lastEventType,
           maxRounds,
           creditTighteningActive,
+          dealInflation,
         },
         rng
       ));
@@ -1233,12 +1269,13 @@ export function generateSourcedDeals(
   maSourcingTier: number = 0,
   maxRounds: number = 20,
   creditTighteningActive: boolean = false,
-  rng?: SeededRng
+  rng?: SeededRng,
+  dealInflation: number = 0,
 ): Deal[] {
   const deals: Deal[] = [];
 
   // Build options based on MA sourcing tier
-  const sourcingOptions: DealGenerationOptions = { source: 'sourced', maxRounds, creditTighteningActive, maSourcingTier: maSourcingTier as MASourcingTier };
+  const sourcingOptions: DealGenerationOptions = { source: 'sourced', maxRounds, creditTighteningActive, maSourcingTier: maSourcingTier as MASourcingTier, dealInflation };
   if (maSourcingTier >= 2) {
     sourcingOptions.qualityFloor = 2;
     if (maFocus?.subType) sourcingOptions.subType = maFocus.subType;
@@ -1289,7 +1326,8 @@ export function generateProactiveOutreachDeals(
   portfolioEbitda: number = 0,
   maxRounds: number = 20,
   creditTighteningActive: boolean = false,
-  rng?: SeededRng
+  rng?: SeededRng,
+  dealInflation: number = 0,
 ): Deal[] {
   const deals: Deal[] = [];
   const sectorId = maFocus.sectorId ?? pickWeightedSector(round, maxRounds, rng);
@@ -1303,6 +1341,7 @@ export function generateProactiveOutreachDeals(
         source: 'proprietary',
         maxRounds,
         creditTighteningActive,
+        dealInflation,
       },
       rng
     ));

@@ -39,6 +39,7 @@ import {
   generateDistressedDeals,
   generateRecessionDeals,
   calculateIntegrationGrowthPenalty,
+  calculateDealInflation,
 } from '../engine/businesses';
 import { generateBuyerProfile, calculateSizeTierPremium } from '../engine/buyers';
 import {
@@ -68,8 +69,17 @@ import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue
 import { getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
 
-import type { GameDifficulty, GameDuration } from '../engine/types';
+import type { GameDifficulty, GameDuration, GameActionType } from '../engine/types';
 import { generateRandomSeed, createRngStreams } from '../engine/rng';
+import { checkIPOEligibility, executeIPO as executeIPOEngine, processEarningsResult } from '../engine/ipo';
+import {
+  checkFamilyOfficeEligibility,
+  initializeFamilyOffice,
+  advanceFamilyOfficeRound,
+  commitPhilanthropy,
+  makeInvestment,
+  applySuccessionChoice,
+} from '../engine/familyOffice';
 
 /** Recompute totalDebt from holdco loan + per-business bank debt */
 function computeTotalDebt(businesses: Business[], holdcoLoanBalance: number): number {
@@ -155,6 +165,9 @@ import {
   SELLER_DECEPTION_FIRE_SALE_PCT, SELLER_DECEPTION_QUALITY_DROP,
   WORKING_CAPITAL_CRUNCH_REVENUE_PENALTY, WORKING_CAPITAL_CRUNCH_PENALTY_ROUNDS,
   INTEGRATION_RESTRUCTURING_PCT, INTEGRATION_RESTRUCTURING_MERGER_PCT,
+  SUCCESSION_INVEST_COST_MIN, SUCCESSION_INVEST_COST_MAX, SUCCESSION_INVEST_RESTORE,
+  SUCCESSION_PROMOTE_RESTORE, SUCCESSION_PROMOTE_HR_BONUS, SUCCESSION_PROMOTE_PLATFORM_BONUS,
+  SUCCESSION_QUALITY_DROP, SUCCESSION_SELL_DISCOUNT,
 } from '../data/gameConfig';
 import {
   canUnlockTier,
@@ -221,6 +234,9 @@ interface GameStore extends GameState {
   workingCapitalInject: () => void;
   workingCapitalCredit: () => void;
   workingCapitalAbsorb: () => void;
+  successionInvest: () => void;
+  successionPromote: () => void;
+  successionSell: () => void;
 
   setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference, subType?: string | null) => void;
 
@@ -246,6 +262,17 @@ interface GameStore extends GameState {
 
   // Deal sourcing
   sourceDealFlow: () => void;
+
+  // IPO Pathway (20-year mode)
+  executeIPO: () => void;
+  declineIPO: () => void;
+
+  // Family Office (20-year mode endgame)
+  startFamilyOffice: () => void;
+  familyOfficePhilanthropy: (amount: number) => void;
+  familyOfficeInvest: (type: string, amount: number) => void;
+  familyOfficeSuccession: (choice: import('../engine/types').FOSuccessionChoice) => void;
+  familyOfficeAdvanceRound: () => void;
 
   // AI enhancement
   triggerAIEnhancement: () => Promise<void>;
@@ -331,6 +358,9 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   holdcoAmortizationThisRound: 0,
   consolidationBoomSectorId: undefined,
   seed: 0,
+  dealInflationState: { crisisResetRoundsRemaining: 0 },
+  ipoState: null,
+  familyOfficeState: null,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -389,6 +419,9 @@ export const useGameStore = create<GameStore>()(
           activeTurnarounds: [],
           founderDistributionsReceived: 0,
           isChallenge: seed != null,
+          dealInflationState: { crisisResetRoundsRemaining: 0 },
+          ipoState: null,
+          familyOfficeState: null,
         };
 
         set({
@@ -688,6 +721,13 @@ export const useGameStore = create<GameStore>()(
         if (gameState.inflationRoundsRemaining > 0) {
           gameState.inflationRoundsRemaining--;
         }
+        // Decrement deal inflation crisis reset counter
+        if (gameState.dealInflationState?.crisisResetRoundsRemaining > 0) {
+          gameState.dealInflationState = {
+            ...gameState.dealInflationState,
+            crisisResetRoundsRemaining: gameState.dealInflationState.crisisResetRoundsRemaining - 1,
+          };
+        }
 
         // Resolve turnarounds that have reached their end round
         let resolvedTurnarounds = [...(gameState.activeTurnarounds || state.activeTurnarounds)];
@@ -787,6 +827,9 @@ export const useGameStore = create<GameStore>()(
         // Create seeded RNG streams for this round's deal generation
         const roundStreams = createRngStreams(state.seed, state.round);
 
+        // Calculate deal inflation for 20yr mode
+        const dealInflationAdder = calculateDealInflation(state.round, state.duration, state.dealInflationState);
+
         // Generate new deals with M&A focus and portfolio synergies
         const newPipeline = generateDealPipeline(
           state.dealPipeline,
@@ -800,7 +843,8 @@ export const useGameStore = create<GameStore>()(
           lastEvt,
           state.maxRounds,
           state.creditTighteningRoundsRemaining > 0,
-          roundStreams.deals
+          roundStreams.deals,
+          dealInflationAdder,
         );
 
         // Inject distressed deals during Financial Crisis (bypass MAX_DEALS cap)
@@ -971,6 +1015,18 @@ export const useGameStore = create<GameStore>()(
         };
         const newRoundHistory = [...(state.roundHistory ?? []), roundHistoryEntry];
 
+        // Process IPO earnings result (if public)
+        let updatedIPOState = state.ipoState;
+        if (state.ipoState?.isPublic) {
+          const actualEbitda = updatedBusinesses
+            .filter(b => b.status === 'active')
+            .reduce((sum, b) => sum + b.ebitda, 0);
+          updatedIPOState = processEarningsResult(
+            { ...state, businesses: updatedBusinesses },
+            actualEbitda,
+          );
+        }
+
         if (!gameOver) {
           // Advance to collect phase — all debt P&I is now handled in advanceToEvent waterfall
           // Just recompute totalDebt for consistency
@@ -999,6 +1055,7 @@ export const useGameStore = create<GameStore>()(
             acquisitionsThisRound: 0,
             lastAcquisitionResult: null,
             lastIntegrationOutcome: null,
+            ipoState: updatedIPOState,
           });
         } else {
           // Game over — run final collection to settle all remaining debt before scoring
@@ -1023,6 +1080,7 @@ export const useGameStore = create<GameStore>()(
             totalDebt: gameOverDebt,
             metrics: gameOverMetrics,
             focusBonus: calculateSectorFocusBonus(finalState.businesses),
+            ipoState: updatedIPOState,
           });
         }
       },
@@ -2785,6 +2843,131 @@ export const useGameStore = create<GameStore>()(
         useToastStore.getState().addToast({ message: `Absorbed working capital hit — ${Math.round(totalPenalty * 100)}% revenue penalty`, type: 'warning' });
       },
 
+      // ── Management Succession event actions ──
+
+      successionInvest: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_management_succession' || !event.affectedBusinessId) return;
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+        const cost = event.choices?.find(c => c.action === 'successionInvest')?.cost ?? randomInt(SUCCESSION_INVEST_COST_MIN, SUCCESSION_INVEST_COST_MAX);
+        if (state.cash < cost) return;
+        const streams = createRngStreams(state.seed, state.round);
+        const restored = streams.events.fork('succession_invest').next() < SUCCESSION_INVEST_RESTORE;
+        const newState = {
+          ...state,
+          cash: state.cash - cost,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            if (restored) {
+              const restoredQuality = Math.min(5, b.qualityRating + SUCCESSION_QUALITY_DROP) as 1 | 2 | 3 | 4 | 5;
+              const newMargin = clampMargin(b.ebitdaMargin + 0.015 * SUCCESSION_QUALITY_DROP);
+              return { ...b, qualityRating: restoredQuality, ebitdaMargin: newMargin, ebitda: Math.round(b.revenue * newMargin), successionResolved: true };
+            }
+            return { ...b, successionResolved: true };
+          }),
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'improve' as GameActionType, round: state.round, details: { businessId: event.affectedBusinessId, action: 'successionInvest', cost, restored } },
+          ],
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        const addToast = useToastStore.getState().addToast;
+        if (restored) {
+          addToast({ message: `External hire succeeded — ${business.name} quality restored`, type: 'success' });
+        } else {
+          addToast({ message: `External hire didn't work out — ${business.name} quality stays dropped`, type: 'warning' });
+        }
+      },
+
+      successionPromote: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_management_succession' || !event.affectedBusinessId) return;
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+        // Calculate promote chance with shared services bonuses
+        const hrActive = state.sharedServices?.some(s => s.type === 'recruiting_hr' && s.active) ?? false;
+        let promoteChance = SUCCESSION_PROMOTE_RESTORE;
+        if (hrActive) promoteChance += SUCCESSION_PROMOTE_HR_BONUS;
+        if (business.isPlatform) promoteChance += SUCCESSION_PROMOTE_PLATFORM_BONUS;
+        promoteChance = Math.min(0.95, promoteChance);
+        const streams = createRngStreams(state.seed, state.round);
+        const restored = streams.events.fork('succession_promote').next() < promoteChance;
+        const newState = {
+          ...state,
+          businesses: state.businesses.map(b => {
+            if (b.id !== event.affectedBusinessId) return b;
+            if (restored) {
+              const restoredQuality = Math.min(5, b.qualityRating + SUCCESSION_QUALITY_DROP) as 1 | 2 | 3 | 4 | 5;
+              const newMargin = clampMargin(b.ebitdaMargin + 0.015 * SUCCESSION_QUALITY_DROP);
+              return { ...b, qualityRating: restoredQuality, ebitdaMargin: newMargin, ebitda: Math.round(b.revenue * newMargin), successionResolved: true };
+            }
+            return { ...b, successionResolved: true };
+          }),
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'improve' as GameActionType, round: state.round, details: { businessId: event.affectedBusinessId, action: 'successionPromote', restored } },
+          ],
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        const addToast = useToastStore.getState().addToast;
+        if (restored) {
+          addToast({ message: `Internal promotion succeeded — ${business.name} quality restored`, type: 'success' });
+        } else {
+          addToast({ message: `Internal promotion struggled — ${business.name} quality stays dropped`, type: 'warning' });
+        }
+      },
+
+      successionSell: () => {
+        const state = get();
+        const event = state.currentEvent;
+        if (!event || event.type !== 'portfolio_management_succession' || !event.affectedBusinessId) return;
+        const business = state.businesses.find(b => b.id === event.affectedBusinessId);
+        if (!business) return;
+        const valuation = calculateExitValuation(business, state.round, undefined, undefined, state.integratedPlatforms);
+        const fairValue = Math.round(business.ebitda * valuation.totalMultiple);
+        const sellPrice = Math.round(fairValue * (1 - SUCCESSION_SELL_DISCOUNT));
+        // Pay off all business debt
+        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining;
+        const netProceeds = Math.max(0, sellPrice - debtPayoff);
+        // Apply rollover equity split if applicable
+        const playerProceeds = business.rolloverEquityPct > 0
+          ? Math.round(netProceeds * (1 - business.rolloverEquityPct))
+          : netProceeds;
+        // Remove business (and handle bolt-ons if platform)
+        const boltOnIds = business.boltOnIds || [];
+        const removedIds = new Set([business.id, ...boltOnIds]);
+        const newState = {
+          ...state,
+          cash: state.cash + playerProceeds,
+          totalExitProceeds: state.totalExitProceeds + playerProceeds,
+          businesses: state.businesses.filter(b => !removedIds.has(b.id)),
+          exitedBusinesses: [
+            ...state.exitedBusinesses,
+            ...state.businesses.filter(b => removedIds.has(b.id)).map(b => ({
+              ...b,
+              status: 'sold' as const,
+              successionResolved: true,
+              exitPrice: b.id === business.id ? sellPrice : 0,
+              exitRound: state.round,
+              earnoutRemaining: 0,
+            })),
+          ],
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'sell' as GameActionType, round: state.round, details: { businessId: business.id, proceeds: playerProceeds } },
+          ],
+          currentEvent: null,
+        };
+        newState.totalDebt = computeTotalDebt(newState.businesses, newState.holdcoLoanBalance);
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Sold ${business.name} for ${formatMoney(playerProceeds)} net proceeds`, type: 'info' });
+      },
+
       // Restructuring actions
       distressedSale: (businessId: string) => {
         const state = get();
@@ -2943,6 +3126,7 @@ export const useGameStore = create<GameStore>()(
         // without this, every sourcing call in the same round gets the same seed
         const priorSourceCount = state.actionsThisRound.filter(a => a.type === 'source_deals').length;
         const srcStreams = createRngStreams(state.seed, state.round);
+        const srcInflation = calculateDealInflation(state.round, state.duration, state.dealInflationState);
         const newDeals = generateSourcedDeals(
           state.round,
           state.maFocus,
@@ -2951,7 +3135,8 @@ export const useGameStore = create<GameStore>()(
           state.maSourcing.active ? state.maSourcing.tier : 0,
           state.maxRounds,
           state.creditTighteningRoundsRemaining > 0,
-          srcStreams.deals.fork(`source-${priorSourceCount}`)
+          srcStreams.deals.fork(`source-${priorSourceCount}`),
+          srcInflation,
         );
 
         set({
@@ -2962,6 +3147,100 @@ export const useGameStore = create<GameStore>()(
             { type: 'source_deals', round: state.round, details: { cost, dealsGenerated: newDeals.length } },
           ],
         });
+      },
+
+      // ── IPO Pathway actions (20-year mode) ──
+
+      executeIPO: () => {
+        const state = get();
+        const { eligible, reasons } = checkIPOEligibility(state);
+        if (!eligible) {
+          useToastStore.getState().addToast({ message: `Cannot IPO: ${reasons[0]}`, type: 'warning' });
+          return;
+        }
+        const result = executeIPOEngine(state);
+        const newState = {
+          ...state,
+          cash: state.cash + result.cashRaised,
+          ipoState: result.ipoState,
+          sharesOutstanding: result.ipoState.sharesOutstanding,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'ipo' as const, round: state.round, details: { cashRaised: result.cashRaised, sharesIssued: result.newSharesIssued } },
+          ],
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({
+          message: `IPO successful! Raised ${formatMoney(result.cashRaised)}`,
+          type: 'success',
+        });
+      },
+
+      declineIPO: () => {
+        useToastStore.getState().addToast({
+          message: 'Staying private — discipline will be rewarded at exit',
+          type: 'info',
+        });
+      },
+
+      // ── Family Office actions (20-year mode endgame) ──
+
+      startFamilyOffice: () => {
+        const state = get();
+        const score = calculateFinalScore(state);
+        const { eligible, reasons } = checkFamilyOfficeEligibility(state, score);
+        if (!eligible) {
+          useToastStore.getState().addToast({
+            message: `Cannot start Family Office: ${reasons[0]}`,
+            type: 'warning',
+          });
+          return;
+        }
+        set({ familyOfficeState: initializeFamilyOffice() });
+        useToastStore.getState().addToast({
+          message: 'Welcome to the Family Office — your legacy begins',
+          type: 'success',
+        });
+      },
+
+      familyOfficePhilanthropy: (amount: number) => {
+        const state = get();
+        if (!state.familyOfficeState?.isActive) return;
+        if (state.cash < amount) return;
+        const updated = commitPhilanthropy(state.familyOfficeState, amount);
+        set({ familyOfficeState: updated, cash: state.cash - amount });
+      },
+
+      familyOfficeInvest: (type: string, amount: number) => {
+        const state = get();
+        if (!state.familyOfficeState?.isActive) return;
+        if (state.cash < amount) return;
+        const updated = makeInvestment(state.familyOfficeState, type, amount);
+        set({ familyOfficeState: updated, cash: state.cash - amount });
+      },
+
+      familyOfficeSuccession: (choice) => {
+        const state = get();
+        if (!state.familyOfficeState?.isActive) return;
+        const updated = applySuccessionChoice(state.familyOfficeState, choice);
+        set({ familyOfficeState: updated });
+        useToastStore.getState().addToast({
+          message: `Succession plan chosen: ${choice.replaceAll('_', ' ')}`,
+          type: 'info',
+        });
+      },
+
+      familyOfficeAdvanceRound: () => {
+        const state = get();
+        if (!state.familyOfficeState?.isActive) return;
+        const updated = advanceFamilyOfficeRound(state.familyOfficeState);
+        set({ familyOfficeState: updated });
+        if (updated.legacyScore) {
+          useToastStore.getState().addToast({
+            message: `Legacy Score: ${updated.legacyScore.total}/100 — ${updated.legacyScore.grade}`,
+            type: 'success',
+          });
+        }
       },
 
       upgradeMASourcing: () => {
@@ -3037,13 +3316,15 @@ export const useGameStore = create<GameStore>()(
 
         const priorOutreachCount = state.actionsThisRound.filter(a => a.type === 'proactive_outreach').length;
         const outStreams = createRngStreams(state.seed, state.round);
+        const outInflation = calculateDealInflation(state.round, state.duration, state.dealInflationState);
         const newDeals = generateProactiveOutreachDeals(
           state.round,
           state.maFocus,
           totalPortfolioEbitda,
           state.maxRounds,
           state.creditTighteningRoundsRemaining > 0,
-          outStreams.deals.fork(`outreach-${priorOutreachCount}`)
+          outStreams.deals.fork(`outreach-${priorOutreachCount}`),
+          outInflation,
         );
 
         set({
@@ -3547,7 +3828,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v26', // v26: proportional decaying integration growth drag
+      name: 'holdco-tycoon-save-v27', // v27: 20-year mode upgrade (deal inflation, succession, IPO, family office)
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -3609,6 +3890,9 @@ export const useGameStore = create<GameStore>()(
         focusBonus: state.focusBonus,
         consolidationBoomSectorId: state.consolidationBoomSectorId,
         seed: state.seed,
+        dealInflationState: state.dealInflationState,
+        ipoState: state.ipoState,
+        familyOfficeState: state.familyOfficeState,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.holdcoName) {
@@ -3661,6 +3945,12 @@ export const useGameStore = create<GameStore>()(
             if (!Array.isArray(state.passedDealIds)) {
               (state as any).passedDealIds = [];
             }
+            // Backwards compat: 20-year mode fields
+            if (!(state as any).dealInflationState) {
+              (state as any).dealInflationState = { crisisResetRoundsRemaining: 0 };
+            }
+            if ((state as any).ipoState === undefined) (state as any).ipoState = null;
+            if ((state as any).familyOfficeState === undefined) (state as any).familyOfficeState = null;
             // Restore business ID counter to avoid collisions after save/load
             if (Array.isArray(state.businesses)) {
               restoreBusinessIdCounter(state.businesses);

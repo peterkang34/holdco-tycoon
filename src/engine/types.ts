@@ -148,6 +148,7 @@ export interface Business {
   // Event-driven tracking
   successionPlanRound?: number;   // Key-Man succession plan countdown start
   earnoutDisputeRound?: number;   // Cooldown: last earn-out dispute round
+  successionResolved?: boolean;   // Management succession event resolved (one-time per business)
 
   // Dynamic narratives
   storyBeats?: StoryBeat[]; // Narrative events that happened to this business
@@ -338,7 +339,8 @@ export type EventType =
   | 'portfolio_supplier_shift'
   | 'portfolio_seller_deception'
   | 'portfolio_working_capital_crunch'
-  | 'sector_consolidation_boom';
+  | 'sector_consolidation_boom'
+  | 'portfolio_management_succession';
 
 export interface EventChoice {
   label: string;
@@ -417,6 +419,64 @@ export interface RoundHistoryEntry {
   businessCount: number;
   cash: number;
   totalDebt: number;
+}
+
+// ── 20-Year Mode: Deal Inflation ──
+
+export interface DealInflationState {
+  crisisResetRoundsRemaining: number; // Financial Crisis reduces inflation for N rounds
+}
+
+// ── 20-Year Mode: IPO Pathway ──
+
+export interface IPOState {
+  isPublic: boolean;
+  stockPrice: number;
+  sharesOutstanding: number;
+  preIPOShares: number;           // founder shares at IPO time (for dilution tracking)
+  marketSentiment: number;        // -0.3 to +0.3
+  earningsExpectations: number;   // EBITDA target
+  ipoRound: number;
+  consecutiveMisses: number;
+  shareFundedDealsThisRound: number; // max 1/round
+}
+
+// ── 20-Year Mode: Family Office Endgame ──
+
+export type FOSuccessionChoice = 'heir_apparent' | 'professional_ceo' | 'family_council';
+
+export interface FOInvestment {
+  type: string;
+  amount: number;
+  round: number;
+}
+
+export interface FOCommitment {
+  type: string;
+  amount: number;
+  round: number;
+  irrevocable: boolean;
+}
+
+export interface LegacyScore {
+  total: number;
+  grade: 'Enduring' | 'Influential' | 'Established' | 'Fragile';
+  wealthPreservation: number;
+  reputationScore: number;
+  philanthropyScore: number;
+  successionQuality: number;
+  permanentHoldPerformance: number;
+}
+
+export interface FamilyOfficeState {
+  isActive: boolean;
+  foRound: number;                // 1-5
+  reputation: number;             // 0-100
+  philanthropyCommitted: number;
+  investments: FOInvestment[];
+  irrevocableCommitments: FOCommitment[];
+  generationalSuccessionChoice?: FOSuccessionChoice;
+  legacyScore?: LegacyScore;
 }
 
 export interface GameState {
@@ -519,6 +579,11 @@ export interface GameState {
 
   // Challenge mode
   isChallenge: boolean; // true when game started from a challenge URL
+
+  // 20-Year Mode features
+  dealInflationState: DealInflationState;
+  ipoState: IPOState | null;
+  familyOfficeState: FamilyOfficeState | null;
 }
 
 export type GameActionType =
@@ -546,7 +611,8 @@ export type GameActionType =
   | 'sell_platform'
   | 'unlock_turnaround_tier'
   | 'start_turnaround'
-  | 'turnaround_resolved';
+  | 'turnaround_resolved'
+  | 'ipo';
 
 export interface GameAction {
   type: GameActionType;

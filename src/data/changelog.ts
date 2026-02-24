@@ -12,6 +12,31 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 23, 2026',
+    title: '20-Year Mode Upgrade',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Deal Inflation: Starting year 11, asking multiples inflate +0.5x/yr (cap +3.0x). Financial crises reset by -2.0x for 2 rounds.',
+          'Management Succession: Businesses held 8+ years may face operator retirement. Choose: invest in external hire (75% restore), promote from within (50%+ with HR/platform bonuses), or sell at 85% fair value.',
+          'IPO Pathway: At round 16+ with $75M+ EBITDA, 6+ businesses, Q4+ avg quality, and 2+ platforms, take your holdco public. Manage earnings expectations, analyst sentiment, and share-funded acquisitions.',
+          'Family Office Endgame: Post-game 5-round mini-game for $1B+ distributions with B+ grade. Build your dynasty through philanthropy, investments, and generational succession.',
+          'Stay Private Bonus: Declining the IPO when eligible earns a 5-10% FEV bonus — makes the private path a genuine strategic choice.',
+        ],
+      },
+      {
+        heading: 'Narrative & Polish',
+        items: [
+          'AI chronicles now shift voice across 5 narrative phases as your holdco matures.',
+          'Business anniversaries at 5, 10, and 15 years celebrate milestones with EBITDA comparisons.',
+          'Final Countdown badge appears at year 18 in 20-year games.',
+          'Mode selection subtitles: Quick Play "Make your fortune" / Full Game "Build your legacy".',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 23, 2026',
     title: 'Smarter Integration Penalties',
     sections: [
       {

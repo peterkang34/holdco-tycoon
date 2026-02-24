@@ -165,6 +165,120 @@ export const CONSOLIDATION_BOOM_EXCLUSIVE_MIN_OPCOS = 2;     // need 2+ in secto
 export const CONSOLIDATION_BOOM_SECTORS = ['environmental', 'homeServices', 'autoServices', 'industrial'] as const;
 export const CONSOLIDATION_BOOM_DYNAMIC_MIN_OPCOS = 3;
 
+// ── 20-Year Mode: Deal Inflation ──
+
+export const DEAL_INFLATION_START_ROUND = 11;
+export const DEAL_INFLATION_RATE = 0.5;       // +0.5x per year past start
+export const DEAL_INFLATION_CAP = 3.0;        // max +3.0x
+export const DEAL_INFLATION_CRISIS_RESET = 2.0; // Financial Crisis reduces by 2.0x
+export const DEAL_INFLATION_CRISIS_DURATION = 2; // crisis reset lasts 2 rounds
+
+// ── 20-Year Mode: Final Countdown ──
+
+export const FINAL_COUNTDOWN_START_ROUND = 18;
+
+// ── 20-Year Mode: Business Anniversaries ──
+
+export const ANNIVERSARY_MILESTONES = [5, 10, 15] as const;
+
+// ── 20-Year Mode: Narrative Tone ──
+
+export type NarrativePhaseId = 'scrappy_startup' | 'growing_operator' | 'seasoned_builder' | 'adapting_veteran' | 'legacy_architect';
+
+export interface NarrativePhaseConfig {
+  id: NarrativePhaseId;
+  label: string;
+  toneGuidance: string;
+}
+
+export const NARRATIVE_PHASE_CONFIG: NarrativePhaseConfig[] = [
+  {
+    id: 'scrappy_startup',
+    label: 'Scrappy Startup',
+    toneGuidance: 'Write with hungry, uncertain energy. The founder is new to this — excited but unproven. Use language that conveys ambition mixed with naivety. Short sentences, forward momentum.',
+  },
+  {
+    id: 'growing_operator',
+    label: 'Growing Operator',
+    toneGuidance: 'Write with growing confidence. The operator is learning what works, expanding their playbook. Reference pattern recognition and early wins. Optimistic but grounded.',
+  },
+  {
+    id: 'seasoned_builder',
+    label: 'Seasoned Builder',
+    toneGuidance: 'Write with commanding authority. The builder has earned their reputation. Strategic, measured language. Reference institutional knowledge, system-level thinking.',
+  },
+  {
+    id: 'adapting_veteran',
+    label: 'Adapting Veteran',
+    toneGuidance: 'Write with reflective wisdom. The veteran has seen cycles come and go. More selective, philosophical. Reference lessons learned, trade-offs understood.',
+  },
+  {
+    id: 'legacy_architect',
+    label: 'Legacy Architect',
+    toneGuidance: 'Write with contemplative gravitas. The architect is thinking about permanence. Philosophical, weighing what endures. Reference legacy, institutional durability, what outlasts the founder.',
+  },
+];
+
+/** Returns the narrative phase for a given round and maxRounds. */
+export function getNarrativePhase(round: number, maxRounds: number): NarrativePhaseConfig {
+  if (maxRounds <= 10) {
+    // 10-year mode: compressed 3 phases
+    if (round <= 3) return NARRATIVE_PHASE_CONFIG[0];
+    if (round <= 6) return NARRATIVE_PHASE_CONFIG[1];
+    return NARRATIVE_PHASE_CONFIG[2];
+  }
+  // 20-year mode: 5 phases
+  if (round <= 4) return NARRATIVE_PHASE_CONFIG[0];
+  if (round <= 8) return NARRATIVE_PHASE_CONFIG[1];
+  if (round <= 12) return NARRATIVE_PHASE_CONFIG[2];
+  if (round <= 16) return NARRATIVE_PHASE_CONFIG[3];
+  return NARRATIVE_PHASE_CONFIG[4];
+}
+
+// ── 20-Year Mode: Management Succession ──
+
+export const SUCCESSION_MIN_YEARS_HELD = 8;
+export const SUCCESSION_INVEST_COST_MIN = 300;   // $K
+export const SUCCESSION_INVEST_COST_MAX = 500;   // $K
+export const SUCCESSION_INVEST_RESTORE = 0.75;
+export const SUCCESSION_PROMOTE_RESTORE = 0.50;
+export const SUCCESSION_PROMOTE_HR_BONUS = 0.20;
+export const SUCCESSION_PROMOTE_PLATFORM_BONUS = 0.15;
+export const SUCCESSION_QUALITY_DROP = 1;
+export const SUCCESSION_SELL_DISCOUNT = 0.15;
+export const SUCCESSION_PROB = 0.06;
+
+// ── 20-Year Mode: IPO Pathway ──
+
+export const IPO_MIN_EBITDA = 75000;       // $75M
+export const IPO_MIN_BUSINESSES = 6;
+export const IPO_MIN_AVG_QUALITY = 4.0;
+export const IPO_MIN_PLATFORMS = 2;
+export const IPO_MIN_ROUND = 16;
+export const IPO_EARNINGS_MISS_PENALTY = 0.15;
+export const IPO_EARNINGS_BEAT_BONUS = 0.08;
+export const IPO_CONSECUTIVE_MISS_THRESHOLD = 2;
+export const IPO_SHARE_FUNDED_DEALS_PER_ROUND = 1;
+export const IPO_DILUTION_PENALTY = 0.05;
+export const IPO_STAY_PRIVATE_BONUS_MIN = 0.05;
+export const IPO_STAY_PRIVATE_BONUS_MAX = 0.10;
+
+// ── 20-Year Mode: Family Office Endgame ──
+
+export const FAMILY_OFFICE_MIN_DISTRIBUTIONS = 1000000; // $1B
+export const FAMILY_OFFICE_MIN_COMPOSITE_GRADE = 'B';
+export const FAMILY_OFFICE_MIN_Q4_BUSINESSES = 3;
+export const FAMILY_OFFICE_MIN_LONG_HELD = 2;
+export const FAMILY_OFFICE_ROUNDS = 5;
+export const FAMILY_OFFICE_SUCCESSION_ROUND = 3;
+
+// ── Mode Selection Copy ──
+
+export const DURATION_SUBTITLE = {
+  quick: 'Make your fortune',
+  standard: 'Build your legacy',
+} as const;
+
 // Type helpers for consumers
 export type DifficultyConfig = typeof DIFFICULTY_CONFIG;
 export type DurationConfig = typeof DURATION_CONFIG;

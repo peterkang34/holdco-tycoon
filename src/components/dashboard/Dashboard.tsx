@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Metrics, DistressLevel, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
 import { getDistressLabel } from '../../engine/distress';
 import { MetricCard } from '../ui/MetricCard';
+import { FINAL_COUNTDOWN_START_ROUND } from '../../data/gameConfig';
 
 interface DashboardProps {
   metrics: Metrics;
@@ -84,7 +85,16 @@ export function Dashboard({
       <div className="mb-4">
         <div className="flex items-center justify-between mb-1">
           <span className="text-sm text-text-muted">Year {round} of {totalRounds}</span>
-          <span className="text-sm text-text-muted">{totalRounds - round} years remaining</span>
+          <div className="flex items-center gap-2">
+            {round >= FINAL_COUNTDOWN_START_ROUND && totalRounds === 20 && (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 animate-pulse">
+                {totalRounds - round} {totalRounds - round === 1 ? 'Year' : 'Years'} Remaining
+              </span>
+            )}
+            {!(round >= FINAL_COUNTDOWN_START_ROUND && totalRounds === 20) && (
+              <span className="text-sm text-text-muted">{totalRounds - round} years remaining</span>
+            )}
+          </div>
         </div>
         <div className="h-2 bg-white/10 rounded-full overflow-hidden">
           <div

@@ -95,6 +95,7 @@ WRITING GUIDELINES:
 - Tone should match overall trajectory, not just one metric
 - Use ONLY the exact financial figures provided above — do NOT invent, calculate, or round your own numbers
 - Do NOT mention portfolio quality ratings or scores
+${context.narrativeToneGuidance ? `- VOICE/TONE: ${context.narrativeToneGuidance}` : ''}
 
 Write 3-4 sentences in a shareholder letter style. Keep it under 80 words. Respond with just the narrative text.`;
 }

@@ -62,6 +62,7 @@ function makeBusiness(overrides: Partial<Business> = {}): Business {
       competitivePositionText: '',
     },
     integrationRoundsRemaining: 0,
+    integrationGrowthDrag: 0,
     improvements: [],
     sellerNoteBalance: 0,
     sellerNoteRate: 0,
