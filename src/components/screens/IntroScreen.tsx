@@ -4,6 +4,7 @@ import { SECTOR_LIST } from '../../data/sectors';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { ChangelogModal } from '../ui/ChangelogModal';
 import { UserManualModal } from '../ui/UserManualModal';
+import { FeedbackModal } from '../ui/FeedbackModal';
 import { DIFFICULTY_CONFIG, DURATION_CONFIG, DURATION_SUBTITLE } from '../../data/gameConfig';
 import type { ChallengeParams } from '../../utils/challenge';
 import { generateRandomSeed } from '../../engine/rng';
@@ -26,6 +27,7 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showUserManual, setShowUserManual] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [showChallengeCreator, setShowChallengeCreator] = useState(false);
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [challengeDifficulty, setChallengeDifficulty] = useState<GameDifficulty>('easy');
@@ -420,6 +422,13 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
             >
               📖 User Manual
             </button>
+            <span className="text-text-muted/40">·</span>
+            <button
+              onClick={() => setShowFeedback(true)}
+              className="text-sm text-text-muted hover:text-accent transition-colors"
+            >
+              💬 Feedback
+            </button>
           </div>
         </div>
 
@@ -439,6 +448,11 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
       {showUserManual && (
         <UserManualModal onClose={() => setShowUserManual(false)} />
       )}
+      <FeedbackModal
+        isOpen={showFeedback}
+        onClose={() => setShowFeedback(false)}
+        context={{ screen: 'intro' }}
+      />
     </div>
   );
 }

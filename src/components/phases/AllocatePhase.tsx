@@ -350,7 +350,7 @@ export function AllocatePhase({
     });
   }, [dealPipeline, showPassedDeals, passedDealIdSet, dealFilters, dealSort, cash]);
 
-  const allDealsExpanded = expandedDealIds.size >= filteredSortedDeals.length && filteredSortedDeals.length > 0;
+  const allDealsExpanded = filteredSortedDeals.length > 0 && filteredSortedDeals.every(d => expandedDealIds.has(d.id));
 
   const toggleDeal = useCallback((id: string) => {
     setExpandedDealIds(prev => {
@@ -362,8 +362,8 @@ export function AllocatePhase({
 
   const toggleAllDeals = useCallback(() => {
     setExpandedDealIds(prev => {
-      const visibleIds = filteredSortedDeals.map(d => d.id);
-      return prev.size >= visibleIds.length ? new Set() : new Set(visibleIds);
+      const allVisible = filteredSortedDeals.every(d => prev.has(d.id));
+      return allVisible ? new Set<string>() : new Set(filteredSortedDeals.map(d => d.id));
     });
   }, [filteredSortedDeals]);
 

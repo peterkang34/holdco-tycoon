@@ -76,7 +76,7 @@ interface AnalyticsData {
   cohortRetention: CohortRow[];
 }
 
-type TabId = 'overview' | 'funnel' | 'retention' | 'engagement' | 'balance' | 'challenge' | 'devices';
+type TabId = 'overview' | 'funnel' | 'retention' | 'engagement' | 'balance' | 'challenge' | 'devices' | 'feedback';
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'funnel', label: 'Funnel' },
@@ -85,7 +85,29 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'balance', label: 'Balance' },
   { id: 'challenge', label: 'Challenge' },
   { id: 'devices', label: 'Devices' },
+  { id: 'feedback', label: 'Feedback' },
 ];
+
+interface FeedbackEntry {
+  type: 'bug' | 'feature' | 'other';
+  message: string;
+  email?: string;
+  context: {
+    screen?: string;
+    round?: number;
+    difficulty?: string;
+    duration?: string;
+    holdcoName?: string;
+    device?: string;
+    playerId?: string;
+  };
+  date: string;
+}
+
+interface FeedbackData {
+  entries: FeedbackEntry[];
+  counts: { total: number; bug: number; feature: number; other: number };
+}
 
 // ── Shared Components ─────────────────────────────────────────
 
@@ -273,6 +295,9 @@ export function AdminDashboard() {
   const [loading, setLoading] = useState(() => !!sessionStorage.getItem('admin_token'));
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [feedbackData, setFeedbackData] = useState<FeedbackData | null>(null);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackFilter, setFeedbackFilter] = useState<'all' | 'bug' | 'feature' | 'other'>('all');
 
   useEffect(() => {
     if (!token) return;
@@ -298,6 +323,22 @@ export function AdminDashboard() {
       })
       .finally(() => setLoading(false));
   }, [token]);
+
+  // Lazy-fetch feedback data only when tab first clicked
+  useEffect(() => {
+    if (activeTab !== 'feedback' || feedbackData || feedbackLoading || !token) return;
+    setFeedbackLoading(true);
+    fetch('/api/admin/feedback', {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(res => {
+        if (!res.ok) throw new Error(`API error: ${res.status}`);
+        return res.json();
+      })
+      .then((d) => setFeedbackData(d))
+      .catch(() => {/* swallow — empty state is fine */})
+      .finally(() => setFeedbackLoading(false));
+  }, [activeTab, feedbackData, feedbackLoading, token]);
 
   // ── Aggregation hooks (must be before early returns) ──
 
@@ -1051,6 +1092,95 @@ export function AdminDashboard() {
               ))}
             </div>
           </div>
+        </>
+      )}
+
+      {/* ═══════ FEEDBACK TAB ═══════ */}
+      {activeTab === 'feedback' && (
+        <>
+          {feedbackLoading && (
+            <div className="text-center text-text-muted py-12">Loading feedback...</div>
+          )}
+          {!feedbackLoading && feedbackData && (
+            <>
+              {/* Counts */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                <MetricCard label="Total" value={feedbackData.counts.total} />
+                <MetricCard label="Bugs" value={feedbackData.counts.bug} />
+                <MetricCard label="Features" value={feedbackData.counts.feature} />
+                <MetricCard label="Other" value={feedbackData.counts.other} />
+              </div>
+
+              {/* Filter pills */}
+              <div className="flex gap-2 mb-4">
+                {(['all', 'bug', 'feature', 'other'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setFeedbackFilter(f)}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                      feedbackFilter === f
+                        ? 'bg-accent text-white'
+                        : 'bg-bg-secondary text-text-muted hover:text-text-primary'
+                    }`}
+                  >
+                    {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Entries */}
+              <div className="space-y-3">
+                {feedbackData.entries
+                  .filter(e => feedbackFilter === 'all' || e.type === feedbackFilter)
+                  .map((entry, i) => (
+                    <div key={i} className="card p-4">
+                      <div className="flex items-start justify-between gap-3 mb-2">
+                        <span className={`text-xs px-2 py-0.5 rounded font-medium ${
+                          entry.type === 'bug' ? 'bg-danger/20 text-danger' :
+                          entry.type === 'feature' ? 'bg-accent/20 text-accent' :
+                          'bg-white/10 text-text-secondary'
+                        }`}>
+                          {entry.type}
+                        </span>
+                        <span className="text-[10px] text-text-muted shrink-0">
+                          {new Date(entry.date).toLocaleString()}
+                        </span>
+                      </div>
+                      <p className="text-sm text-text-primary whitespace-pre-wrap mb-2">{entry.message}</p>
+                      <div className="flex flex-wrap gap-1.5">
+                        {entry.context?.screen && (
+                          <span className="text-[10px] bg-white/5 text-text-muted px-1.5 py-0.5 rounded">{entry.context.screen}</span>
+                        )}
+                        {entry.context?.round != null && (
+                          <span className="text-[10px] bg-white/5 text-text-muted px-1.5 py-0.5 rounded">R{entry.context.round}</span>
+                        )}
+                        {entry.context?.difficulty && (
+                          <span className="text-[10px] bg-white/5 text-text-muted px-1.5 py-0.5 rounded">{entry.context.difficulty}</span>
+                        )}
+                        {entry.context?.duration && (
+                          <span className="text-[10px] bg-white/5 text-text-muted px-1.5 py-0.5 rounded">{entry.context.duration}</span>
+                        )}
+                        {entry.context?.holdcoName && (
+                          <span className="text-[10px] bg-white/5 text-text-muted px-1.5 py-0.5 rounded">{entry.context.holdcoName}</span>
+                        )}
+                        {entry.context?.device && (
+                          <span className="text-[10px] bg-white/5 text-text-muted px-1.5 py-0.5 rounded">{entry.context.device}</span>
+                        )}
+                        {entry.email && (
+                          <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded">{entry.email}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                {feedbackData.entries.filter(e => feedbackFilter === 'all' || e.type === feedbackFilter).length === 0 && (
+                  <div className="text-center text-text-muted py-8 text-sm">No feedback entries yet</div>
+                )}
+              </div>
+            </>
+          )}
+          {!feedbackLoading && !feedbackData && (
+            <div className="text-center text-text-muted py-12">Failed to load feedback</div>
+          )}
         </>
       )}
     </div>

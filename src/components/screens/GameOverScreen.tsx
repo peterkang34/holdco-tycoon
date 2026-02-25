@@ -24,6 +24,7 @@ import {
 } from '../../utils/challenge';
 import { ChallengeComparison } from '../ui/ChallengeComparison';
 import { ChallengeScoreboard } from '../ui/ChallengeScoreboard';
+import { FeedbackModal } from '../ui/FeedbackModal';
 import { checkFamilyOfficeEligibility } from '../../engine/familyOffice';
 
 /** Heuristic archetype classification based on game actions */
@@ -127,6 +128,7 @@ export function GameOverScreen({
   const [scoreboardLinkCopied, setScoreboardLinkCopied] = useState(false);
   const [showComparison, setShowComparison] = useState(!!incomingResult);
   const [scoreboardFailed, setScoreboardFailed] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   // Build challenge params from current game (works for both challenge and solo games)
   const currentChallengeParams: ChallengeParams = useMemo(() => (
@@ -1068,6 +1070,12 @@ export function GameOverScreen({
         >
           Get The Holdco Guide →
         </a>
+        <button
+          onClick={() => setShowFeedback(true)}
+          className="text-sm text-text-muted hover:text-accent transition-colors min-h-[44px] inline-flex items-center justify-center"
+        >
+          💬 Send Feedback
+        </button>
       </div>
 
       {/* Challenge Comparison Modal */}
@@ -1079,6 +1087,13 @@ export function GameOverScreen({
           onClose={() => setShowComparison(false)}
         />
       )}
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        isOpen={showFeedback}
+        onClose={() => setShowFeedback(false)}
+        context={{ screen: 'gameover', round: maxRounds, difficulty, duration, holdcoName }}
+      />
 
       {/* Footer */}
       <p className="text-center text-text-muted text-sm mt-8">

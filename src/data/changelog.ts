@@ -11,6 +11,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'February 25, 2026',
+    title: 'In-Game Feedback & Bug Fixes',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Send feedback, report bugs, or request features directly from the game — accessible from all three screens.',
+        ],
+      },
+      {
+        heading: 'Bug Fixes',
+        items: [
+          'Fixed expand/collapse on mobile deal cards not working correctly after filtering.',
+          'Fixed rare issue where deals could appear duplicated after sourcing new deals.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 24, 2026',
     title: 'Family Office Endgame',
     sections: [

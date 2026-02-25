@@ -3772,10 +3772,17 @@ export const useGameStore = create<GameStore>()(
       },
 
       triggerAIEnhancement: async () => {
-        const state = get();
+        const { dealPipeline, round: snapshotRound } = get();
         try {
-          const enhancedDeals = await enhanceDealsWithAI(state.dealPipeline);
-          set({ dealPipeline: enhancedDeals });
+          const enhancedDeals = await enhanceDealsWithAI(dealPipeline);
+          // Guard: discard stale results if round changed during async AI call
+          const current = get();
+          if (current.round !== snapshotRound) return;
+          // Merge AI results into the current pipeline (not the stale snapshot)
+          // to avoid overwriting deals added while AI was running
+          const enhancedById = new Map(enhancedDeals.map(d => [d.id, d]));
+          const merged = current.dealPipeline.map(d => enhancedById.get(d.id) ?? d);
+          set({ dealPipeline: merged });
         } catch (error) {
           console.error('AI enhancement failed:', error);
         }

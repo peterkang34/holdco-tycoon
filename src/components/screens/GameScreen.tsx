@@ -16,6 +16,7 @@ import { InstructionsModal } from '../ui/InstructionsModal';
 import { AnnualReportModal } from '../ui/AnnualReportModal';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { UserManualModal } from '../ui/UserManualModal';
+import { FeedbackModal } from '../ui/FeedbackModal';
 import { MetricDrilldownModal } from '../ui/MetricDrilldownModal';
 import { ToastContainer } from '../ui/ToastContainer';
 import { calculateFounderEquityValue, calculateFounderPersonalWealth } from '../../engine/scoring';
@@ -50,6 +51,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   const [showAnnualReports, setShowAnnualReports] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [showManual, setShowManual] = useState(false);
+  const [showFeedback, setShowFeedback] = useState(false);
   const [drilldownMetric, setDrilldownMetric] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
@@ -894,6 +896,13 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
               </button>
             )}
             <button
+              onClick={() => setShowFeedback(true)}
+              className="text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5"
+              title="Send Feedback"
+            >
+              💬
+            </button>
+            <button
               onClick={() => setShowLeaderboard(true)}
               className="text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5"
               title="High Scores"
@@ -1016,6 +1025,13 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       {showManual && (
         <UserManualModal onClose={() => setShowManual(false)} />
       )}
+
+      {/* Feedback Modal */}
+      <FeedbackModal
+        isOpen={showFeedback}
+        onClose={() => setShowFeedback(false)}
+        context={{ screen: 'game', round, difficulty, duration, holdcoName }}
+      />
 
       {/* Metric Drilldown Modal */}
       {drilldownMetric && (
