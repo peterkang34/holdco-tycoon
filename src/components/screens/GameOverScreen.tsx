@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration, IntegratedPlatform } from '../../engine/types';
 import type { IPOState } from '../../engine/types';
-import { calculateStayPrivateBonus } from '../../engine/ipo';
+import { calculateStayPrivateBonus, getIPODilutionPenalty } from '../../engine/ipo';
 import { useGameStore } from '../../hooks/useGame';
 import { SECTORS } from '../../data/sectors';
 import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLeaderboardRankFromList } from '../../engine/scoring';
@@ -629,12 +629,23 @@ export function GameOverScreen({
                 <span className="font-mono">{formatMoney(enterpriseValue)}</span>
               </div>
               {(() => {
-                const stayBonus = calculateStayPrivateBonus(useGameStore.getState());
-                return stayBonus > 0 ? (
-                  <div className="text-xs text-green-400/70 -mt-0.5">
-                    Includes +{(stayBonus * 100).toFixed(0)}% stay-private bonus
-                  </div>
-                ) : null;
+                const gameState = useGameStore.getState();
+                const stayBonus = calculateStayPrivateBonus(gameState);
+                const dilutionPenalty = getIPODilutionPenalty(gameState);
+                return (
+                  <>
+                    {stayBonus > 0 && (
+                      <div className="text-xs text-green-400/70 -mt-0.5">
+                        Includes +{(stayBonus * 100).toFixed(0)}% stay-private bonus
+                      </div>
+                    )}
+                    {dilutionPenalty > 0 && (
+                      <div className="text-xs text-red-400/70 -mt-0.5">
+                        Includes -{(dilutionPenalty * 100).toFixed(0)}% share-funded dilution penalty
+                      </div>
+                    )}
+                  </>
+                );
               })()}
               <div className="flex justify-between text-sm">
                 <span className="text-text-muted">x Your Ownership ({(currentOwnership * 100).toFixed(1)}%)</span>

@@ -9,7 +9,7 @@ import { calculateMetrics, calculateSectorFocusBonus, calculateExitValuation } f
 import { POST_GAME_INSIGHTS } from '../data/tips';
 import { getAllDedupedBusinesses } from './helpers';
 import { RESTRUCTURING_FEV_PENALTY } from '../data/gameConfig';
-import { calculateStayPrivateBonus } from './ipo';
+import { calculateStayPrivateBonus, getIPODilutionPenalty } from './ipo';
 
 const LEADERBOARD_KEY = 'holdco-tycoon-leaderboard';
 const MAX_LEADERBOARD_ENTRIES = 10;
@@ -76,6 +76,12 @@ export function calculateEnterpriseValue(state: GameState): number {
   const stayPrivateBonus = calculateStayPrivateBonus(state);
   if (stayPrivateBonus > 0) {
     ev *= (1 + stayPrivateBonus);
+  }
+
+  // IPO dilution penalty: extra cost beyond natural ownership dilution
+  const dilutionPenalty = getIPODilutionPenalty(state);
+  if (dilutionPenalty > 0) {
+    ev *= (1 - dilutionPenalty);
   }
 
   return Math.round(Math.max(0, ev));

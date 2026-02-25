@@ -240,6 +240,12 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         detail: 'Another buyer snatched the deal',
         type: 'danger',
       });
+    } else if (structure.type === 'share_funded') {
+      addToast({
+        message: `Acquired ${deal.business.name} via stock`,
+        detail: `${structure.shareTerms?.sharesToIssue?.toLocaleString() ?? 0} shares issued — ${((structure.shareTerms?.dilutionPct ?? 0) * 100).toFixed(1)}% dilution`,
+        type: 'success',
+      });
     } else {
       addToast({
         message: `Acquired ${deal.business.name}`,
@@ -260,6 +266,15 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         message: `Outbid on ${deal.business.name}`,
         detail: 'Another buyer snatched the deal',
         type: 'danger',
+      });
+    } else if (structure.type === 'share_funded') {
+      const suffix = integrationOutcome === 'failure' ? ' — troubled integration'
+        : integrationOutcome === 'partial' ? ' — rocky integration, reduced synergies'
+        : ' — seamless integration';
+      addToast({
+        message: `Tucked ${deal.business.name} into ${platform?.name ?? 'platform'} via stock`,
+        detail: `${structure.shareTerms?.sharesToIssue?.toLocaleString() ?? 0} shares issued — ${((structure.shareTerms?.dilutionPct ?? 0) * 100).toFixed(1)}% dilution${suffix}`,
+        type: integrationOutcome === 'failure' ? 'danger' : 'info',
       });
     } else {
       const structureLabel = `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`;

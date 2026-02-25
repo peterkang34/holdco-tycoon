@@ -211,7 +211,7 @@ export interface Deal {
 export type SellerArchetype = 'retiring_founder' | 'burnt_out_operator' | 'accidental_holdco'
   | 'distressed_seller' | 'mbo_candidate' | 'franchise_breakaway';
 
-export type DealStructureType = 'all_cash' | 'seller_note' | 'bank_debt' | 'earnout' | 'seller_note_bank_debt' | 'rollover_equity';
+export type DealStructureType = 'all_cash' | 'seller_note' | 'bank_debt' | 'earnout' | 'seller_note_bank_debt' | 'rollover_equity' | 'share_funded';
 
 export interface DealStructure {
   type: DealStructureType;
@@ -231,6 +231,11 @@ export interface DealStructure {
     targetEbitdaGrowth: number;
   };
   rolloverEquityPct?: number;
+  shareTerms?: {
+    sharesToIssue: number;
+    newTotalShares: number;
+    dilutionPct: number;
+  };
   leverage: number;
   risk: 'low' | 'medium' | 'high';
 }

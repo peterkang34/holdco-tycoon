@@ -1121,6 +1121,35 @@ export const useGameStore = create<GameStore>()(
           return;
         }
 
+        // Share-funded: no cash, issue new shares
+        if (structure.type === 'share_funded') {
+          if (!state.ipoState?.isPublic || !structure.shareTerms) return;
+          const newBusiness = executeDealStructure(deal, structure, state.round, state.maxRounds);
+          const businessWithPlatformFields: Business = { ...newBusiness, isPlatform: false, platformScale: 0, boltOnIds: [], synergiesRealized: 0, totalAcquisitionCost: deal.effectivePrice, acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0 };
+          const newBusinesses = [...state.businesses, businessWithPlatformFields];
+          const updatedIPO = {
+            ...state.ipoState,
+            sharesOutstanding: structure.shareTerms.newTotalShares,
+            shareFundedDealsThisRound: state.ipoState.shareFundedDealsThisRound + 1,
+          };
+          set({
+            ipoState: updatedIPO,
+            sharesOutstanding: updatedIPO.sharesOutstanding,
+            businesses: newBusinesses,
+            totalDebt: computeTotalDebt(newBusinesses, state.holdcoLoanBalance),
+            totalInvestedCapital: state.totalInvestedCapital + deal.effectivePrice,
+            dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
+            acquisitionsThisRound: state.acquisitionsThisRound + 1,
+            lastAcquisitionResult: 'success',
+            actionsThisRound: [...state.actionsThisRound, {
+              type: 'acquire', round: state.round,
+              details: { businessId: newBusiness.id, businessName: deal.business.name, sector: SECTORS[deal.business.sectorId].name, structure: 'share_funded', price: deal.effectivePrice, askingPrice: deal.effectivePrice, heat: deal.heat },
+            }],
+            metrics: calculateMetrics({ ...state, businesses: newBusinesses, ipoState: updatedIPO, sharesOutstanding: updatedIPO.sharesOutstanding }),
+          });
+          return;
+        }
+
         const newBusiness = executeDealStructure(deal, structure, state.round, state.maxRounds);
 
         // Add platform fields to new business
@@ -1198,6 +1227,88 @@ export const useGameStore = create<GameStore>()(
 
         // Must be same sector
         if (platform.sectorId !== deal.business.sectorId) return;
+
+        // Share-funded tuck-in: no cash, issue new shares, then proceed with normal tuck-in integration
+        if (structure.type === 'share_funded') {
+          if (!state.ipoState?.isPublic || !structure.shareTerms) return;
+          const updatedIPO = {
+            ...state.ipoState,
+            sharesOutstanding: structure.shareTerms.newTotalShares,
+            shareFundedDealsThisRound: state.ipoState.shareFundedDealsThisRound + 1,
+          };
+          // Swap state references so the rest of the tuck-in logic uses updated IPO
+          // We'll re-enter the function with a modified state snapshot
+          const hasSharedServicesSF = state.sharedServices.filter(s => s.active).length > 0;
+          const subTypeAffinitySF = getSubTypeAffinity(platform.sectorId, platform.subType, deal.business.subType);
+          const { tier: sizeRatioTierSF, ratio: sizeRatioSF } = getSizeRatioTier(deal.business.ebitda, platform.ebitda);
+          const outcomeSF = determineIntegrationOutcome(deal.business, platform, hasSharedServicesSF, subTypeAffinitySF, sizeRatioTierSF);
+          const synergiesSF = calculateSynergies(outcomeSF, deal.business.ebitda, true, subTypeAffinitySF, sizeRatioTierSF);
+          const boltOnIdSF = generateBusinessId();
+          const boltOnBusinessSF: Business = {
+            id: boltOnIdSF, name: deal.business.name, sectorId: deal.business.sectorId, subType: deal.business.subType,
+            ebitda: deal.business.ebitda, peakEbitda: deal.business.peakEbitda, acquisitionEbitda: deal.business.acquisitionEbitda,
+            acquisitionPrice: deal.effectivePrice, acquisitionRound: state.round, acquisitionMultiple: deal.business.acquisitionMultiple,
+            organicGrowthRate: deal.business.organicGrowthRate, revenue: deal.business.revenue, ebitdaMargin: deal.business.ebitdaMargin,
+            acquisitionRevenue: deal.business.acquisitionRevenue, acquisitionMargin: deal.business.acquisitionMargin,
+            peakRevenue: deal.business.peakRevenue, revenueGrowthRate: deal.business.revenueGrowthRate, marginDriftRate: deal.business.marginDriftRate,
+            qualityRating: deal.business.qualityRating, dueDiligence: deal.business.dueDiligence,
+            integrationRoundsRemaining: 1, integrationGrowthDrag: 0, improvements: [],
+            sellerNoteBalance: 0, sellerNoteRate: 0, sellerNoteRoundsRemaining: 0,
+            bankDebtBalance: 0, bankDebtRate: 0, bankDebtRoundsRemaining: 0,
+            earnoutRemaining: 0, earnoutTarget: 0,
+            status: 'integrated', isPlatform: false, platformScale: 0, boltOnIds: [],
+            parentPlatformId: targetPlatformId, integrationOutcome: outcomeSF, synergiesRealized: synergiesSF,
+            totalAcquisitionCost: deal.effectivePrice, acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0,
+            rolloverEquityPct: 0, integratedPlatformId: platform.integratedPlatformId,
+          };
+          const restructuringCostSF = outcomeSF === 'failure' ? Math.round(Math.abs(deal.business.ebitda) * INTEGRATION_RESTRUCTURING_PCT) : 0;
+          const growthDragPenaltySF = outcomeSF === 'failure' ? calculateIntegrationGrowthPenalty(deal.business.ebitda, platform.ebitda, false) : 0;
+          const newPlatformScaleSF = platform.platformScale + 1;
+          const combinedEbitdaSF = platform.ebitda + deal.business.ebitda + synergiesSF;
+          const multipleExpansionSF = calculateMultipleExpansion(newPlatformScaleSF, combinedEbitdaSF) - calculateMultipleExpansion(platform.platformScale, platform.ebitda);
+          const combinedRevenueSF = platform.revenue + deal.business.revenue;
+          const blendedMarginSF = combinedRevenueSF > 0 ? combinedEbitdaSF / combinedRevenueSF : platform.ebitdaMargin;
+          const updatedBusinessesSF = state.businesses.map(b => {
+            if (b.id === targetPlatformId) {
+              return { ...b, isPlatform: true, platformScale: newPlatformScaleSF, boltOnIds: [...b.boltOnIds, boltOnIdSF],
+                ebitda: b.ebitda + deal.business.ebitda + synergiesSF, revenue: combinedRevenueSF,
+                ebitdaMargin: clampMargin(blendedMarginSF), peakRevenue: Math.max(b.peakRevenue, combinedRevenueSF),
+                synergiesRealized: b.synergiesRealized + synergiesSF, totalAcquisitionCost: b.totalAcquisitionCost + deal.effectivePrice,
+                acquisitionMultiple: b.acquisitionMultiple + multipleExpansionSF, organicGrowthRate: b.organicGrowthRate,
+                revenueGrowthRate: b.revenueGrowthRate, integrationGrowthDrag: (b.integrationGrowthDrag ?? 0) + growthDragPenaltySF,
+              };
+            }
+            return b;
+          });
+          const tuckInBusinessesSF = [...updatedBusinessesSF, boltOnBusinessSF];
+          const newTotalDebtSF = computeTotalDebt(tuckInBusinessesSF, state.holdcoLoanBalance);
+          const tuckInCashSF = Math.max(0, state.cash - restructuringCostSF);
+          const updatedIntegratedPlatformsSF = platform.integratedPlatformId
+            ? state.integratedPlatforms.map(ip => ip.id === platform.integratedPlatformId ? { ...ip, constituentBusinessIds: [...ip.constituentBusinessIds, boltOnIdSF] } : ip)
+            : state.integratedPlatforms;
+          set({
+            cash: tuckInCashSF,
+            ipoState: updatedIPO,
+            sharesOutstanding: updatedIPO.sharesOutstanding,
+            totalDebt: newTotalDebtSF,
+            totalInvestedCapital: state.totalInvestedCapital + deal.effectivePrice + restructuringCostSF,
+            businesses: tuckInBusinessesSF,
+            dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
+            acquisitionsThisRound: state.acquisitionsThisRound + 1,
+            lastAcquisitionResult: 'success',
+            lastIntegrationOutcome: outcomeSF,
+            integratedPlatforms: updatedIntegratedPlatformsSF,
+            actionsThisRound: [...state.actionsThisRound, {
+              type: 'acquire_tuck_in', round: state.round,
+              details: { businessId: boltOnIdSF, businessName: deal.business.name, sector: SECTORS[deal.business.sectorId].name,
+                platformId: targetPlatformId, structure: 'share_funded', price: deal.effectivePrice, askingPrice: deal.effectivePrice,
+                integrationOutcome: outcomeSF, synergies: synergiesSF, restructuringCost: restructuringCostSF,
+                growthDragPenalty: growthDragPenaltySF, heat: deal.heat, sizeRatio: sizeRatioSF, sizeRatioTier: sizeRatioTierSF },
+            }],
+            metrics: calculateMetrics({ ...state, cash: tuckInCashSF, totalDebt: newTotalDebtSF, businesses: tuckInBusinessesSF, ipoState: updatedIPO, sharesOutstanding: updatedIPO.sharesOutstanding }),
+          });
+          return;
+        }
 
         // Check if shared services are active (helps integration)
         const hasSharedServices = state.sharedServices.filter(s => s.active).length > 0;

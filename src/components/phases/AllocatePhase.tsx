@@ -516,7 +516,7 @@ export function AllocatePhase({
   const renderDealStructuring = () => {
     if (!selectedDeal) return null;
 
-    const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening, maxRoundsFromStore ?? 20, !distressRestrictions.canTakeDebt, maSourcing?.tier ?? 0, duration ?? 'standard', selectedDeal.sellerArchetype);
+    const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening, maxRoundsFromStore ?? 20, !distressRestrictions.canTakeDebt, maSourcing?.tier ?? 0, duration ?? 'standard', selectedDeal.sellerArchetype, ipoState ?? undefined);
     const availablePlatformsForDeal = getPlatformsForSector(selectedDeal.business.sectorId);
     const canTuckIn = availablePlatformsForDeal.length > 0;
 
@@ -764,6 +764,7 @@ export function AllocatePhase({
                       ? 'opacity-50 cursor-not-allowed'
                       : 'cursor-pointer hover:border-accent'
                   } ${
+                    structure.type === 'share_funded' ? 'border-purple-500/30' :
                     structure.risk === 'low' ? 'border-green-500/30' :
                     structure.risk === 'medium' ? 'border-yellow-500/30' :
                     'border-red-500/30'
@@ -790,16 +791,32 @@ export function AllocatePhase({
                       <span className="text-text-muted">Cash Required</span>
                       <span className="font-mono">{formatMoney(structure.cashRequired)}</span>
                     </div>
-                    <div className="flex justify-between">
-                      <span className="text-text-muted">Cash After</span>
-                      <span className={`font-mono font-bold ${
-                        (cash - structure.cashRequired) >= 5000 ? 'text-green-400' :
-                        (cash - structure.cashRequired) >= 2000 ? 'text-yellow-400' :
-                        'text-red-400'
-                      }`}>
-                        {formatMoney(cash - structure.cashRequired)}
-                      </span>
-                    </div>
+                    {structure.type === 'share_funded' && structure.shareTerms ? (
+                      <>
+                        <div className="flex justify-between">
+                          <span className="text-text-muted">Shares to Issue</span>
+                          <span className="font-mono text-purple-400">{structure.shareTerms.sharesToIssue.toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-text-muted">Dilution</span>
+                          <span className="font-mono text-purple-400">{(structure.shareTerms.dilutionPct * 100).toFixed(1)}%</span>
+                        </div>
+                        <div className="text-xs text-purple-400/70 mt-1">
+                          Issues {structure.shareTerms.sharesToIssue.toLocaleString()} shares at ${ipoState?.stockPrice?.toFixed(2) ?? '?'}/share
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex justify-between">
+                        <span className="text-text-muted">Cash After</span>
+                        <span className={`font-mono font-bold ${
+                          (cash - structure.cashRequired) >= 5000 ? 'text-green-400' :
+                          (cash - structure.cashRequired) >= 2000 ? 'text-yellow-400' :
+                          'text-red-400'
+                        }`}>
+                          {formatMoney(cash - structure.cashRequired)}
+                        </span>
+                      </div>
+                    )}
                     {structure.sellerNote && (
                       <div className="flex justify-between">
                         <span className="text-text-muted">Seller Note</span>

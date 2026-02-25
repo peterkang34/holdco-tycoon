@@ -63,6 +63,8 @@ import {
   INTEGRATION_DRAG_EPSILON,
   INTEGRATION_RESTRUCTURING_PCT,
   INTEGRATION_RESTRUCTURING_MERGER_PCT,
+  IPO_DILUTION_PENALTY,
+  IPO_SHARE_FUNDED_DEALS_PER_ROUND,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
 import {
@@ -73,6 +75,7 @@ import {
   earnoutCountdownLabel,
   BANNED_COPY_PATTERNS,
 } from '../../data/mechanicsCopy';
+import { getStructureLabel } from '../deals';
 
 // ── File reading helper ──
 const __filename = fileURLToPath(import.meta.url);
@@ -1370,6 +1373,32 @@ describe('Display Proofreader', () => {
     it('Strategy B: deals.ts contains rollover_equity', () => {
       const deals = readComponent('engine/deals.ts');
       expect(deals).toContain('rollover_equity');
+    });
+
+    // ── Share-Funded (Stock) ──
+
+    it('Strategy A: getStructureLabel returns correct share-funded label', () => {
+      expect(getStructureLabel('share_funded')).toBe('Share-Funded (Stock)');
+    });
+
+    it('Strategy B: UserManualModal documents share-funded acquisitions', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Share-funded acquisitions');
+      expect(manual).toContain('max 1 per round');
+      expect(manual).toContain('-5% FEV dilution penalty');
+    });
+
+    it('Strategy A: IPO_DILUTION_PENALTY matches manual claim of 5%', () => {
+      expect(IPO_DILUTION_PENALTY * 100).toBe(5);
+    });
+
+    it('Strategy A: IPO_SHARE_FUNDED_DEALS_PER_ROUND matches manual claim of 1', () => {
+      expect(IPO_SHARE_FUNDED_DEALS_PER_ROUND).toBe(1);
+    });
+
+    it('Strategy B: deals.ts contains share_funded', () => {
+      const deals = readComponent('engine/deals.ts');
+      expect(deals).toContain('share_funded');
     });
   });
 

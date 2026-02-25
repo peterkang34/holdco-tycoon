@@ -217,12 +217,13 @@ export function calculateStayPrivateBonus(state: GameState): number {
  */
 export function getIPODilutionPenalty(state: GameState): number {
   if (!state.ipoState?.isPublic) return 0;
-  const originalShares = state.ipoState.preIPOShares || state.sharesOutstanding;
+  const originalShares = state.ipoState.preIPOShares ?? state.sharesOutstanding;
   const currentShares = state.ipoState.sharesOutstanding;
   if (originalShares <= 0) return 0;
   // IPO itself issues ~25% new shares (20% dilution). Only count EXTRA dilution beyond IPO.
   const ipoNewShares = Math.round(originalShares * 0.25); // expected IPO shares
   const extraShares = Math.max(0, currentShares - originalShares - ipoNewShares);
   const dilutionEvents = Math.max(0, Math.round(extraShares / originalShares * 5));
-  return dilutionEvents * IPO_DILUTION_PENALTY;
+  // Cap at 50% to prevent EV zeroing — natural ownership dilution (FEV = EV × ownership%) already penalizes heavily
+  return Math.min(0.50, dilutionEvents * IPO_DILUTION_PENALTY);
 }

@@ -570,6 +570,9 @@ export function migrateV26ToV27(): void {
     if (v26Data.state.ipoState === undefined) {
       v26Data.state.ipoState = null;
     }
+    if (v26Data.state.ipoState && v26Data.state.ipoState.shareFundedDealsThisRound === undefined) {
+      v26Data.state.ipoState.shareFundedDealsThisRound = 0;
+    }
     if (v26Data.state.familyOfficeState === undefined) {
       v26Data.state.familyOfficeState = null;
     }

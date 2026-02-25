@@ -1,11 +1,14 @@
 import { Deal, DealStructure, DealStructureType, Business, GameDuration } from './types';
+import type { IPOState } from './types';
 import { clampMargin } from './helpers';
 import {
   ROLLOVER_EQUITY_CONFIG,
   ROLLOVER_MIN_QUALITY,
   ROLLOVER_MIN_MA_TIER,
   ROLLOVER_EXCLUDED_ARCHETYPES,
+  IPO_SHARE_FUNDED_DEALS_PER_ROUND,
 } from '../data/gameConfig';
+import { calculateShareFundedTerms } from './ipo';
 
 export function generateDealStructures(
   deal: Deal,
@@ -17,6 +20,7 @@ export function generateDealStructures(
   maSourcingTier: number = 0,
   duration: GameDuration = 'standard',
   sellerArchetype?: string,
+  ipoState?: IPOState,
 ): DealStructure[] {
   const askingPrice = deal.effectivePrice;
   const structures: DealStructure[] = [];
@@ -161,6 +165,18 @@ export function generateDealStructures(
     }
   }
 
+  // Option G: Share-Funded (public companies only, max 1/round, requires meaningful stock price)
+  if (ipoState?.isPublic && ipoState.shareFundedDealsThisRound < IPO_SHARE_FUNDED_DEALS_PER_ROUND && ipoState.stockPrice >= 1.0) {
+    const terms = calculateShareFundedTerms(askingPrice, ipoState);
+    structures.push({
+      type: 'share_funded',
+      cashRequired: 0,
+      shareTerms: terms,
+      leverage: 0,
+      risk: 'medium',
+    });
+  }
+
   return structures;
 }
 
@@ -221,6 +237,8 @@ export function getStructureLabel(type: DealStructureType): string {
       return 'LBO (Note + Debt)';
     case 'rollover_equity':
       return 'Rollover Equity';
+    case 'share_funded':
+      return 'Share-Funded (Stock)';
   }
 }
 
@@ -246,6 +264,11 @@ export function getStructureDescription(structure: DealStructure): string {
       const totalPrice = structure.cashRequired + (structure.sellerNote?.amount ?? 0) + Math.round((structure.cashRequired + (structure.sellerNote?.amount ?? 0)) * (structure.rolloverEquityPct ?? 0) / (1 - (structure.rolloverEquityPct ?? 0)));
       const cashPct = Math.round((structure.cashRequired / totalPrice) * 100);
       return `Seller rolls over ${rolloverPct}% as equity, reducing your cash outlay to ${cashPct}% of price. Seller stays aligned post-close — growth and margin bonuses. At exit, seller receives ${rolloverPct}% of net proceeds.`;
+    }
+    case 'share_funded': {
+      const terms = structure.shareTerms;
+      if (!terms) return 'Issue new shares to fund the acquisition. No cash required but dilutes your ownership.';
+      return `Issue ${terms.sharesToIssue.toLocaleString()} shares to fund the acquisition — ${(terms.dilutionPct * 100).toFixed(1)}% dilution. No cash outlay, but permanent ownership reduction plus a scoring penalty per dilution event.`;
     }
   }
 }

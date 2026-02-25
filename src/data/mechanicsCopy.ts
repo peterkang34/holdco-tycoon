@@ -31,6 +31,12 @@ export const EV_WATERFALL_LABELS = {
   sellerNotes: 'Opco Seller Notes',
 } as const;
 
+export const SHARE_FUNDED_LABELS = {
+  name: 'Share-Funded (Stock)',
+  behavior: 'Issue new shares to fund acquisition — no cash, but dilutes ownership + -5% FEV penalty per event',
+  limit: 'Max 1 per round',
+} as const;
+
 export const DEBT_EXPLAINER =
   'All debt (holdco loan, seller notes, and bank debt) auto-pays equal annual installments: each year you pay (remaining balance ÷ years left) in principal, plus interest on the current balance. ' +
   'Holdco and bank debt can also be paid down early in the Capital tab. ' +

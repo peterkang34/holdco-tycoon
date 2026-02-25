@@ -12,6 +12,29 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 24, 2026',
+    title: 'Share-Funded Acquisitions',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Public companies can now acquire businesses using stock — a 7th deal structure option ("Share-Funded") that costs $0 cash but dilutes your ownership.',
+          'Share-funded deals appear as a purple card in the deal structure picker, showing shares to issue and dilution percentage.',
+          'Works for both standalone acquisitions and tuck-ins into existing platforms.',
+          'Each share-funded deal incurs a -5% FEV dilution penalty on top of natural ownership reduction — making it a genuine tradeoff.',
+          'Game Over EV waterfall now shows the cumulative dilution penalty when applicable.',
+        ],
+      },
+      {
+        heading: 'Balance',
+        items: [
+          'Dilution penalty capped at 50% to prevent EV zeroing from excessive share-funded deals.',
+          'Share-funded option requires stock price above $1.00 — prevents extreme dilution exploit at near-zero prices.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 24, 2026',
     title: 'IPO Pathway UI',
     sections: [
       {
