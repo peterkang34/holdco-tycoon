@@ -55,6 +55,7 @@ function App() {
     hasRestructured,
     integratedPlatforms,
     isChallenge,
+    ipoState,
     startGame,
     resetGame,
   } = useGameStore();
@@ -186,6 +187,7 @@ function App() {
           totalDebt={totalDebt}
           hasRestructured={hasRestructured}
           integratedPlatforms={integratedPlatforms}
+          ipoState={ipoState}
           challengeData={challengeData}
           incomingResult={incomingResult}
           onPlayAgain={handlePlayAgain}

@@ -1376,7 +1376,8 @@ function TwentyYearContent() {
 
       <SubHeading>IPO Pathway</SubHeading>
       <P>
-        At round 16+, qualifying holdcos can take the company public. Going public opens
+        At round 16+, qualifying holdcos can take the company public. The IPO section
+        appears in the <strong>Capital tab</strong> during the Allocate phase. Going public opens
         new capabilities but introduces Wall Street constraints.
       </P>
       <DataTable

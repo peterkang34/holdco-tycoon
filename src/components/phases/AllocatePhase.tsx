@@ -39,7 +39,9 @@ import { checkPlatformEligibility, calculateIntegrationCost, getEligibleBusiness
 import { getPlatformSaleBonus } from '../../data/gameConfig';
 import { getEligiblePrograms, canUnlockTier } from '../../engine/turnarounds';
 import { TURNAROUND_TIER_CONFIG, getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
-import { TURNAROUND_FATIGUE_THRESHOLD } from '../../data/gameConfig';
+import { TURNAROUND_FATIGUE_THRESHOLD, IPO_MIN_ROUND } from '../../data/gameConfig';
+import { checkIPOEligibility, canShareFundedDeal } from '../../engine/ipo';
+import type { IPOState } from '../../engine/types';
 import { DEBT_LABELS, DEBT_EXPLAINER } from '../../data/mechanicsCopy';
 import { useIsMobile } from '../../hooks/useMediaQuery';
 import { CardListControls } from '../ui/CardListControls';
@@ -115,6 +117,9 @@ interface AllocatePhaseProps {
   activeTurnarounds: ActiveTurnaround[];
   onUnlockTurnaroundTier: () => void;
   onStartTurnaround: (businessId: string, programId: string) => void;
+  ipoState?: IPOState | null;
+  onExecuteIPO?: () => void;
+  onDeclineIPO?: () => void;
 }
 
 type AllocateTab = 'portfolio' | 'deals' | 'shared_services' | 'capital';
@@ -183,6 +188,9 @@ export function AllocatePhase({
   activeTurnarounds,
   onUnlockTurnaroundTier,
   onStartTurnaround,
+  ipoState,
+  onExecuteIPO,
+  onDeclineIPO,
 }: AllocatePhaseProps) {
   const isMobile = useIsMobile();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -2028,6 +2036,111 @@ export function AllocatePhase({
                     Issuing new shares raises cash but dilutes your ownership %. Buybacks retire outside shares, increasing your % back.
                     You must always hold &gt;{ownershipFloorPct}% to keep control.
                   </div>
+                </div>
+              );
+            })()}
+
+            {/* IPO Pathway — 20-year mode only */}
+            {(() => {
+              if (duration !== 'standard') return null;
+              if (ipoState?.isPublic) {
+                // Post-IPO: Public Company Dashboard
+                const sentimentPct = ipoState.marketSentiment * 100;
+                const sentimentColor = sentimentPct >= 10 ? 'text-green-400' : sentimentPct >= 0 ? 'text-green-400/70' : sentimentPct >= -10 ? 'text-yellow-400' : 'text-red-400';
+                const sentimentBarColor = sentimentPct >= 10 ? 'bg-green-400' : sentimentPct >= 0 ? 'bg-green-400/70' : sentimentPct >= -10 ? 'bg-yellow-400' : 'bg-red-400';
+                const sentimentBarWidth = Math.abs(sentimentPct) / 30 * 100; // max sentiment is ±0.3
+                const totalEbitdaForTarget = businesses.filter(b => b.status === 'active').reduce((s, b) => s + b.ebitda, 0);
+                const shareFundedRemaining = canShareFundedDeal({ ipoState, businesses, duration, round, cash, totalDebt, sharesOutstanding, interestRate } as any) ? 1 : 0;
+
+                return (
+                  <div className="card">
+                    <h4 className="font-bold mb-3 flex items-center gap-2">
+                      <span className="text-accent">📈</span> Public Company Dashboard
+                    </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center mb-4">
+                      <div>
+                        <p className="text-text-muted text-xs">Stock Price</p>
+                        <p className="font-mono font-bold text-lg">${ipoState.stockPrice.toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <p className="text-text-muted text-xs">Market Sentiment</p>
+                        <p className={`font-mono font-bold text-lg ${sentimentColor}`}>
+                          {sentimentPct >= 0 ? '+' : ''}{sentimentPct.toFixed(0)}%
+                        </p>
+                        <div className="w-full h-1.5 bg-white/10 rounded-full mt-1 overflow-hidden" role="progressbar" aria-valuenow={sentimentPct} aria-valuemin={-30} aria-valuemax={30} aria-label={`Market sentiment: ${sentimentPct >= 0 ? '+' : ''}${sentimentPct.toFixed(0)}%`}>
+                          <div className={`h-full rounded-full ${sentimentBarColor}`} style={{ width: `${Math.min(100, sentimentBarWidth)}%` }} />
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-text-muted text-xs">Earnings Target</p>
+                        <p className="font-mono font-bold text-lg">{formatMoney(ipoState.earningsExpectations)}</p>
+                        <p className="text-xs text-text-muted">Actual: {formatMoney(totalEbitdaForTarget)}</p>
+                      </div>
+                      <div>
+                        <p className="text-text-muted text-xs">Share-Funded Deals</p>
+                        <p className="font-mono font-bold text-lg">{shareFundedRemaining}/1</p>
+                        <p className="text-xs text-text-muted">remaining this round</p>
+                      </div>
+                    </div>
+                    {ipoState.consecutiveMisses >= 1 && (
+                      <div className={`p-2 rounded text-xs ${ipoState.consecutiveMisses >= 2 ? 'bg-red-900/20 text-red-400' : 'bg-yellow-900/20 text-yellow-400'}`}>
+                        {ipoState.consecutiveMisses >= 2
+                          ? `⚠️ Analyst downgrade — ${ipoState.consecutiveMisses} consecutive misses. Stock under heavy pressure.`
+                          : `⚠️ ${ipoState.consecutiveMisses} consecutive miss${ipoState.consecutiveMisses !== 1 ? 'es' : ''} — another will trigger analyst downgrade.`}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              if (duration !== 'standard' || round < IPO_MIN_ROUND) return null;
+
+              // Pre-IPO: Eligibility checklist
+              const partialState = { businesses, duration, round, cash, totalDebt, sharesOutstanding, interestRate, ipoState } as any;
+              const { eligible, reasons } = checkIPOEligibility(partialState);
+
+              // Build gate items — if eligible, no reasons; show all-pass
+              const gates = eligible
+                ? [
+                    { label: 'EBITDA threshold', pass: true },
+                    { label: 'Business count', pass: true },
+                    { label: 'Average quality', pass: true },
+                    { label: 'Platform count', pass: true },
+                  ]
+                : reasons.map(r => ({ label: r, pass: false }));
+
+              return (
+                <div className="card">
+                  <h4 className="font-bold mb-3 flex items-center gap-2">
+                    <span className="text-accent">🔔</span> IPO Pathway
+                  </h4>
+                  <div className="space-y-1.5 mb-4">
+                    {gates.map((g, i) => (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        <span className={g.pass ? 'text-green-400' : 'text-red-400'}>{g.pass ? '✓' : '✗'}</span>
+                        <span className={g.pass ? 'text-text-secondary' : 'text-text-muted'}>{g.label}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={onExecuteIPO}
+                      disabled={!eligible}
+                      className="btn-primary flex-1 text-sm min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Go Public
+                    </button>
+                    <button
+                      onClick={onDeclineIPO}
+                      disabled={!eligible}
+                      className="btn-secondary flex-1 text-sm min-h-[44px] disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      Stay Private
+                    </button>
+                  </div>
+                  <p className="text-xs text-text-muted mt-2">
+                    Going public raises cash but adds earnings pressure. Staying private earns a bonus at exit.
+                  </p>
                 </div>
               );
             })()}

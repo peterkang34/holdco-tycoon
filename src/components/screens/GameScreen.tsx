@@ -165,6 +165,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     duration,
     seed,
     lastAcquisitionResult,
+    ipoState,
+    executeIPO,
+    declineIPO,
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;
@@ -564,6 +567,23 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     }
   }, [phase, round, businesses, maxRounds, addToast]);
 
+  // IPO earnings toasts — fire on round change when public
+  const prevIPOStateRef = useRef(ipoState);
+  useEffect(() => {
+    const prev = prevIPOStateRef.current;
+    prevIPOStateRef.current = ipoState;
+    if (!ipoState?.isPublic || !prev?.isPublic) return;
+
+    if (ipoState.marketSentiment > prev.marketSentiment) {
+      addToast({ message: 'Beat earnings expectations', detail: 'Market sentiment improved', type: 'success' });
+    } else if (ipoState.marketSentiment < prev.marketSentiment) {
+      addToast({ message: 'Missed earnings expectations', detail: 'Market sentiment declined', type: 'warning' });
+    }
+    if (ipoState.consecutiveMisses >= 2 && prev.consecutiveMisses < 2) {
+      addToast({ message: 'Analyst downgrade', detail: 'Consecutive earnings misses — stock under pressure', type: 'danger' });
+    }
+  }, [round, ipoState, addToast]);
+
   // Update telemetry session meta with current round
   useEffect(() => {
     updateSessionRound(round);
@@ -795,6 +815,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             activeTurnarounds={activeTurnarounds}
             onUnlockTurnaroundTier={handleUnlockTurnaroundTier}
             onStartTurnaround={handleStartTurnaround}
+            ipoState={ipoState}
+            onExecuteIPO={executeIPO}
+            onDeclineIPO={declineIPO}
           />
         );
       default:

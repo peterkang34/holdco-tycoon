@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration, IntegratedPlatform } from '../../engine/types';
+import type { IPOState } from '../../engine/types';
+import { calculateStayPrivateBonus } from '../../engine/ipo';
 import { useGameStore } from '../../hooks/useGame';
 import { SECTORS } from '../../data/sectors';
 import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLeaderboardRankFromList } from '../../engine/scoring';
@@ -68,6 +70,7 @@ interface GameOverScreenProps {
   totalDebt: number;
   hasRestructured?: boolean;
   integratedPlatforms: IntegratedPlatform[];
+  ipoState?: IPOState | null;
   challengeData?: ChallengeParams | null;
   incomingResult?: PlayerResult | null;
   onPlayAgain: () => void;
@@ -101,6 +104,7 @@ export function GameOverScreen({
   totalDebt,
   hasRestructured = false,
   integratedPlatforms,
+  ipoState,
   challengeData,
   incomingResult,
   onPlayAgain,
@@ -624,6 +628,14 @@ export function GameOverScreen({
                 <span>= Enterprise Value</span>
                 <span className="font-mono">{formatMoney(enterpriseValue)}</span>
               </div>
+              {(() => {
+                const stayBonus = calculateStayPrivateBonus(useGameStore.getState());
+                return stayBonus > 0 ? (
+                  <div className="text-xs text-green-400/70 -mt-0.5">
+                    Includes +{(stayBonus * 100).toFixed(0)}% stay-private bonus
+                  </div>
+                ) : null;
+              })()}
               <div className="flex justify-between text-sm">
                 <span className="text-text-muted">x Your Ownership ({(currentOwnership * 100).toFixed(1)}%)</span>
                 <span className="font-mono"></span>
@@ -667,6 +679,34 @@ export function GameOverScreen({
           </div>
         );
       })()}
+
+      {/* IPO Summary */}
+      {ipoState?.isPublic && (
+        <div className="card mb-6">
+          <h2 className="text-lg font-bold mb-4">IPO Summary</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+            <div>
+              <p className="text-text-muted text-sm">IPO Round</p>
+              <p className="text-lg sm:text-xl font-bold font-mono">Year {ipoState.ipoRound}</p>
+            </div>
+            <div>
+              <p className="text-text-muted text-sm">Final Stock Price</p>
+              <p className="text-lg sm:text-xl font-bold font-mono text-accent">${ipoState.stockPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+            </div>
+            <div>
+              <p className="text-text-muted text-sm">Market Sentiment</p>
+              <p className={`text-lg sm:text-xl font-bold font-mono ${ipoState.marketSentiment >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                {ipoState.marketSentiment >= 0 ? '+' : ''}{(ipoState.marketSentiment * 100).toFixed(0)}%
+              </p>
+            </div>
+            <div>
+              <p className="text-text-muted text-sm">Shares Outstanding</p>
+              <p className="text-lg sm:text-xl font-bold font-mono">{ipoState.sharesOutstanding.toLocaleString()}</p>
+              <p className="text-xs text-text-muted">Pre-IPO: {ipoState.preIPOShares.toLocaleString()}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Save to Leaderboard */}
       {!hasSaved && !leaderboardLoading && canMakeLeaderboard && (

@@ -11,6 +11,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'February 24, 2026',
+    title: 'IPO Pathway UI',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'IPO Pathway now has a full in-game UI in the Capital tab — eligibility checklist, Go Public / Stay Private buttons, and a Public Company Dashboard with stock price, market sentiment, earnings targets, and share-funded deal tracking.',
+          'Earnings toasts fire each round when public — beat, missed, and analyst downgrade notifications.',
+          'Game Over screen now shows an IPO Summary card (round, stock price, sentiment, shares) and a stay-private bonus note in the EV waterfall.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 23, 2026',
     title: '20-Year Mode Upgrade',
     sections: [
