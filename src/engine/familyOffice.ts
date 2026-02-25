@@ -82,6 +82,10 @@ export function advanceFamilyOfficeRound(
   foState: FamilyOfficeState,
 ): FamilyOfficeState {
   if (foState.legacyScore) return foState; // already complete
+  // Block advancement past succession round without a choice
+  if (foState.foRound === FAMILY_OFFICE_SUCCESSION_ROUND && !foState.generationalSuccessionChoice) {
+    return foState;
+  }
   if (foState.foRound >= FAMILY_OFFICE_ROUNDS) {
     // Final round — compute legacy score
     return {
@@ -97,6 +101,13 @@ export function advanceFamilyOfficeRound(
 }
 
 /**
+ * Preview reputation gain for a philanthropy amount.
+ */
+export function philanthropyRepGain(amount: number): number {
+  return Math.round(amount / 5000);
+}
+
+/**
  * Make a philanthropy commitment (irrevocable).
  */
 export function commitPhilanthropy(
@@ -106,7 +117,7 @@ export function commitPhilanthropy(
   return {
     ...foState,
     philanthropyCommitted: foState.philanthropyCommitted + amount,
-    reputation: Math.min(100, foState.reputation + Math.round(amount / 5000)),
+    reputation: Math.min(100, foState.reputation + philanthropyRepGain(amount)),
     irrevocableCommitments: [
       ...foState.irrevocableCommitments,
       { type: 'philanthropy', amount, round: foState.foRound, irrevocable: true },

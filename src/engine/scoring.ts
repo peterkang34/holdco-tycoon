@@ -606,7 +606,7 @@ export async function loadLeaderboard(): Promise<LeaderboardEntry[]> {
  */
 export async function saveToLeaderboard(
   entry: Omit<LeaderboardEntry, 'id' | 'date'>,
-  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number; hasRestructured?: boolean; submittedMultiplier?: number }
+  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number; hasRestructured?: boolean; submittedMultiplier?: number; familyOfficeCompleted?: boolean; legacyGrade?: string }
 ): Promise<LeaderboardEntry> {
   const newEntry: LeaderboardEntry = {
     ...entry,
@@ -635,6 +635,8 @@ export async function saveToLeaderboard(
     ...(extra?.duration ? { duration: extra.duration as 'standard' | 'quick' } : {}),
     ...(extra?.hasRestructured ? { hasRestructured: extra.hasRestructured } : {}),
     ...(extra?.submittedMultiplier != null ? { submittedMultiplier: extra.submittedMultiplier } : {}),
+    ...(extra?.familyOfficeCompleted ? { familyOfficeCompleted: extra.familyOfficeCompleted } : {}),
+    ...(extra?.legacyGrade ? { legacyGrade: extra.legacyGrade } : {}),
   };
   saveToLocalLeaderboard(localEntry);
   return newEntry;

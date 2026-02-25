@@ -276,7 +276,7 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
       <div className="flex items-center gap-4 min-w-0 flex-1">
         <RankBadge rank={rank} />
         <div className="min-w-0">
-          <p className="font-bold">{entry.initials}</p>
+          <p className="font-bold">{entry.initials}{entry.familyOfficeCompleted && <span className="ml-1" title="Family Office Legacy">🦅</span>}</p>
           <p className="text-xs text-text-muted truncate">{entry.holdcoName}</p>
         </div>
       </div>

@@ -4,12 +4,13 @@ import { useGameStore, getFinalScore, getPostGameInsights, getEnterpriseValue, g
 import { IntroScreen } from './components/screens/IntroScreen';
 import { GameScreen } from './components/screens/GameScreen';
 import { GameOverScreen } from './components/screens/GameOverScreen';
+import { FamilyOfficeScreen } from './components/screens/FamilyOfficeScreen';
 import { ScoreboardScreen } from './components/screens/ScoreboardScreen';
 import { SectorId, GameDifficulty, GameDuration } from './engine/types';
 import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, replaceUrlWithChallenge, type ChallengeParams, type PlayerResult } from './utils/challenge';
 import { trackPageView } from './services/telemetry';
 
-type Screen = 'intro' | 'game' | 'gameOver' | 'scoreboard';
+type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'scoreboard';
 
 function App() {
   const [isAdmin, setIsAdmin] = useState(window.location.hash === '#/admin');
@@ -134,6 +135,16 @@ function App() {
     setScreen('intro');
   };
 
+  const handleEnterFamilyOffice = () => {
+    window.scrollTo(0, 0);
+    setScreen('familyOffice');
+  };
+
+  const handleFamilyOfficeComplete = () => {
+    window.scrollTo(0, 0);
+    setScreen('gameOver');
+  };
+
   // Compute game-over values only when needed (non-reactive to avoid infinite re-renders)
   const score = useMemo(() => screen === 'gameOver' ? getFinalScore() : undefined, [screen]);
   const insights = useMemo(() => screen === 'gameOver' ? getPostGameInsights() : undefined, [screen]);
@@ -191,7 +202,11 @@ function App() {
           challengeData={challengeData}
           incomingResult={incomingResult}
           onPlayAgain={handlePlayAgain}
+          onEnterFamilyOffice={handleEnterFamilyOffice}
         />
+      )}
+      {screen === 'familyOffice' && (
+        <FamilyOfficeScreen onComplete={handleFamilyOfficeComplete} />
       )}
       {screen === 'scoreboard' && scoreboardParams && (
         <ScoreboardScreen

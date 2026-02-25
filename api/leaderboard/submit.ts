@@ -54,6 +54,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       duration,
       founderEquityValue,
       founderPersonalWealth,
+      familyOfficeCompleted,
+      legacyGrade,
     } = body || {};
 
     // initials: 2-4 uppercase alpha chars
@@ -145,6 +147,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       date: new Date().toISOString(),
       totalRevenue: typeof totalRevenue === 'number' ? Math.round(totalRevenue) : undefined,
       avgEbitdaMargin: typeof avgEbitdaMargin === 'number' ? Math.round(avgEbitdaMargin * 1000) / 1000 : undefined,
+      familyOfficeCompleted: familyOfficeCompleted === true ? true : undefined,
+      legacyGrade: typeof legacyGrade === 'string' && ['Enduring','Influential','Established','Fragile'].includes(legacyGrade) ? legacyGrade : undefined,
     };
 
     // Add to sorted set with adjusted FEV as the ranking score

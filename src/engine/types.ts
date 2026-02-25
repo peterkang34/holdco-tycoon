@@ -662,6 +662,8 @@ export interface LeaderboardEntry {
   founderPersonalWealth?: number;
   hasRestructured?: boolean;
   submittedMultiplier?: number;
+  familyOfficeCompleted?: boolean;
+  legacyGrade?: string; // 'Enduring' | 'Influential' | 'Established' | 'Fragile'
 }
 
 // Utility types

@@ -3333,6 +3333,7 @@ export const useGameStore = create<GameStore>()(
       familyOfficeSuccession: (choice) => {
         const state = get();
         if (!state.familyOfficeState?.isActive) return;
+        if (state.familyOfficeState.generationalSuccessionChoice) return; // already chosen — locked
         const updated = applySuccessionChoice(state.familyOfficeState, choice);
         set({ familyOfficeState: updated });
         useToastStore.getState().addToast({

@@ -12,6 +12,22 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 24, 2026',
+    title: 'Family Office Endgame',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Family Office is now fully playable — a 5-round post-game mini-game for elite 20-year players who meet all eligibility gates.',
+          'Make irrevocable philanthropy commitments that build your reputation. Diversify investments across equities, fixed income, real estate, and alternatives.',
+          'Choose a succession plan in Round 3: Heir Apparent, Professional CEO, or Family Council — each with different risks and legacy implications.',
+          'Receive a Legacy Score (0-100) graded Enduring, Influential, Established, or Fragile across five components.',
+          'Players who complete the Family Office earn a 🦅 eagle badge next to their name on the leaderboard.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 24, 2026',
     title: 'Share-Funded Acquisitions',
     sections: [
       {
