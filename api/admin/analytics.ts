@@ -224,6 +224,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Non-critical — continue without leaderboard data
     }
 
+    // Activity feed: recent starts + abandons
+    let activityFeed: unknown[] = [];
+    try {
+      const rawActivity = await kv.lrange('t:activity:recent', 0, 49);
+      activityFeed = rawActivity.map((item) => {
+        try {
+          return typeof item === 'string' ? JSON.parse(item) : item;
+        } catch {
+          return null;
+        }
+      }).filter(Boolean);
+    } catch {
+      // Non-critical
+    }
+
     // Phase 5: Cohort retention data
     let cohortRetention: { cohortWeek: string; weekData: Record<string, number> }[] = [];
     try {
@@ -250,7 +265,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     res.setHeader('Cache-Control', 'private, no-cache');
-    return res.status(200).json({ allTime, months, leaderboardEntries, recentEntries, cohortRetention });
+    return res.status(200).json({ allTime, months, leaderboardEntries, recentEntries, activityFeed, cohortRetention });
   } catch (error) {
     console.error('Analytics error:', error);
     return res.status(500).json({ error: 'Failed to fetch analytics' });

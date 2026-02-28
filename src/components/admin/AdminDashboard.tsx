@@ -70,11 +70,24 @@ interface LeaderboardEntry {
   date: string;
 }
 
+interface ActivityEvent {
+  type: 'start' | 'abandon';
+  ts: string;
+  difficulty?: string;
+  duration?: string;
+  sector?: string;
+  device?: string;
+  gameNumber?: number;
+  round?: number;
+  sessionDurationMs?: number;
+}
+
 interface AnalyticsData {
   allTime: { started: number; completed: number };
   months: MonthData[];
   leaderboardEntries: LeaderboardEntry[];
   recentEntries: LeaderboardEntry[];
+  activityFeed: ActivityEvent[];
   cohortRetention: CohortRow[];
 }
 
@@ -752,6 +765,51 @@ export function AdminDashboard() {
                   </tbody>
                 </table>
               </div>
+            </div>
+          )}
+
+          {/* Activity Feed */}
+          {data.activityFeed && data.activityFeed.length > 0 && (
+            <div className="card p-4 mt-4">
+              <SectionHeader title="Live Activity Feed" />
+              <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                {data.activityFeed.map((evt, i) => {
+                  const dateObj = new Date(evt.ts);
+                  const timeAgo = getTimeAgo(dateObj);
+                  const durationLabel = evt.duration === 'quick' ? '10yr' : '20yr';
+                  const diffLabel = evt.difficulty === 'normal' ? 'Hard' : 'Easy';
+
+                  if (evt.type === 'start') {
+                    return (
+                      <div key={i} className="flex items-center gap-2 py-1.5 border-b border-border/30 text-xs">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium w-16 text-center shrink-0">START</span>
+                        <span className="text-text-muted font-mono w-16 shrink-0" title={dateObj.toLocaleString()}>{timeAgo}</span>
+                        <span className="text-text-secondary">{diffLabel} {durationLabel}</span>
+                        {evt.sector && <span className="text-text-muted">· {evt.sector}</span>}
+                        {evt.device && <span className="text-text-muted ml-auto">{evt.device}</span>}
+                        {evt.gameNumber != null && (
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${evt.gameNumber === 1 ? 'bg-accent/20 text-accent' : 'bg-white/5 text-text-muted'}`}>
+                            {evt.gameNumber === 1 ? 'New' : `#${evt.gameNumber}`}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  } else {
+                    const mins = evt.sessionDurationMs ? Math.round(evt.sessionDurationMs / 60000) : null;
+                    return (
+                      <div key={i} className="flex items-center gap-2 py-1.5 border-b border-border/30 text-xs">
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-medium w-16 text-center shrink-0">ABANDON</span>
+                        <span className="text-text-muted font-mono w-16 shrink-0" title={dateObj.toLocaleString()}>{timeAgo}</span>
+                        {evt.round != null && <span className="text-text-secondary">Year {evt.round}</span>}
+                        {evt.difficulty && <span className="text-text-muted">· {diffLabel} {durationLabel}</span>}
+                        {mins != null && <span className="text-text-muted ml-auto">{mins}m played</span>}
+                        {evt.device && <span className="text-text-muted">{evt.device}</span>}
+                      </div>
+                    );
+                  }
+                })}
+              </div>
+              <p className="text-[10px] text-text-muted mt-2">Shows last 50 events. Feed populates from new sessions going forward.</p>
             </div>
           )}
         </>

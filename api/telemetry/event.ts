@@ -96,6 +96,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         pipe.incr(`t:challenge:${monthKey}:started`);
       }
 
+      // Activity feed: store individual event for admin dashboard
+      pipe.lpush('t:activity:recent', JSON.stringify({
+        type: 'start',
+        ts: new Date().toISOString(),
+        difficulty,
+        duration,
+        sector,
+        device,
+        gameNumber,
+      }));
+      pipe.ltrim('t:activity:recent', 0, 99);
+
       // Cohort tracking (Phase 5)
       if (playerId) {
         try {
@@ -185,6 +197,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (sessionDurationMs != null && round != null) {
         pipe.hincrby(`t:abandon:duration:${monthKey}`, `R${round}-${getDurationBucket(sessionDurationMs)}`, 1);
       }
+
+      // Activity feed: store individual abandon event
+      pipe.lpush('t:activity:recent', JSON.stringify({
+        type: 'abandon',
+        ts: new Date().toISOString(),
+        round,
+        difficulty,
+        duration,
+        device,
+        sessionDurationMs,
+      }));
+      pipe.ltrim('t:activity:recent', 0, 99);
 
       await pipe.exec();
     } else if (event === 'page_view') {
