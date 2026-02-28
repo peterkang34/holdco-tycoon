@@ -658,6 +658,30 @@ function migrateV28ToV29(): void {
 }
 
 /**
+ * v29→v30: Family Office cash pool — backfill familyOfficeCash from founderDistributionsReceived
+ */
+function migrateV29ToV30(): void {
+  const v29Key = 'holdco-tycoon-save-v29';
+  const v30Key = 'holdco-tycoon-save-v30';
+  if (localStorage.getItem(v30Key)) return;
+  try {
+    const raw = localStorage.getItem(v29Key);
+    if (!raw) return;
+    const v29Data = JSON.parse(raw);
+
+    // Backfill familyOfficeCash on existing FO state
+    if (v29Data.state?.familyOfficeState && v29Data.state.familyOfficeState.familyOfficeCash === undefined) {
+      v29Data.state.familyOfficeState.familyOfficeCash = v29Data.state.founderDistributionsReceived ?? 0;
+    }
+
+    localStorage.setItem(v30Key, JSON.stringify(v29Data));
+    localStorage.removeItem(v29Key);
+  } catch (e) {
+    console.error('v29→v30 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -682,4 +706,5 @@ export function runAllMigrations(): void {
   migrateV26ToV27();
   migrateV27ToV28();
   migrateV28ToV29();
+  migrateV29ToV30();
 }

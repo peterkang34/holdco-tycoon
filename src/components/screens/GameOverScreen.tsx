@@ -25,7 +25,6 @@ import {
 import { ChallengeComparison } from '../ui/ChallengeComparison';
 import { ChallengeScoreboard } from '../ui/ChallengeScoreboard';
 import { FeedbackModal } from '../ui/FeedbackModal';
-import { checkFamilyOfficeEligibility } from '../../engine/familyOffice';
 
 /** Heuristic archetype classification based on game actions */
 function computeArchetype(
@@ -76,7 +75,6 @@ interface GameOverScreenProps {
   challengeData?: ChallengeParams | null;
   incomingResult?: PlayerResult | null;
   onPlayAgain: () => void;
-  onEnterFamilyOffice: () => void;
 }
 
 export function GameOverScreen({
@@ -111,10 +109,8 @@ export function GameOverScreen({
   challengeData,
   incomingResult,
   onPlayAgain,
-  onEnterFamilyOffice,
 }: GameOverScreenProps) {
   const familyOfficeState = useGameStore(s => s.familyOfficeState);
-  const startFamilyOffice = useGameStore(s => s.startFamilyOffice);
 
   const [initials, setInitials] = useState('');
   const [hasSaved, setHasSaved] = useState(false);
@@ -148,12 +144,7 @@ export function GameOverScreen({
     totalDistributions: Math.round(totalDistributions),
   }), [holdcoName, founderEquityValue, score, businesses, metricsHistory, hasRestructured, totalDistributions]);
 
-  const foEligibility = useMemo(() => {
-    if (familyOfficeState?.legacyScore) return { eligible: false, completed: true, active: false };
-    if (familyOfficeState?.isActive) return { eligible: false, completed: false, active: true };
-    const state = useGameStore.getState();
-    return { ...checkFamilyOfficeEligibility(state, score), completed: false, active: false };
-  }, [familyOfficeState, score]);
+  // foEligibility removed — FO unlock/in-progress cards moved to App.tsx bridge screen
 
   const handleChallengeShare = async () => {
     const url = buildChallengeUrl(currentChallengeParams);
@@ -573,38 +564,6 @@ export function GameOverScreen({
           Play Again
         </button>
       </div>
-      )}
-
-      {/* Family Office Unlock */}
-      {!bankruptRound && foEligibility.eligible && !foEligibility.completed && !foEligibility.active && (
-        <div className="card mb-6 border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-yellow-500/10">
-          <div className="text-center">
-            <span className="text-4xl block mb-2">🦅</span>
-            <h2 className="text-xl font-bold mb-1">Family Office Unlocked</h2>
-            <p className="text-sm text-text-secondary mb-4">
-              Your legacy qualifies you for the Family Office endgame — 5 rounds of philanthropy, investments, and succession planning.
-            </p>
-            <button
-              onClick={() => { startFamilyOffice(); onEnterFamilyOffice(); }}
-              className="btn-primary text-lg py-3"
-            >
-              Enter Family Office
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Family Office — In Progress (returned mid-way) */}
-      {!bankruptRound && foEligibility.active && !foEligibility.completed && (
-        <div className="card mb-6 border-amber-500/30">
-          <div className="text-center">
-            <span className="text-3xl block mb-2">🦅</span>
-            <p className="text-sm text-text-secondary mb-3">Family Office in progress — Round {familyOfficeState?.foRound ?? '?'} of 5</p>
-            <button onClick={onEnterFamilyOffice} className="btn-primary">
-              Continue Family Office
-            </button>
-          </div>
-        </div>
       )}
 
       {/* Family Office — Completed */}

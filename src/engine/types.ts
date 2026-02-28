@@ -479,6 +479,7 @@ export interface FamilyOfficeState {
   isActive: boolean;
   foRound: number;                // 1-5
   reputation: number;             // 0-100
+  familyOfficeCash: number;       // personal wealth pool for FO allocations
   philanthropyCommitted: number;
   investments: FOInvestment[];
   irrevocableCommitments: FOCommitment[];

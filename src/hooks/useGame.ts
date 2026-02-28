@@ -3358,7 +3358,7 @@ export const useGameStore = create<GameStore>()(
           });
           return;
         }
-        set({ familyOfficeState: initializeFamilyOffice() });
+        set({ familyOfficeState: initializeFamilyOffice(state.founderDistributionsReceived) });
         useToastStore.getState().addToast({
           message: 'Welcome to the Family Office — your legacy begins',
           type: 'success',
@@ -3368,17 +3368,17 @@ export const useGameStore = create<GameStore>()(
       familyOfficePhilanthropy: (amount: number) => {
         const state = get();
         if (!state.familyOfficeState?.isActive) return;
-        if (state.cash < amount) return;
         const updated = commitPhilanthropy(state.familyOfficeState, amount);
-        set({ familyOfficeState: updated, cash: state.cash - amount });
+        if (updated === state.familyOfficeState) return; // insufficient cash
+        set({ familyOfficeState: updated });
       },
 
       familyOfficeInvest: (type: string, amount: number) => {
         const state = get();
         if (!state.familyOfficeState?.isActive) return;
-        if (state.cash < amount) return;
         const updated = makeInvestment(state.familyOfficeState, type, amount);
-        set({ familyOfficeState: updated, cash: state.cash - amount });
+        if (updated === state.familyOfficeState) return; // insufficient cash
+        set({ familyOfficeState: updated });
       },
 
       familyOfficeSuccession: (choice) => {
@@ -4001,7 +4001,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v29', // v29: IPO overhaul (public company bonus, initialStockPrice, 10% public floor)
+      name: 'holdco-tycoon-save-v30', // v30: Family Office cash pool (uses personal wealth instead of holdco cash)
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -4124,6 +4124,10 @@ export const useGameStore = create<GameStore>()(
             }
             if ((state as any).ipoState === undefined) (state as any).ipoState = null;
             if ((state as any).familyOfficeState === undefined) (state as any).familyOfficeState = null;
+            // Backfill familyOfficeCash for pre-v30 FO saves
+            if (state.familyOfficeState && (state.familyOfficeState as any).familyOfficeCash === undefined) {
+              (state.familyOfficeState as any).familyOfficeCash = (state as any).founderDistributionsReceived ?? 0;
+            }
             // Restore business ID counter to avoid collisions after save/load
             if (Array.isArray(state.businesses)) {
               restoreBusinessIdCounter(state.businesses);

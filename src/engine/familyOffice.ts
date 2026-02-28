@@ -63,12 +63,14 @@ export function checkFamilyOfficeEligibility(
 
 /**
  * Initialize the Family Office state for the 5-round mini-game.
+ * @param personalWealth — founder's cumulative distributions, used as the FO cash pool
  */
-export function initializeFamilyOffice(): FamilyOfficeState {
+export function initializeFamilyOffice(personalWealth: number): FamilyOfficeState {
   return {
     isActive: true,
     foRound: 1,
     reputation: 50, // starts at neutral
+    familyOfficeCash: personalWealth,
     philanthropyCommitted: 0,
     investments: [],
     irrevocableCommitments: [],
@@ -109,13 +111,17 @@ export function philanthropyRepGain(amount: number): number {
 
 /**
  * Make a philanthropy commitment (irrevocable).
+ * Deducts from the FO's own cash pool.
  */
 export function commitPhilanthropy(
   foState: FamilyOfficeState,
   amount: number,
 ): FamilyOfficeState {
+  if (amount <= 0) return foState;
+  if (foState.familyOfficeCash < amount) return foState;
   return {
     ...foState,
+    familyOfficeCash: foState.familyOfficeCash - amount,
     philanthropyCommitted: foState.philanthropyCommitted + amount,
     reputation: Math.min(100, foState.reputation + philanthropyRepGain(amount)),
     irrevocableCommitments: [
@@ -127,14 +133,18 @@ export function commitPhilanthropy(
 
 /**
  * Make an investment allocation.
+ * Deducts from the FO's own cash pool.
  */
 export function makeInvestment(
   foState: FamilyOfficeState,
   type: string,
   amount: number,
 ): FamilyOfficeState {
+  if (amount <= 0) return foState;
+  if (foState.familyOfficeCash < amount) return foState;
   return {
     ...foState,
+    familyOfficeCash: foState.familyOfficeCash - amount,
     investments: [
       ...foState.investments,
       { type, amount, round: foState.foRound },

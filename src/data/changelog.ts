@@ -12,6 +12,27 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 28, 2026',
+    title: 'Family Office Overhaul',
+    sections: [
+      {
+        heading: 'Bug Fixes',
+        items: [
+          'Family Office now uses your personal wealth (cumulative distributions) instead of holdco operating cash — buttons actually work now.',
+          'Family Office intercepts before the Game Over screen as a dedicated bridge, not buried inside results.',
+          'Fixed duplicate leaderboard entries when submitting before and after Family Office.',
+        ],
+      },
+      {
+        heading: 'Quality of Life',
+        items: [
+          'Added #/fo-test shortcut URL for quick Family Office testing.',
+          'Mid-game Family Office saves now resume properly on page reload.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 28, 2026',
     title: 'Smarter Public Equity Raises',
     sections: [
       {

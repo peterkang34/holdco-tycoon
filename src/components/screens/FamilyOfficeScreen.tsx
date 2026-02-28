@@ -41,7 +41,7 @@ const GRADE_BG: Record<string, string> = {
 
 export function FamilyOfficeScreen({ onComplete }: FamilyOfficeScreenProps) {
   const familyOfficeState = useGameStore(s => s.familyOfficeState);
-  const cash = useGameStore(s => s.cash);
+  const cash = familyOfficeState?.familyOfficeCash ?? 0;
   const holdcoName = useGameStore(s => s.holdcoName);
   const startFamilyOffice = useGameStore(s => s.startFamilyOffice);
   const familyOfficePhilanthropy = useGameStore(s => s.familyOfficePhilanthropy);

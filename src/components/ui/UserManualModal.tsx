@@ -1439,9 +1439,10 @@ function TwentyYearContent() {
 
       <SubHeading>Family Office Endgame</SubHeading>
       <P>
-        The Family Office is a post-game 5-round mini-game unlocked after the main game
-        ends for exceptional players. It explores what happens after the fortune is made:
-        wealth preservation, philanthropy, and generational succession.
+        The Family Office is a 5-round mini-game that intercepts before your final results
+        for exceptional players. It explores what happens after the fortune is made:
+        wealth preservation, philanthropy, and generational succession. The Family Office
+        operates on your personal wealth (cumulative founder distributions), not holdco operating cash.
       </P>
       <DataTable
         headers={['Gate', 'Requirement']}

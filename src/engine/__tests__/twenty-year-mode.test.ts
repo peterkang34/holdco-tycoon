@@ -701,10 +701,11 @@ describe('Family Office Eligibility (Sprint 7)', () => {
 
 describe('Family Office Initialization (Sprint 7)', () => {
   it('should initialize with correct defaults', () => {
-    const fo = initializeFamilyOffice();
+    const fo = initializeFamilyOffice(5000000);
     expect(fo.isActive).toBe(true);
     expect(fo.foRound).toBe(1);
     expect(fo.reputation).toBe(50);
+    expect(fo.familyOfficeCash).toBe(5000000);
     expect(fo.philanthropyCommitted).toBe(0);
     expect(fo.investments).toHaveLength(0);
     expect(fo.irrevocableCommitments).toHaveLength(0);
@@ -713,14 +714,14 @@ describe('Family Office Initialization (Sprint 7)', () => {
 
 describe('Family Office Round Processing (Sprint 8)', () => {
   it('should advance round', () => {
-    const fo = initializeFamilyOffice();
+    const fo = initializeFamilyOffice(5000000);
     const next = advanceFamilyOfficeRound(fo);
     expect(next.foRound).toBe(2);
   });
 
   it('should calculate legacy score on final round', () => {
     const fo: FamilyOfficeState = {
-      ...initializeFamilyOffice(),
+      ...initializeFamilyOffice(5000000),
       foRound: FAMILY_OFFICE_ROUNDS,
       generationalSuccessionChoice: 'professional_ceo',
     };
@@ -731,7 +732,7 @@ describe('Family Office Round Processing (Sprint 8)', () => {
   });
 
   it('should track philanthropy commitments', () => {
-    const fo = initializeFamilyOffice();
+    const fo = initializeFamilyOffice(5000000);
     const updated = commitPhilanthropy(fo, 50000);
     expect(updated.philanthropyCommitted).toBe(50000);
     expect(updated.irrevocableCommitments).toHaveLength(1);
@@ -740,7 +741,7 @@ describe('Family Office Round Processing (Sprint 8)', () => {
   });
 
   it('should track investments', () => {
-    const fo = initializeFamilyOffice();
+    const fo = initializeFamilyOffice(5000000);
     const updated = makeInvestment(fo, 'real_estate', 100000);
     expect(updated.investments).toHaveLength(1);
     expect(updated.investments[0].type).toBe('real_estate');
@@ -756,13 +757,13 @@ describe('Generational Succession (Sprint 8)', () => {
   });
 
   it('should apply succession choice', () => {
-    const fo = initializeFamilyOffice();
+    const fo = initializeFamilyOffice(5000000);
     const updated = applySuccessionChoice(fo, 'professional_ceo');
     expect(updated.generationalSuccessionChoice).toBe('professional_ceo');
   });
 
   it('succession round should be round 3', () => {
-    const fo = { ...initializeFamilyOffice(), foRound: 3 };
+    const fo = { ...initializeFamilyOffice(5000000), foRound: 3 };
     expect(isSuccessionRound(fo)).toBe(true);
     expect(isSuccessionRound({ ...fo, foRound: 2 })).toBe(false);
   });
@@ -774,6 +775,7 @@ describe('Legacy Score Calculation (Sprint 8)', () => {
       isActive: true,
       foRound: 5,
       reputation: 80,
+      familyOfficeCash: 5000000,
       philanthropyCommitted: 100000,
       investments: [
         { type: 'real_estate', amount: 50000, round: 1 },
@@ -802,6 +804,7 @@ describe('Legacy Score Calculation (Sprint 8)', () => {
       isActive: true,
       foRound: 5,
       reputation: 100,
+      familyOfficeCash: 5000000,
       philanthropyCommitted: 500000,
       investments: Array.from({ length: 5 }, (_, i) => ({
         type: `type_${i}`, amount: 100000, round: i + 1,
@@ -821,6 +824,7 @@ describe('Legacy Score Calculation (Sprint 8)', () => {
       isActive: true,
       foRound: 5,
       reputation: 10,
+      familyOfficeCash: 5000000,
       philanthropyCommitted: 0,
       investments: [],
       irrevocableCommitments: [],
@@ -832,13 +836,13 @@ describe('Legacy Score Calculation (Sprint 8)', () => {
 
   it('family office completeness check', () => {
     const incomplete: FamilyOfficeState = {
-      ...initializeFamilyOffice(),
+      ...initializeFamilyOffice(5000000),
       foRound: 3,
     };
     expect(isFamilyOfficeComplete(incomplete)).toBe(false);
 
     const complete: FamilyOfficeState = {
-      ...initializeFamilyOffice(),
+      ...initializeFamilyOffice(5000000),
       foRound: 5,
       legacyScore: { total: 60, grade: 'Influential', wealthPreservation: 12, reputationScore: 12, philanthropyScore: 12, successionQuality: 12, permanentHoldPerformance: 12 },
     };
@@ -1068,6 +1072,7 @@ describe('QA: Family Office Legacy Score — Edge Cases', () => {
       isActive: true,
       foRound: 5,
       reputation: 0,
+      familyOfficeCash: 0,
       philanthropyCommitted: 0,
       investments: [],
       irrevocableCommitments: [],
@@ -1087,6 +1092,7 @@ describe('QA: Family Office Legacy Score — Edge Cases', () => {
       isActive: true,
       foRound: 5,
       reputation: 999, // extreme
+      familyOfficeCash: 0,
       philanthropyCommitted: 99999999, // extreme
       investments: Array.from({ length: 50 }, (_, i) => ({
         type: `type_${i}`, amount: 100000, round: 1,
@@ -1114,6 +1120,7 @@ describe('QA: Family Office Legacy Score — Edge Cases', () => {
       isActive: true,
       foRound: 5,
       reputation: 100,
+      familyOfficeCash: 0,
       philanthropyCommitted: 500000,
       investments: Array.from({ length: 10 }, (_, i) => ({
         type: `type_${i}`, amount: 100000, round: 1,
@@ -1138,6 +1145,7 @@ describe('QA: Family Office Legacy Score — Edge Cases', () => {
       isActive: true,
       foRound: 5,
       reputation: 50,
+      familyOfficeCash: 5000000,
       philanthropyCommitted: 0,
       investments: [],
       irrevocableCommitments: [],
@@ -1155,13 +1163,13 @@ describe('QA: Family Office Legacy Score — Edge Cases', () => {
   });
 
   it('philanthropy reputation boost should be proportional to amount', () => {
-    const fo1 = commitPhilanthropy(initializeFamilyOffice(), 5000);
-    const fo2 = commitPhilanthropy(initializeFamilyOffice(), 50000);
+    const fo1 = commitPhilanthropy(initializeFamilyOffice(5000000), 5000);
+    const fo2 = commitPhilanthropy(initializeFamilyOffice(5000000), 50000);
     expect(fo2.reputation).toBeGreaterThan(fo1.reputation);
   });
 
   it('reputation should clamp at 100', () => {
-    let fo = initializeFamilyOffice();
+    let fo = initializeFamilyOffice(5000000);
     fo.reputation = 99;
     const updated = commitPhilanthropy(fo, 500000); // huge donation
     expect(updated.reputation).toBeLessThanOrEqual(100);
@@ -1171,7 +1179,7 @@ describe('QA: Family Office Legacy Score — Edge Cases', () => {
 describe('QA: Family Office Round Advancement', () => {
   it('should not advance past round 5', () => {
     const fo: FamilyOfficeState = {
-      ...initializeFamilyOffice(),
+      ...initializeFamilyOffice(5000000),
       foRound: FAMILY_OFFICE_ROUNDS,
       generationalSuccessionChoice: 'professional_ceo',
     };
@@ -1183,7 +1191,7 @@ describe('QA: Family Office Round Advancement', () => {
 
   it('advancing from round 4 to 5 should just increment, not compute score', () => {
     const fo: FamilyOfficeState = {
-      ...initializeFamilyOffice(),
+      ...initializeFamilyOffice(5000000),
       foRound: 4,
     };
     const result = advanceFamilyOfficeRound(fo);
