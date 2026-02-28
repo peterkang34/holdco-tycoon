@@ -278,7 +278,7 @@ interface GameStore extends GameState {
   declineIPO: () => void;
 
   // Family Office (20-year mode endgame)
-  startFamilyOffice: () => void;
+  startFamilyOffice: (force?: boolean) => void;
   completeFamilyOffice: () => void;
 
   // AI enhancement
@@ -3355,17 +3355,19 @@ export const useGameStore = create<GameStore>()(
 
       // ── Family Office V2 actions (real holdco mechanics) ──
 
-      startFamilyOffice: () => {
+      startFamilyOffice: (force?: boolean) => {
         const state = get();
         if (state.isFamilyOfficeMode) return; // prevent double-invocation
-        const score = calculateFinalScore(state);
-        const { eligible, reasons } = checkFamilyOfficeEligibility(state, score);
-        if (!eligible) {
-          useToastStore.getState().addToast({
-            message: `Cannot start Family Office: ${reasons[0]}`,
-            type: 'warning',
-          });
-          return;
+        if (!force) {
+          const score = calculateFinalScore(state);
+          const { eligible, reasons } = checkFamilyOfficeEligibility(state, score);
+          if (!eligible) {
+            useToastStore.getState().addToast({
+              message: `Cannot start Family Office: ${reasons[0]}`,
+              type: 'warning',
+            });
+            return;
+          }
         }
 
         // 1. Snapshot all persisted fields

@@ -236,7 +236,7 @@ function App() {
                       // Test mode: inject mock distributions so startFamilyOffice has capital
                       useGameStore.setState({ founderDistributionsReceived: 2000000 });
                     }
-                    startFamilyOffice();
+                    startFamilyOffice(true); // force=true bypasses eligibility for testing
                     window.scrollTo(0, 0);
                     setScreen('game');
                   }}
