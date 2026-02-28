@@ -200,17 +200,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       completed: Number(results[allTimeOffset + 1]) || 0,
     };
 
-    // Fetch leaderboard top 25 (negative indices = highest scores)
+    // Fetch leaderboard top 25 (negative indices = highest scores) + recent 25 by date
     let leaderboardEntries: unknown[] = [];
+    let recentEntries: unknown[] = [];
     try {
-      const raw = await kv.zrange(LEADERBOARD_KEY, -25, -1);
-      leaderboardEntries = raw.map((entry) => {
+      const raw = await kv.zrange(LEADERBOARD_KEY, 0, -1);
+      const allEntries = raw.map((entry) => {
         try {
           return typeof entry === 'string' ? JSON.parse(entry) : entry;
         } catch {
           return null;
         }
-      }).filter(Boolean).reverse();
+      }).filter(Boolean);
+
+      // Top 25 by adjusted FEV (sorted set is ascending, so take last 25 reversed)
+      leaderboardEntries = allEntries.slice(-25).reverse();
+
+      // Recent 25 by date
+      recentEntries = [...allEntries]
+        .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        .slice(0, 25);
     } catch {
       // Non-critical — continue without leaderboard data
     }
@@ -241,7 +250,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     res.setHeader('Cache-Control', 'private, no-cache');
-    return res.status(200).json({ allTime, months, leaderboardEntries, cohortRetention });
+    return res.status(200).json({ allTime, months, leaderboardEntries, recentEntries, cohortRetention });
   } catch (error) {
     console.error('Analytics error:', error);
     return res.status(500).json({ error: 'Failed to fetch analytics' });

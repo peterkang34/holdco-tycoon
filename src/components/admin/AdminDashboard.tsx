@@ -74,6 +74,7 @@ interface AnalyticsData {
   allTime: { started: number; completed: number };
   months: MonthData[];
   leaderboardEntries: LeaderboardEntry[];
+  recentEntries: LeaderboardEntry[];
   cohortRetention: CohortRow[];
 }
 
@@ -89,6 +90,18 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'feedback', label: 'Feedback' },
 ];
 
+function getTimeAgo(date: Date): string {
+  const now = Date.now();
+  const diff = now - date.getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return date.toLocaleDateString();
+}
 
 // ── Shared Components ─────────────────────────────────────────
 
@@ -648,6 +661,7 @@ export function AdminDashboard() {
                     <tr className="text-text-muted border-b border-border">
                       <th className="text-left py-2 pr-3">#</th>
                       <th className="text-left py-2 pr-3">Name</th>
+                      <th className="text-center py-2 pr-3">Initials</th>
                       <th className="text-right py-2 pr-3">Adj FEV</th>
                       <th className="text-right py-2 pr-3">Raw FEV</th>
                       <th className="text-center py-2 pr-3">Score</th>
@@ -669,6 +683,7 @@ export function AdminDashboard() {
                         <tr key={i} className="border-b border-border/50">
                           <td className="py-1.5 pr-3 text-text-muted font-mono">{i + 1}</td>
                           <td className="py-1.5 pr-3 text-text-primary truncate max-w-[150px]">{entry.holdcoName}</td>
+                          <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.initials || '—'}</td>
                           <td className="py-1.5 pr-3 text-right font-mono text-accent">{formatMoney(adjFev)}</td>
                           <td className="py-1.5 pr-3 text-right font-mono text-text-secondary">{formatMoney(entry.founderEquityValue)}</td>
                           <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.score ?? '—'}</td>
@@ -680,6 +695,57 @@ export function AdminDashboard() {
                           </td>
                           <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.businessCount ?? '—'}</td>
                           <td className="py-1.5 text-right text-text-muted font-mono">{new Date(entry.date).toLocaleDateString()}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Recent Games Feed */}
+          {data.recentEntries && data.recentEntries.length > 0 && (
+            <div className="card p-4 mt-4">
+              <SectionHeader title="Recent Games (Last 25)" />
+              <div className="overflow-x-auto">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-text-muted border-b border-border">
+                      <th className="text-left py-2 pr-3">Date</th>
+                      <th className="text-center py-2 pr-3">Initials</th>
+                      <th className="text-left py-2 pr-3">Name</th>
+                      <th className="text-right py-2 pr-3">Adj FEV</th>
+                      <th className="text-center py-2 pr-3">Score</th>
+                      <th className="text-center py-2 pr-3">Grade</th>
+                      <th className="text-center py-2 pr-3">Mode</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recentEntries.map((entry, i) => {
+                      const multiplier = entry.difficulty === 'normal'
+                        ? DIFFICULTY_CONFIG.normal.leaderboardMultiplier
+                        : DIFFICULTY_CONFIG.easy.leaderboardMultiplier;
+                      const adjFev = Math.round(entry.founderEquityValue * multiplier);
+                      const durationLabel = entry.duration === 'quick' ? '10' : '20';
+                      const diffLabel = entry.difficulty === 'normal' ? 'H' : 'E';
+                      const dateObj = new Date(entry.date);
+                      const timeAgo = getTimeAgo(dateObj);
+                      return (
+                        <tr key={i} className="border-b border-border/50">
+                          <td className="py-1.5 pr-3 text-text-muted font-mono" title={dateObj.toLocaleString()}>
+                            {timeAgo}
+                          </td>
+                          <td className="py-1.5 pr-3 text-center font-mono text-text-primary font-bold">{entry.initials || '—'}</td>
+                          <td className="py-1.5 pr-3 text-text-secondary truncate max-w-[150px]">{entry.holdcoName}</td>
+                          <td className="py-1.5 pr-3 text-right font-mono text-accent">{formatMoney(adjFev)}</td>
+                          <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.score ?? '—'}</td>
+                          <td className={`py-1.5 pr-3 text-center font-bold ${getGradeColor(entry.grade)}`}>{entry.grade}</td>
+                          <td className="py-1.5 pr-3 text-center">
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
+                              {diffLabel}/{durationLabel}
+                            </span>
+                          </td>
                         </tr>
                       );
                     })}
