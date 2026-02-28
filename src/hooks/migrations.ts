@@ -634,6 +634,30 @@ function migrateV27ToV28(): void {
 }
 
 /**
+ * v28→v29: IPO overhaul — backfill initialStockPrice
+ */
+function migrateV28ToV29(): void {
+  const v28Key = 'holdco-tycoon-save-v28';
+  const v29Key = 'holdco-tycoon-save-v29';
+  if (localStorage.getItem(v29Key)) return;
+  try {
+    const raw = localStorage.getItem(v28Key);
+    if (!raw) return;
+    const v28Data = JSON.parse(raw);
+
+    // Backfill initialStockPrice from current stockPrice for existing IPO saves
+    if (v28Data.state?.ipoState && v28Data.state.ipoState.initialStockPrice === undefined) {
+      v28Data.state.ipoState.initialStockPrice = v28Data.state.ipoState.stockPrice ?? 0;
+    }
+
+    localStorage.setItem(v29Key, JSON.stringify(v28Data));
+    localStorage.removeItem(v28Key);
+  } catch (e) {
+    console.error('v28→v29 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -657,4 +681,5 @@ export function runAllMigrations(): void {
   migrateV25ToV26();
   migrateV26ToV27();
   migrateV27ToV28();
+  migrateV28ToV29();
 }

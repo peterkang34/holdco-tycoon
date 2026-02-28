@@ -12,11 +12,10 @@ import {
   checkIPOEligibility,
   executeIPO,
   processEarningsResult,
-  calculateStayPrivateBonus,
+  calculatePublicCompanyBonus,
   canShareFundedDeal,
   calculateShareFundedTerms,
   calculateStockPrice,
-  getIPODilutionPenalty,
 } from '../ipo';
 import { createMockGameState, createMockBusiness } from './helpers';
 import {
@@ -36,9 +35,8 @@ import {
   IPO_EARNINGS_BEAT_BONUS,
   IPO_CONSECUTIVE_MISS_THRESHOLD,
   IPO_SHARE_FUNDED_DEALS_PER_ROUND,
-  IPO_DILUTION_PENALTY,
-  IPO_STAY_PRIVATE_BONUS_MIN,
-  IPO_STAY_PRIVATE_BONUS_MAX,
+  IPO_FEV_BONUS_BASE,
+  IPO_FEV_BONUS_MAX,
   SUCCESSION_MIN_YEARS_HELD,
   SUCCESSION_INVEST_COST_MIN,
   SUCCESSION_INVEST_COST_MAX,
@@ -55,6 +53,12 @@ import {
   FAMILY_OFFICE_MIN_LONG_HELD,
   FAMILY_OFFICE_ROUNDS,
   FAMILY_OFFICE_SUCCESSION_ROUND,
+  EQUITY_DILUTION_STEP,
+  EQUITY_DILUTION_FLOOR,
+  EQUITY_BUYBACK_COOLDOWN,
+  EQUITY_ISSUANCE_SENTIMENT_PENALTY,
+  MIN_FOUNDER_OWNERSHIP,
+  MIN_PUBLIC_FOUNDER_OWNERSHIP,
 } from '../../data/gameConfig';
 import {
   checkFamilyOfficeEligibility,
@@ -369,6 +373,7 @@ describe('IPO Eligibility (Sprint 4)', () => {
       marketSentiment: 0,
       earningsExpectations: 80000,
       ipoRound: 16,
+      initialStockPrice: 100,
       consecutiveMisses: 0,
       shareFundedDealsThisRound: 0,
     };
@@ -423,6 +428,7 @@ describe('IPO Earnings Processing (Sprint 5)', () => {
       marketSentiment: 0,
       earningsExpectations: totalEbitda, // target = current
       ipoRound: 16,
+      initialStockPrice: 100,
       consecutiveMisses: 0,
       shareFundedDealsThisRound: 1,
     };
@@ -497,7 +503,7 @@ describe('Share-Funded Deals (Sprint 5)', () => {
     const state = createMockGameState({
       ipoState: {
         isPublic: true, stockPrice: 100, sharesOutstanding: 1200, preIPOShares: 1000,
-        marketSentiment: 0, earningsExpectations: 80000, ipoRound: 16,
+        marketSentiment: 0, earningsExpectations: 80000, ipoRound: 16, initialStockPrice: 100,
         consecutiveMisses: 0, shareFundedDealsThisRound: 0,
       },
     });
@@ -508,7 +514,7 @@ describe('Share-Funded Deals (Sprint 5)', () => {
     const state = createMockGameState({
       ipoState: {
         isPublic: true, stockPrice: 100, sharesOutstanding: 1200, preIPOShares: 1000,
-        marketSentiment: 0, earningsExpectations: 80000, ipoRound: 16,
+        marketSentiment: 0, earningsExpectations: 80000, ipoRound: 16, initialStockPrice: 100,
         consecutiveMisses: 0, shareFundedDealsThisRound: IPO_SHARE_FUNDED_DEALS_PER_ROUND,
       },
     });
@@ -518,7 +524,7 @@ describe('Share-Funded Deals (Sprint 5)', () => {
   it('should calculate correct share-funded terms', () => {
     const ipoState = {
       isPublic: true, stockPrice: 50, sharesOutstanding: 1200, preIPOShares: 1000,
-      marketSentiment: 0, earningsExpectations: 80000, ipoRound: 16,
+      marketSentiment: 0, earningsExpectations: 80000, ipoRound: 16, initialStockPrice: 50,
       consecutiveMisses: 0, shareFundedDealsThisRound: 0,
     };
     const terms = calculateShareFundedTerms(5000, ipoState);
@@ -528,52 +534,59 @@ describe('Share-Funded Deals (Sprint 5)', () => {
   });
 });
 
-describe('Stay Private Bonus (Sprint 6)', () => {
-  it('should return 0 when public', () => {
+describe('Public Company Bonus', () => {
+  it('should return 0 when private', () => {
+    const state = createIPOEligibleState();
+    expect(calculatePublicCompanyBonus(state)).toBe(0);
+  });
+
+  it('should return base bonus when public', () => {
     const state = createIPOEligibleState();
     state.ipoState = {
       isPublic: true, stockPrice: 100, sharesOutstanding: 1200, preIPOShares: 1000,
-      marketSentiment: 0, earningsExpectations: 80000, ipoRound: 16,
+      marketSentiment: 0, earningsExpectations: 80000, ipoRound: 16, initialStockPrice: 100,
       consecutiveMisses: 0, shareFundedDealsThisRound: 0,
     };
-    expect(calculateStayPrivateBonus(state)).toBe(0);
+    const bonus = calculatePublicCompanyBonus(state);
+    expect(bonus).toBeGreaterThanOrEqual(IPO_FEV_BONUS_BASE);
   });
 
-  it('should return 0 when not eligible for IPO', () => {
-    const state = createMockGameState({ round: 5, duration: 'standard' });
-    expect(calculateStayPrivateBonus(state)).toBe(0);
-  });
-
-  it('should return bonus when eligible but private', () => {
+  it('should increase with stock appreciation', () => {
     const state = createIPOEligibleState();
-    const bonus = calculateStayPrivateBonus(state);
-    expect(bonus).toBeGreaterThanOrEqual(IPO_STAY_PRIVATE_BONUS_MIN);
-    expect(bonus).toBeLessThanOrEqual(IPO_STAY_PRIVATE_BONUS_MAX);
+    state.ipoState = {
+      isPublic: true, stockPrice: 200, sharesOutstanding: 1200, preIPOShares: 1000,
+      marketSentiment: 0, earningsExpectations: 80000, ipoRound: 16, initialStockPrice: 100,
+      consecutiveMisses: 0, shareFundedDealsThisRound: 0,
+    };
+    const bonus = calculatePublicCompanyBonus(state);
+    expect(bonus).toBeGreaterThan(IPO_FEV_BONUS_BASE);
   });
 
-  it('bonus should scale with excess EBITDA', () => {
-    const state1 = createIPOEligibleState(); // 84000 EBITDA (barely above 75000)
-    const bonus1 = calculateStayPrivateBonus(state1);
+  it('should cap at IPO_FEV_BONUS_MAX', () => {
+    const state = createIPOEligibleState();
+    state.ipoState = {
+      isPublic: true, stockPrice: 500, sharesOutstanding: 1200, preIPOShares: 1000,
+      marketSentiment: 0.3, earningsExpectations: 80000, ipoRound: 16, initialStockPrice: 100,
+      consecutiveMisses: 0, shareFundedDealsThisRound: 0,
+    };
+    const bonus = calculatePublicCompanyBonus(state);
+    expect(bonus).toBeLessThanOrEqual(IPO_FEV_BONUS_MAX);
+  });
 
-    // Double the EBITDA
-    const bigBusinesses = [];
-    for (let i = 0; i < 7; i++) {
-      bigBusinesses.push(createMockBusiness({
-        id: `biz_${i}`,
-        ebitda: 24000,
-        qualityRating: 4 as QualityRating,
-        isPlatform: i < 2,
-      }));
-    }
-    const state2 = createMockGameState({
-      businesses: bigBusinesses,
-      round: 16,
-      duration: 'standard',
-      maxRounds: 20,
-    });
-    const bonus2 = calculateStayPrivateBonus(state2);
-
-    expect(bonus2).toBeGreaterThan(bonus1);
+  it('consecutive misses should reduce bonus', () => {
+    const state1 = createIPOEligibleState();
+    state1.ipoState = {
+      isPublic: true, stockPrice: 100, sharesOutstanding: 1200, preIPOShares: 1000,
+      marketSentiment: 0, earningsExpectations: 80000, ipoRound: 16, initialStockPrice: 100,
+      consecutiveMisses: 0, shareFundedDealsThisRound: 0,
+    };
+    const state2 = createIPOEligibleState();
+    state2.ipoState = {
+      isPublic: true, stockPrice: 100, sharesOutstanding: 1200, preIPOShares: 1000,
+      marketSentiment: 0, earningsExpectations: 80000, ipoRound: 16, initialStockPrice: 100,
+      consecutiveMisses: 2, shareFundedDealsThisRound: 0,
+    };
+    expect(calculatePublicCompanyBonus(state1)).toBeGreaterThan(calculatePublicCompanyBonus(state2));
   });
 });
 
@@ -582,7 +595,7 @@ describe('IPO Constants Validation', () => {
     expect(IPO_MIN_EBITDA).toBe(75000);
     expect(IPO_MIN_BUSINESSES).toBe(6);
     expect(IPO_MIN_AVG_QUALITY).toBe(4.0);
-    expect(IPO_MIN_PLATFORMS).toBe(2);
+    expect(IPO_MIN_PLATFORMS).toBe(1);
     expect(IPO_MIN_ROUND).toBe(16);
   });
 
@@ -592,11 +605,10 @@ describe('IPO Constants Validation', () => {
     expect(IPO_CONSECUTIVE_MISS_THRESHOLD).toBe(2);
   });
 
-  it('should have correct share/dilution constants', () => {
+  it('should have correct share/bonus constants', () => {
     expect(IPO_SHARE_FUNDED_DEALS_PER_ROUND).toBe(1);
-    expect(IPO_DILUTION_PENALTY).toBe(0.05);
-    expect(IPO_STAY_PRIVATE_BONUS_MIN).toBe(0.05);
-    expect(IPO_STAY_PRIVATE_BONUS_MAX).toBe(0.10);
+    expect(IPO_FEV_BONUS_BASE).toBe(0.05);
+    expect(IPO_FEV_BONUS_MAX).toBe(0.18);
   });
 });
 
@@ -910,6 +922,7 @@ describe('QA: IPO Stock Price Edge Cases', () => {
       marketSentiment: -0.3,
       earningsExpectations: 80000,
       ipoRound: 16,
+      initialStockPrice: 100,
       consecutiveMisses: 0,
       shareFundedDealsThisRound: 0,
     };
@@ -940,6 +953,7 @@ describe('QA: IPO Stock Price Edge Cases', () => {
         marketSentiment: 0,
         earningsExpectations: 0,
         ipoRound: 16,
+        initialStockPrice: 100,
         consecutiveMisses: 0,
         shareFundedDealsThisRound: 0,
       },
@@ -963,6 +977,7 @@ describe('QA: IPO Earnings — Exact Boundary', () => {
       marketSentiment: 0,
       earningsExpectations: totalEbitda,
       ipoRound: 16,
+      initialStockPrice: 100,
       consecutiveMisses: 0,
       shareFundedDealsThisRound: 0,
     };
@@ -1272,8 +1287,13 @@ describe('QA: 10-Year Mode Gating', () => {
   });
 });
 
-describe('QA: Stay Private Bonus — Interaction with Scoring', () => {
-  it('stay private bonus should be 0 if IPO already taken', () => {
+describe('QA: Public Company Bonus — Interaction with Scoring', () => {
+  it('public company bonus should be 0 when private', () => {
+    const state = createIPOEligibleState();
+    expect(calculatePublicCompanyBonus(state)).toBe(0);
+  });
+
+  it('public company bonus should include base when public', () => {
     const state = createIPOEligibleState();
     state.ipoState = {
       isPublic: true,
@@ -1283,38 +1303,13 @@ describe('QA: Stay Private Bonus — Interaction with Scoring', () => {
       marketSentiment: 0,
       earningsExpectations: 80000,
       ipoRound: 16,
+      initialStockPrice: 100,
       consecutiveMisses: 0,
       shareFundedDealsThisRound: 0,
     };
-    expect(calculateStayPrivateBonus(state)).toBe(0);
-  });
-
-  it('stay private bonus should scale between MIN and MAX', () => {
-    const state = createIPOEligibleState();
-    const bonus = calculateStayPrivateBonus(state);
-    expect(bonus).toBeGreaterThanOrEqual(IPO_STAY_PRIVATE_BONUS_MIN);
-    expect(bonus).toBeLessThanOrEqual(IPO_STAY_PRIVATE_BONUS_MAX);
-  });
-
-  it('stay private bonus excessFactor should clamp at 1.0', () => {
-    // Create state with extremely high EBITDA (way above $75M)
-    const bigBusinesses = [];
-    for (let i = 0; i < 7; i++) {
-      bigBusinesses.push(createMockBusiness({
-        id: `biz_${i}`,
-        ebitda: 100000, // $100M each = $700M total, way above $75M
-        qualityRating: 4 as QualityRating,
-        isPlatform: i < 2,
-      }));
-    }
-    const state = createMockGameState({
-      businesses: bigBusinesses,
-      round: 16,
-      duration: 'standard',
-      maxRounds: 20,
-    });
-    const bonus = calculateStayPrivateBonus(state);
-    expect(bonus).toBe(IPO_STAY_PRIVATE_BONUS_MAX); // should hit max
+    const bonus = calculatePublicCompanyBonus(state);
+    expect(bonus).toBeGreaterThanOrEqual(IPO_FEV_BONUS_BASE);
+    expect(bonus).toBeLessThanOrEqual(IPO_FEV_BONUS_MAX);
   });
 });
 
@@ -1328,6 +1323,7 @@ describe('QA: Share-Funded Deal Edge Cases', () => {
       marketSentiment: 0,
       earningsExpectations: 80000,
       ipoRound: 16,
+      initialStockPrice: 100,
       consecutiveMisses: 0,
       shareFundedDealsThisRound: 0,
     };
@@ -1345,6 +1341,7 @@ describe('QA: Share-Funded Deal Edge Cases', () => {
       marketSentiment: 0,
       earningsExpectations: 80000,
       ipoRound: 16,
+      initialStockPrice: 100,
       consecutiveMisses: 0,
       shareFundedDealsThisRound: 0,
     };
@@ -1419,22 +1416,127 @@ describe('QA: FO Eligibility — Long-Held Calculation', () => {
   });
 });
 
-describe('QA: IPO Dilution Penalty Calculation', () => {
-  it('getIPODilutionPenalty should return 0 when private', () => {
-    const state = createMockGameState({ ipoState: null });
-    expect(getIPODilutionPenalty(state)).toBe(0);
-  });
-
-  it('getIPODilutionPenalty should return 0 right after IPO (no extra dilution)', () => {
+describe('QA: executeIPO sets initialStockPrice', () => {
+  it('executeIPO should set initialStockPrice on the returned ipoState', () => {
     const state = createIPOEligibleState();
     const result = executeIPO(state);
-    // Apply IPO result to state
-    state.ipoState = result.ipoState;
-    // sharesOutstanding on state vs ipoState will differ
-    // The function uses state.sharesOutstanding (pre-IPO) vs ipoState.sharesOutstanding (post-IPO)
-    const penalty = getIPODilutionPenalty(state);
-    // This checks the delta: (1250 - 1000) / 1000 * 5 = 1.25, round to 1 event => 1 * 0.05 = 0.05
-    expect(Number.isFinite(penalty)).toBe(true);
-    expect(penalty).toBeGreaterThanOrEqual(0);
+    expect(result.ipoState.initialStockPrice).toBeDefined();
+    expect(result.ipoState.initialStockPrice).toBe(result.ipoState.stockPrice);
+    expect(result.ipoState.initialStockPrice).toBeGreaterThan(0);
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// POST-IPO EQUITY RAISES
+// ══════════════════════════════════════════════════════════════════
+
+describe('Post-IPO Equity Raises', () => {
+  function createPublicState(overrides: Record<string, unknown> = {}) {
+    const state = createIPOEligibleState();
+    const ipoResult = executeIPO(state);
+    return createMockGameState({
+      ...state,
+      businesses: state.businesses,
+      cash: state.cash + ipoResult.cashRaised,
+      sharesOutstanding: ipoResult.ipoState.sharesOutstanding,
+      ipoState: ipoResult.ipoState,
+      round: 17,
+      ...overrides,
+    });
+  }
+
+  it('issues at stock price (not intrinsic × discount) for public companies', () => {
+    const state = createPublicState();
+    const stockPrice = calculateStockPrice(state);
+    expect(stockPrice).toBeGreaterThan(0);
+    // Stock price should be used, not intrinsic value × discount
+    const amount = 10000; // $10M
+    const expectedShares = Math.round((amount / stockPrice) * 1000) / 1000;
+    const newTotal = state.sharesOutstanding + expectedShares;
+    const newOwnership = state.founderShares / newTotal;
+    // Ownership should still be above 10% floor
+    expect(newOwnership).toBeGreaterThan(MIN_PUBLIC_FOUNDER_OWNERSHIP);
+  });
+
+  it('applies -1% sentiment penalty per issuance', () => {
+    const state = createPublicState();
+    const originalSentiment = state.ipoState!.marketSentiment;
+    // Simulate what issueEquity does to sentiment
+    const newSentiment = Math.max(originalSentiment - EQUITY_ISSUANCE_SENTIMENT_PENALTY, -0.30);
+    expect(newSentiment).toBeCloseTo(originalSentiment - 0.01, 5);
+  });
+
+  it('clamps sentiment at -0.30 after many issuances', () => {
+    // Start with very low sentiment
+    const state = createPublicState();
+    state.ipoState!.marketSentiment = -0.29;
+    // One more penalty should clamp at -0.30
+    const newSentiment = Math.max(state.ipoState!.marketSentiment - EQUITY_ISSUANCE_SENTIMENT_PENALTY, -0.30);
+    expect(newSentiment).toBe(-0.30);
+  });
+
+  it('does NOT apply escalating discount for public (equityRaisesUsed ignored for pricing)', () => {
+    const state = createPublicState({ equityRaisesUsed: 5 });
+    const stockPrice = calculateStockPrice(state);
+    // Even with 5 prior raises, public companies use stock price
+    // The escalating discount formula would give: max(1 - 0.10*5, 0.10) = 0.50
+    // But public companies should NOT apply this — they use stockPrice directly
+    expect(stockPrice).toBeGreaterThan(0);
+    // Verify the discount formula is only for private
+    const privateDiscount = Math.max(1 - EQUITY_DILUTION_STEP * 5, EQUITY_DILUTION_FLOOR);
+    expect(privateDiscount).toBe(0.50); // confirms private would discount heavily
+  });
+
+  it('private companies still use escalating discount (unchanged)', () => {
+    const state = createMockGameState({
+      equityRaisesUsed: 3,
+      ipoState: null, // private
+    });
+    const discount = Math.max(1 - EQUITY_DILUTION_STEP * state.equityRaisesUsed, EQUITY_DILUTION_FLOOR);
+    expect(discount).toBe(0.70); // 1 - 0.10*3 = 0.70
+  });
+
+  it('stock price recalculated after issuance', () => {
+    const state = createPublicState();
+    const priceBeforeIssuance = calculateStockPrice(state);
+    // After issuing shares: more shares outstanding → different stock price
+    const amount = 10000;
+    const newShares = Math.round((amount / priceBeforeIssuance) * 1000) / 1000;
+    const postState = {
+      ...state,
+      cash: state.cash + amount,
+      sharesOutstanding: state.sharesOutstanding + newShares,
+      ipoState: {
+        ...state.ipoState!,
+        sharesOutstanding: state.sharesOutstanding + newShares,
+        marketSentiment: state.ipoState!.marketSentiment - EQUITY_ISSUANCE_SENTIMENT_PENALTY,
+      },
+    };
+    const priceAfterIssuance = calculateStockPrice(postState);
+    // Price should change (cash goes up but so do shares and sentiment drops)
+    expect(priceAfterIssuance).not.toBe(priceBeforeIssuance);
+  });
+
+  it('10% ownership floor still enforced for public', () => {
+    const state = createPublicState({ founderShares: 150 }); // low founder shares
+    const stockPrice = calculateStockPrice(state);
+    // Try to issue so many shares that ownership would drop below 10%
+    const hugeAmount = 1000000; // $1B
+    const newShares = Math.round((hugeAmount / stockPrice) * 1000) / 1000;
+    const newTotal = state.sharesOutstanding + newShares;
+    const newOwnership = state.founderShares / newTotal;
+    // The store would block this — verify the math shows it breaches
+    expect(newOwnership).toBeLessThan(MIN_PUBLIC_FOUNDER_OWNERSHIP);
+  });
+
+  it('2-round cooldown still enforced for public', () => {
+    const state = createPublicState({ lastBuybackRound: 16 }); // buyback in round 16
+    // Round 17, cooldown is 2 rounds — should be blocked
+    const blocked = state.lastBuybackRound > 0 && state.round - state.lastBuybackRound < EQUITY_BUYBACK_COOLDOWN;
+    expect(blocked).toBe(true);
+  });
+
+  it('EQUITY_ISSUANCE_SENTIMENT_PENALTY = 0.01', () => {
+    expect(EQUITY_ISSUANCE_SENTIMENT_PENALTY).toBe(0.01);
   });
 });

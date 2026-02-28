@@ -362,21 +362,26 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
 
   const handleIssueEquity = useCallback((amount: number) => {
     const prevShares = sharesOutstanding;
+    const prevSentiment = useGameStore.getState().ipoState?.marketSentiment;
     issueEquity(amount);
     // Check if equity raise actually succeeded (sharesOutstanding would change)
     // We need to read from store directly since state update is synchronous in Zustand
-    const newShares = useGameStore.getState().sharesOutstanding;
+    const newState = useGameStore.getState();
+    const newShares = newState.sharesOutstanding;
     if (newShares === prevShares) {
+      const ipoPublic = newState.ipoState?.isPublic;
       addToast({
         message: 'Equity raise blocked',
-        detail: 'Would breach 51% founder ownership floor',
+        detail: `Would breach ${ipoPublic ? '10' : '51'}% founder ownership floor`,
         type: 'warning',
       });
     } else {
       const newOwnership = founderShares / newShares;
+      const isPublic = !!newState.ipoState?.isPublic;
+      const sentimentDelta = isPublic && prevSentiment != null ? (newState.ipoState!.marketSentiment - prevSentiment) : 0;
       addToast({
-        message: `Raised ${formatMoney(amount)} equity`,
-        detail: `Ownership: ${(newOwnership * 100).toFixed(1)}%`,
+        message: `Raised ${formatMoney(amount)} equity${isPublic ? ' at market price' : ''}`,
+        detail: `Ownership: ${(newOwnership * 100).toFixed(1)}%${sentimentDelta !== 0 ? ` | Sentiment: ${(sentimentDelta * 100).toFixed(0)}%` : ''}`,
         type: 'info',
       });
     }
@@ -987,6 +992,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         concentrationCount={concentrationCount}
         diversificationBonus={diversificationBonus}
         covenantBreachRounds={covenantBreachRounds}
+        isPublic={ipoState?.isPublic}
         onMetricClick={setDrilldownMetric}
       />
 

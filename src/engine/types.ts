@@ -443,6 +443,7 @@ export interface IPOState {
   marketSentiment: number;        // -0.3 to +0.3
   earningsExpectations: number;   // EBITDA target
   ipoRound: number;
+  initialStockPrice: number;
   consecutiveMisses: number;
   shareFundedDealsThisRound: number; // max 1/round
 }

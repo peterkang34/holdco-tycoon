@@ -612,11 +612,11 @@ function FinancialContent() {
         are limited:
       </P>
       <BulletList items={[
-        'Each raise applies escalating dilution (10% more discount per prior raise, floor of 10% of intrinsic value)',
-        'You must maintain majority control — ownership cannot drop below 51%',
-        'There is no hard cap — but successive raises become increasingly expensive as you approach the 51% floor',
+        'Private companies: escalating dilution (10% more discount per prior raise, floor 10%)',
+        'Public companies (post-IPO): shares issued at current stock price — each issuance applies -1% market sentiment',
+        'You must maintain majority control — ownership cannot drop below 51% (10% if public after IPO)',
+        'There is no hard cap — but successive raises become increasingly expensive as you approach the ownership floor',
         '2-round cooldown between equity raises and buybacks',
-        'New shares are issued at intrinsic value per share (minus escalating discount)',
       ]} />
 
       <SubHeading>Share Buybacks</SubHeading>
@@ -1409,7 +1409,7 @@ function TwentyYearContent() {
           ['Minimum EBITDA', '$75M+ portfolio EBITDA'],
           ['Businesses', '6+ active businesses'],
           ['Avg Quality', '4.0+ average quality rating'],
-          ['Platforms', '2+ forged platforms'],
+          ['Platforms', '1+ platform'],
           ['Round', 'Year 16+'],
         ]}
       />
@@ -1420,16 +1420,22 @@ function TwentyYearContent() {
         <><strong>Earnings expectations</strong> are set at prior EBITDA &times; 1.05 &mdash; analysts expect 5% growth every year</>,
         <><strong>Beat earnings:</strong> +8% market sentiment. <strong>Miss earnings:</strong> -15% sentiment</>,
         <><strong>2 consecutive misses:</strong> analyst downgrade (-10% additional sentiment)</>,
-        <><strong>Share-funded acquisitions:</strong> max 1 per round, each causes -5% FEV dilution penalty</>,
+        <><strong>Share-funded acquisitions:</strong> max 1 per round — dilutes ownership naturally (no extra penalty)</>,
+        <><strong>Ownership floor:</strong> drops from 51% to 10% after IPO, allowing more aggressive equity issuance</>,
       ]} />
 
-      <SubHeading>Stay Private Bonus</SubHeading>
+      <SubHeading>Public Company Bonus</SubHeading>
       <P>
-        Not every holdco should go public. If you meet IPO eligibility requirements but
-        choose to stay private, you earn a <strong>+5-10% FEV bonus</strong> at game end.
-        The bonus scales with how far above the EBITDA gate you are. This makes the
-        private path a viable strategic choice.
+        Public companies earn a <strong>performance-based 5-18% FEV bonus</strong> at game end.
+        The bonus rewards strong stewardship as a public company:
       </P>
+      <BulletList items={[
+        <>5% base for being public</>,
+        <>Up to +5% for stock price appreciation since IPO</>,
+        <>+3% for perfect earnings (no consecutive misses)</>,
+        <>Up to +2% for positive market sentiment</>,
+        <>Up to +3% for platform maturity (index tier)</>,
+      ]} />
 
       <SubHeading>Family Office Endgame</SubHeading>
       <P>

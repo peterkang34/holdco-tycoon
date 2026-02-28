@@ -21,7 +21,7 @@ import {
   formatPercent,
 } from '../../engine/types';
 import { getDistressRestrictions, calculateCovenantHeadroom } from '../../engine/distress';
-import { EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EARNOUT_EXPIRATION_YEARS, MIN_FOUNDER_OWNERSHIP } from '../../data/gameConfig';
+import { EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EQUITY_ISSUANCE_SENTIMENT_PENALTY, EARNOUT_EXPIRATION_YEARS, MIN_FOUNDER_OWNERSHIP, MIN_PUBLIC_FOUNDER_OWNERSHIP, IPO_MIN_EBITDA, IPO_MIN_BUSINESSES, IPO_MIN_AVG_QUALITY, IPO_MIN_PLATFORMS } from '../../data/gameConfig';
 import { SECTOR_LIST } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
@@ -371,18 +371,19 @@ export function AllocatePhase({
   const dealSourcingCost = (maSourcing.active && maSourcing.tier >= 1) ? DEAL_SOURCING_COST_TIER1 : DEAL_SOURCING_COST_BASE;
 
   // Escalating dilution + cooldown derived values
-  const equityDiscount = Math.max(1 - EQUITY_DILUTION_STEP * equityRaisesUsed, EQUITY_DILUTION_FLOOR);
-  const effectivePricePerShare = intrinsicValuePerShare * equityDiscount;
+  const isPublic = !!ipoState?.isPublic;
+  const equityDiscount = isPublic ? 1 : Math.max(1 - EQUITY_DILUTION_STEP * equityRaisesUsed, EQUITY_DILUTION_FLOOR);
+  const effectivePricePerShare = isPublic ? (ipoState?.stockPrice ?? 0) : intrinsicValuePerShare * equityDiscount;
   const raiseCooldownBlocked = lastBuybackRound > 0 && round - lastBuybackRound < EQUITY_BUYBACK_COOLDOWN;
   const buybackCooldownBlocked = lastEquityRaiseRound > 0 && round - lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN;
   const raiseBlocked = raiseCooldownBlocked || intrinsicValuePerShare <= 0;
   const raiseCooldownRemainder = raiseCooldownBlocked ? EQUITY_BUYBACK_COOLDOWN - (round - lastBuybackRound) : 0;
-  // Max raise before hitting 51% floor: founderShares / (sharesOutstanding + maxNewShares) = MIN_FOUNDER_OWNERSHIP
-  // => maxNewShares = (founderShares / MIN_FOUNDER_OWNERSHIP) - sharesOutstanding
-  const maxNewShares = Math.max(0, (founderShares / MIN_FOUNDER_OWNERSHIP) - sharesOutstanding);
+  // Max raise before hitting ownership floor: founderShares / (sharesOutstanding + maxNewShares) = effectiveOwnershipFloor
+  const effectiveOwnershipFloor = ipoState?.isPublic ? MIN_PUBLIC_FOUNDER_OWNERSHIP : MIN_FOUNDER_OWNERSHIP;
+  const maxNewShares = Math.max(0, (founderShares / effectiveOwnershipFloor) - sharesOutstanding);
   const maxRaiseAmount = Math.floor(maxNewShares * effectivePricePerShare); // in $k (internal)
   const atOwnershipFloor = maxRaiseAmount <= 0;
-  const ownershipFloorPct = Math.round(MIN_FOUNDER_OWNERSHIP * 100);
+  const ownershipFloorPct = Math.round(effectiveOwnershipFloor * 100);
   const buybackCooldownRemainder = buybackCooldownBlocked ? EQUITY_BUYBACK_COOLDOWN - (round - lastEquityRaiseRound) : 0;
   const aiEnabled = isAIEnabled();
   const activeServicesCount = sharedServices.filter(s => s.active).length;
@@ -735,14 +736,15 @@ export function AllocatePhase({
                         </div>
                         {parsedAmount >= 1000 && effectivePricePerShare > 0 && (
                           <div className="text-xs space-y-1 mt-2">
-                            <p className="text-text-muted">= {newShares.toFixed(1)} shares @ {formatMoney(effectivePricePerShare)}/share{equityRaisesUsed > 0 ? ` (${Math.round((1 - equityDiscount) * 100)}% discount)` : ''}</p>
+                            <p className="text-text-muted">= {newShares.toFixed(1)} shares @ {formatMoney(effectivePricePerShare)}/share{isPublic ? ' (market)' : equityRaisesUsed > 0 ? ` (${Math.round((1 - equityDiscount) * 100)}% discount)` : ''}</p>
                             <p className={`font-medium ${wouldBreachFloor ? 'text-danger' : newOwnership < 55 ? 'text-warning' : 'text-text-secondary'}`}>
                               Ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% → {newOwnership.toFixed(1)}%
                             </p>
                             {wouldBreachFloor && <p className="text-danger">Below {ownershipFloorPct}% — raise would be blocked</p>}
+                            {isPublic && <p className="text-warning">-{(EQUITY_ISSUANCE_SENTIMENT_PENALTY * 100).toFixed(0)}% market sentiment</p>}
                           </div>
                         )}
-                        <p className="text-xs text-text-muted mt-2">Raise #{equityRaisesUsed + 1}{equityRaisesUsed > 0 ? ` — ${Math.round((1 - equityDiscount) * 100)}% investor discount` : ' — no discount'}</p>
+                        <p className="text-xs text-text-muted mt-2">{isPublic ? `Sentiment: ${((ipoState?.marketSentiment ?? 0) * 100).toFixed(0)}% · -${(EQUITY_ISSUANCE_SENTIMENT_PENALTY * 100).toFixed(0)}% per issuance` : `Raise #${equityRaisesUsed + 1}${equityRaisesUsed > 0 ? ` — ${Math.round((1 - equityDiscount) * 100)}% investor discount` : ' — no discount'}`}</p>
                       </>
                     ) : (
                       <p className="text-sm text-warning">
@@ -921,13 +923,15 @@ export function AllocatePhase({
                       </div>
                       {parsedAmount >= 1000 && effectivePricePerShare > 0 && (
                         <div className="text-xs space-y-1">
+                          <p className="text-text-muted">= {newShares.toFixed(1)} shares @ {formatMoney(effectivePricePerShare)}/share{isPublic ? ' (market)' : equityRaisesUsed > 0 ? ` (${Math.round((1 - equityDiscount) * 100)}% discount)` : ''}</p>
                           <p className={`font-medium ${wouldBreachFloor ? 'text-danger' : newOwnership < 55 ? 'text-warning' : 'text-text-secondary'}`}>
                             Ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}% → {newOwnership.toFixed(1)}%
                           </p>
                           {wouldBreachFloor && <p className="text-danger">Below {ownershipFloorPct}% — raise would be blocked</p>}
+                          {isPublic && <p className="text-warning">-{(EQUITY_ISSUANCE_SENTIMENT_PENALTY * 100).toFixed(0)}% market sentiment</p>}
                         </div>
                       )}
-                      <p className="text-xs text-text-muted mt-2">Raise #{equityRaisesUsed + 1}{equityRaisesUsed > 0 ? ` — ${Math.round((1 - equityDiscount) * 100)}% investor discount` : ' — no discount'}</p>
+                      <p className="text-xs text-text-muted mt-2">{isPublic ? `Sentiment: ${((ipoState?.marketSentiment ?? 0) * 100).toFixed(0)}% · -${(EQUITY_ISSUANCE_SENTIMENT_PENALTY * 100).toFixed(0)}% per issuance` : `Raise #${equityRaisesUsed + 1}${equityRaisesUsed > 0 ? ` — ${Math.round((1 - equityDiscount) * 100)}% investor discount` : ' — no discount'}`}</p>
                     </div>
                   )}
                 </div>
@@ -1569,7 +1573,7 @@ export function AllocatePhase({
                 </span>
                 <span className="hidden sm:inline text-white/20">|</span>
                 <span className="text-text-muted text-xs sm:text-sm">
-                  {atOwnershipFloor ? `At ${ownershipFloorPct}% ownership floor` : `Next raise: ${equityRaisesUsed > 0 ? `${Math.round((1 - equityDiscount) * 100)}% discount` : 'no discount'}${raiseCooldownBlocked ? ` (cooldown: ${raiseCooldownRemainder}yr)` : ''}`}
+                  {atOwnershipFloor ? `At ${ownershipFloorPct}% ownership floor` : isPublic ? `Market price${raiseCooldownBlocked ? ` (cooldown: ${raiseCooldownRemainder}yr)` : ''}` : `Next raise: ${equityRaisesUsed > 0 ? `${Math.round((1 - equityDiscount) * 100)}% discount` : 'no discount'}${raiseCooldownBlocked ? ` (cooldown: ${raiseCooldownRemainder}yr)` : ''}`}
                 </span>
               </div>
             )}
@@ -2006,11 +2010,11 @@ export function AllocatePhase({
                     </div>
                     <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden flex">
                       <div
-                        className={`h-full transition-all ${founderOwnership > 0.6 ? 'bg-accent' : founderOwnership > 0.51 ? 'bg-warning' : 'bg-danger'}`}
+                        className={`h-full transition-all ${founderOwnership > 0.6 ? 'bg-accent' : founderOwnership > effectiveOwnershipFloor ? 'bg-warning' : 'bg-danger'}`}
                         style={{ width: `${founderOwnership * 100}%` }}
                       />
                     </div>
-                    {founderOwnership < 0.55 && (
+                    {founderOwnership < effectiveOwnershipFloor + 0.04 && (
                       <p className="text-xs text-warning mt-1">Control at risk — you must stay above {ownershipFloorPct}%</p>
                     )}
                   </div>
@@ -2080,10 +2084,14 @@ export function AllocatePhase({
                     <h4 className="font-bold mb-3 flex items-center gap-2">
                       <span className="text-accent">📈</span> Public Company Dashboard
                     </h4>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center mb-4">
+                    <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 text-center mb-4">
                       <div>
                         <p className="text-text-muted text-xs">Stock Price</p>
                         <p className="font-mono font-bold text-lg">${ipoState.stockPrice.toFixed(2)}</p>
+                      </div>
+                      <div>
+                        <p className="text-text-muted text-xs">Market Cap</p>
+                        <p className="font-mono font-bold text-lg">{formatMoney(Math.round(ipoState.stockPrice * ipoState.sharesOutstanding))}</p>
                       </div>
                       <div>
                         <p className="text-text-muted text-xs">Market Sentiment</p>
@@ -2116,7 +2124,41 @@ export function AllocatePhase({
                 );
               }
 
-              if (duration !== 'standard' || round < IPO_MIN_ROUND) return null;
+              if (duration !== 'standard') return null;
+
+              if (round < IPO_MIN_ROUND) {
+                // Teaser card — show gates with current progress
+                const teaserActive = businesses.filter(b => b.status === 'active');
+                const teaserEbitda = teaserActive.reduce((s, b) => s + b.ebitda, 0);
+                const teaserAvgQ = teaserActive.length > 0 ? teaserActive.reduce((s, b) => s + b.qualityRating, 0) / teaserActive.length : 0;
+                const teaserPlatforms = teaserActive.filter(b => b.isPlatform).length;
+                const teaserGates = [
+                  { label: `Round ${IPO_MIN_ROUND}+`, current: `Round ${round}`, met: round >= IPO_MIN_ROUND },
+                  { label: `$${(IPO_MIN_EBITDA / 1000).toFixed(0)}M+ EBITDA`, current: `$${(teaserEbitda / 1000).toFixed(1)}M`, met: teaserEbitda >= IPO_MIN_EBITDA },
+                  { label: `${IPO_MIN_BUSINESSES}+ businesses`, current: `${teaserActive.length}`, met: teaserActive.length >= IPO_MIN_BUSINESSES },
+                  { label: `${IPO_MIN_AVG_QUALITY}+ avg quality`, current: `${teaserAvgQ.toFixed(1)}`, met: teaserAvgQ >= IPO_MIN_AVG_QUALITY },
+                  { label: `${IPO_MIN_PLATFORMS}+ platform${IPO_MIN_PLATFORMS !== 1 ? 's' : ''}`, current: `${teaserPlatforms}`, met: teaserPlatforms >= IPO_MIN_PLATFORMS },
+                ];
+                return (
+                  <div className="card opacity-60">
+                    <h4 className="font-bold mb-2 flex items-center gap-2 text-text-muted">
+                      <span>🔒</span> IPO Pathway
+                      <span className="text-xs font-normal ml-auto">Unlocks Round {IPO_MIN_ROUND}</span>
+                    </h4>
+                    <div className="space-y-1">
+                      {teaserGates.map((g, i) => (
+                        <div key={i} className="flex items-center justify-between text-xs">
+                          <span className="flex items-center gap-1.5">
+                            <span className={g.met ? 'text-green-400' : 'text-white/30'}>{g.met ? '✓' : '○'}</span>
+                            <span className="text-text-muted">{g.label}</span>
+                          </span>
+                          <span className={`font-mono ${g.met ? 'text-green-400/70' : 'text-white/30'}`}>{g.current}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
 
               // Pre-IPO: Eligibility checklist
               const partialState = { businesses, duration, round, cash, totalDebt, sharesOutstanding, interestRate, ipoState } as any;
@@ -2162,7 +2204,7 @@ export function AllocatePhase({
                     </button>
                   </div>
                   <p className="text-xs text-text-muted mt-2">
-                    Going public raises cash but adds earnings pressure. Staying private earns a bonus at exit.
+                    Going public raises cash and earns a performance bonus. Staying private avoids earnings pressure.
                   </p>
                 </div>
               );
@@ -2277,12 +2319,19 @@ export function AllocatePhase({
             <div className={`card ${raiseBlocked ? 'opacity-50' : ''}`}>
               <h4 className="font-bold mb-3">Issue Equity</h4>
               <p className="text-sm text-text-muted mb-2">
-                Raise capital by selling new shares at {formatMoney(effectivePricePerShare)}/share{equityRaisesUsed > 0 ? ` (${Math.round((1 - equityDiscount) * 100)}% discount)` : ''}.
+                {isPublic
+                  ? `Issue new shares at market price (${formatMoney(effectivePricePerShare)}/share). Each issuance applies -${(EQUITY_ISSUANCE_SENTIMENT_PENALTY * 100).toFixed(0)}% market sentiment.`
+                  : `Raise capital by selling new shares at ${formatMoney(effectivePricePerShare)}/share${equityRaisesUsed > 0 ? ` (${Math.round((1 - equityDiscount) * 100)}% discount)` : ''}.`
+                }
               </p>
               <div className="text-xs text-text-muted mb-4 flex flex-wrap gap-x-2 gap-y-0.5">
                 <span>Your ownership: {(founderShares / sharesOutstanding * 100).toFixed(1)}%</span>
                 <span className="hidden sm:inline text-white/20">|</span>
-                <span>Raise #{equityRaisesUsed + 1}</span>
+                {isPublic ? (
+                  <span>Sentiment: {((ipoState?.marketSentiment ?? 0) * 100).toFixed(0)}% · -{(EQUITY_ISSUANCE_SENTIMENT_PENALTY * 100).toFixed(0)}% per issuance</span>
+                ) : (
+                  <span>Raise #{equityRaisesUsed + 1}</span>
+                )}
                 {!atOwnershipFloor && maxRaiseAmount > 0 && (
                   <>
                     <span className="hidden sm:inline text-white/20">|</span>
@@ -2342,8 +2391,8 @@ export function AllocatePhase({
                       }
                     } else {
                       const shareCount = parseInt(equityAmount) || 0;
-                      if (shareCount > 0 && intrinsicValuePerShare > 0) {
-                        const internalAmount = Math.floor(shareCount * intrinsicValuePerShare);
+                      if (shareCount > 0 && effectivePricePerShare > 0) {
+                        const internalAmount = Math.floor(shareCount * effectivePricePerShare);
                         if (internalAmount > 0) {
                           onIssueEquity(internalAmount);
                           setEquityAmount('');
@@ -2364,10 +2413,10 @@ export function AllocatePhase({
                       if (shareCount < 1) return true;
                       internalAmt = Math.floor(shareCount * effectivePricePerShare);
                     }
-                    // Check if this amount would breach 51% floor
+                    // Check if this amount would breach ownership floor
                     const newShares_ = Math.round((internalAmt / effectivePricePerShare) * 1000) / 1000;
                     const newOwnership_ = founderShares / (sharesOutstanding + newShares_);
-                    return newOwnership_ < MIN_FOUNDER_OWNERSHIP;
+                    return newOwnership_ < effectiveOwnershipFloor;
                   })()}
                   className="btn-primary text-sm min-h-[44px]"
                 >
@@ -2409,8 +2458,14 @@ export function AllocatePhase({
                     </div>
                     <div className="flex justify-between">
                       <span className="text-text-muted">At price per share</span>
-                      <span className="font-mono">{formatMoney(effectivePricePerShare)}{equityRaisesUsed > 0 ? ` (${Math.round((1 - equityDiscount) * 100)}% off)` : ''}</span>
+                      <span className="font-mono">{formatMoney(effectivePricePerShare)}{isPublic ? ' (market)' : equityRaisesUsed > 0 ? ` (${Math.round((1 - equityDiscount) * 100)}% off)` : ''}</span>
                     </div>
+                    {isPublic && (
+                      <div className="flex justify-between">
+                        <span className="text-text-muted">Sentiment impact</span>
+                        <span className="font-mono text-warning">-{(EQUITY_ISSUANCE_SENTIMENT_PENALTY * 100).toFixed(0)}%</span>
+                      </div>
+                    )}
                     <div className="flex justify-between">
                       <span className="text-text-muted">Your new ownership</span>
                       <span className={`font-mono font-bold ${newOwnership < ownershipFloorPct ? 'text-danger' : newOwnership < 55 ? 'text-warning' : ''}`}>

@@ -33,7 +33,7 @@ export const EV_WATERFALL_LABELS = {
 
 export const SHARE_FUNDED_LABELS = {
   name: 'Share-Funded (Stock)',
-  behavior: 'Issue new shares to fund acquisition — no cash, but dilutes ownership + -5% FEV penalty per event',
+  behavior: 'Issue new shares to fund acquisition — no cash, but dilutes ownership naturally',
   limit: 'Max 1 per round',
 } as const;
 
@@ -75,4 +75,8 @@ export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   { pattern: /Small \(\$500k-\$1\.5M\)/i, reason: 'Old 3-tier deal size system removed in v28. Now 7-tier affordability system.', allow: ['changelog.ts'] },
   { pattern: /Medium \(\$1\.5M-\$3M\)/i, reason: 'Old 3-tier deal size system removed in v28. Now 7-tier affordability system.', allow: ['changelog.ts'] },
   { pattern: /Large \(\$3M\+\)/i, reason: 'Old 3-tier deal size system removed in v28. Now 7-tier affordability system.', allow: ['changelog.ts'] },
+  { pattern: /-5% FEV penalty/i, reason: 'IPO dilution penalty removed in v29. Share-funded deals dilute ownership naturally.', allow: ['changelog.ts'] },
+  { pattern: /dilution penalty/i, reason: 'IPO dilution penalty removed in v29. No extra penalty beyond natural ownership dilution.', allow: ['changelog.ts'] },
+  { pattern: /stay.private bonus/i, reason: 'Stay-private bonus removed in v29. Replaced by public company bonus.', allow: ['changelog.ts'] },
+  { pattern: /escalating dilution.*regardless|same.*discount.*public.*private/i, reason: 'Post-IPO equity raises issue at stock price (no discount). Only private companies use escalating discount.' },
 ];

@@ -151,7 +151,8 @@ const FOUNDER_OWNERSHIP = 0.80;
 const STARTING_SHARES = 1000;
 const FOUNDER_SHARES = 800;
 const STARTING_INTEREST_RATE = 0.07;
-import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, IMPROVEMENT_COST_FLOOR, QUALITY_IMPROVEMENT_MULTIPLIER, MIN_FOUNDER_OWNERSHIP } from '../data/gameConfig';
+import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EQUITY_ISSUANCE_SENTIMENT_PENALTY, IMPROVEMENT_COST_FLOOR, QUALITY_IMPROVEMENT_MULTIPLIER, MIN_FOUNDER_OWNERSHIP, MIN_PUBLIC_FOUNDER_OWNERSHIP } from '../data/gameConfig';
+import { calculateStockPrice } from '../engine/ipo';
 import { clampMargin, capGrowthRate, applyEbitdaFloor } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
 import { buildChronicleContext } from '../services/chronicleContext';
@@ -2049,36 +2050,63 @@ export const useGameStore = create<GameStore>()(
         // Cooldown: blocked if buyback was done within EQUITY_BUYBACK_COOLDOWN rounds
         if (state.lastBuybackRound > 0 && state.round - state.lastBuybackRound < EQUITY_BUYBACK_COOLDOWN) return;
 
+        const isPublic = !!state.ipoState?.isPublic;
+
         const metrics = calculateMetrics(state);
         // M-5: Guard against division by zero or negative intrinsic value
         if (metrics.intrinsicValuePerShare <= 0) return;
 
-        // Escalating dilution: each prior raise discounts the price by EQUITY_DILUTION_STEP
-        const discount = Math.max(1 - EQUITY_DILUTION_STEP * state.equityRaisesUsed, EQUITY_DILUTION_FLOOR);
-        const effectivePrice = metrics.intrinsicValuePerShare * discount;
+        // Branch pricing: public → stock price, private → escalating discount
+        let effectivePrice: number;
+        let discount: number;
+        if (isPublic) {
+          const stockPrice = calculateStockPrice(state);
+          if (stockPrice <= 0) return;
+          effectivePrice = stockPrice;
+          discount = 0; // no discount for public
+        } else {
+          // Escalating dilution: each prior raise discounts the price by EQUITY_DILUTION_STEP
+          discount = 1 - Math.max(1 - EQUITY_DILUTION_STEP * state.equityRaisesUsed, EQUITY_DILUTION_FLOOR);
+          effectivePrice = metrics.intrinsicValuePerShare * (1 - discount);
+        }
         const newShares = Math.round((amount / effectivePrice) * 1000) / 1000;
 
         // Calculate what ownership would be after issuance
         const newTotalShares = state.sharesOutstanding + newShares;
         const newFounderOwnership = state.founderShares / newTotalShares;
 
-        // Must maintain majority control (51%+)
-        if (newFounderOwnership < MIN_FOUNDER_OWNERSHIP) return;
+        // Must maintain control — 51% if private, 10% if public
+        const effectiveFloor = isPublic ? MIN_PUBLIC_FOUNDER_OWNERSHIP : MIN_FOUNDER_OWNERSHIP;
+        if (newFounderOwnership < effectiveFloor) return;
 
         trackFeatureUsed('equity_raise', state.round);
 
-        const issueState = {
+        let sentimentPenalty = 0;
+        const issueState: typeof state = {
           ...state,
           cash: state.cash + amount,
           sharesOutstanding: newTotalShares,
           equityRaisesUsed: state.equityRaisesUsed + 1,
           lastEquityRaiseRound: state.round,
         };
+
+        // Post-IPO: apply sentiment penalty and sync IPO state
+        if (isPublic && issueState.ipoState) {
+          sentimentPenalty = EQUITY_ISSUANCE_SENTIMENT_PENALTY;
+          const newSentiment = Math.max(issueState.ipoState.marketSentiment - sentimentPenalty, -0.30);
+          issueState.ipoState = {
+            ...issueState.ipoState,
+            marketSentiment: newSentiment,
+            sharesOutstanding: newTotalShares,
+          };
+          issueState.ipoState.stockPrice = calculateStockPrice(issueState);
+        }
+
         set({
           ...issueState,
           actionsThisRound: [
             ...state.actionsThisRound,
-            { type: 'issue_equity', round: state.round, details: { amount, newShares, newOwnership: newFounderOwnership, discount: 1 - discount } },
+            { type: 'issue_equity', round: state.round, details: { amount, newShares, newOwnership: newFounderOwnership, discount, sentimentPenalty } },
           ],
           metrics: calculateMetrics(issueState),
         });
@@ -3168,14 +3196,24 @@ export const useGameStore = create<GameStore>()(
         const emergencyPrice = metrics.intrinsicValuePerShare * 0.5;
         const newShares = Math.round((amount / emergencyPrice) * 1000) / 1000;
 
-        // No 51% ownership floor during emergency
-        const emergencyState = {
+        // No ownership floor during emergency (neither 51% nor 10%)
+        const emergencyState: typeof state = {
           ...state,
           cash: state.cash + amount,
           sharesOutstanding: state.sharesOutstanding + newShares,
           equityRaisesUsed: state.equityRaisesUsed + 1,
           lastEquityRaiseRound: state.round,
         };
+
+        // Sync IPO state if public — keep sharesOutstanding and stock price consistent
+        if (emergencyState.ipoState?.isPublic) {
+          emergencyState.ipoState = {
+            ...emergencyState.ipoState,
+            sharesOutstanding: emergencyState.sharesOutstanding,
+          };
+          emergencyState.ipoState.stockPrice = calculateStockPrice(emergencyState);
+        }
+
         set({
           ...emergencyState,
           actionsThisRound: [
@@ -3302,7 +3340,7 @@ export const useGameStore = create<GameStore>()(
 
       declineIPO: () => {
         useToastStore.getState().addToast({
-          message: 'Staying private — discipline will be rewarded at exit',
+          message: 'Staying private — no IPO this round',
           type: 'info',
         });
       },
@@ -3963,7 +4001,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v28', // v28: 7-tier EBITDA system (affordability-based deal sizing)
+      name: 'holdco-tycoon-save-v29', // v29: IPO overhaul (public company bonus, initialStockPrice, 10% public floor)
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

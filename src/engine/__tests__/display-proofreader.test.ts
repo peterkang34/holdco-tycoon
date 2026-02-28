@@ -63,12 +63,15 @@ import {
   INTEGRATION_DRAG_EPSILON,
   INTEGRATION_RESTRUCTURING_PCT,
   INTEGRATION_RESTRUCTURING_MERGER_PCT,
-  IPO_DILUTION_PENALTY,
+  IPO_FEV_BONUS_BASE,
+  IPO_FEV_BONUS_MAX,
   IPO_SHARE_FUNDED_DEALS_PER_ROUND,
+  IPO_MIN_PLATFORMS,
   DEAL_SIZE_TIERS,
   TIER_PIPELINE_COUNTS,
   BUYER_PREMIUM_EBITDA_CAP,
   BUYER_PREMIUM_MAX,
+  EQUITY_ISSUANCE_SENTIMENT_PENALTY,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
 import {
@@ -529,10 +532,25 @@ describe('Display Proofreader', () => {
       expect(EQUITY_BUYBACK_COOLDOWN).toBe(2);
     });
 
+    it('EQUITY_ISSUANCE_SENTIMENT_PENALTY = 0.01', () => {
+      expect(EQUITY_ISSUANCE_SENTIMENT_PENALTY).toBe(0.01);
+    });
+
     it('Manual does NOT claim a hard cap on equity raises (Strategy B)', () => {
       const manual = readComponent('components/ui/UserManualModal.tsx');
       // After fix: should mention escalating dilution, NOT "Maximum 3" or "Maximum 2"
       expect(manual).not.toMatch(/Maximum \d+ equity raises/);
+    });
+
+    it('Manual describes "stock price" and "-1% sentiment" for public companies (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toMatch(/stock price/i);
+      expect(manual).toMatch(/-1%.*sentiment/i);
+    });
+
+    it('Manual describes "escalating dilution" for private companies (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toMatch(/escalating dilution/i);
     });
   });
 
@@ -1389,11 +1407,22 @@ describe('Display Proofreader', () => {
       const manual = readComponent('components/ui/UserManualModal.tsx');
       expect(manual).toContain('Share-funded acquisitions');
       expect(manual).toContain('max 1 per round');
-      expect(manual).toContain('-5% FEV dilution penalty');
+      expect(manual).toContain('dilutes ownership naturally');
     });
 
-    it('Strategy A: IPO_DILUTION_PENALTY matches manual claim of 5%', () => {
-      expect(IPO_DILUTION_PENALTY * 100).toBe(5);
+    it('Strategy B: UserManualModal documents public company bonus', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Public Company Bonus');
+      expect(manual).toContain('5-18% FEV bonus');
+    });
+
+    it('Strategy A: IPO_FEV_BONUS constants are correct', () => {
+      expect(IPO_FEV_BONUS_BASE).toBe(0.05);
+      expect(IPO_FEV_BONUS_MAX).toBe(0.18);
+    });
+
+    it('Strategy A: IPO_MIN_PLATFORMS is 1', () => {
+      expect(IPO_MIN_PLATFORMS).toBe(1);
     });
 
     it('Strategy A: IPO_SHARE_FUNDED_DEALS_PER_ROUND matches manual claim of 1', () => {

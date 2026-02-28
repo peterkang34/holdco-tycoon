@@ -60,6 +60,7 @@ describe('calculateAffordability', () => {
       marketSentiment: 0,
       earningsExpectations: 0,
       ipoRound: 16,
+      initialStockPrice: 50,
       consecutiveMisses: 0,
       shareFundedDealsThisRound: 0,
     };
@@ -78,6 +79,7 @@ describe('calculateAffordability', () => {
       marketSentiment: 0,
       earningsExpectations: 0,
       ipoRound: 16,
+      initialStockPrice: 50,
       consecutiveMisses: 0,
       shareFundedDealsThisRound: 0,
     };

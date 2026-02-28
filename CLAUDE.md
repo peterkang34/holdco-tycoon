@@ -70,8 +70,8 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
-- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v28`
-- **Tests**: Vitest in `src/engine/__tests__/` — 1194 tests across 22 suites (incl. display-proofreader)
+- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v29`
+- **Tests**: Vitest in `src/engine/__tests__/` — 1211 tests across 22 suites (incl. display-proofreader)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Rollover Equity**: 6th deal structure — seller reinvests ~25% (standard) or ~20% (quick) as equity; gated behind M&A Tier 2+, Q3+, non-distressed archetypes, noNewDebt; exit split applied AFTER debt payoff; FEV deducts rollover claims; note rate 5%
@@ -82,11 +82,11 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 
 ## Key Files
 - `src/hooks/useGame.ts` — Zustand store (game actions, state transitions)
-- `src/hooks/migrations.ts` — Save migration logic (current: v28)
+- `src/hooks/migrations.ts` — Save migration logic (current: v29)
 - `src/engine/affordability.ts` — 7-tier affordability engine (calculateAffordability, getAffordabilityWeights, pickWeightedTier, generateTrophyEbitda)
 - `src/hooks/chronicleContext.ts` — AI chronicle context builder
 - `src/engine/helpers.ts` — Shared helpers (clampMargin, capGrowthRate, applyEbitdaFloor)
-- `src/engine/__tests__/display-proofreader.test.ts` — 200 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
+- `src/engine/__tests__/display-proofreader.test.ts` — 221 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
 - `src/data/mechanicsCopy.ts` — Centralized registry for mechanic descriptions (debt labels, waterfall labels, countdown functions, banned patterns)
 - `src/data/gameConfig.ts` — Game constants and configuration
 - `src/components/screens/GameScreen.tsx` — Main game screen (phase routing, toast handlers)
@@ -122,7 +122,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 7. **Secret Sauce Docs** — Update `_secret-sauce/` files if any game mechanics, formulas, events, recipes, scoring, or balance constants changed (these are gitignored, local-only design docs)
 
 ## Display Proofreader (MANDATORY)
-- **`display-proofreader.test.ts`** — 212 tests that validate UI copy matches engine constants
+- **`display-proofreader.test.ts`** — 221 tests that validate UI copy matches engine constants
 - **When changing ANY game mechanic**: ALWAYS update UserManualModal.tsx to reflect the change (user rule: manual must ALWAYS be updated automatically)
 - **When changing ANY engine constant** (rates, thresholds, formulas, scoring weights): update the proofreader test AND the UI copy (UserManualModal, CollectPhase, DealCard, etc.)
 - **When changing ANY UI copy** that references numbers/mechanics: update the proofreader test to assert the new value
@@ -137,20 +137,20 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **CollectPhase needs ALL businesses** (not just activeBusinesses) — `calculateIntegratedDebtService` filters internally
 - **Earn-out display must cap at available cash** — store uses `Math.min(earnoutRemaining, available)`, display must match
 - **Race conditions in async AI calls** — always check state is still current before setting narrative/storyBeats
-- **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety
+- **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety. Current: v29
 - **Integrated platforms**: Margin/growth bonuses are ONE-TIME mutations at forge time (clamped via `clampMargin`/`capGrowthRate`); multiple expansion + recession resistance are automatic via engine; platform sale bonus is tiered by `multipleExpansion` (0.3x for 2.0x+, 0.5x otherwise) via `getPlatformSaleBonus()`
 - **15 sectors, ~93 sub-types**: Overlaps resolved (no cross-sector sub-type duplication); sectors.ts is authoritative
 - **Platform thresholds scale by mode**: `INTEGRATION_THRESHOLD_MULTIPLIER` in gameConfig.ts (Easy-Std 1.0, Easy-Quick 0.7, Normal-Std 0.7, Normal-Quick 0.5)
 - **Turnaround quality improvements are permanent mutations** — qualityRating changes at resolution; qualityImprovedTiers tracks cumulative tiers for exit premium
 - **Portfolio fatigue**: 4+ simultaneous turnarounds = -10ppt success rate penalty; warn in UI
 - **Turnaround durations scale by game mode**: Quick games get ~half duration (T1: 2, T2: 3, T3: 2-3 rounds vs Standard T1: 4, T2: 5, T3: 3-6)
-- **Equity raises use escalating dilution**: `EQUITY_DILUTION_STEP` (10% per prior raise), `EQUITY_DILUTION_FLOOR` (10% min), + 2-round raise↔buyback cooldown; no hard cap
+- **Equity raises**: Private → escalating dilution (`EQUITY_DILUTION_STEP` 10%/raise, `EQUITY_DILUTION_FLOOR` 10%). Public → stock price + -1% sentiment/issuance (`EQUITY_ISSUANCE_SENTIMENT_PENALTY`). Both have 2-round cooldown
 - **Emergency equity raises**: flat 50% discount, NO escalating discount, but DO trigger cooldown
 - **Portfolio valuation uses quality-adjusted multiples**: `midpoint + (quality - 3) × 0.35`, floored at sector min — matches deal generation factor
 - **Rollover equity exit split**: Applied AFTER debt payoff (`playerProceeds = netProceeds * (1 - rolloverPct)`); merges use EBITDA-weighted average; tuck-ins have rolloverPct: 0 (parent's pct covers); platform sales use per-constituent split with `Math.max(0, ...)` floor; FEV deducts rollover claims from portfolio value; gated behind `!noNewDebt`
 - **20-Year Mode features are gated on `duration === 'standard'`** — Deal Inflation, Succession Events, IPO, Family Office all check mode. 10-year mode stays untouched except compressed narrative tone (3 phases instead of 5)
 - **Deal Inflation applies AFTER quality adjustment, BEFORE competitive position** — in `businesses.ts` deal generation. Financial Crisis resets inflation by -2.0x for 2 rounds via `dealInflationState.crisisResetRoundsRemaining`
-- **IPO stock price is derived, not random** — `EV / totalShares * (1 + marketSentiment)`. Earnings expectations = prior EBITDA * 1.05. 2 consecutive misses = analyst downgrade (-0.10 sentiment). Max 1 share-funded deal/round with -5% FEV dilution each (capped at 50% total). Share-funded requires stock price >= $1.00. Purple card in deal structure picker. Works for standalone + tuck-in acquisitions
+- **IPO stock price is derived, not random** — `EV / totalShares * (1 + marketSentiment)`. Earnings expectations = prior EBITDA * 1.05. 2 consecutive misses = analyst downgrade (-0.10 sentiment). Max 1 share-funded deal/round — dilutes ownership naturally (no extra penalty). Performance-based 5-18% public company bonus (base 5% + stock appreciation + earnings + sentiment + platforms). `MIN_PUBLIC_FOUNDER_OWNERSHIP = 0.10` (vs 51% private). `IPO_MIN_PLATFORMS = 1`. Share-funded requires stock price >= $1.00. Purple card in deal structure picker. Works for standalone + tuck-in acquisitions
 - **Family Office is a post-game mini-game** — 5 rounds, triggered from GameOverScreen when player has $1B+ distributions + B+ grade + 3 Q4+ businesses + 2 businesses held 10+ years. Irrevocable philanthropy commitments. Succession choice at round 3. Legacy Score grades: Enduring/Influential/Established/Fragile
 - **Succession events fire once per business** — `successionResolved: boolean` prevents repeats. 8+ years held, Q3+, 20yr mode only. Quality drops immediately; 3 choices (invest, promote, sell) with shared services interaction on promote path
 - **Behavioral copy must come from `mechanicsCopy.ts`** — never hardcode debt descriptions directly in components; if changing mechanic behavior, update mechanicsCopy.ts AND add old description to BANNED_COPY_PATTERNS

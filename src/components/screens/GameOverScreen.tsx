@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration, IntegratedPlatform } from '../../engine/types';
 import type { IPOState } from '../../engine/types';
-import { calculateStayPrivateBonus, getIPODilutionPenalty } from '../../engine/ipo';
+import { calculatePublicCompanyBonus } from '../../engine/ipo';
 import { useGameStore } from '../../hooks/useGame';
 import { SECTORS } from '../../data/sectors';
 import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLeaderboardRankFromList } from '../../engine/scoring';
@@ -692,18 +692,12 @@ export function GameOverScreen({
               </div>
               {(() => {
                 const gameState = useGameStore.getState();
-                const stayBonus = calculateStayPrivateBonus(gameState);
-                const dilutionPenalty = getIPODilutionPenalty(gameState);
+                const publicBonus = calculatePublicCompanyBonus(gameState);
                 return (
                   <>
-                    {stayBonus > 0 && (
+                    {publicBonus > 0 && (
                       <div className="text-xs text-green-400/70 -mt-0.5">
-                        Includes +{(stayBonus * 100).toFixed(0)}% stay-private bonus
-                      </div>
-                    )}
-                    {dilutionPenalty > 0 && (
-                      <div className="text-xs text-red-400/70 -mt-0.5">
-                        Includes -{(dilutionPenalty * 100).toFixed(0)}% share-funded dilution penalty
+                        Includes +{(publicBonus * 100).toFixed(0)}% public company bonus
                       </div>
                     )}
                   </>

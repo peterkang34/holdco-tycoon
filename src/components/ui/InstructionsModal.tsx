@@ -61,7 +61,7 @@ export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, 
               <span className="font-bold">{Math.round((1 - founderOwnership) * 100)}%</span>
             </div>
             <p className="text-xs text-text-muted mt-2">
-              You must maintain &gt;51% ownership to keep control. Be careful when issuing new equity!
+              You must maintain majority ownership to keep control. Be careful when issuing new equity!
             </p>
           </div>
 

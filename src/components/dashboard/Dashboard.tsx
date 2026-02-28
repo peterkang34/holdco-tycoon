@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Metrics, DistressLevel, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
 import { getDistressLabel } from '../../engine/distress';
 import { MetricCard } from '../ui/MetricCard';
-import { FINAL_COUNTDOWN_START_ROUND } from '../../data/gameConfig';
+import { FINAL_COUNTDOWN_START_ROUND, MIN_FOUNDER_OWNERSHIP, MIN_PUBLIC_FOUNDER_OWNERSHIP } from '../../data/gameConfig';
 
 interface DashboardProps {
   metrics: Metrics;
@@ -18,6 +18,7 @@ interface DashboardProps {
   concentrationCount?: number; // Max opcos sharing a focus group
   diversificationBonus?: boolean; // Has 4+ unique sectors
   covenantBreachRounds?: number; // Consecutive rounds in breach
+  isPublic?: boolean; // Whether the company is public (post-IPO)
   onMetricClick?: (key: string) => void;
 }
 
@@ -35,6 +36,7 @@ export function Dashboard({
   concentrationCount,
   diversificationBonus,
   covenantBreachRounds,
+  isPublic,
   onMetricClick,
 }: DashboardProps) {
   const getCashStatus = () => {
@@ -246,7 +248,7 @@ export function Dashboard({
       <div className="flex flex-wrap gap-1 sm:gap-2 mt-3 sm:mt-4">
         <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
           founderOwnership >= 0.70 ? 'bg-accent/20 text-accent' :
-          founderOwnership >= 0.51 ? 'bg-warning/20 text-warning' :
+          founderOwnership >= (isPublic ? MIN_PUBLIC_FOUNDER_OWNERSHIP : MIN_FOUNDER_OWNERSHIP) ? 'bg-warning/20 text-warning' :
           'bg-danger/20 text-danger'
         }`}>
           Your Ownership: {formatPercent(founderOwnership)}

@@ -12,6 +12,20 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 28, 2026',
+    title: 'Smarter Public Equity Raises',
+    sections: [
+      {
+        heading: 'Balance Changes',
+        items: [
+          'Public companies now issue shares at market price instead of using the private-market escalating discount.',
+          'Each public equity issuance applies a -1% market sentiment penalty — Wall Street punishes dilution.',
+          'Private companies keep the existing escalating discount system (10% more per prior raise, floor 10%).',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 28, 2026',
     title: '7-Tier Deal Size System',
     sections: [
       {

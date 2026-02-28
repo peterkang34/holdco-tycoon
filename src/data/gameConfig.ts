@@ -63,7 +63,9 @@ export const RESTRUCTURING_FEV_PENALTY = 0.80; // 20% FEV haircut for restructur
 export const EQUITY_DILUTION_STEP = 0.10;   // 10% discount per prior raise
 export const EQUITY_DILUTION_FLOOR = 0.10;  // minimum 10% of intrinsic value
 export const EQUITY_BUYBACK_COOLDOWN = 2;   // rounds between raise↔buyback
+export const EQUITY_ISSUANCE_SENTIMENT_PENALTY = 0.01; // -1% market sentiment per public equity issuance
 export const MIN_FOUNDER_OWNERSHIP = 0.51;  // 51% floor — must maintain majority control
+export const MIN_PUBLIC_FOUNDER_OWNERSHIP = 0.10;  // 10% floor after IPO — public companies can dilute further
 
 // ── Earn-out Constants ──
 
@@ -306,15 +308,14 @@ export const SUCCESSION_PROB = 0.06;
 export const IPO_MIN_EBITDA = 75000;       // $75M
 export const IPO_MIN_BUSINESSES = 6;
 export const IPO_MIN_AVG_QUALITY = 4.0;
-export const IPO_MIN_PLATFORMS = 2;
+export const IPO_MIN_PLATFORMS = 1;
 export const IPO_MIN_ROUND = 16;
 export const IPO_EARNINGS_MISS_PENALTY = 0.15;
 export const IPO_EARNINGS_BEAT_BONUS = 0.08;
 export const IPO_CONSECUTIVE_MISS_THRESHOLD = 2;
 export const IPO_SHARE_FUNDED_DEALS_PER_ROUND = 1;
-export const IPO_DILUTION_PENALTY = 0.05;
-export const IPO_STAY_PRIVATE_BONUS_MIN = 0.05;
-export const IPO_STAY_PRIVATE_BONUS_MAX = 0.10;
+export const IPO_FEV_BONUS_BASE = 0.05;
+export const IPO_FEV_BONUS_MAX = 0.18;
 
 // ── 20-Year Mode: Family Office Endgame ──
 

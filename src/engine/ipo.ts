@@ -16,9 +16,8 @@ import {
   IPO_EARNINGS_BEAT_BONUS,
   IPO_CONSECUTIVE_MISS_THRESHOLD,
   IPO_SHARE_FUNDED_DEALS_PER_ROUND,
-  IPO_DILUTION_PENALTY,
-  IPO_STAY_PRIVATE_BONUS_MIN,
-  IPO_STAY_PRIVATE_BONUS_MAX,
+  IPO_FEV_BONUS_BASE,
+  IPO_FEV_BONUS_MAX,
 } from '../data/gameConfig';
 
 /**
@@ -109,14 +108,16 @@ export function executeIPO(state: GameState): {
   const pricePerShare = currentShares > 0 ? equityValue / currentShares : 0;
   const cashRaised = Math.round(newShares * pricePerShare);
 
+  const stockPrice = Math.round(pricePerShare * 100) / 100;
   const ipoState: IPOState = {
     isPublic: true,
-    stockPrice: Math.round(pricePerShare * 100) / 100,
+    stockPrice,
     sharesOutstanding: totalShares,
     preIPOShares: currentShares,
     marketSentiment: 0.05, // mild IPO pop
     earningsExpectations: Math.round(totalEbitda * 1.05), // analysts expect 5% growth
     ipoRound: state.round,
+    initialStockPrice: stockPrice,
     consecutiveMisses: 0,
     shareFundedDealsThisRound: 0,
   };
@@ -197,33 +198,42 @@ export function calculateShareFundedTerms(
 }
 
 /**
- * Calculate FEV bonus for staying private when eligible for IPO.
- * Rewards discipline — scales with how many gates are exceeded.
+ * Calculate performance-based FEV bonus for public companies.
+ * 5% base + up to 5% stock appreciation + 3% perfect earnings + 2% positive sentiment = 15% max.
+ * Index tier (IPO_FEV_BONUS_MAX - 15% = 3%) adds up to 3% more for 18% cap.
  */
-export function calculateStayPrivateBonus(state: GameState): number {
-  if (state.ipoState?.isPublic) return 0;
-  const { eligible } = checkIPOEligibility(state);
-  if (!eligible) return 0;
-
-  // Scale between min and max based on how much you exceed gates
-  const active = state.businesses.filter(b => b.status === 'active');
-  const totalEbitda = active.reduce((sum, b) => sum + b.ebitda, 0);
-  const excessFactor = Math.min(1.0, (totalEbitda - IPO_MIN_EBITDA) / IPO_MIN_EBITDA);
-  return IPO_STAY_PRIVATE_BONUS_MIN + excessFactor * (IPO_STAY_PRIVATE_BONUS_MAX - IPO_STAY_PRIVATE_BONUS_MIN);
-}
-
-/**
- * Get the FEV dilution penalty for share-funded deals.
- */
-export function getIPODilutionPenalty(state: GameState): number {
+export function calculatePublicCompanyBonus(state: GameState): number {
   if (!state.ipoState?.isPublic) return 0;
-  const originalShares = state.ipoState.preIPOShares ?? state.sharesOutstanding;
-  const currentShares = state.ipoState.sharesOutstanding;
-  if (originalShares <= 0) return 0;
-  // IPO itself issues ~25% new shares (20% dilution). Only count EXTRA dilution beyond IPO.
-  const ipoNewShares = Math.round(originalShares * 0.25); // expected IPO shares
-  const extraShares = Math.max(0, currentShares - originalShares - ipoNewShares);
-  const dilutionEvents = Math.max(0, Math.round(extraShares / originalShares * 5));
-  // Cap at 50% to prevent EV zeroing — natural ownership dilution (FEV = EV × ownership%) already penalizes heavily
-  return Math.min(0.50, dilutionEvents * IPO_DILUTION_PENALTY);
+
+  let bonus = IPO_FEV_BONUS_BASE; // 5% base for being public
+
+  // Stock appreciation: up to +5% based on price growth since IPO
+  const initialPrice = state.ipoState.initialStockPrice || state.ipoState.stockPrice;
+  if (initialPrice > 0) {
+    const appreciation = (state.ipoState.stockPrice - initialPrice) / initialPrice;
+    bonus += Math.min(0.05, Math.max(0, appreciation * 0.10)); // 10% of appreciation, capped at 5%
+  }
+
+  // Perfect earnings: +3% if no consecutive misses
+  if (state.ipoState.consecutiveMisses === 0) {
+    bonus += 0.03;
+  }
+
+  // Positive sentiment: up to +2% based on market sentiment
+  if (state.ipoState.marketSentiment > 0) {
+    bonus += Math.min(0.02, state.ipoState.marketSentiment * 0.067); // 0.3 sentiment → 2%
+  }
+
+  // Index tier: up to +3% based on number of platforms (proxy for holdco maturity)
+  const active = state.businesses.filter(b => b.status === 'active');
+  const platformCount = active.filter(b => b.isPlatform).length;
+  if (platformCount >= 3) {
+    bonus += 0.03;
+  } else if (platformCount >= 2) {
+    bonus += 0.02;
+  } else if (platformCount >= 1) {
+    bonus += 0.01;
+  }
+
+  return Math.min(IPO_FEV_BONUS_MAX, bonus);
 }

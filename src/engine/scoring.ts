@@ -9,7 +9,7 @@ import { calculateMetrics, calculateSectorFocusBonus, calculateExitValuation } f
 import { POST_GAME_INSIGHTS } from '../data/tips';
 import { getAllDedupedBusinesses } from './helpers';
 import { RESTRUCTURING_FEV_PENALTY } from '../data/gameConfig';
-import { calculateStayPrivateBonus, getIPODilutionPenalty } from './ipo';
+import { calculatePublicCompanyBonus } from './ipo';
 
 const LEADERBOARD_KEY = 'holdco-tycoon-leaderboard';
 const MAX_LEADERBOARD_ENTRIES = 10;
@@ -60,7 +60,12 @@ export function calculateEnterpriseValue(state: GameState): number {
   }
 
   const blendedMultiple = totalEbitda > 0 ? weightedMultiple / totalEbitda : 0;
-  const portfolioValue = totalEbitda * blendedMultiple;
+  let portfolioValue = totalEbitda * blendedMultiple;
+
+  // Sentiment flow-through for public companies: market sentiment affects portfolio value
+  if (state.ipoState?.isPublic) {
+    portfolioValue *= (1 + state.ipoState.marketSentiment);
+  }
 
   // Total debt: state.totalDebt (holdco loan + per-business bank debt) + seller notes
   const opcoSellerNotes = activeBusinesses.reduce(
@@ -72,16 +77,10 @@ export function calculateEnterpriseValue(state: GameState): number {
   // EV = Portfolio Value + Cash - All Debt - Rollover Claims (no distribution add-back)
   let ev = portfolioValue + state.cash - totalDebt - rolloverClaims;
 
-  // Stay-private bonus: rewards declining IPO when eligible (20yr mode only)
-  const stayPrivateBonus = calculateStayPrivateBonus(state);
-  if (stayPrivateBonus > 0) {
-    ev *= (1 + stayPrivateBonus);
-  }
-
-  // IPO dilution penalty: extra cost beyond natural ownership dilution
-  const dilutionPenalty = getIPODilutionPenalty(state);
-  if (dilutionPenalty > 0) {
-    ev *= (1 - dilutionPenalty);
+  // Public company bonus: performance-based 5-18% FEV bonus
+  const publicBonus = calculatePublicCompanyBonus(state);
+  if (publicBonus > 0) {
+    ev *= (1 + publicBonus);
   }
 
   return Math.round(Math.max(0, ev));
