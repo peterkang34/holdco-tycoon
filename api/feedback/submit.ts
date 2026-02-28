@@ -74,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       await kv.zremrangebyrank('feedback:submissions', 0, totalCount - MAX_ENTRIES - 1);
     }
 
-    return res.status(200).json({ ok: true });
+    return res.status(200).json({ ok: true, id: String(Date.now()) });
   } catch (error) {
     console.error('Feedback submit error:', error);
     return res.status(500).json({ error: 'Failed to submit feedback' });
