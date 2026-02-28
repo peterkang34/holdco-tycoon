@@ -334,6 +334,7 @@ export const FO_DEAL_INFLATION = 2.5;
 export const FO_MA_SOURCING_TIER = 1;
 export const FO_MAX_ROUNDS = 5;
 export const FO_QUALITY_FLOOR = 3;
+export const FO_RESTRUCTURING_PENALTY = 0.80;
 
 // ── Mode Selection Copy ──
 

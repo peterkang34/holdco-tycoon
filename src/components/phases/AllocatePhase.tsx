@@ -513,8 +513,8 @@ export function AllocatePhase({
     { id: 'portfolio', label: 'Portfolio', badge: activeBusinesses.length },
     { id: 'deals', label: 'Deals', badge: dealPipeline.length },
     { id: 'shared_services', label: 'Shared Services' },
-    // Hide Capital tab in FO mode (distributions, buybacks, equity, IPO are all blocked)
-    ...(!isFamilyOfficeMode ? [{ id: 'capital' as AllocateTab, label: 'Capital' }] : []),
+    // FO mode: show "Debt" tab (debt management only); normal: full "Capital" tab
+    { id: 'capital', label: isFamilyOfficeMode ? 'Debt' : 'Capital' },
   ];
 
   const renderDealStructuring = () => {
@@ -689,8 +689,14 @@ export function AllocatePhase({
                   You have {formatMoney(cash)} — shortfall: <span className="text-warning font-mono">{formatMoney(Math.max(0, selectedDeal.effectivePrice * 0.25 - cash))}</span>
                 </p>
               </div>
-              {/* In-modal equity raise for Scenario A */}
-              {(() => {
+              {/* In-modal equity raise for Scenario A (hidden in FO mode) */}
+              {isFamilyOfficeMode ? (
+                <div className="border border-white/10 bg-white/5 rounded-lg p-4">
+                  <p className="text-sm text-text-secondary">
+                    Not enough cash for this deal. Consider selling a business or choosing a smaller deal.
+                  </p>
+                </div>
+              ) : (() => {
                 const shortfall = Math.max(0, Math.round(selectedDeal.effectivePrice * 0.25) - cash);
                 const suggestedRaise = Math.ceil(shortfall / 100) * 100;
                 const canRaise = !raiseBlocked && !atOwnershipFloor;
@@ -878,8 +884,8 @@ export function AllocatePhase({
               ))}
             </div>
 
-            {/* Scenario B: Collapsible equity raise for when you can afford some structures but want more options */}
-            {(() => {
+            {/* Scenario B: Collapsible equity raise (hidden in FO mode — no equity raises) */}
+            {!isFamilyOfficeMode && (() => {
               if (raiseBlocked || atOwnershipFloor) return null;
               const parsedAmount = parseInt(modalEquityAmount) || 0;
               const internalAmount = Math.round(parsedAmount / 1000);
@@ -1996,8 +2002,8 @@ export function AllocatePhase({
               );
             })()}
 
-            {/* Cap Table / Equity Summary */}
-            {(() => {
+            {/* Cap Table / Equity Summary (hidden in FO mode) */}
+            {!isFamilyOfficeMode && (() => {
               const founderOwnership = founderShares / sharesOutstanding;
               const outsideShares = sharesOutstanding - founderShares;
               const isEasyMode = difficulty === 'easy';
@@ -2071,8 +2077,8 @@ export function AllocatePhase({
               );
             })()}
 
-            {/* IPO Pathway — 20-year mode only */}
-            {(() => {
+            {/* IPO Pathway — 20-year mode only (hidden in FO mode) */}
+            {!isFamilyOfficeMode && (() => {
               if (duration !== 'standard') return null;
               if (ipoState?.isPublic) {
                 // Post-IPO: Public Company Dashboard
@@ -2319,6 +2325,8 @@ export function AllocatePhase({
               );
             })()}
 
+            {/* Equity / Buyback / Distribute — hidden in FO mode */}
+            {!isFamilyOfficeMode && <>
             {/* Issue Equity */}
             <div className={`card ${raiseBlocked ? 'opacity-50' : ''}`}>
               <h4 className="font-bold mb-3">Issue Equity</h4>
@@ -2660,6 +2668,7 @@ export function AllocatePhase({
                 <strong>Scoring:</strong> Distributing when ROIIC is low and leverage is healthy earns points. But distributing while ROIIC is high (should reinvest) or leverage is high (should deleverage) costs points. Hoarding excess cash also hurts. Follow the hierarchy: reinvest → deleverage → buyback → distribute.
               </p>
             </div>
+            </>}
           </div>
           </div>
         )}

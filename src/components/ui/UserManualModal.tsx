@@ -1460,7 +1460,8 @@ function TwentyYearContent() {
         <><strong>Starting cash:</strong> remaining 75% of distributions becomes your FO operating capital</>,
         <><strong>Pro Sports Franchises:</strong> exclusive FO sector — trophy assets with the highest multiples (15-35x) but lowest margins (5-18%)</>,
         <><strong>Premium deals:</strong> all FO deals are Q3+ quality with late-game pricing</>,
-        <><strong>Restricted actions:</strong> distributions, buybacks, equity raises, IPO, and turnarounds are not available during FO</>,
+        <><strong>Debt tab:</strong> the Capital tab becomes &ldquo;Debt&rdquo; in FO mode — only debt management is available. Equity raises, distributions, buybacks, IPO, and turnarounds are blocked</>,
+        <><strong>Restructuring penalty:</strong> if you restructure during FO, your FO FEV is reduced by 20% before MOIC calculation</>,
       ]} />
 
       <SubHeading>FO Multiplier &amp; Legacy Grade</SubHeading>

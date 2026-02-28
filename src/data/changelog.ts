@@ -21,7 +21,8 @@ export const CHANGELOG: ChangelogEntry[] = [
           'New Pro Sports Franchises sector exclusive to Family Office mode — trophy assets with the highest multiples in the game (15-35x) but the lowest margins (5-18%).',
           '25% philanthropy deduction taken upfront before FO play begins.',
           'FO performance earns a 1.0-1.5x multiplier on your main game Adjusted FEV for the leaderboard.',
-          'Capital tab hidden during FO mode — distributions, buybacks, equity raises, IPO, and turnarounds are not available.',
+          'Capital tab becomes "Debt" in FO mode — only debt management available. Equity raises, distributions, buybacks, IPO, and turnarounds are blocked.',
+          'Restructuring during FO applies a 20% penalty to your FO FEV before MOIC calculation.',
         ],
       },
       {

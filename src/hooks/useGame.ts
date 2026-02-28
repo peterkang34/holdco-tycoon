@@ -3503,7 +3503,7 @@ export const useGameStore = create<GameStore>()(
         // 1. Calculate FO FEV from current (FO) state
         const foFEV = calculateFounderEquityValue(state);
         const foStartingCash = state.familyOfficeState.foStartingCash;
-        const legacyScore = calculateFOLegacyScore(foFEV, foStartingCash);
+        const legacyScore = calculateFOLegacyScore(foFEV, foStartingCash, state.hasRestructured);
         const foMultiplier = legacyScore.foMultiplier;
 
         // 2. Restore main game state from snapshot

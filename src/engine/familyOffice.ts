@@ -17,6 +17,7 @@ import {
   FAMILY_OFFICE_MIN_LONG_HELD,
   FO_MULTIPLIER_CAP,
   FO_MULTIPLIER_MOIC_SCALE,
+  FO_RESTRUCTURING_PENALTY,
 } from '../data/gameConfig';
 
 const PASSING_GRADES = ['S', 'A', 'B'];
@@ -63,19 +64,23 @@ export function checkFamilyOfficeEligibility(
 /**
  * Calculate the FO multiplier from MOIC.
  * Formula: 1.0 + min(0.50, max(0, MOIC) × 0.10)
+ * Restructuring during FO applies a 0.80x penalty to foFEV before MOIC calc.
  */
-export function calculateFOMultiplier(foFEV: number, foStartingCash: number): number {
+export function calculateFOMultiplier(foFEV: number, foStartingCash: number, hasRestructured?: boolean): number {
   if (foStartingCash <= 0) return 1.0;
-  const moic = foFEV / foStartingCash;
+  const effectiveFEV = hasRestructured ? foFEV * FO_RESTRUCTURING_PENALTY : foFEV;
+  const moic = effectiveFEV / foStartingCash;
   return Math.min(1.0 + FO_MULTIPLIER_CAP, 1.0 + Math.max(0, moic) * FO_MULTIPLIER_MOIC_SCALE);
 }
 
 /**
  * Calculate the FO legacy score from ending FEV and starting cash.
+ * Restructuring during FO penalizes the effective FEV used for MOIC.
  */
-export function calculateFOLegacyScore(foFEV: number, foStartingCash: number): LegacyScore {
-  const moic = foStartingCash > 0 ? foFEV / foStartingCash : 0;
-  const multiplier = calculateFOMultiplier(foFEV, foStartingCash);
+export function calculateFOLegacyScore(foFEV: number, foStartingCash: number, hasRestructured?: boolean): LegacyScore {
+  const effectiveFEV = hasRestructured ? foFEV * FO_RESTRUCTURING_PENALTY : foFEV;
+  const moic = foStartingCash > 0 ? effectiveFEV / foStartingCash : 0;
+  const multiplier = calculateFOMultiplier(foFEV, foStartingCash, hasRestructured);
 
   let grade: LegacyScore['grade'];
   if (moic >= 3.5) grade = 'Enduring';
