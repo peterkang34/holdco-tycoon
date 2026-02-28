@@ -71,7 +71,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
 - **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v29`
-- **Tests**: Vitest in `src/engine/__tests__/` — 1211 tests across 22 suites (incl. display-proofreader)
+- **Tests**: Vitest in `src/engine/__tests__/` — 1325 tests across 23 suites (incl. display-proofreader + playtest system)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Rollover Equity**: 6th deal structure — seller reinvests ~25% (standard) or ~20% (quick) as equity; gated behind M&A Tier 2+, Q3+, non-distressed archetypes, noNewDebt; exit split applied AFTER debt payoff; FEV deducts rollover claims; note rate 5%
@@ -120,6 +120,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 5. **Display Proofreader** — Run `npx vitest run src/engine/__tests__/display-proofreader.test.ts` if mechanics/UI copy changed
 6. **mechanicsCopy.ts** — If changing mechanic behavior, update `src/data/mechanicsCopy.ts` AND add old description to `BANNED_COPY_PATTERNS`
 7. **Secret Sauce Docs** — Update `_secret-sauce/` files if any game mechanics, formulas, events, recipes, scoring, or balance constants changed (these are gitignored, local-only design docs)
+8. **Playtest Coverage** — If adding a new game mechanic, add a key to `FEATURE_REGISTRY` in `src/engine/__tests__/playtest/coverage.ts`, wire up `coverage.record()` in `simulator.ts`, and update a strategy or the hard-to-trigger list in `playtest.test.ts` (see instructions in coverage.ts)
 
 ## Display Proofreader (MANDATORY)
 - **`display-proofreader.test.ts`** — 221 tests that validate UI copy matches engine constants
