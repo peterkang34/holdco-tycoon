@@ -447,7 +447,7 @@ export const useGameStore = create<GameStore>()(
         // Send abandon telemetry if mid-game
         const state = get();
         if (state.round > 0 && !state.gameOver) {
-          trackGameAbandon(state.round, state.maxRounds, state.difficulty, state.duration, state.businesses[0]?.sectorId || 'agency', state.isChallenge);
+          trackGameAbandon(state.round, state.maxRounds, state.difficulty, state.duration, state.businesses[0]?.sectorId || 'agency', state.isChallenge, calculateFounderEquityValue(state));
         }
 
         resetBusinessIdCounter();

@@ -13,6 +13,7 @@ interface SessionMeta {
   maxRounds: number;
   startedAt: number;
   isChallenge: boolean;
+  fev?: number;
 }
 
 function saveSessionMeta(meta: SessionMeta): void {
@@ -71,6 +72,7 @@ export function trackGameStart(difficulty: string, duration: string, sector: str
       device: getDeviceType(),
       isChallenge: prevMeta.isChallenge,
       sessionDurationMs: Date.now() - prevMeta.startedAt,
+      fev: prevMeta.fev,
     });
   }
 
@@ -120,6 +122,7 @@ export function trackGameStart(difficulty: string, duration: string, sector: str
         device: getDeviceType(),
         isChallenge: currentMeta.isChallenge,
         sessionDurationMs: Date.now() - currentMeta.startedAt,
+        fev: currentMeta.fev,
       });
       clearSessionMeta();
     }
@@ -188,7 +191,7 @@ export function trackGameComplete(snapshot: GameCompleteSnapshot): void {
   }
 }
 
-export function trackGameAbandon(round: number, maxRounds: number, difficulty: string, duration: string, sector: string, isChallenge: boolean): void {
+export function trackGameAbandon(round: number, maxRounds: number, difficulty: string, duration: string, sector: string, isChallenge: boolean, fev?: number): void {
   const sessionId = localStorage.getItem(SESSION_ID_KEY) || '';
   const meta = getSessionMeta();
 
@@ -204,6 +207,7 @@ export function trackGameAbandon(round: number, maxRounds: number, difficulty: s
     device: getDeviceType(),
     isChallenge,
     sessionDurationMs: meta ? Date.now() - meta.startedAt : undefined,
+    fev: fev ?? meta?.fev,
   });
 
   clearSessionMeta();
@@ -213,11 +217,12 @@ export function trackGameAbandon(round: number, maxRounds: number, difficulty: s
   }
 }
 
-export function updateSessionRound(round: number): void {
+export function updateSessionRound(round: number, fev?: number): void {
   try {
     const meta = getSessionMeta();
     if (meta) {
       meta.round = round;
+      if (fev != null) meta.fev = fev;
       saveSessionMeta(meta);
     }
   } catch {}

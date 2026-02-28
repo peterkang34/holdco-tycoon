@@ -207,6 +207,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         duration,
         device,
         sessionDurationMs,
+        fev,
       }));
       pipe.ltrim('t:activity:recent', 0, 99);
 

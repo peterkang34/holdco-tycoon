@@ -606,9 +606,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     }
   }, [round, ipoState, addToast]);
 
-  // Update telemetry session meta with current round
+  // Update telemetry session meta with current round + FEV snapshot
   useEffect(() => {
-    updateSessionRound(round);
+    const fev = calculateFounderEquityValue(useGameStore.getState());
+    updateSessionRound(round, fev);
   }, [round]);
 
   // Track which allocate phase entry we've shown a nudge for

@@ -80,6 +80,7 @@ interface ActivityEvent {
   gameNumber?: number;
   round?: number;
   sessionDurationMs?: number;
+  fev?: number;
 }
 
 interface AnalyticsData {
@@ -802,6 +803,7 @@ export function AdminDashboard() {
                         <span className="text-text-muted font-mono w-16 shrink-0" title={dateObj.toLocaleString()}>{timeAgo}</span>
                         {evt.round != null && <span className="text-text-secondary">Year {evt.round}</span>}
                         {evt.difficulty && <span className="text-text-muted">· {diffLabel} {durationLabel}</span>}
+                        {evt.fev != null && <span className="font-mono text-accent">{formatMoney(evt.fev)}</span>}
                         {mins != null && <span className="text-text-muted ml-auto">{mins}m played</span>}
                         {evt.device && <span className="text-text-muted">{evt.device}</span>}
                       </div>
