@@ -860,8 +860,9 @@ export function generateDealWithSize(
   affordability?: number,
 ): Deal {
   // Resolve the tier: explicit tier param > sizePreference (if it's a tier) > fallback to 'small'
-  const resolvedTier: DealSizeTier = tier
-    ?? (sizePreference !== 'any' ? sizePreference as DealSizeTier : 'small');
+  // Pro Sports Franchises are always trophy-tier assets
+  const resolvedTier: DealSizeTier = sectorId === 'proSports' ? 'trophy'
+    : (tier ?? (sizePreference !== 'any' ? sizePreference as DealSizeTier : 'small'));
   const tierConfig = DEAL_SIZE_TIERS[resolvedTier];
 
   let quality = generateQualityRating(rng);
