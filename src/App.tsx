@@ -8,7 +8,7 @@ import { FamilyOfficeScreen } from './components/screens/FamilyOfficeScreen';
 import { ScoreboardScreen } from './components/screens/ScoreboardScreen';
 import { SectorId, GameDifficulty, GameDuration, formatMoney } from './engine/types';
 import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, replaceUrlWithChallenge, type ChallengeParams, type PlayerResult } from './utils/challenge';
-import { checkFamilyOfficeEligibility } from './engine/familyOffice';
+import { checkFamilyOfficeEligibility, initializeFamilyOffice } from './engine/familyOffice';
 import { calculateFinalScore } from './engine/scoring';
 import { FAMILY_OFFICE_MIN_DISTRIBUTIONS } from './data/gameConfig';
 import { trackPageView } from './services/telemetry';
@@ -205,7 +205,7 @@ function App() {
             <p className="text-text-muted text-sm text-center mb-8">
               {founderDistributionsReceived >= FAMILY_OFFICE_MIN_DISTRIBUTIONS
                 ? 'Eligible — your distributions meet the $1B threshold.'
-                : 'Your current save may not have enough distributions. Start a full game and distribute $1B+ to test properly.'}
+                : 'Test mode — will start FO with $2B mock wealth.'}
             </p>
             {familyOfficeState?.isActive && !familyOfficeState?.legacyScore ? (
               <button
@@ -218,15 +218,18 @@ function App() {
               <div className="flex flex-col gap-3 w-full max-w-xs">
                 <button
                   onClick={() => {
-                    startFamilyOffice();
-                    // Only navigate if startFamilyOffice succeeded (sets familyOfficeState)
+                    if (founderDistributionsReceived >= FAMILY_OFFICE_MIN_DISTRIBUTIONS) {
+                      startFamilyOffice();
+                    } else {
+                      // Test mode: bypass eligibility, inject mock FO with $2B wealth
+                      useGameStore.setState({ familyOfficeState: initializeFamilyOffice(2000000) });
+                    }
                     if (useGameStore.getState().familyOfficeState?.isActive) {
                       window.scrollTo(0, 0);
                       setScreen('familyOffice');
                     }
                   }}
                   className="btn-primary text-lg py-3"
-                  disabled={founderDistributionsReceived < FAMILY_OFFICE_MIN_DISTRIBUTIONS}
                 >
                   Enter Family Office
                 </button>
