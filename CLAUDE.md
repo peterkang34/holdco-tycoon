@@ -70,8 +70,8 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
-- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v30`
-- **Tests**: Vitest in `src/engine/__tests__/` — 1325 tests across 23 suites (incl. display-proofreader + playtest system)
+- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v31`
+- **Tests**: Vitest in `src/engine/__tests__/` — 1323 tests across 23 suites (incl. display-proofreader + playtest system)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Rollover Equity**: 6th deal structure — seller reinvests ~25% (standard) or ~20% (quick) as equity; gated behind M&A Tier 2+, Q3+, non-distressed archetypes, noNewDebt; exit split applied AFTER debt payoff; FEV deducts rollover claims; note rate 5%
@@ -82,11 +82,11 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 
 ## Key Files
 - `src/hooks/useGame.ts` — Zustand store (game actions, state transitions)
-- `src/hooks/migrations.ts` — Save migration logic (current: v30)
+- `src/hooks/migrations.ts` — Save migration logic (current: v31)
 - `src/engine/affordability.ts` — 7-tier affordability engine (calculateAffordability, getAffordabilityWeights, pickWeightedTier, generateTrophyEbitda)
 - `src/hooks/chronicleContext.ts` — AI chronicle context builder
 - `src/engine/helpers.ts` — Shared helpers (clampMargin, capGrowthRate, applyEbitdaFloor)
-- `src/engine/__tests__/display-proofreader.test.ts` — 221 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
+- `src/engine/__tests__/display-proofreader.test.ts` — 222 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
 - `src/data/mechanicsCopy.ts` — Centralized registry for mechanic descriptions (debt labels, waterfall labels, countdown functions, banned patterns)
 - `src/data/gameConfig.ts` — Game constants and configuration
 - `src/components/screens/GameScreen.tsx` — Main game screen (phase routing, toast handlers)
@@ -96,7 +96,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/data/turnaroundPrograms.ts` — 7 turnaround programs across 3 tiers, sector quality ceilings
 - `src/engine/turnarounds.ts` — Turnaround eligibility, cost, resolution, quality improvement, exit premium
 - `src/engine/ipo.ts` — IPO Pathway engine (eligibility, stock price, earnings, share-funded deals, stay-private bonus)
-- `src/engine/familyOffice.ts` — Family Office Endgame engine (eligibility, philanthropy, succession, legacy scoring)
+- `src/engine/familyOffice.ts` — Family Office V2 engine (eligibility, FO multiplier, legacy scoring)
 - `src/data/platformRecipes.ts` — 38 integrated platform recipes (32 within-sector + 6 cross-sector)
 - `src/engine/platforms.ts` — Platform eligibility, forging, bonus application
 - `src/components/ui/LeaderboardModal.tsx` — Tabbed leaderboard (exports filtering utils for GameOverScreen)
@@ -123,7 +123,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 8. **Playtest Coverage** — If adding a new game mechanic, add a key to `FEATURE_REGISTRY` in `src/engine/__tests__/playtest/coverage.ts`, wire up `coverage.record()` in `simulator.ts`, and update a strategy or the hard-to-trigger list in `playtest.test.ts` (see instructions in coverage.ts)
 
 ## Display Proofreader (MANDATORY)
-- **`display-proofreader.test.ts`** — 221 tests that validate UI copy matches engine constants
+- **`display-proofreader.test.ts`** — 222 tests that validate UI copy matches engine constants
 - **When changing ANY game mechanic**: ALWAYS update UserManualModal.tsx to reflect the change (user rule: manual must ALWAYS be updated automatically)
 - **When changing ANY engine constant** (rates, thresholds, formulas, scoring weights): update the proofreader test AND the UI copy (UserManualModal, CollectPhase, DealCard, etc.)
 - **When changing ANY UI copy** that references numbers/mechanics: update the proofreader test to assert the new value
@@ -138,9 +138,9 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **CollectPhase needs ALL businesses** (not just activeBusinesses) — `calculateIntegratedDebtService` filters internally
 - **Earn-out display must cap at available cash** — store uses `Math.min(earnoutRemaining, available)`, display must match
 - **Race conditions in async AI calls** — always check state is still current before setting narrative/storyBeats
-- **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety. Current: v30
+- **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety. Current: v31
 - **Integrated platforms**: Margin/growth bonuses are ONE-TIME mutations at forge time (clamped via `clampMargin`/`capGrowthRate`); multiple expansion + recession resistance are automatic via engine; platform sale bonus is tiered by `multipleExpansion` (0.3x for 2.0x+, 0.5x otherwise) via `getPlatformSaleBonus()`
-- **15 sectors, ~93 sub-types**: Overlaps resolved (no cross-sector sub-type duplication); sectors.ts is authoritative
+- **16 sectors, ~98 sub-types**: 15 standard + 1 FO-exclusive (proSports). Overlaps resolved (no cross-sector sub-type duplication); sectors.ts is authoritative
 - **Platform thresholds scale by mode**: `INTEGRATION_THRESHOLD_MULTIPLIER` in gameConfig.ts (Easy-Std 1.0, Easy-Quick 0.7, Normal-Std 0.7, Normal-Quick 0.5)
 - **Turnaround quality improvements are permanent mutations** — qualityRating changes at resolution; qualityImprovedTiers tracks cumulative tiers for exit premium
 - **Portfolio fatigue**: 4+ simultaneous turnarounds = -10ppt success rate penalty; warn in UI
@@ -152,7 +152,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **20-Year Mode features are gated on `duration === 'standard'`** — Deal Inflation, Succession Events, IPO, Family Office all check mode. 10-year mode stays untouched except compressed narrative tone (3 phases instead of 5)
 - **Deal Inflation applies AFTER quality adjustment, BEFORE competitive position** — in `businesses.ts` deal generation. Financial Crisis resets inflation by -2.0x for 2 rounds via `dealInflationState.crisisResetRoundsRemaining`
 - **IPO stock price is derived, not random** — `EV / totalShares * (1 + marketSentiment)`. Earnings expectations = prior EBITDA * 1.05. 2 consecutive misses = analyst downgrade (-0.10 sentiment). Max 1 share-funded deal/round — dilutes ownership naturally (no extra penalty). Performance-based 5-18% public company bonus (base 5% + stock appreciation + earnings + sentiment + platforms). `MIN_PUBLIC_FOUNDER_OWNERSHIP = 0.10` (vs 51% private). `IPO_MIN_PLATFORMS = 1`. Share-funded requires stock price >= $1.00. Purple card in deal structure picker. Works for standalone + tuck-in acquisitions
-- **Family Office is a post-game mini-game** — 5 rounds, intercepted via bridge screen BEFORE GameOverScreen when player has $1B+ distributions + B+ grade + 3 Q4+ businesses + 2 businesses held 10+ years. Uses its own `familyOfficeCash` pool (funded from `founderDistributionsReceived`), NOT holdco operating cash. Irrevocable philanthropy commitments. Succession choice at round 3. Legacy Score grades: Enduring/Influential/Established/Fragile. Test shortcut: `#/fo-test`
+- **Family Office V2 is real holdco gameplay** — 5 rounds of actual deal flow/improvements/M&A using 75% of accumulated distributions (25% upfront philanthropy). Snapshot/reset/restore pattern: main game state serialized to `mainGameSnapshot`, state reset for FO play, restored on completion. FO performance → MOIC → 1.0-1.5x multiplier on Adjusted FEV. Pro Sports Franchises sector exclusive to FO mode. Capital tab hidden (distributions/buybacks/equity/IPO/turnarounds blocked). Eligibility: $1B+ distributions + B+ grade + 3 Q4+ businesses + 2 businesses held 10+ years. Legacy grades: Enduring/Influential/Established/Fragile. Test shortcut: `#/fo-test`
 - **Succession events fire once per business** — `successionResolved: boolean` prevents repeats. 8+ years held, Q3+, 20yr mode only. Quality drops immediately; 3 choices (invest, promote, sell) with shared services interaction on promote path
 - **Behavioral copy must come from `mechanicsCopy.ts`** — never hardcode debt descriptions directly in components; if changing mechanic behavior, update mechanicsCopy.ts AND add old description to BANNED_COPY_PATTERNS
 - **Integration failure growth drag is proportional and decaying** — `-(acquiredEbitda/platformEbitda) × 3.0ppt`, clamped [floor -0.5ppt, cap -3.0ppt]; mergers ×0.67 factor; decays 50%/yr (standard) or 65%/yr (quick); stored on `business.integrationGrowthDrag` (separate from base rates); restructuring cost 15% tuck-ins / 12% mergers

@@ -1439,10 +1439,10 @@ function TwentyYearContent() {
 
       <SubHeading>Family Office Endgame</SubHeading>
       <P>
-        The Family Office is a 5-round mini-game that intercepts before your final results
-        for exceptional players. It explores what happens after the fortune is made:
-        wealth preservation, philanthropy, and generational succession. The Family Office
-        operates on your personal wealth (cumulative founder distributions), not holdco operating cash.
+        The Family Office is a 5-round bonus game that intercepts before your final results
+        for exceptional players. Instead of a passive mini-game, you play 5 rounds of real
+        holdco gameplay — same deal flow, improvements, and M&A — using your accumulated
+        personal wealth.
       </P>
       <DataTable
         headers={['Gate', 'Requirement']}
@@ -1456,34 +1456,26 @@ function TwentyYearContent() {
 
       <P><strong>Family Office mechanics:</strong></P>
       <BulletList items={[
-        <><strong>Reputation</strong> (0-100): starts at 50 (neutral), influenced by philanthropy and decisions</>,
-        <><strong>Philanthropy:</strong> irrevocable cash commitments that boost reputation and legacy score</>,
-        <><strong>Investments:</strong> portfolio allocations scored on diversification</>,
-        <><strong>Generational Succession</strong> (Round 3): choose Heir Apparent (risky but authentic), Professional CEO (safe but costly), or Family Council (moderate governance friction)</>,
+        <><strong>Philanthropy deduction:</strong> 25% of your distributions are committed to philanthropy upfront before play begins</>,
+        <><strong>Starting cash:</strong> remaining 75% of distributions becomes your FO operating capital</>,
+        <><strong>Pro Sports Franchises:</strong> exclusive FO sector — trophy assets with the highest multiples (15-35x) but lowest margins (5-18%)</>,
+        <><strong>Premium deals:</strong> all FO deals are Q3+ quality with late-game pricing</>,
+        <><strong>Restricted actions:</strong> distributions, buybacks, equity raises, IPO, and turnarounds are not available during FO</>,
       ]} />
 
-      <SubHeading>Legacy Score</SubHeading>
+      <SubHeading>FO Multiplier &amp; Legacy Grade</SubHeading>
       <P>
-        At the end of the Family Office mini-game, you receive a Legacy Score (0-100)
-        composed of five equally-weighted components:
+        Your FO performance earns a multiplier (1.0x-1.5x) applied to your main game
+        Adjusted FEV for the leaderboard. The multiplier is based on your MOIC (Multiple
+        on Invested Capital) — your ending FO FEV divided by your starting FO cash.
       </P>
       <DataTable
-        headers={['Component', 'Weight', 'What It Measures']}
+        headers={['MOIC', 'Multiplier', 'Grade']}
         rows={[
-          ['Wealth Preservation', '20%', 'Investment diversification and count'],
-          ['Reputation', '20%', 'Final reputation score'],
-          ['Philanthropy', '20%', 'Total committed to philanthropy'],
-          ['Succession Quality', '20%', 'Governance choice and execution'],
-          ['Permanent Hold Performance', '20%', 'Commitment count and depth'],
-        ]}
-      />
-      <DataTable
-        headers={['Grade', 'Score Range']}
-        rows={[
-          ['Enduring', '80-100'],
-          ['Influential', '60-79'],
-          ['Established', '40-59'],
-          ['Fragile', '0-39'],
+          ['< 1.0x (lost money)', '1.00-1.10x', 'Fragile'],
+          ['1.0-2.0x (preserved)', '1.10-1.20x', 'Established'],
+          ['2.0-3.5x (grew well)', '1.20-1.35x', 'Influential'],
+          ['3.5x+ (exceptional)', '1.35-1.50x', 'Enduring'],
         ]}
       />
 

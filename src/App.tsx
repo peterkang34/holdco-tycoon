@@ -8,12 +8,12 @@ import { FamilyOfficeScreen } from './components/screens/FamilyOfficeScreen';
 import { ScoreboardScreen } from './components/screens/ScoreboardScreen';
 import { SectorId, GameDifficulty, GameDuration, formatMoney } from './engine/types';
 import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, replaceUrlWithChallenge, type ChallengeParams, type PlayerResult } from './utils/challenge';
-import { checkFamilyOfficeEligibility, initializeFamilyOffice } from './engine/familyOffice';
+import { checkFamilyOfficeEligibility } from './engine/familyOffice';
 import { calculateFinalScore } from './engine/scoring';
 import { FAMILY_OFFICE_MIN_DISTRIBUTIONS } from './data/gameConfig';
 import { trackPageView } from './services/telemetry';
 
-type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBridge' | 'scoreboard';
+type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard';
 
 function App() {
   const [isAdmin, setIsAdmin] = useState(window.location.hash === '#/admin');
@@ -64,9 +64,11 @@ function App() {
     integratedPlatforms,
     isChallenge,
     ipoState,
-    familyOfficeState,
+    familyOfficeState: _familyOfficeState,
     founderDistributionsReceived,
+    isFamilyOfficeMode,
     startFamilyOffice,
+    completeFamilyOffice,
     startGame,
     resetGame,
   } = useGameStore();
@@ -112,12 +114,13 @@ function App() {
     if (isFoTest) {
       return; // handled in render
     }
-    const foState = useGameStore.getState().familyOfficeState;
+    const currentState = useGameStore.getState();
     if (holdcoName && round > 0 && !gameOver) {
+      // Both normal games and FO-mode games resume at GameScreen
       setScreen('game');
-    } else if (gameOver && foState?.isActive && !foState?.legacyScore) {
-      // Mid-FO reload — resume at FO screen
-      setScreen('familyOffice');
+    } else if (gameOver && currentState.familyOfficeState?.isActive && !currentState.familyOfficeState?.legacyScore) {
+      // Mid-FO reload (legacy — shouldn't happen with V2, but safe fallback)
+      setScreen('familyOfficeResults');
     } else if (gameOver && isChallenge) {
       // Challenge game over — route to GameOverScreen so scoreboard can mount and auto-submit
       setScreen('gameOver');
@@ -142,8 +145,16 @@ function App() {
 
   const handleGameOver = () => {
     window.scrollTo(0, 0);
-    // Check FO eligibility — intercept before game over if qualified
     const state = useGameStore.getState();
+
+    // FO mode game over — calculate FO results and show results screen
+    if (state.isFamilyOfficeMode) {
+      completeFamilyOffice();
+      setScreen('familyOfficeResults');
+      return;
+    }
+
+    // Check FO eligibility — intercept before game over if qualified
     if (!state.familyOfficeState && state.duration === 'standard' && !state.bankruptRound) {
       const score = calculateFinalScore(state);
       const { eligible } = checkFamilyOfficeEligibility(state, score);
@@ -163,13 +174,13 @@ function App() {
     setScreen('intro');
   };
 
-  const handleFamilyOfficeComplete = () => {
+  const handleFamilyOfficeResultsComplete = () => {
     window.scrollTo(0, 0);
     setScreen('gameOver');
   };
 
   // Compute game-over values only when needed (non-reactive to avoid infinite re-renders)
-  const needsScoring = screen === 'gameOver' || screen === 'familyOfficeBridge';
+  const needsScoring = screen === 'gameOver' || screen === 'familyOfficeBridge' || screen === 'familyOfficeResults';
   const score = useMemo(() => needsScoring ? getFinalScore() : undefined, [needsScoring]);
   const insights = useMemo(() => screen === 'gameOver' ? getPostGameInsights() : undefined, [screen]);
   const enterpriseValue = useMemo(() => needsScoring ? getEnterpriseValue() : undefined, [needsScoring]);
@@ -184,50 +195,50 @@ function App() {
     );
   }
 
-  // #/fo-test — quick test shortcut for FO bridge flow
+  // #/fo-test — quick test shortcut for FO V2 flow
+  // Sets up a minimal qualifying state, calls startFamilyOffice, and enters GameScreen in FO mode
   if (isFoTest) {
     return (
       <div className="min-h-screen bg-bg-primary text-text-primary overflow-x-hidden">
-        {screen === 'familyOffice' ? (
+        {screen === 'familyOfficeResults' ? (
           <FamilyOfficeScreen onComplete={() => {
             window.scrollTo(0, 0);
             setIsFoTest(false);
             window.location.hash = '';
             setScreen('gameOver');
           }} />
+        ) : screen === 'game' ? (
+          <GameScreen onGameOver={handleGameOver} onResetGame={handlePlayAgain} showTutorial={false} isChallenge={false} />
         ) : (
           <div className="min-h-screen px-4 sm:px-8 py-8 pb-16 max-w-2xl mx-auto flex flex-col items-center justify-center">
             <span className="text-6xl block mb-6">🦅</span>
-            <h1 className="text-3xl font-bold mb-2 text-center">Family Office Test</h1>
+            <h1 className="text-3xl font-bold mb-2 text-center">Family Office V2 Test</h1>
             <p className="text-text-secondary text-center mb-2">
               Founder Distributions: {formatMoney(founderDistributionsReceived)}
             </p>
             <p className="text-text-muted text-sm text-center mb-8">
               {founderDistributionsReceived >= FAMILY_OFFICE_MIN_DISTRIBUTIONS
                 ? 'Eligible — your distributions meet the $1B threshold.'
-                : 'Test mode — will start FO with $2B mock wealth.'}
+                : 'Test mode — will inject $2B mock distributions and start FO.'}
             </p>
-            {familyOfficeState?.isActive && !familyOfficeState?.legacyScore ? (
+            {isFamilyOfficeMode ? (
               <button
-                onClick={() => { window.scrollTo(0, 0); setScreen('familyOffice'); }}
+                onClick={() => { window.scrollTo(0, 0); setScreen('game'); }}
                 className="btn-primary text-lg py-3 px-8"
               >
-                Resume Family Office (Round {familyOfficeState.foRound})
+                Resume Family Office Game
               </button>
             ) : (
               <div className="flex flex-col gap-3 w-full max-w-xs">
                 <button
                   onClick={() => {
-                    if (founderDistributionsReceived >= FAMILY_OFFICE_MIN_DISTRIBUTIONS) {
-                      startFamilyOffice();
-                    } else {
-                      // Test mode: bypass eligibility, inject mock FO with $2B wealth
-                      useGameStore.setState({ familyOfficeState: initializeFamilyOffice(2000000) });
+                    if (founderDistributionsReceived < FAMILY_OFFICE_MIN_DISTRIBUTIONS) {
+                      // Test mode: inject mock distributions so startFamilyOffice has capital
+                      useGameStore.setState({ founderDistributionsReceived: 2000000 });
                     }
-                    if (useGameStore.getState().familyOfficeState?.isActive) {
-                      window.scrollTo(0, 0);
-                      setScreen('familyOffice');
-                    }
+                    startFamilyOffice();
+                    window.scrollTo(0, 0);
+                    setScreen('game');
                   }}
                   className="btn-primary text-lg py-3"
                 >
@@ -263,15 +274,15 @@ function App() {
           <p className="text-text-secondary text-center mb-2">{holdcoName}</p>
           <p className="text-text-muted text-sm text-center mb-8 max-w-md">
             Your holding company has grown into a legacy institution.
-            Before seeing your final results, you can enter the Family Office — a 5-round endgame of
-            philanthropy, investments, and succession planning.
+            Before seeing your final results, you can enter the Family Office — 5 rounds of real holdco gameplay
+            using your accumulated wealth, earning up to a 1.5x multiplier on your Adjusted FEV.
           </p>
           <div className="flex flex-col gap-3 w-full max-w-xs">
             <button
               onClick={() => {
-                useGameStore.getState().startFamilyOffice();
+                startFamilyOffice();
                 window.scrollTo(0, 0);
-                setScreen('familyOffice');
+                setScreen('game');
               }}
               className="btn-primary text-lg py-3"
             >
@@ -324,8 +335,8 @@ function App() {
           onPlayAgain={handlePlayAgain}
         />
       )}
-      {screen === 'familyOffice' && (
-        <FamilyOfficeScreen onComplete={handleFamilyOfficeComplete} />
+      {screen === 'familyOfficeResults' && (
+        <FamilyOfficeScreen onComplete={handleFamilyOfficeResultsComplete} />
       )}
       {screen === 'scoreboard' && scoreboardParams && (
         <ScoreboardScreen

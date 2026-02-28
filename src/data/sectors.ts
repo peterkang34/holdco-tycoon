@@ -1,4 +1,4 @@
-import { SectorDefinition } from '../engine/types';
+import { SectorDefinition, SectorId } from '../engine/types';
 
 // All EBITDA values are in thousands (so 1500 = $1.5M, 15000 = $15M)
 // Scaled to realistic holdco acquisition targets ($1M-$10M+ EBITDA businesses)
@@ -490,8 +490,46 @@ export const SECTORS: Record<string, SectorDefinition> = {
     marginDriftRange: [-0.004, 0.000],
     marginVolatility: 0.01,
   },
+  proSports: {
+    id: 'proSports',
+    name: 'Pro Sports Franchises',
+    emoji: '🏟️',
+    color: '#D4AF37',
+    baseEbitda: [15000, 60000],
+    acquisitionMultiple: [15.0, 35.0],
+    volatility: 0.04,
+    capexRate: 0.20,
+    organicGrowthRange: [0.06, 0.15],
+    reinvestmentEfficiency: 0.7,
+    clientConcentration: 'low',
+    talentDependency: 'medium',
+    recessionSensitivity: 0.3,
+    sharedServicesBenefit: 0.5,
+    sectorFocusGroup: ['proSports'],
+    subTypes: [
+      'Premier Football Franchise',
+      'Elite Basketball Franchise',
+      'Baseball Franchise',
+      'Hockey / Arena Sports',
+      'Global Football Club',
+    ],
+    subTypeGroups: [0, 0, 1, 1, 0],
+    baseRevenue: [100000, 1200000],
+    baseMargin: [0.05, 0.18],
+    marginDriftRange: [-0.002, 0.003],
+    marginVolatility: 0.01,
+  },
 };
 
+/** Sectors exclusive to Family Office mode */
+export const FO_EXCLUSIVE_SECTORS: SectorId[] = ['proSports'];
+
+/** Standard sector list (excludes FO-exclusive sectors) */
+export const SECTOR_LIST_STANDARD = Object.values(SECTORS).filter(
+  s => !FO_EXCLUSIVE_SECTORS.includes(s.id)
+);
+
+/** Full sector list (includes FO-exclusive sectors) */
 export const SECTOR_LIST = Object.values(SECTORS);
 
 export function getSectorById(id: string): SectorDefinition | undefined {

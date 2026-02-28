@@ -74,12 +74,14 @@ import { generateRandomSeed, createRngStreams } from '../engine/rng';
 import { checkIPOEligibility, executeIPO as executeIPOEngine, processEarningsResult } from '../engine/ipo';
 import {
   checkFamilyOfficeEligibility,
-  initializeFamilyOffice,
-  advanceFamilyOfficeRound,
-  commitPhilanthropy,
-  makeInvestment,
-  applySuccessionChoice,
+  calculateFOLegacyScore,
 } from '../engine/familyOffice';
+import {
+  FO_PHILANTHROPY_RATE,
+  FO_DEAL_INFLATION,
+  FO_MA_SOURCING_TIER,
+  FO_MAX_ROUNDS,
+} from '../data/gameConfig';
 
 /** Recompute totalDebt from holdco loan + per-business bank debt */
 function computeTotalDebt(businesses: Business[], holdcoLoanBalance: number): number {
@@ -277,10 +279,7 @@ interface GameStore extends GameState {
 
   // Family Office (20-year mode endgame)
   startFamilyOffice: () => void;
-  familyOfficePhilanthropy: (amount: number) => void;
-  familyOfficeInvest: (type: string, amount: number) => void;
-  familyOfficeSuccession: (choice: import('../engine/types').FOSuccessionChoice) => void;
-  familyOfficeAdvanceRound: () => void;
+  completeFamilyOffice: () => void;
 
   // AI enhancement
   triggerAIEnhancement: () => Promise<void>;
@@ -369,6 +368,7 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   dealInflationState: { crisisResetRoundsRemaining: 0 },
   ipoState: null,
   familyOfficeState: null,
+  isFamilyOfficeMode: false,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -835,8 +835,10 @@ export const useGameStore = create<GameStore>()(
         // Create seeded RNG streams for this round's deal generation
         const roundStreams = createRngStreams(state.seed, state.round);
 
-        // Calculate deal inflation for 20yr mode
-        const dealInflationAdder = calculateDealInflation(state.round, state.duration, state.dealInflationState);
+        // Calculate deal inflation for 20yr mode (FO mode uses fixed inflation)
+        const dealInflationAdder = state.isFamilyOfficeMode
+          ? FO_DEAL_INFLATION
+          : calculateDealInflation(state.round, state.duration, state.dealInflationState);
 
         // Generate new deals with M&A focus, portfolio synergies, and affordability
         const newPipeline = generateDealPipeline(
@@ -856,6 +858,7 @@ export const useGameStore = create<GameStore>()(
           state.cash,
           state.ipoState ?? null,
           state.requiresRestructuring || state.covenantBreachRounds >= 1,
+          state.isFamilyOfficeMode ?? false,
         );
 
         // Inject distressed deals during Financial Crisis (bypass MAX_DEALS cap)
@@ -1026,9 +1029,9 @@ export const useGameStore = create<GameStore>()(
         };
         const newRoundHistory = [...(state.roundHistory ?? []), roundHistoryEntry];
 
-        // Process IPO earnings result (if public)
+        // Process IPO earnings result (if public) — skip in FO mode
         let updatedIPOState = state.ipoState;
-        if (state.ipoState?.isPublic) {
+        if (!state.isFamilyOfficeMode && state.ipoState?.isPublic) {
           const actualEbitda = updatedBusinesses
             .filter(b => b.status === 'active')
             .reduce((sum, b) => sum + b.ebitda, 0);
@@ -2042,6 +2045,7 @@ export const useGameStore = create<GameStore>()(
 
       issueEquity: (amount: number) => {
         const state = get();
+        if (state.isFamilyOfficeMode) return; // No equity raises in FO mode
         if (amount <= 0) return;
 
         // Guard: no normal equity raises during restructuring (use emergencyEquityRaise instead)
@@ -2114,6 +2118,7 @@ export const useGameStore = create<GameStore>()(
 
       buybackShares: (amount: number) => {
         const state = get();
+        if (state.isFamilyOfficeMode) return; // No buybacks in FO mode
         if (state.cash < amount) return;
 
         // Block buybacks when no active businesses — prevents sell-all-then-buyback FEV exploit
@@ -2166,6 +2171,7 @@ export const useGameStore = create<GameStore>()(
 
       distributeToOwners: (amount: number) => {
         const state = get();
+        if (state.isFamilyOfficeMode) return; // No distributions in FO mode
         if (state.cash < amount) return;
 
         // Enforce distress restrictions — covenant breach blocks distributions
@@ -3188,6 +3194,7 @@ export const useGameStore = create<GameStore>()(
 
       emergencyEquityRaise: (amount: number) => {
         const state = get();
+        if (state.isFamilyOfficeMode) return; // No emergency equity in FO mode
         const metrics = calculateMetrics(state);
         if (metrics.intrinsicValuePerShare <= 0) return;
 
@@ -3315,6 +3322,7 @@ export const useGameStore = create<GameStore>()(
 
       executeIPO: () => {
         const state = get();
+        if (state.isFamilyOfficeMode) return; // No IPO in FO mode
         const { eligible, reasons } = checkIPOEligibility(state);
         if (!eligible) {
           useToastStore.getState().addToast({ message: `Cannot IPO: ${reasons[0]}`, type: 'warning' });
@@ -3345,10 +3353,11 @@ export const useGameStore = create<GameStore>()(
         });
       },
 
-      // ── Family Office actions (20-year mode endgame) ──
+      // ── Family Office V2 actions (real holdco mechanics) ──
 
       startFamilyOffice: () => {
         const state = get();
+        if (state.isFamilyOfficeMode) return; // prevent double-invocation
         const score = calculateFinalScore(state);
         const { eligible, reasons } = checkFamilyOfficeEligibility(state, score);
         if (!eligible) {
@@ -3358,50 +3367,178 @@ export const useGameStore = create<GameStore>()(
           });
           return;
         }
-        set({ familyOfficeState: initializeFamilyOffice(state.founderDistributionsReceived) });
+
+        // 1. Snapshot all persisted fields
+        const partialState: Record<string, unknown> = {};
+        const partializeKeys = [
+          'holdcoName', 'round', 'phase', 'gameOver', 'difficulty', 'duration', 'maxRounds',
+          'businesses', 'exitedBusinesses', 'cash', 'totalDebt', 'interestRate',
+          'sharesOutstanding', 'founderShares', 'initialRaiseAmount', 'initialOwnershipPct',
+          'totalInvestedCapital', 'totalDistributions', 'totalBuybacks', 'totalExitProceeds',
+          'equityRaisesUsed', 'lastEquityRaiseRound', 'lastBuybackRound',
+          'sharedServices', 'dealPipeline', 'passedDealIds', 'maFocus', 'maSourcing',
+          'integratedPlatforms', 'turnaroundTier', 'activeTurnarounds',
+          'currentEvent', 'eventHistory', 'creditTighteningRoundsRemaining', 'inflationRoundsRemaining',
+          'metricsHistory', 'roundHistory', 'actionsThisRound',
+          'debtPaymentThisRound', 'cashBeforeDebtPayments',
+          'holdcoDebtStartRound', 'holdcoAmortizationThisRound',
+          'requiresRestructuring', 'covenantBreachRounds', 'hasRestructured', 'bankruptRound',
+          'exitMultiplePenalty', 'holdcoLoanBalance', 'holdcoLoanRate', 'holdcoLoanRoundsRemaining',
+          'acquisitionsThisRound', 'maxAcquisitionsPerRound', 'lastAcquisitionResult', 'lastIntegrationOutcome',
+          'founderDistributionsReceived', 'isChallenge', 'metrics', 'focusBonus',
+          'consolidationBoomSectorId', 'seed', 'dealInflationState', 'ipoState', 'familyOfficeState',
+          'isFamilyOfficeMode',
+        ];
+        for (const key of partializeKeys) {
+          partialState[key] = (state as any)[key];
+        }
+        const mainGameSnapshot = JSON.stringify(partialState);
+
+        // 2. Calculate FO cash (75% of distributions after 25% philanthropy)
+        const philanthropyDeduction = Math.round(state.founderDistributionsReceived * FO_PHILANTHROPY_RATE);
+        const foStartingCash = state.founderDistributionsReceived - philanthropyDeduction;
+
+        // 3. Reset state for FO play
+        resetBusinessIdCounter();
+        resetUsedNames();
+        const gameSeed = state.seed || generateRandomSeed();
+        const round1Streams = createRngStreams(gameSeed, 1);
+        const foInitialPipeline = generateDealPipeline(
+          [], 1, undefined, undefined, undefined, 0,
+          FO_MA_SOURCING_TIER, true, undefined, FO_MAX_ROUNDS,
+          false, round1Streams.deals, FO_DEAL_INFLATION, foStartingCash, null, false, true,
+        );
+
+        set({
+          // Core reset
+          businesses: [],
+          exitedBusinesses: [],
+          cash: foStartingCash,
+          totalDebt: 0,
+          holdcoLoanBalance: 0,
+          holdcoLoanRate: 0,
+          holdcoLoanRoundsRemaining: 0,
+          holdcoDebtStartRound: 0,
+          holdcoAmortizationThisRound: 0,
+          round: 1,
+          phase: 'collect' as GamePhase,
+          gameOver: false,
+          maxRounds: FO_MAX_ROUNDS,
+          isFamilyOfficeMode: true,
+          interestRate: STARTING_INTEREST_RATE,
+          sharesOutstanding: 1000,
+          founderShares: 1000,
+          initialRaiseAmount: foStartingCash,
+          initialOwnershipPct: 1.0,
+          totalInvestedCapital: 0,
+          totalDistributions: 0,
+          totalBuybacks: 0,
+          totalExitProceeds: 0,
+          equityRaisesUsed: 0,
+          lastEquityRaiseRound: 0,
+          lastBuybackRound: 0,
+          dealPipeline: foInitialPipeline,
+          passedDealIds: [],
+          maFocus: { sectorId: null, sizePreference: 'any' as DealSizePreference, subType: null },
+          maSourcing: { tier: FO_MA_SOURCING_TIER as MASourcingTier, active: true, unlockedRound: 0, lastUpgradeRound: 0 },
+          integratedPlatforms: [],
+          turnaroundTier: 0 as TurnaroundTier,
+          activeTurnarounds: [],
+          currentEvent: null,
+          eventHistory: [],
+          creditTighteningRoundsRemaining: 0,
+          inflationRoundsRemaining: 0,
+          metricsHistory: [],
+          roundHistory: [],
+          actionsThisRound: [],
+          debtPaymentThisRound: 0,
+          cashBeforeDebtPayments: foStartingCash,
+          requiresRestructuring: false,
+          covenantBreachRounds: 0,
+          hasRestructured: false,
+          bankruptRound: undefined,
+          exitMultiplePenalty: 0,
+          acquisitionsThisRound: 0,
+          maxAcquisitionsPerRound: 3,
+          lastAcquisitionResult: null,
+          lastIntegrationOutcome: null,
+          consolidationBoomSectorId: undefined,
+          dealInflationState: { crisisResetRoundsRemaining: 0 },
+          ipoState: null,
+          sharedServices: initializeSharedServices(),
+          founderDistributionsReceived: 0,
+          // FO state
+          familyOfficeState: {
+            isActive: true,
+            mainGameSnapshot,
+            foStartingCash,
+            philanthropyDeduction,
+          },
+          metrics: calculateMetrics({
+            ...initialState,
+            cash: foStartingCash,
+            businesses: [],
+            totalDebt: 0,
+            holdcoLoanBalance: 0,
+            sharesOutstanding: 1000,
+            founderShares: 1000,
+          } as GameState),
+          focusBonus: null,
+        });
+
         useToastStore.getState().addToast({
-          message: 'Welcome to the Family Office — your legacy begins',
+          message: `Family Office started — ${formatMoney(philanthropyDeduction)} committed to philanthropy`,
           type: 'success',
         });
       },
 
-      familyOfficePhilanthropy: (amount: number) => {
+      completeFamilyOffice: () => {
         const state = get();
-        if (!state.familyOfficeState?.isActive) return;
-        const updated = commitPhilanthropy(state.familyOfficeState, amount);
-        if (updated === state.familyOfficeState) return; // insufficient cash
-        set({ familyOfficeState: updated });
-      },
+        if (!state.isFamilyOfficeMode || !state.familyOfficeState?.isActive) return;
 
-      familyOfficeInvest: (type: string, amount: number) => {
-        const state = get();
-        if (!state.familyOfficeState?.isActive) return;
-        const updated = makeInvestment(state.familyOfficeState, type, amount);
-        if (updated === state.familyOfficeState) return; // insufficient cash
-        set({ familyOfficeState: updated });
-      },
+        // 1. Calculate FO FEV from current (FO) state
+        const foFEV = calculateFounderEquityValue(state);
+        const foStartingCash = state.familyOfficeState.foStartingCash;
+        const legacyScore = calculateFOLegacyScore(foFEV, foStartingCash);
+        const foMultiplier = legacyScore.foMultiplier;
 
-      familyOfficeSuccession: (choice) => {
-        const state = get();
-        if (!state.familyOfficeState?.isActive) return;
-        if (state.familyOfficeState.generationalSuccessionChoice) return; // already chosen — locked
-        const updated = applySuccessionChoice(state.familyOfficeState, choice);
-        set({ familyOfficeState: updated });
-        useToastStore.getState().addToast({
-          message: `Succession plan chosen: ${choice.replaceAll('_', ' ')}`,
-          type: 'info',
-        });
-      },
+        // 2. Restore main game state from snapshot
+        const snapshot = state.familyOfficeState.mainGameSnapshot;
+        if (!snapshot) return;
 
-      familyOfficeAdvanceRound: () => {
-        const state = get();
-        if (!state.familyOfficeState?.isActive) return;
-        const updated = advanceFamilyOfficeRound(state.familyOfficeState);
-        set({ familyOfficeState: updated });
-        if (updated.legacyScore) {
+        try {
+          const restored = JSON.parse(snapshot);
+
+          // 3. Merge restored state with FO results
+          set({
+            ...restored,
+            // Override FO state with results
+            familyOfficeState: {
+              isActive: false,
+              foStartingCash,
+              philanthropyDeduction: state.familyOfficeState.philanthropyDeduction,
+              foMultiplier,
+              legacyScore,
+              // Clear snapshot to save space
+            },
+            isFamilyOfficeMode: false,
+          });
+        } catch (e) {
+          console.error('Failed to restore main game state:', e);
+          // Fallback: just end FO mode with base multiplier, keep current state
+          set({
+            isFamilyOfficeMode: false,
+            familyOfficeState: {
+              isActive: false,
+              foStartingCash,
+              philanthropyDeduction: state.familyOfficeState.philanthropyDeduction,
+              foMultiplier: 1.0,
+              legacyScore,
+            },
+          });
           useToastStore.getState().addToast({
-            message: `Legacy Score: ${updated.legacyScore.total}/100 — ${updated.legacyScore.grade}`,
-            type: 'success',
+            message: 'Could not restore main game — FO multiplier applied to current state.',
+            type: 'warning',
           });
         }
       },
@@ -3751,6 +3888,7 @@ export const useGameStore = create<GameStore>()(
 
       unlockTurnaroundTier: () => {
         const state = get();
+        if (state.isFamilyOfficeMode) return; // No turnaround unlocks in FO mode
         if (state.phase !== 'allocate') return;
 
         const activeCount = state.businesses.filter(b => b.status === 'active').length;
@@ -3777,6 +3915,7 @@ export const useGameStore = create<GameStore>()(
 
       startTurnaroundProgram: (businessId: string, programId: string) => {
         const state = get();
+        if (state.isFamilyOfficeMode) return; // No turnarounds in FO mode
         if (state.phase !== 'allocate') return;
 
         const business = state.businesses.find(b => b.id === businessId && b.status === 'active');
@@ -4001,7 +4140,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v30', // v30: Family Office cash pool (uses personal wealth instead of holdco cash)
+      name: 'holdco-tycoon-save-v31', // v31: Family Office V2 — real holdco mechanics, Pro Sports sector
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -4066,6 +4205,7 @@ export const useGameStore = create<GameStore>()(
         dealInflationState: state.dealInflationState,
         ipoState: state.ipoState,
         familyOfficeState: state.familyOfficeState,
+        isFamilyOfficeMode: state.isFamilyOfficeMode,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.holdcoName) {
@@ -4083,6 +4223,8 @@ export const useGameStore = create<GameStore>()(
                 (state.totalDistributions || 0) * (state.founderShares / (state.sharesOutstanding || 1))
               );
             }
+            // Backfill isFamilyOfficeMode
+            if ((state as any).isFamilyOfficeMode === undefined) (state as any).isFamilyOfficeMode = false;
             // Backfill integratedPlatforms
             if (!(state as any).integratedPlatforms) (state as any).integratedPlatforms = [];
             // Backfill turnaround fields
@@ -4124,10 +4266,6 @@ export const useGameStore = create<GameStore>()(
             }
             if ((state as any).ipoState === undefined) (state as any).ipoState = null;
             if ((state as any).familyOfficeState === undefined) (state as any).familyOfficeState = null;
-            // Backfill familyOfficeCash for pre-v30 FO saves
-            if (state.familyOfficeState && (state.familyOfficeState as any).familyOfficeCash === undefined) {
-              (state.familyOfficeState as any).familyOfficeCash = (state as any).founderDistributionsReceived ?? 0;
-            }
             // Restore business ID counter to avoid collisions after save/load
             if (Array.isArray(state.businesses)) {
               restoreBusinessIdCounter(state.businesses);

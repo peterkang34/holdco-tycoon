@@ -12,21 +12,24 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 28, 2026',
-    title: 'Family Office Overhaul',
+    title: 'Family Office V2 — Real Holdco Mechanics',
     sections: [
       {
-        heading: 'Bug Fixes',
+        heading: 'New Features',
         items: [
-          'Family Office now uses your personal wealth (cumulative distributions) instead of holdco operating cash — buttons actually work now.',
-          'Family Office intercepts before the Game Over screen as a dedicated bridge, not buried inside results.',
-          'Fixed duplicate leaderboard entries when submitting before and after Family Office.',
+          'Family Office completely overhauled — now plays 5 rounds of real holdco gameplay (same deals, improvements, M&A) using your accumulated personal wealth.',
+          'New Pro Sports Franchises sector exclusive to Family Office mode — trophy assets with the highest multiples in the game (15-35x) but the lowest margins (5-18%).',
+          '25% philanthropy deduction taken upfront before FO play begins.',
+          'FO performance earns a 1.0-1.5x multiplier on your main game Adjusted FEV for the leaderboard.',
+          'Capital tab hidden during FO mode — distributions, buybacks, equity raises, IPO, and turnarounds are not available.',
         ],
       },
       {
         heading: 'Quality of Life',
         items: [
-          'Added #/fo-test shortcut URL for quick Family Office testing.',
-          'Mid-game Family Office saves now resume properly on page reload.',
+          'FO deals maintain consistent late-game pricing across all 5 rounds.',
+          'FO results screen shows MOIC, multiplier earned, and legacy grade before continuing to final results.',
+          'Mid-FO saves resume properly on page reload.',
         ],
       },
     ],

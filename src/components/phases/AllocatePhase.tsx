@@ -120,6 +120,7 @@ interface AllocatePhaseProps {
   ipoState?: IPOState | null;
   onExecuteIPO?: () => void;
   onDeclineIPO?: () => void;
+  isFamilyOfficeMode?: boolean;
 }
 
 type AllocateTab = 'portfolio' | 'deals' | 'shared_services' | 'capital';
@@ -191,6 +192,7 @@ export function AllocatePhase({
   ipoState,
   onExecuteIPO,
   onDeclineIPO,
+  isFamilyOfficeMode = false,
 }: AllocatePhaseProps) {
   const isMobile = useIsMobile();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -511,7 +513,8 @@ export function AllocatePhase({
     { id: 'portfolio', label: 'Portfolio', badge: activeBusinesses.length },
     { id: 'deals', label: 'Deals', badge: dealPipeline.length },
     { id: 'shared_services', label: 'Shared Services' },
-    { id: 'capital', label: 'Capital' },
+    // Hide Capital tab in FO mode (distributions, buybacks, equity, IPO are all blocked)
+    ...(!isFamilyOfficeMode ? [{ id: 'capital' as AllocateTab, label: 'Capital' }] : []),
   ];
 
   const renderDealStructuring = () => {

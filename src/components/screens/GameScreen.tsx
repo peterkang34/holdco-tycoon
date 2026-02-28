@@ -170,6 +170,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     ipoState,
     executeIPO,
     declineIPO,
+    isFamilyOfficeMode,
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;
@@ -841,6 +842,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             ipoState={ipoState}
             onExecuteIPO={executeIPO}
             onDeclineIPO={declineIPO}
+            isFamilyOfficeMode={isFamilyOfficeMode}
           />
         );
       default:
@@ -883,9 +885,15 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       <div className="bg-bg-card border-b border-white/10 px-3 sm:px-4 py-2 sm:py-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <span className="text-xl sm:text-2xl">🏛️</span>
-            <h1 className="text-base sm:text-xl font-bold truncate max-w-[120px] sm:max-w-none">{holdcoName}</h1>
-            {difficulty && (
+            <span className="text-xl sm:text-2xl">{isFamilyOfficeMode ? '🦅' : '🏛️'}</span>
+            <h1 className="text-base sm:text-xl font-bold truncate max-w-[120px] sm:max-w-none">
+              {isFamilyOfficeMode ? `${holdcoName} Family Office` : holdcoName}
+            </h1>
+            {isFamilyOfficeMode ? (
+              <span className="text-xs px-1.5 sm:px-2 py-0.5 rounded whitespace-nowrap bg-amber-500/20 text-amber-400">
+                FO {round}/{maxRounds}
+              </span>
+            ) : difficulty && (
               <span className={`text-xs px-1.5 sm:px-2 py-0.5 rounded whitespace-nowrap ${difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
                 {difficulty === 'normal' ? 'H' : 'E'}{maxRounds && maxRounds < 20 ? `/${maxRounds}` : ''}
               </span>

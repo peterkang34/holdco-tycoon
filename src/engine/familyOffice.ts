@@ -1,13 +1,12 @@
 /**
- * Family Office Endgame engine — 20-year mode only.
- * Post-game 5-round mini-game for players with $1B+ distributions.
- * New mechanics: reputation, philanthropy, succession, legacy scoring.
+ * Family Office V2 engine — 20-year mode only.
+ * Post-game 5-round holdco gameplay using real game mechanics.
+ * Player uses accumulated distributions to build a new portfolio,
+ * earning a 1.0-1.5x multiplier on their main-game Adjusted FEV.
  */
 
 import type {
   GameState,
-  FamilyOfficeState,
-  FOSuccessionChoice,
   LegacyScore,
   ScoreBreakdown,
 } from './types';
@@ -16,8 +15,8 @@ import {
   FAMILY_OFFICE_MIN_COMPOSITE_GRADE,
   FAMILY_OFFICE_MIN_Q4_BUSINESSES,
   FAMILY_OFFICE_MIN_LONG_HELD,
-  FAMILY_OFFICE_ROUNDS,
-  FAMILY_OFFICE_SUCCESSION_ROUND,
+  FO_MULTIPLIER_CAP,
+  FO_MULTIPLIER_MOIC_SCALE,
 } from '../data/gameConfig';
 
 const PASSING_GRADES = ['S', 'A', 'B'];
@@ -62,200 +61,34 @@ export function checkFamilyOfficeEligibility(
 }
 
 /**
- * Initialize the Family Office state for the 5-round mini-game.
- * @param personalWealth — founder's cumulative distributions, used as the FO cash pool
+ * Calculate the FO multiplier from MOIC.
+ * Formula: 1.0 + min(0.50, max(0, MOIC) × 0.10)
  */
-export function initializeFamilyOffice(personalWealth: number): FamilyOfficeState {
-  return {
-    isActive: true,
-    foRound: 1,
-    reputation: 50, // starts at neutral
-    familyOfficeCash: personalWealth,
-    philanthropyCommitted: 0,
-    investments: [],
-    irrevocableCommitments: [],
-  };
+export function calculateFOMultiplier(foFEV: number, foStartingCash: number): number {
+  if (foStartingCash <= 0) return 1.0;
+  const moic = foFEV / foStartingCash;
+  return Math.min(1.0 + FO_MULTIPLIER_CAP, 1.0 + Math.max(0, moic) * FO_MULTIPLIER_MOIC_SCALE);
 }
 
 /**
- * Process a Family Office round — advance to the next round.
+ * Calculate the FO legacy score from ending FEV and starting cash.
  */
-export function advanceFamilyOfficeRound(
-  foState: FamilyOfficeState,
-): FamilyOfficeState {
-  if (foState.legacyScore) return foState; // already complete
-  // Block advancement past succession round without a choice
-  if (foState.foRound === FAMILY_OFFICE_SUCCESSION_ROUND && !foState.generationalSuccessionChoice) {
-    return foState;
-  }
-  if (foState.foRound >= FAMILY_OFFICE_ROUNDS) {
-    // Final round — compute legacy score
-    return {
-      ...foState,
-      legacyScore: calculateLegacyScore(foState),
-    };
-  }
-
-  return {
-    ...foState,
-    foRound: foState.foRound + 1,
-  };
-}
-
-/**
- * Preview reputation gain for a philanthropy amount.
- */
-export function philanthropyRepGain(amount: number): number {
-  return Math.round(amount / 5000);
-}
-
-/**
- * Make a philanthropy commitment (irrevocable).
- * Deducts from the FO's own cash pool.
- */
-export function commitPhilanthropy(
-  foState: FamilyOfficeState,
-  amount: number,
-): FamilyOfficeState {
-  if (amount <= 0) return foState;
-  if (foState.familyOfficeCash < amount) return foState;
-  return {
-    ...foState,
-    familyOfficeCash: foState.familyOfficeCash - amount,
-    philanthropyCommitted: foState.philanthropyCommitted + amount,
-    reputation: Math.min(100, foState.reputation + philanthropyRepGain(amount)),
-    irrevocableCommitments: [
-      ...foState.irrevocableCommitments,
-      { type: 'philanthropy', amount, round: foState.foRound, irrevocable: true },
-    ],
-  };
-}
-
-/**
- * Make an investment allocation.
- * Deducts from the FO's own cash pool.
- */
-export function makeInvestment(
-  foState: FamilyOfficeState,
-  type: string,
-  amount: number,
-): FamilyOfficeState {
-  if (amount <= 0) return foState;
-  if (foState.familyOfficeCash < amount) return foState;
-  return {
-    ...foState,
-    familyOfficeCash: foState.familyOfficeCash - amount,
-    investments: [
-      ...foState.investments,
-      { type, amount, round: foState.foRound },
-    ],
-  };
-}
-
-/**
- * Get succession choices available at round 3.
- */
-export function getSuccessionChoices(): {
-  choice: FOSuccessionChoice;
-  label: string;
-  description: string;
-  riskDescription: string;
-}[] {
-  return [
-    {
-      choice: 'heir_apparent',
-      label: 'Heir Apparent',
-      description: 'Groom your eldest to take the reins.',
-      riskDescription: '40% chance of competence shortfall — reputation -20 if it happens.',
-    },
-    {
-      choice: 'professional_ceo',
-      label: 'Professional CEO',
-      description: 'Hire external professional management.',
-      riskDescription: '5% FCF ongoing cost, 15% cultural drift risk — reputation -10 if drift occurs.',
-    },
-    {
-      choice: 'family_council',
-      label: 'Family Council',
-      description: 'Establish a family governance council.',
-      riskDescription: 'Governance friction slows decisions, 25% family dispute risk — reputation -15 if dispute.',
-    },
-  ];
-}
-
-/**
- * Apply the generational succession choice.
- */
-export function applySuccessionChoice(
-  foState: FamilyOfficeState,
-  choice: FOSuccessionChoice,
-): FamilyOfficeState {
-  return {
-    ...foState,
-    generationalSuccessionChoice: choice,
-    // Reputation adjustments applied in legacy scoring
-  };
-}
-
-/**
- * Is this the succession round?
- */
-export function isSuccessionRound(foState: FamilyOfficeState): boolean {
-  return foState.foRound === FAMILY_OFFICE_SUCCESSION_ROUND;
-}
-
-/**
- * Is the Family Office mini-game complete?
- */
-export function isFamilyOfficeComplete(foState: FamilyOfficeState): boolean {
-  return foState.foRound >= FAMILY_OFFICE_ROUNDS && foState.legacyScore !== undefined;
-}
-
-/**
- * Calculate the final Legacy Score (5 components, 20% each).
- */
-export function calculateLegacyScore(foState: FamilyOfficeState): LegacyScore {
-  // 1. Wealth Preservation (20%) — based on investment diversification
-  const investmentCount = foState.investments.length;
-  const uniqueTypes = new Set(foState.investments.map(i => i.type)).size;
-  const wealthPreservation = Math.min(20, investmentCount * 3 + uniqueTypes * 5);
-
-  // 2. Reputation (20%) — direct from reputation score
-  const reputationScore = Math.min(20, Math.round(foState.reputation / 5));
-
-  // 3. Philanthropy (20%) — based on total committed
-  const philanthropyScore = Math.min(20, Math.round(foState.philanthropyCommitted / 25000));
-
-  // 4. Succession Quality (20%) — based on choice and execution
-  let successionQuality = 10; // baseline
-  if (foState.generationalSuccessionChoice === 'professional_ceo') {
-    successionQuality = 16; // safest choice
-  } else if (foState.generationalSuccessionChoice === 'family_council') {
-    successionQuality = 14; // moderate
-  } else if (foState.generationalSuccessionChoice === 'heir_apparent') {
-    successionQuality = 12; // riskiest but highest upside
-  }
-
-  // 5. Permanent Hold Performance (20%) — based on commitment count
-  const commitmentCount = foState.irrevocableCommitments.length;
-  const permanentHoldPerformance = Math.min(20, commitmentCount * 4 + 8);
-
-  const total = wealthPreservation + reputationScore + philanthropyScore +
-    successionQuality + permanentHoldPerformance;
+export function calculateFOLegacyScore(foFEV: number, foStartingCash: number): LegacyScore {
+  const moic = foStartingCash > 0 ? foFEV / foStartingCash : 0;
+  const multiplier = calculateFOMultiplier(foFEV, foStartingCash);
 
   let grade: LegacyScore['grade'];
-  if (total >= 80) grade = 'Enduring';
-  else if (total >= 60) grade = 'Influential';
-  else if (total >= 40) grade = 'Established';
+  if (moic >= 3.5) grade = 'Enduring';
+  else if (moic >= 2.0) grade = 'Influential';
+  else if (moic >= 1.0) grade = 'Established';
   else grade = 'Fragile';
 
   return {
-    total,
+    total: Math.round(moic * 100),
     grade,
-    wealthPreservation,
-    reputationScore,
-    philanthropyScore,
-    successionQuality,
-    permanentHoldPerformance,
+    foFEV,
+    foStartingCash,
+    foMOIC: moic,
+    foMultiplier: multiplier,
   };
 }

@@ -336,7 +336,8 @@ export function GameOverScreen({
   );
   const difficultyMultiplier = DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0;
   const restructuringMultiplier = hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0;
-  const adjustedFEV = Math.round(founderEquityValue * difficultyMultiplier * restructuringMultiplier);
+  const foMultiplier = familyOfficeState?.foMultiplier ?? 1.0;
+  const adjustedFEV = Math.round(founderEquityValue * difficultyMultiplier * restructuringMultiplier * foMultiplier);
   const canMakeLeaderboard = wouldMakeLeaderboardFromList(leaderboard, adjustedFEV);
   const potentialRank = getLeaderboardRankFromList(leaderboard, adjustedFEV);
 
@@ -420,6 +421,7 @@ export function GameOverScreen({
           submittedMultiplier: difficultyMultiplier,
           familyOfficeCompleted: !!familyOfficeState?.legacyScore,
           legacyGrade: familyOfficeState?.legacyScore?.grade,
+          foMultiplier: foMultiplier > 1.0 ? foMultiplier : undefined,
         }
       );
 
@@ -438,6 +440,7 @@ export function GameOverScreen({
         submittedMultiplier: difficultyMultiplier,
         familyOfficeCompleted: !!familyOfficeState?.legacyScore,
         legacyGrade: familyOfficeState?.legacyScore?.grade,
+        foMultiplier: foMultiplier > 1.0 ? foMultiplier : undefined,
       };
       setLeaderboard(prev => {
         // Avoid duplicates if the entry is somehow already present
@@ -572,7 +575,20 @@ export function GameOverScreen({
           <div className="text-center">
             <span className="text-3xl block mb-1">🦅</span>
             <p className="font-bold text-lg">{familyOfficeState.legacyScore.grade} Legacy</p>
-            <p className="text-sm text-text-muted">{familyOfficeState.legacyScore.total}/100 Legacy Score</p>
+            <div className="grid grid-cols-3 gap-4 mt-3 text-center">
+              <div>
+                <p className="text-xs text-text-muted">Starting Capital</p>
+                <p className="font-mono text-sm">{formatMoney(familyOfficeState.legacyScore.foStartingCash)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-muted">MOIC</p>
+                <p className="font-mono text-sm font-bold">{familyOfficeState.legacyScore.foMOIC.toFixed(2)}x</p>
+              </div>
+              <div>
+                <p className="text-xs text-text-muted">FEV Multiplier</p>
+                <p className="font-mono text-sm font-bold text-amber-400">{familyOfficeState.legacyScore.foMultiplier.toFixed(2)}x</p>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -677,7 +693,13 @@ export function GameOverScreen({
               {hasRestructured && (
                 <div className="flex justify-between text-sm">
                   <span className="text-red-400">x Restructuring (-20%)</span>
-                  <span className="font-mono text-red-400">-{formatMoney(Math.round(founderEquityValue * difficultyMultiplier) - adjustedFEV)}</span>
+                  <span className="font-mono text-red-400">-{formatMoney(Math.round(founderEquityValue * difficultyMultiplier) - Math.round(founderEquityValue * difficultyMultiplier * restructuringMultiplier))}</span>
+                </div>
+              )}
+              {foMultiplier > 1.0 && (
+                <div className="flex justify-between text-sm">
+                  <span className="text-amber-400">x FO Multiplier ({foMultiplier.toFixed(2)}x)</span>
+                  <span className="font-mono text-amber-400">{formatMoney(Math.round(founderEquityValue * difficultyMultiplier * restructuringMultiplier * foMultiplier))}</span>
                 </div>
               )}
               <div className="border-t border-white/10 pt-2 flex justify-between text-sm font-bold">

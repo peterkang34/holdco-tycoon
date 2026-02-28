@@ -682,6 +682,61 @@ function migrateV29ToV30(): void {
 }
 
 /**
+ * v30→v31: Family Office V2 — real holdco mechanics replace slider mini-game.
+ * Migrate old FamilyOfficeState format to new format. Add isFamilyOfficeMode default.
+ */
+function migrateV30ToV31(): void {
+  const v30Key = 'holdco-tycoon-save-v30';
+  const v31Key = 'holdco-tycoon-save-v31';
+  if (localStorage.getItem(v31Key)) return;
+  try {
+    const raw = localStorage.getItem(v30Key);
+    if (!raw) return;
+    const v30Data = JSON.parse(raw);
+
+    // Add isFamilyOfficeMode default
+    if (v30Data.state?.isFamilyOfficeMode === undefined) {
+      v30Data.state.isFamilyOfficeMode = false;
+    }
+
+    // Migrate old FamilyOfficeState to new format
+    if (v30Data.state?.familyOfficeState) {
+      const oldFO = v30Data.state.familyOfficeState;
+
+      // Detect old-format FO state (has investments array or foRound or familyOfficeCash)
+      if (oldFO.investments || oldFO.foRound !== undefined || oldFO.familyOfficeCash !== undefined) {
+        // Old format completed (has investments) → preserve as completed with no bonus
+        if (Array.isArray(oldFO.investments) && oldFO.investments.length > 0) {
+          v30Data.state.familyOfficeState = {
+            isActive: false,
+            foStartingCash: 0,
+            philanthropyDeduction: 0,
+            foMultiplier: 1.0, // No bonus for old-format games
+            legacyScore: {
+              total: 0,
+              grade: 'Fragile',
+              foFEV: 0,
+              foStartingCash: 0,
+              foMOIC: 0,
+              foMultiplier: 1.0,
+            },
+          };
+        } else {
+          // Old format mid-game or unstarted → reset
+          v30Data.state.familyOfficeState = null;
+        }
+      }
+      // New format already — leave as-is
+    }
+
+    localStorage.setItem(v31Key, JSON.stringify(v30Data));
+    localStorage.removeItem(v30Key);
+  } catch (e) {
+    console.error('v30→v31 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -707,4 +762,5 @@ export function runAllMigrations(): void {
   migrateV27ToV28();
   migrateV28ToV29();
   migrateV29ToV30();
+  migrateV30ToV31();
 }

@@ -14,7 +14,7 @@ import { calculatePublicCompanyBonus } from './ipo';
 const LEADERBOARD_KEY = 'holdco-tycoon-leaderboard';
 const MAX_LEADERBOARD_ENTRIES = 10;
 
-/** Compute adjusted FEV for a leaderboard entry (applies difficulty multiplier + restructuring penalty) */
+/** Compute adjusted FEV for a leaderboard entry (applies difficulty multiplier + restructuring penalty + FO multiplier) */
 function getAdjustedFEV(entry: LeaderboardEntry): number {
   const raw = entry.founderEquityValue ?? entry.enterpriseValue;
   const difficulty = entry.difficulty ?? 'easy';
@@ -22,7 +22,8 @@ function getAdjustedFEV(entry: LeaderboardEntry): number {
   const multiplier = entry.submittedMultiplier
     ?? (difficulty === 'easy' ? 1.0 : 1.35);
   const restructuringPenalty = entry.hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0;
-  return Math.round(raw * multiplier * restructuringPenalty);
+  const foMultiplier = entry.foMultiplier ?? 1.0;
+  return Math.round(raw * multiplier * restructuringPenalty * foMultiplier);
 }
 
 /**
@@ -605,7 +606,7 @@ export async function loadLeaderboard(): Promise<LeaderboardEntry[]> {
  */
 export async function saveToLeaderboard(
   entry: Omit<LeaderboardEntry, 'id' | 'date'>,
-  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number; hasRestructured?: boolean; submittedMultiplier?: number; familyOfficeCompleted?: boolean; legacyGrade?: string }
+  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number; hasRestructured?: boolean; submittedMultiplier?: number; familyOfficeCompleted?: boolean; legacyGrade?: string; foMultiplier?: number }
 ): Promise<LeaderboardEntry> {
   const newEntry: LeaderboardEntry = {
     ...entry,
@@ -636,6 +637,7 @@ export async function saveToLeaderboard(
     ...(extra?.submittedMultiplier != null ? { submittedMultiplier: extra.submittedMultiplier } : {}),
     ...(extra?.familyOfficeCompleted ? { familyOfficeCompleted: extra.familyOfficeCompleted } : {}),
     ...(extra?.legacyGrade ? { legacyGrade: extra.legacyGrade } : {}),
+    ...(extra?.foMultiplier != null ? { foMultiplier: extra.foMultiplier } : {}),
   };
   saveToLocalLeaderboard(localEntry);
   return newEntry;

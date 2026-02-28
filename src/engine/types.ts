@@ -15,7 +15,8 @@ export type SectorId =
   | 'autoServices'
   | 'distribution'
   | 'wealthManagement'
-  | 'environmental';
+  | 'environmental'
+  | 'proSports';
 
 export type SectorFocusGroup = SectorId;
 
@@ -450,41 +451,22 @@ export interface IPOState {
 
 // ── 20-Year Mode: Family Office Endgame ──
 
-export type FOSuccessionChoice = 'heir_apparent' | 'professional_ceo' | 'family_council';
-
-export interface FOInvestment {
-  type: string;
-  amount: number;
-  round: number;
-}
-
-export interface FOCommitment {
-  type: string;
-  amount: number;
-  round: number;
-  irrevocable: boolean;
-}
-
 export interface LegacyScore {
-  total: number;
+  total: number;           // MOIC as percentage (e.g., 250 for 2.5x MOIC)
   grade: 'Enduring' | 'Influential' | 'Established' | 'Fragile';
-  wealthPreservation: number;
-  reputationScore: number;
-  philanthropyScore: number;
-  successionQuality: number;
-  permanentHoldPerformance: number;
+  foFEV: number;           // FO ending Founder Equity Value
+  foStartingCash: number;  // for display
+  foMOIC: number;          // multiple on invested capital
+  foMultiplier: number;    // the multiplier applied (1.0-1.5)
 }
 
 export interface FamilyOfficeState {
   isActive: boolean;
-  foRound: number;                // 1-5
-  reputation: number;             // 0-100
-  familyOfficeCash: number;       // personal wealth pool for FO allocations
-  philanthropyCommitted: number;
-  investments: FOInvestment[];
-  irrevocableCommitments: FOCommitment[];
-  generationalSuccessionChoice?: FOSuccessionChoice;
-  legacyScore?: LegacyScore;
+  mainGameSnapshot?: string;      // serialized pre-FO GameState (cleared after FO ends)
+  foStartingCash: number;         // post-philanthropy cash for MOIC calc
+  philanthropyDeduction: number;  // 25% deducted
+  foMultiplier?: number;          // 1.0-1.5 calculated at FO end
+  legacyScore?: LegacyScore;      // kept for display (grade, MOIC, etc.)
 }
 
 export interface GameState {
@@ -588,6 +570,9 @@ export interface GameState {
   // Challenge mode
   isChallenge: boolean; // true when game started from a challenge URL
 
+  // Family Office mode (reuses GameScreen with holdco mechanics)
+  isFamilyOfficeMode?: boolean;
+
   // 20-Year Mode features
   dealInflationState: DealInflationState;
   ipoState: IPOState | null;
@@ -667,6 +652,7 @@ export interface LeaderboardEntry {
   submittedMultiplier?: number;
   familyOfficeCompleted?: boolean;
   legacyGrade?: string; // 'Enduring' | 'Influential' | 'Established' | 'Fragile'
+  foMultiplier?: number; // 1.0-1.5 (FO performance bonus on Adjusted FEV)
 }
 
 // Utility types

@@ -324,7 +324,16 @@ export const FAMILY_OFFICE_MIN_COMPOSITE_GRADE = 'B';
 export const FAMILY_OFFICE_MIN_Q4_BUSINESSES = 3;
 export const FAMILY_OFFICE_MIN_LONG_HELD = 2;
 export const FAMILY_OFFICE_ROUNDS = 5;
-export const FAMILY_OFFICE_SUCCESSION_ROUND = 3;
+export const FAMILY_OFFICE_SUCCESSION_ROUND = 3; // kept for migration compat
+
+// FO V2 — Real holdco mechanics
+export const FO_PHILANTHROPY_RATE = 0.25;
+export const FO_MULTIPLIER_CAP = 0.50;
+export const FO_MULTIPLIER_MOIC_SCALE = 0.10;
+export const FO_DEAL_INFLATION = 2.5;
+export const FO_MA_SOURCING_TIER = 1;
+export const FO_MAX_ROUNDS = 5;
+export const FO_QUALITY_FLOOR = 3;
 
 // ── Mode Selection Copy ──
 

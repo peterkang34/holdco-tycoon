@@ -32,9 +32,10 @@ import {
   DEAL_INFLATION_CRISIS_RESET,
   DEAL_SIZE_TIERS,
   TIER_PIPELINE_COUNTS,
+  FO_QUALITY_FLOOR,
 } from '../data/gameConfig';
 import type { DealInflationState, GameDuration, IPOState } from './types';
-import { SECTORS, SECTOR_LIST } from '../data/sectors';
+import { SECTORS, SECTOR_LIST, SECTOR_LIST_STANDARD } from '../data/sectors';
 import { getRandomBusinessName } from '../data/names';
 import { calculateSizeTierPremium } from './buyers';
 import {
@@ -1028,6 +1029,7 @@ export function generateDealPipeline(
   cash: number = 0,
   ipoState: IPOState | null = null,
   noNewDebt: boolean = false,
+  isFamilyOfficeMode: boolean = false,
 ): Deal[] {
   // Age existing deals first
   let pipeline = currentPipeline.map(deal => ({
@@ -1043,7 +1045,9 @@ export function generateDealPipeline(
 
   // Track sectors already in pipeline to ensure variety
   const sectorsInPipeline = new Set(pipeline.map(d => d.business.sectorId));
-  const allSectorIds = SECTOR_LIST.map(s => s.id);
+  // FO mode includes proSports; normal mode excludes FO-exclusive sectors
+  const sectorList = isFamilyOfficeMode ? SECTOR_LIST : SECTOR_LIST_STANDARD;
+  const allSectorIds = sectorList.map(s => s.id);
 
   // Compute affordability and tier weights
   const affordResult = rng
@@ -1211,6 +1215,22 @@ export function generateDealPipeline(
   }
   if (toRemove.size > 0) {
     pipeline = pipeline.filter((_, i) => !toRemove.has(i));
+  }
+
+  // FO mode: clamp quality floor (Family Office gets premium deal quality)
+  if (isFamilyOfficeMode) {
+    pipeline = pipeline.map(deal => {
+      if (deal.business.qualityRating < FO_QUALITY_FLOOR) {
+        return {
+          ...deal,
+          business: {
+            ...deal.business,
+            qualityRating: FO_QUALITY_FLOOR as QualityRating,
+          },
+        };
+      }
+      return deal;
+    });
   }
 
   return pipeline;
