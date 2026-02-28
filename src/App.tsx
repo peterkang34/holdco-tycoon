@@ -10,7 +10,6 @@ import { SectorId, GameDifficulty, GameDuration, formatMoney } from './engine/ty
 import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, replaceUrlWithChallenge, type ChallengeParams, type PlayerResult } from './utils/challenge';
 import { checkFamilyOfficeEligibility } from './engine/familyOffice';
 import { calculateFinalScore } from './engine/scoring';
-import { FAMILY_OFFICE_MIN_DISTRIBUTIONS } from './data/gameConfig';
 import { trackPageView } from './services/telemetry';
 
 type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard';
@@ -36,6 +35,7 @@ function App() {
   const [challengeData, setChallengeData] = useState<ChallengeParams | null>(null);
   const [incomingResult, setIncomingResult] = useState<PlayerResult | null>(null);
   const [scoreboardParams, setScoreboardParams] = useState<ChallengeParams | null>(null);
+  const [foTestAmount, setFoTestAmount] = useState(2000000); // $2B default
 
   const {
     holdcoName,
@@ -216,26 +216,44 @@ function App() {
             <p className="text-text-secondary text-center mb-2">
               Founder Distributions: {formatMoney(founderDistributionsReceived)}
             </p>
-            <p className="text-text-muted text-sm text-center mb-8">
-              {founderDistributionsReceived >= FAMILY_OFFICE_MIN_DISTRIBUTIONS
-                ? 'Eligible — your distributions meet the $1B threshold.'
-                : 'Test mode — will inject $2B mock distributions and start FO.'}
-            </p>
             {isFamilyOfficeMode ? (
-              <button
-                onClick={() => { window.scrollTo(0, 0); setScreen('game'); }}
-                className="btn-primary text-lg py-3 px-8"
-              >
-                Resume Family Office Game
-              </button>
+              <>
+                <p className="text-text-muted text-sm text-center mb-8">
+                  FO game in progress.
+                </p>
+                <button
+                  onClick={() => { window.scrollTo(0, 0); setScreen('game'); }}
+                  className="btn-primary text-lg py-3 px-8"
+                >
+                  Resume Family Office Game
+                </button>
+              </>
             ) : (
               <div className="flex flex-col gap-3 w-full max-w-xs">
+                <p className="text-text-muted text-sm text-center mb-4">
+                  Select injection amount (pre-philanthropy):
+                </p>
+                <div className="grid grid-cols-4 gap-2 mb-4">
+                  {([2000000, 5000000, 10000000, 20000000] as const).map(amount => (
+                    <button
+                      key={amount}
+                      onClick={() => setFoTestAmount(amount)}
+                      className={`py-2 px-1 rounded text-sm font-medium transition-colors ${
+                        foTestAmount === amount
+                          ? 'bg-accent-primary text-white'
+                          : 'bg-white/10 text-text-secondary hover:bg-white/15'
+                      }`}
+                    >
+                      ${amount / 1000000}B
+                    </button>
+                  ))}
+                </div>
+                <p className="text-text-muted text-xs text-center mb-2">
+                  After 25% philanthropy: {formatMoney(foTestAmount * 0.75)} starting cash
+                </p>
                 <button
                   onClick={() => {
-                    if (founderDistributionsReceived < FAMILY_OFFICE_MIN_DISTRIBUTIONS) {
-                      // Test mode: inject mock distributions so startFamilyOffice has capital
-                      useGameStore.setState({ founderDistributionsReceived: 2000000 });
-                    }
+                    useGameStore.setState({ founderDistributionsReceived: foTestAmount });
                     startFamilyOffice(true); // force=true bypasses eligibility for testing
                     window.scrollTo(0, 0);
                     setScreen('game');
