@@ -65,6 +65,7 @@ export function FeedbackTab({ token }: { token: string }) {
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState<'all' | FeedbackType>('all');
   const [statusFilter, setStatusFilter] = useState<'all' | FeedbackStatus>('all');
+  const [viewTab, setViewTab] = useState<'active' | 'resolved'>('active');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
   // Ref to avoid stale closure in updateEntry
@@ -156,11 +157,17 @@ export function FeedbackTab({ token }: { token: string }) {
     }
   }, [token]);
 
+  const RESOLVED_STATUSES: FeedbackStatus[] = ['done', 'deployed'];
+
   // Sort: unresolved first, bugs before features, newest within same status
   const sortedEntries = useMemo(() => {
     if (!feedbackData) return [];
     return [...feedbackData.entries]
       .filter(e => {
+        // Active/Resolved tab split
+        const isResolved = RESOLVED_STATUSES.includes(e.status);
+        if (viewTab === 'active' && isResolved) return false;
+        if (viewTab === 'resolved' && !isResolved) return false;
         if (typeFilter !== 'all' && e.type !== typeFilter) return false;
         if (statusFilter !== 'all' && e.status !== statusFilter) return false;
         return true;
@@ -181,7 +188,7 @@ export function FeedbackTab({ token }: { token: string }) {
         // Newest first
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       });
-  }, [feedbackData, typeFilter, statusFilter]);
+  }, [feedbackData, typeFilter, statusFilter, viewTab]);
 
   if (loading) {
     return <div className="text-center text-text-muted py-12">Loading feedback...</div>;
@@ -203,8 +210,30 @@ export function FeedbackTab({ token }: { token: string }) {
         <MetricCard label="Deployed" value={sc.deployed || 0} />
       </div>
 
-      {/* Type filter pills */}
-      <div className="flex gap-2 mb-2 flex-wrap">
+      {/* Active / Resolved toggle */}
+      <div className="flex gap-1 mb-3">
+        {(['active', 'resolved'] as const).map(tab => {
+          const count = tab === 'active'
+            ? (sc.new || 0) + (sc.acknowledged || 0) + (sc['in-progress'] || 0)
+            : (sc.done || 0) + (sc.deployed || 0);
+          return (
+            <button
+              key={tab}
+              onClick={() => { setViewTab(tab); setStatusFilter('all'); }}
+              className={`px-4 py-1.5 rounded text-xs font-medium transition-colors ${
+                viewTab === tab
+                  ? 'bg-accent text-white'
+                  : 'bg-white/8 text-text-muted hover:text-text-primary'
+              }`}
+            >
+              {tab === 'active' ? 'Active' : 'Resolved'} ({count})
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Filter row: type pills + status pills */}
+      <div className="flex gap-2 mb-4 flex-wrap">
         {(['all', 'bug', 'feature', 'other'] as const).map(f => (
           <button
             key={f}
@@ -218,24 +247,14 @@ export function FeedbackTab({ token }: { token: string }) {
             {f === 'all' ? 'All Types' : f.charAt(0).toUpperCase() + f.slice(1)}
           </button>
         ))}
-      </div>
-
-      {/* Status filter pills */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        <button
-          onClick={() => setStatusFilter('all')}
-          className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
-            statusFilter === 'all'
-              ? 'bg-accent text-white'
-              : 'bg-white/8 text-text-muted hover:text-text-primary'
-          }`}
-        >
-          All Statuses
-        </button>
-        {STATUS_ORDER.map(s => (
+        <span className="w-px bg-border/30 mx-1" />
+        {(viewTab === 'active'
+          ? (['new', 'acknowledged', 'in-progress'] as FeedbackStatus[])
+          : (['done', 'deployed'] as FeedbackStatus[])
+        ).map(s => (
           <button
             key={s}
-            onClick={() => setStatusFilter(s)}
+            onClick={() => setStatusFilter(statusFilter === s ? 'all' : s)}
             className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
               statusFilter === s
                 ? STATUS_BADGE[s]
@@ -253,7 +272,7 @@ export function FeedbackTab({ token }: { token: string }) {
           <div
             key={entry.id}
             className={`card p-4 transition-opacity ${
-              entry.status === 'deployed' ? 'opacity-50' : ''
+              RESOLVED_STATUSES.includes(entry.status) ? 'opacity-60' : ''
             } ${entry.priority === 'critical' ? 'shadow-[inset_3px_0_0_var(--color-danger)]' : ''}`}
           >
             <div className="flex items-start justify-between gap-3 mb-2">
