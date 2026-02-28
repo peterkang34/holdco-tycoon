@@ -9,15 +9,11 @@ import type {
   GameState,
   GamePhase,
   Business,
-  Deal,
-  DealStructure,
   SectorId,
   GameDifficulty,
   GameDuration,
-  GameEvent,
   QualityRating,
   RoundHistoryEntry,
-  ScoreBreakdown,
   ActiveTurnaround,
 } from '../../types';
 
@@ -38,7 +34,6 @@ import {
   generateDealPipeline,
   createStartingBusiness,
   resetBusinessIdCounter,
-  executeDealStructure as bizExecuteDealStructure,
   generateDealWithSize,
   pickWeightedSector,
   calculateDealInflation,
@@ -46,17 +41,15 @@ import {
   calculateSynergies,
   getSubTypeAffinity,
   getSizeRatioTier,
-  calculateMultipleExpansion,
-  generateBusinessId,
   calculateIntegrationGrowthPenalty,
 } from '../../businesses';
 import { generateDealStructures, executeDealStructure } from '../../deals';
 import { calculateFinalScore, calculateEnterpriseValue, calculateFounderEquityValue } from '../../scoring';
 import { getDistressRestrictions } from '../../distress';
 import { createRngStreams } from '../../rng';
-import { resolveTurnaround, getEligiblePrograms, calculateTurnaroundCost, getTurnaroundDuration } from '../../turnarounds';
-import { checkPlatformEligibility, calculateIntegrationCost, forgePlatform, checkPlatformDissolution } from '../../platforms';
-import { processEarningsResult, checkIPOEligibility, executeIPO } from '../../ipo';
+import { resolveTurnaround, calculateTurnaroundCost, getTurnaroundDuration } from '../../turnarounds';
+import { checkPlatformEligibility, calculateIntegrationCost, forgePlatform } from '../../platforms';
+import { processEarningsResult } from '../../ipo';
 
 // Data imports
 import { DIFFICULTY_CONFIG, DURATION_CONFIG, EARNOUT_EXPIRATION_YEARS, COVENANT_BREACH_ROUNDS_THRESHOLD, KEY_MAN_SUCCESSION_ROUNDS, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, MIN_FOUNDER_OWNERSHIP } from '../../../data/gameConfig';
@@ -67,7 +60,7 @@ import { resetUsedNames } from '../../../data/names';
 import { clampMargin } from '../../helpers';
 
 // Playtest types
-import type { PlaytestStrategy, AllocateDecisions } from './strategies';
+import type { PlaytestStrategy } from './strategies';
 import { PlaytestCoverage } from './coverage';
 import type { PlaytestResult } from './assertions';
 
@@ -410,7 +403,7 @@ function simulateCollectToEvent(state: GameState, coverage: PlaytestCoverage): G
     return {
       ...bankruptState,
       metrics: calculateMetrics(bankruptState),
-    };
+    } as GameState;
   }
 
   let gameState: GameState = {
@@ -535,7 +528,7 @@ function simulateCollectToEvent(state: GameState, coverage: PlaytestCoverage): G
     eventHistory: event ? [...state.eventHistory, event] : state.eventHistory,
     actionsThisRound: [],
     metrics: calculateMetrics(gameState),
-  };
+  } as GameState;
 }
 
 // ── Phase 2: Event choices ──
@@ -560,7 +553,7 @@ function simulateEventChoices(
   return {
     ...gameState,
     metrics: calculateMetrics(gameState),
-  };
+  } as GameState;
 }
 
 // ── Phase 3: Restructuring (simplified) ──
@@ -591,7 +584,7 @@ function simulateRestructuring(state: GameState, coverage: PlaytestCoverage): Ga
       cash: state.cash + raiseAmount,
       sharesOutstanding: state.sharesOutstanding + newShares,
     }),
-  };
+  } as GameState;
 }
 
 // ── Phase 4: Allocate ──
@@ -637,16 +630,16 @@ function simulateAllocatePhase(
     state.requiresRestructuring || state.covenantBreachRounds >= 1,
   );
 
-  let gameState: GameState = {
+  let gameState = {
     ...state,
     phase: 'allocate' as GamePhase,
     dealPipeline: pipeline,
-    actionsThisRound: [],
+    actionsThisRound: [] as GameState['actionsThisRound'],
     focusBonus,
     acquisitionsThisRound: 0,
-    lastAcquisitionResult: null,
-    lastIntegrationOutcome: null,
-  };
+    lastAcquisitionResult: null as GameState['lastAcquisitionResult'],
+    lastIntegrationOutcome: null as GameState['lastIntegrationOutcome'],
+  } as GameState;
 
   // Get strategy decisions
   const decisions = strategy.decideAllocations(gameState, pipeline, coverage);
@@ -982,7 +975,7 @@ function simulateAllocatePhase(
   return {
     ...gameState,
     metrics: calculateMetrics(gameState),
-  };
+  } as GameState;
 }
 
 // ── Phase 5: End Round ──
@@ -1143,7 +1136,7 @@ function simulateEndRound(state: GameState, coverage: PlaytestCoverage): GameSta
       lastIntegrationOutcome: null,
       ipoState: updatedIPOState,
       exitMultiplePenalty: 0,
-    };
+    } as GameState;
   } else {
     // Game over — run final collection
     const finalState = runFinalCollection({ ...state, businesses: updatedBusinesses });
@@ -1174,7 +1167,7 @@ function simulateEndRound(state: GameState, coverage: PlaytestCoverage): GameSta
       metrics: gameOverMetrics,
       focusBonus: calculateSectorFocusBonus(finalState.businesses),
       ipoState: updatedIPOState,
-    };
+    } as GameState;
   }
 }
 

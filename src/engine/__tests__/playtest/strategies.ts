@@ -12,17 +12,10 @@ import type {
   Business,
   GameEvent,
   SectorId,
-  QualityRating,
 } from '../../types';
 import { generateDealStructures } from '../../deals';
-import { calculateMetrics, calculateExitValuation } from '../../simulation';
-import { checkIPOEligibility, executeIPO, canShareFundedDeal, calculateShareFundedTerms, calculateStockPrice } from '../../ipo';
-import { checkFamilyOfficeEligibility, initializeFamilyOffice, commitPhilanthropy, makeInvestment, getSuccessionChoices, applySuccessionChoice, isSuccessionRound } from '../../familyOffice';
-import { calculateFinalScore, calculateEnterpriseValue, calculateFounderEquityValue } from '../../scoring';
-import { getEligiblePrograms, calculateTurnaroundCost, getTurnaroundDuration } from '../../turnarounds';
-import { checkPlatformEligibility, calculateIntegrationCost, forgePlatform } from '../../platforms';
+import { getEligiblePrograms, calculateTurnaroundCost } from '../../turnarounds';
 import type { PlaytestCoverage, FeatureKey } from './coverage';
-import { TURNAROUND_FATIGUE_THRESHOLD } from '../../../data/gameConfig';
 
 // ── Strategy Interface ──
 
@@ -130,7 +123,7 @@ export const AggressiveAcquirer: PlaytestStrategy = {
     'end_round', 'scoring_completed', 'margin_drift',
   ],
 
-  decideAllocations(state: GameState, deals: Deal[], coverage: PlaytestCoverage): AllocateDecisions {
+  decideAllocations(state: GameState, deals: Deal[], _coverage: PlaytestCoverage): AllocateDecisions {
     const decisions = defaultDecisions();
     const active = getActiveBusinesses(state);
 
@@ -194,7 +187,7 @@ export const PlatformBuilder: PlaytestStrategy = {
     'scoring_completed', 'margin_drift',
   ],
 
-  decideAllocations(state: GameState, deals: Deal[], coverage: PlaytestCoverage): AllocateDecisions {
+  decideAllocations(state: GameState, deals: Deal[], _coverage: PlaytestCoverage): AllocateDecisions {
     const decisions = defaultDecisions();
     const active = getActiveBusinesses(state);
 
@@ -269,7 +262,7 @@ export const ValueInvestor: PlaytestStrategy = {
     'margin_drift',
   ],
 
-  decideAllocations(state: GameState, deals: Deal[], coverage: PlaytestCoverage): AllocateDecisions {
+  decideAllocations(state: GameState, deals: Deal[], _coverage: PlaytestCoverage): AllocateDecisions {
     const decisions = defaultDecisions();
     const active = getActiveBusinesses(state);
 
@@ -332,7 +325,7 @@ export const TurnaroundArtist: PlaytestStrategy = {
     'scoring_completed', 'margin_drift', 'quality_improvement',
   ],
 
-  decideAllocations(state: GameState, deals: Deal[], coverage: PlaytestCoverage): AllocateDecisions {
+  decideAllocations(state: GameState, deals: Deal[], _coverage: PlaytestCoverage): AllocateDecisions {
     const decisions = defaultDecisions();
     const active = getActiveBusinesses(state);
 
@@ -408,7 +401,7 @@ export const IPOPathway: PlaytestStrategy = {
     'scoring_completed', 'margin_drift', 'deal_inflation',
   ],
 
-  decideAllocations(state: GameState, deals: Deal[], coverage: PlaytestCoverage): AllocateDecisions {
+  decideAllocations(state: GameState, deals: Deal[], _coverage: PlaytestCoverage): AllocateDecisions {
     const decisions = defaultDecisions();
     const active = getActiveBusinesses(state);
     const totalEbitda = active.reduce((sum, b) => sum + b.ebitda, 0);
@@ -479,7 +472,7 @@ export const FamilyOfficeEndgame: PlaytestStrategy = {
     'scoring_completed', 'margin_drift',
   ],
 
-  decideAllocations(state: GameState, deals: Deal[], coverage: PlaytestCoverage): AllocateDecisions {
+  decideAllocations(state: GameState, deals: Deal[], _coverage: PlaytestCoverage): AllocateDecisions {
     const decisions = defaultDecisions();
     const active = getActiveBusinesses(state);
 

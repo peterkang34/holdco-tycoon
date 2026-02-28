@@ -7,20 +7,16 @@
 
 import { describe, it, expect } from 'vitest';
 import { runPlaytest } from './simulator';
-import { validateGameState, validateFinalResult } from './assertions';
+import { validateFinalResult } from './assertions';
 import { PlaytestCoverage, STANDARD_ONLY_FEATURES, type FeatureKey } from './coverage';
 import {
-  ALL_STRATEGIES,
   getStrategiesForMode,
   AggressiveAcquirer,
   PlatformBuilder,
   ValueInvestor,
   TurnaroundArtist,
-  IPOPathway,
-  FamilyOfficeEndgame,
 } from './strategies';
 import type { GameDifficulty, GameDuration } from '../../types';
-import { calculateMetrics } from '../../simulation';
 
 // ── Test Configuration ──
 
