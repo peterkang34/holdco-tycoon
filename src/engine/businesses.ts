@@ -881,8 +881,9 @@ export function generateDealWithSize(
   // Generate EBITDA within tier range
   let adjustedEbitda: number;
   if (resolvedTier === 'trophy') {
-    if (!rng) throw new Error('Trophy tier requires seeded RNG');
-    adjustedEbitda = generateTrophyEbitda(affordability ?? 0, rng);
+    adjustedEbitda = rng
+      ? generateTrophyEbitda(affordability ?? 0, rng)
+      : tierConfig.min + Math.round(Math.random() * tierConfig.min); // fallback without RNG
   } else {
     const minEbitda = tierConfig.min;
     const maxEbitda = tierConfig.max!;
@@ -1397,9 +1398,9 @@ export function generateSourcedDeals(
     deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda, sourcingOptions, rng, pickTier(), affordResult.stretched));
     deals.push(generateDealWithSize(pickWeightedSector(round, maxRounds, rng), round, 'any', portfolioEbitda, sourcingOptions, rng, pickTier(), affordResult.stretched));
   } else {
-    // No focus set - generate diverse deals
+    // No focus set - generate diverse deals (exclude FO-exclusive sectors)
     // M-11: Fisher-Yates shuffle to avoid biased sort comparator
-    const sectors = fisherYatesShuffle([...SECTOR_LIST], rng).slice(0, 3);
+    const sectors = fisherYatesShuffle([...SECTOR_LIST_STANDARD], rng).slice(0, 3);
     sectors.forEach(sector => {
       deals.push(generateDealWithSize(sector.id, round, 'any', portfolioEbitda, sourcingOptions, rng, pickTier(), affordResult.stretched));
     });

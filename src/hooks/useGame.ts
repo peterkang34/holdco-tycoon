@@ -3267,8 +3267,10 @@ export const useGameStore = create<GameStore>()(
         const effectiveSubType = (sectorId !== currentSector || state.maSourcing.tier < 2 || !state.maSourcing.active)
           ? null
           : (subType !== undefined ? subType : state.maFocus.subType);
+        // Pro Sports are always trophy-tier — force size preference
+        const effectiveSize = sectorId === 'proSports' ? 'trophy' as DealSizePreference : sizePreference;
         set({
-          maFocus: { sectorId, sizePreference, subType: effectiveSubType },
+          maFocus: { sectorId, sizePreference: effectiveSize, subType: effectiveSubType },
         });
       },
 

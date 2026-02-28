@@ -1436,12 +1436,13 @@ export function AllocatePhase({
                   <label className="block text-sm text-text-muted mb-1 sm:mb-2 hidden sm:block">Target Size</label>
                   <select
                     aria-label="Target Size"
-                    value={maFocus.sizePreference}
+                    value={maFocus.sectorId === 'proSports' ? 'trophy' : maFocus.sizePreference}
                     onChange={(e) => onSetMAFocus(
                       maFocus.sectorId,
                       e.target.value as DealSizePreference
                     )}
-                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
+                    disabled={maFocus.sectorId === 'proSports'}
+                    className={`w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent${maFocus.sectorId === 'proSports' ? ' opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <option value="any">Any Size</option>
                     <option value="micro">Micro ($500K-$1.5M)</option>
