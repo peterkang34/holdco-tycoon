@@ -9,6 +9,7 @@ import {
 } from './types';
 import type { SeededRng } from './rng';
 import { SECTORS } from '../data/sectors';
+import { BUYER_PREMIUM_EBITDA_CAP, BUYER_PREMIUM_MAX } from '../data/gameConfig';
 
 // ── Size Tier Premium ──────────────────────────────────────────────
 // Smooth interpolation based on EBITDA (in thousands; 1000 = $1M)
@@ -33,12 +34,18 @@ export function calculateSizeTierPremium(ebitda: number): SizeTierResult {
   if (ebitda < 10000) {
     return { tier: 'lower_middle_pe', premium: lerp(ebitda, 5000, 10000, 0.8, 1.5) };
   }
-  if (ebitda < 20000) {
-    return { tier: 'institutional_pe', premium: lerp(ebitda, 10000, 20000, 1.5, 2.5) };
+  if (ebitda < 25000) {
+    return { tier: 'institutional_pe', premium: lerp(ebitda, 10000, 25000, 1.5, 2.5) };
   }
-  // $20M+ EBITDA — caps at $30M
-  const capped = Math.min(ebitda, 30000);
-  return { tier: 'large_pe', premium: lerp(capped, 20000, 30000, 2.5, 3.5) };
+  if (ebitda < 50000) {
+    return { tier: 'large_pe', premium: lerp(ebitda, 25000, 50000, 2.5, 3.5) };
+  }
+  if (ebitda < 100000) {
+    return { tier: 'mega_pe', premium: lerp(ebitda, 50000, 100000, 3.5, 4.5) };
+  }
+  // $100M+ EBITDA: caps at $300M to prevent runaway multiples
+  const capped = Math.min(ebitda, BUYER_PREMIUM_EBITDA_CAP);
+  return { tier: 'strategic_public', premium: lerp(capped, 100000, BUYER_PREMIUM_EBITDA_CAP, 4.5, BUYER_PREMIUM_MAX) };
 }
 
 // ── De-Risking Premium ─────────────────────────────────────────────
@@ -109,6 +116,42 @@ const FAMILY_OFFICE_NAMES = [
   'Winslow Holdings',
 ];
 
+const MEGA_PE_NAMES = [
+  'Apollo Global Management',
+  'KKR & Co.',
+  'Blackstone Group',
+  'Carlyle Group',
+  'TPG Capital',
+  'Warburg Pincus',
+  'Advent International',
+  'Bain Capital',
+  'CVC Capital Partners',
+  'Hellman & Friedman',
+  'Leonard Green & Partners',
+  'Silver Lake Partners',
+  'Ares Management',
+  'BC Partners',
+  'Clayton Dubilier & Rice',
+];
+
+const STRATEGIC_PUBLIC_NAMES = [
+  'Berkshire Hathaway',
+  'Danaher Corporation',
+  'Constellation Software',
+  'TransDigm Group',
+  'Roper Technologies',
+  'Illinois Tool Works',
+  'Fortive Corporation',
+  'HEICO Corporation',
+  'Markel Corporation',
+  'Fairfax Financial',
+  'GIC (Singapore)',
+  'Abu Dhabi Investment Authority',
+  'Temasek Holdings',
+  'Canada Pension Plan',
+  'Brookfield Asset Management',
+];
+
 const STRATEGIC_TEMPLATES: Record<string, string[]> = {
   agency: ['WPP', 'Omnicom', 'Publicis Groupe', 'IPG', 'Dentsu', 'Accenture Song'],
   saas: ['Vista Equity', 'Thoma Bravo', 'Silver Lake', 'Insight Partners', 'Salesforce'],
@@ -137,6 +180,8 @@ function getBuyerType(tier: BuyerPoolTier, rng?: SeededRng): { type: BuyerType; 
     lower_middle_pe: 0.15,
     institutional_pe: 0.25,
     large_pe: 0.35,
+    mega_pe: 0.40,
+    strategic_public: 0.50,
   };
 
   if ((rng ? rng.next() : Math.random()) < strategicChance[tier]) {
@@ -149,6 +194,8 @@ function getBuyerType(tier: BuyerPoolTier, rng?: SeededRng): { type: BuyerType; 
     lower_middle_pe: ['lower_middle_pe', 'lower_middle_pe', 'family_office'],
     institutional_pe: ['institutional_pe', 'institutional_pe', 'large_pe'],
     large_pe: ['large_pe', 'large_pe', 'institutional_pe'],
+    mega_pe: ['mega_pe', 'mega_pe', 'large_pe'],
+    strategic_public: ['strategic_public', 'strategic_public', 'mega_pe'],
   };
 
   const type = pickRandom(typeMap[tier], rng)!;
@@ -166,6 +213,12 @@ function pickBuyerName(buyerType: BuyerType, sectorId: SectorId, rng?: SeededRng
   if (buyerType === 'family_office') {
     return pickRandom(FAMILY_OFFICE_NAMES, rng)!;
   }
+  if (buyerType === 'mega_pe') {
+    return pickRandom(MEGA_PE_NAMES, rng)!;
+  }
+  if (buyerType === 'strategic_public') {
+    return pickRandom(STRATEGIC_PUBLIC_NAMES, rng)!;
+  }
   return pickRandom(PE_FUND_NAMES, rng)!;
 }
 
@@ -177,6 +230,8 @@ function getFundSize(buyerType: BuyerType): string | undefined {
     case 'lower_middle_pe': return '$500M-2B fund';
     case 'institutional_pe': return '$2-10B fund';
     case 'large_pe': return '$10B+ fund';
+    case 'mega_pe': return '$10-50B fund';
+    case 'strategic_public': return 'Public company / sovereign wealth';
     case 'strategic': return undefined;
   }
 }
@@ -243,6 +298,8 @@ const TIER_DESCRIPTIONS: Record<BuyerPoolTier, string> = {
   lower_middle_pe: 'Lower middle market PE funds compete actively for businesses this size. Multiple bidders are common, driving premium valuations.',
   institutional_pe: 'Institutional PE firms with significant capital seek platform assets at this EBITDA level. Competitive auctions frequently drive multiples to 10x+.',
   large_pe: 'Large-cap PE firms and strategic acquirers aggressively pursue assets of this scale. Auctions are highly competitive with institutional-grade pricing.',
+  mega_pe: 'Mega-cap PE firms (Apollo, KKR, Blackstone) compete for assets at this scale. Cross-border interest and club deals drive premium pricing with multiple expansion potential.',
+  strategic_public: 'Public companies and sovereign wealth funds pursue transformational acquisitions at this level. Strategic premiums are significant as buyers value market position and scale synergies.',
 };
 
 export function generateValuationCommentary(
@@ -281,6 +338,8 @@ export function generateValuationCommentary(
     lower_middle_pe: 'lower middle PE',
     institutional_pe: 'institutional PE',
     large_pe: 'large PE',
+    mega_pe: 'mega-cap PE',
+    strategic_public: 'strategic / public',
   };
   const summary = `At $${ebitdaM}M EBITDA${marginPct ? ` (${marginPct}% margins)` : ''}, this attracts ${tierLabels[tier]} attention at ${totalMultiple.toFixed(1)}x`;
 

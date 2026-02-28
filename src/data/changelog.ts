@@ -11,6 +11,31 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'February 28, 2026',
+    title: '7-Tier Deal Size System',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Deals now scale with what you can afford — your cash × leverage determines what shows up in the pipeline, from Micro ($500K) to Trophy ($75M+).',
+          'Seven distinct deal tiers: Micro, Small, Mid-Market, Upper-Mid, Institutional, Marquee, and Trophy — each with quality floors and premium pricing.',
+          'Higher-tier deals attract larger buyers (mega-cap PE, strategic/public acquirers) who pay significantly higher exit multiples.',
+          'Trophy deals use sqrt-scaling: uncapped EBITDA that grows with diminishing returns as your war chest expands.',
+          'Pipeline scarcity ensures rare deals stay rare — Trophy deals are capped at 2 per round.',
+        ],
+      },
+      {
+        heading: 'Balance Changes',
+        items: [
+          'Replaced the old Small/Medium/Large deal size system with affordability-based tier selection.',
+          'Buyer premium expanded from 5 to 7 tiers, with premiums up to +5.5x for $300M+ EBITDA businesses.',
+          'Sourced and proprietary outreach deals now respect your affordability level.',
+          'Updated User Manual with full deal size tier reference table.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 25, 2026',
     title: 'In-Game Feedback & Bug Fixes',
     sections: [

@@ -65,6 +65,10 @@ import {
   INTEGRATION_RESTRUCTURING_MERGER_PCT,
   IPO_DILUTION_PENALTY,
   IPO_SHARE_FUNDED_DEALS_PER_ROUND,
+  DEAL_SIZE_TIERS,
+  TIER_PIPELINE_COUNTS,
+  BUYER_PREMIUM_EBITDA_CAP,
+  BUYER_PREMIUM_MAX,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
 import {
@@ -1602,6 +1606,84 @@ describe('Display Proofreader', () => {
     it('UserManualModal mentions dynamic consolidation boom with 3+ businesses (Strategy B)', () => {
       const manual = readComponent('components/ui/UserManualModal.tsx');
       expect(manual).toContain('3+ businesses');
+    });
+  });
+
+  // ── 7-Tier EBITDA System ──
+
+  describe('7-Tier EBITDA System', () => {
+    it('DEAL_SIZE_TIERS has all 7 tiers (Strategy A)', () => {
+      const tiers = ['micro', 'small', 'mid_market', 'upper_mid', 'institutional', 'marquee', 'trophy'] as const;
+      for (const tier of tiers) {
+        expect(DEAL_SIZE_TIERS[tier]).toBeDefined();
+        expect(DEAL_SIZE_TIERS[tier].min).toBeGreaterThan(0);
+      }
+    });
+
+    it('Trophy tier has null max (uncapped) (Strategy A)', () => {
+      expect(DEAL_SIZE_TIERS.trophy.max).toBeNull();
+    });
+
+    it('TIER_PIPELINE_COUNTS limits trophy to max 2 deals (Strategy A)', () => {
+      expect(TIER_PIPELINE_COUNTS.trophy.max).toBe(2);
+    });
+
+    it('Buyer premium caps at $300M EBITDA with 5.5x max (Strategy A)', () => {
+      expect(BUYER_PREMIUM_EBITDA_CAP).toBe(300000);
+      expect(BUYER_PREMIUM_MAX).toBe(5.5);
+    });
+
+    it('AllocatePhase has 8 deal size dropdown options (Any + 7 tiers) (Strategy B)', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('Any Size');
+      expect(allocate).toContain('Micro ($500K-$1.5M)');
+      expect(allocate).toContain('Small ($1.5M-$4M)');
+      expect(allocate).toContain('Mid-Market ($4M-$10M)');
+      expect(allocate).toContain('Upper-Mid ($10M-$25M)');
+      expect(allocate).toContain('Institutional ($25M-$50M)');
+      expect(allocate).toContain('Marquee ($50M-$75M)');
+      expect(allocate).toContain('Trophy ($75M+)');
+    });
+
+    it('AllocatePhase does NOT contain old 3-tier labels (Strategy B)', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).not.toContain('Small ($500k-$1.5M)');
+      expect(allocate).not.toContain('Medium ($1.5M-$3M)');
+      expect(allocate).not.toContain('Large ($3M+)');
+    });
+
+    it('DEAL_SIZE_TIERS constants match UI labels (Strategy A)', () => {
+      expect(DEAL_SIZE_TIERS.micro.min).toBe(500);
+      expect(DEAL_SIZE_TIERS.micro.max).toBe(1500);
+      expect(DEAL_SIZE_TIERS.small.min).toBe(1500);
+      expect(DEAL_SIZE_TIERS.small.max).toBe(4000);
+      expect(DEAL_SIZE_TIERS.mid_market.min).toBe(4000);
+      expect(DEAL_SIZE_TIERS.mid_market.max).toBe(10000);
+      expect(DEAL_SIZE_TIERS.upper_mid.min).toBe(10000);
+      expect(DEAL_SIZE_TIERS.upper_mid.max).toBe(25000);
+      expect(DEAL_SIZE_TIERS.institutional.min).toBe(25000);
+      expect(DEAL_SIZE_TIERS.institutional.max).toBe(50000);
+      expect(DEAL_SIZE_TIERS.marquee.min).toBe(50000);
+      expect(DEAL_SIZE_TIERS.marquee.max).toBe(75000);
+      expect(DEAL_SIZE_TIERS.trophy.min).toBe(75000);
+    });
+
+    it('UserManualModal documents 7 deal size tiers (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Deal Size Tiers');
+      expect(manual).toContain('Micro');
+      expect(manual).toContain('Mid-Market');
+      expect(manual).toContain('Upper-Mid');
+      expect(manual).toContain('Institutional');
+      expect(manual).toContain('Marquee');
+      expect(manual).toContain('Trophy');
+      expect(manual).toContain('$75M+');
+    });
+
+    it('buyers.ts has mega_pe and strategic_public tier descriptions (Strategy B)', () => {
+      const buyers = readComponent('engine/buyers.ts');
+      expect(buyers).toContain('mega_pe');
+      expect(buyers).toContain('strategic_public');
     });
   });
 });

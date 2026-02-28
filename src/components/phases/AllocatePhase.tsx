@@ -1409,6 +1409,7 @@ export function AllocatePhase({
                 <div>
                   <label className="block text-sm text-text-muted mb-1 sm:mb-2 hidden sm:block">Target Sector</label>
                   <select
+                    aria-label="Target Sector"
                     value={maFocus.sectorId || ''}
                     onChange={(e) => onSetMAFocus(
                       e.target.value ? e.target.value as SectorId : null,
@@ -1427,6 +1428,7 @@ export function AllocatePhase({
                 <div>
                   <label className="block text-sm text-text-muted mb-1 sm:mb-2 hidden sm:block">Target Size</label>
                   <select
+                    aria-label="Target Size"
                     value={maFocus.sizePreference}
                     onChange={(e) => onSetMAFocus(
                       maFocus.sectorId,
@@ -1435,9 +1437,13 @@ export function AllocatePhase({
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   >
                     <option value="any">Any Size</option>
-                    <option value="small">Small ($500k-$1.5M)</option>
-                    <option value="medium">Medium ($1.5M-$3M)</option>
-                    <option value="large">Large ($3M+)</option>
+                    <option value="micro">Micro ($500K-$1.5M)</option>
+                    <option value="small">Small ($1.5M-$4M)</option>
+                    <option value="mid_market">Mid-Market ($4M-$10M)</option>
+                    <option value="upper_mid">Upper-Mid ($10M-$25M)</option>
+                    <option value="institutional">Institutional ($25M-$50M)</option>
+                    <option value="marquee">Marquee ($50M-$75M)</option>
+                    <option value="trophy">Trophy ($75M+)</option>
                   </select>
                 </div>
               </div>

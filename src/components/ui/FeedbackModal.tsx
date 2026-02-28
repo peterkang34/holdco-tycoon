@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Modal } from './Modal';
 import { useToastStore } from '../../hooks/useToast';
 import { getDeviceType, getPlayerId } from '../../utils/device';
@@ -40,6 +40,11 @@ export function FeedbackModal({ isOpen, onClose, context }: FeedbackModalProps) 
       setError('');
     }
   }, [isOpen]);
+
+  const scrollInputIntoView = useCallback((e: React.FocusEvent<HTMLTextAreaElement | HTMLInputElement>) => {
+    const el = e.target;
+    setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 300);
+  }, []);
 
   const canSubmit = message.trim().length >= 10 && !submitting;
 
@@ -120,6 +125,7 @@ export function FeedbackModal({ isOpen, onClose, context }: FeedbackModalProps) 
             'Share your thoughts...'
           }
           rows={4}
+          onFocus={scrollInputIntoView}
           className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50 resize-none"
         />
         <p className="text-xs text-text-muted mt-1 text-right">
@@ -141,6 +147,7 @@ export function FeedbackModal({ isOpen, onClose, context }: FeedbackModalProps) 
           value={email}
           onChange={e => setEmail(e.target.value.slice(0, 100))}
           placeholder="you@example.com"
+          onFocus={scrollInputIntoView}
           className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-text-primary placeholder:text-text-muted/50 focus:outline-none focus:border-accent/50"
         />
       </div>

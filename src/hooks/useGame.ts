@@ -97,39 +97,46 @@ function runFinalCollection(state: GameState): { cash: number; businesses: Busin
   let cash = state.cash;
   let holdcoLoanBalance = state.holdcoLoanBalance;
 
-  // Holdco loan: pay all remaining principal + one round of interest
+  // Holdco loan: pay what we can of remaining principal + one round of interest
   if (holdcoLoanBalance > 0) {
     const holdcoInterest = Math.round(holdcoLoanBalance * (state.holdcoLoanRate || 0));
-    cash -= holdcoInterest + holdcoLoanBalance;
-    holdcoLoanBalance = 0;
+    const holdcoOwed = holdcoInterest + holdcoLoanBalance;
+    const holdcoPaid = Math.min(holdcoOwed, Math.max(0, cash));
+    cash -= holdcoPaid;
+    holdcoLoanBalance = Math.max(0, holdcoOwed - holdcoPaid);
   }
 
-  // OpCo-level debt: pay all remaining seller notes, bank debt, and earnouts
+  // OpCo-level debt: pay what we can of seller notes, bank debt, and earnouts
   const businesses = state.businesses.map(b => {
     if (b.status !== 'active' && b.status !== 'integrated') return b;
     const updated = { ...b };
 
-    // Seller note: pay remaining balance + one round of interest
+    // Seller note: pay what we can of remaining balance + one round of interest
     if (b.sellerNoteBalance > 0) {
       const interest = Math.round(b.sellerNoteBalance * b.sellerNoteRate);
-      cash -= interest + b.sellerNoteBalance;
-      updated.sellerNoteBalance = 0;
-      updated.sellerNoteRoundsRemaining = 0;
+      const owed = interest + b.sellerNoteBalance;
+      const paid = Math.min(owed, Math.max(0, cash));
+      cash -= paid;
+      updated.sellerNoteBalance = Math.max(0, owed - paid);
+      if (updated.sellerNoteBalance === 0) updated.sellerNoteRoundsRemaining = 0;
     }
 
-    // Bank debt: pay remaining balance + one round of interest
+    // Bank debt: pay what we can of remaining balance + one round of interest
     if (b.bankDebtBalance > 0) {
       const interest = Math.round(b.bankDebtBalance * (b.bankDebtRate || 0));
-      cash -= interest + b.bankDebtBalance;
-      updated.bankDebtBalance = 0;
-      updated.bankDebtRoundsRemaining = 0;
+      const owed = interest + b.bankDebtBalance;
+      const paid = Math.min(owed, Math.max(0, cash));
+      cash -= paid;
+      updated.bankDebtBalance = Math.max(0, owed - paid);
+      if (updated.bankDebtBalance === 0) updated.bankDebtRoundsRemaining = 0;
     }
 
-    // Earnout: pay all remaining
+    // Earnout: pay what we can
     if (b.earnoutRemaining > 0) {
-      cash -= b.earnoutRemaining;
-      updated.earnoutRemaining = 0;
-      updated.earnoutTarget = 0;
+      const paid = Math.min(b.earnoutRemaining, Math.max(0, cash));
+      cash -= paid;
+      updated.earnoutRemaining = b.earnoutRemaining - paid;
+      if (updated.earnoutRemaining === 0) updated.earnoutTarget = 0;
     }
 
     return updated;
@@ -381,7 +388,7 @@ export const useGameStore = create<GameStore>()(
 
         const round1Streams = createRngStreams(gameSeed, 1);
         const startingBusiness = createStartingBusiness(startingSector, diffConfig.startingEbitda, diffConfig.startingMultipleCap, round1Streams.cosmetic);
-        const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds, false, round1Streams.deals);
+        const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds, false, round1Streams.deals, 0, diffConfig.initialCash, null, false);
 
         // Holdco loan setup: Normal mode gets a structured loan, Easy mode has none
         const holdcoLoanBalance = diffConfig.startingDebt;
@@ -830,7 +837,7 @@ export const useGameStore = create<GameStore>()(
         // Calculate deal inflation for 20yr mode
         const dealInflationAdder = calculateDealInflation(state.round, state.duration, state.dealInflationState);
 
-        // Generate new deals with M&A focus and portfolio synergies
+        // Generate new deals with M&A focus, portfolio synergies, and affordability
         const newPipeline = generateDealPipeline(
           state.dealPipeline,
           state.round,
@@ -845,18 +852,21 @@ export const useGameStore = create<GameStore>()(
           state.creditTighteningRoundsRemaining > 0,
           roundStreams.deals,
           dealInflationAdder,
+          state.cash,
+          state.ipoState ?? null,
+          state.requiresRestructuring || state.covenantBreachRounds >= 1,
         );
 
         // Inject distressed deals during Financial Crisis (bypass MAX_DEALS cap)
         let finalPipeline = newPipeline;
         if (state.currentEvent?.type === 'global_financial_crisis') {
-          const distressedDeals = generateDistressedDeals(state.round, state.maxRounds, roundStreams.deals);
+          const distressedDeals = generateDistressedDeals(state.round, state.maxRounds, roundStreams.deals, state.cash);
           finalPipeline = [...finalPipeline, ...distressedDeals];
         }
 
         // Inject lighter discounted deals during Recession (1-2 at 15-25% off)
         if (state.currentEvent?.type === 'global_recession') {
-          const recessionDeals = generateRecessionDeals(state.round, state.maxRounds, roundStreams.deals);
+          const recessionDeals = generateRecessionDeals(state.round, state.maxRounds, roundStreams.deals, state.cash);
           finalPipeline = [...finalPipeline, ...recessionDeals];
         }
 
@@ -3248,6 +3258,9 @@ export const useGameStore = create<GameStore>()(
           state.creditTighteningRoundsRemaining > 0,
           srcStreams.deals.fork(`source-${priorSourceCount}`),
           srcInflation,
+          state.cash,
+          state.ipoState ?? null,
+          state.requiresRestructuring || state.covenantBreachRounds >= 1,
         );
 
         set({
@@ -3437,6 +3450,9 @@ export const useGameStore = create<GameStore>()(
           state.creditTighteningRoundsRemaining > 0,
           outStreams.deals.fork(`outreach-${priorOutreachCount}`),
           outInflation,
+          state.cash,
+          state.ipoState ?? null,
+          state.requiresRestructuring || state.covenantBreachRounds >= 1,
         );
 
         set({
@@ -3947,7 +3963,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v27', // v27: 20-year mode upgrade (deal inflation, succession, IPO, family office)
+      name: 'holdco-tycoon-save-v28', // v28: 7-tier EBITDA system (affordability-based deal sizing)
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

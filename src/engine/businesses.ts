@@ -7,6 +7,7 @@ import {
   SectorId,
   MAFocus,
   DealSizePreference,
+  DealSizeTier,
   AcquisitionType,
   EventType,
   IntegrationOutcome,
@@ -29,8 +30,10 @@ import {
   DEAL_INFLATION_RATE,
   DEAL_INFLATION_CAP,
   DEAL_INFLATION_CRISIS_RESET,
+  DEAL_SIZE_TIERS,
+  TIER_PIPELINE_COUNTS,
 } from '../data/gameConfig';
-import type { DealInflationState, GameDuration } from './types';
+import type { DealInflationState, GameDuration, IPOState } from './types';
 import { SECTORS, SECTOR_LIST } from '../data/sectors';
 import { getRandomBusinessName } from '../data/names';
 import { calculateSizeTierPremium } from './buyers';
@@ -39,6 +42,14 @@ import {
   generateBusinessContent,
   generateFallbackContent,
 } from '../services/aiGeneration';
+import {
+  calculateAffordability,
+  getAffordabilityWeights,
+  pickWeightedTier,
+  generateTrophyEbitda,
+  getTierForEbitda,
+  TIER_ORDER,
+} from './affordability';
 
 /**
  * Calculate deal price inflation for 20-year mode.
@@ -836,65 +847,55 @@ export interface DealGenerationOptions {
   dealInflation?: number; // multiple adder from late-game inflation (20yr mode)
 }
 
-// Generate a deal with size preference
+// Generate a deal with size tier (7-tier affordability system)
 export function generateDealWithSize(
   sectorId: SectorId,
   round: number,
   sizePreference: DealSizePreference = 'any',
-  portfolioEbitda: number = 0,
+  _portfolioEbitda: number = 0,
   options: DealGenerationOptions = {},
-  rng?: SeededRng
+  rng?: SeededRng,
+  tier?: DealSizeTier,
+  affordability?: number,
 ): Deal {
+  // Resolve the tier: explicit tier param > sizePreference (if it's a tier) > fallback to 'small'
+  const resolvedTier: DealSizeTier = tier
+    ?? (sizePreference !== 'any' ? sizePreference as DealSizeTier : 'small');
+  const tierConfig = DEAL_SIZE_TIERS[resolvedTier];
+
   let quality = generateQualityRating(rng);
 
-  // Apply quality floor
-  if (options.qualityFloor && quality < options.qualityFloor) {
-    quality = options.qualityFloor;
+  // Apply quality floor from tier config AND from options (take the higher)
+  const effectiveQualityFloor = Math.max(
+    tierConfig.qualityFloor ?? 0,
+    options.qualityFloor ?? 0,
+  ) as QualityRating;
+  if (effectiveQualityFloor > 0 && quality < effectiveQualityFloor) {
+    quality = effectiveQualityFloor;
   }
-
-  // Absolute EBITDA ranges matching UI labels (in $k):
-  //   Small:  500-1500  ($500k-$1.5M)
-  //   Medium: 1500-3000 ($1.5M-$3M)
-  //   Large:  3000+     ($3M+), portfolio scaler allowed
-  //   Any:    sector base × portfolio scaler (unconstrained)
-  const SIZE_RANGES: Record<string, [number, number]> = {
-    small:  [500, 1500],
-    medium: [1500, 3000],
-    large:  [3000, 8000], // 8000 base cap before portfolio scaler
-  };
 
   const business = generateBusiness(sectorId, round, quality, options.subType, rng);
 
+  // Generate EBITDA within tier range
   let adjustedEbitda: number;
-  let adjustedRevenue: number;
-
-  if (sizePreference === 'any') {
-    // 'any': keep original sector-based generation, apply portfolio scaler
-    const portfolioScaler = portfolioEbitda > 3000
-      ? Math.max(1, Math.log2(portfolioEbitda / 3000))
-      : 1;
-    adjustedRevenue = Math.round(business.revenue * portfolioScaler);
-    adjustedEbitda = Math.round(adjustedRevenue * business.ebitdaMargin);
+  if (resolvedTier === 'trophy') {
+    if (!rng) throw new Error('Trophy tier requires seeded RNG');
+    adjustedEbitda = generateTrophyEbitda(affordability ?? 0, rng);
   } else {
-    const [minEbitda, maxEbitda] = SIZE_RANGES[sizePreference];
-    // Pick a random target EBITDA within the absolute range
-    let targetEbitda = minEbitda + (rng ? rng.next() : Math.random()) * (maxEbitda - minEbitda);
-
-    // For 'large', apply portfolio scaler on top of the base range
-    if (sizePreference === 'large') {
-      const portfolioScaler = portfolioEbitda > 3000
-        ? Math.max(1, Math.log2(portfolioEbitda / 3000))
-        : 1;
-      targetEbitda *= portfolioScaler;
-    }
-
-    adjustedEbitda = Math.round(targetEbitda);
-    // Back-solve revenue from target EBITDA and the business's margin
-    // (preserves the margin as a business characteristic)
-    adjustedRevenue = Math.round(adjustedEbitda / business.ebitdaMargin);
+    const minEbitda = tierConfig.min;
+    const maxEbitda = tierConfig.max!;
+    adjustedEbitda = Math.round(
+      minEbitda + (rng ? rng.next() : Math.random()) * (maxEbitda - minEbitda)
+    );
   }
-  // Apply deal inflation to the asking multiple (20yr mode, round 11+)
-  const inflatedMultiple = business.acquisitionMultiple + (options.dealInflation ?? 0);
+
+  // Back-solve revenue from target EBITDA and the business's margin
+  const adjustedRevenue = Math.round(adjustedEbitda / business.ebitdaMargin);
+
+  // Apply deal inflation + entry multiple adder to the asking multiple
+  const inflatedMultiple = business.acquisitionMultiple
+    + (options.dealInflation ?? 0)
+    + tierConfig.multipleAdder;
   const adjustedPrice = Math.round(adjustedEbitda * inflatedMultiple);
   const acquisitionType = determineAcquisitionType(adjustedEbitda, rng);
   const tuckInDiscount = acquisitionType === 'tuck_in'
@@ -1024,10 +1025,10 @@ export function generateDealPipeline(
   creditTighteningActive: boolean = false,
   rng?: SeededRng,
   dealInflation: number = 0,
+  cash: number = 0,
+  ipoState: IPOState | null = null,
+  noNewDebt: boolean = false,
 ): Deal[] {
-  // Deal index counter for deterministic IDs within a round
-  let dealIdx = 0;
-
   // Age existing deals first
   let pipeline = currentPipeline.map(deal => ({
     ...deal,
@@ -1044,16 +1045,35 @@ export function generateDealPipeline(
   const sectorsInPipeline = new Set(pipeline.map(d => d.business.sectorId));
   const allSectorIds = SECTOR_LIST.map(s => s.id);
 
+  // Compute affordability and tier weights
+  const affordResult = rng
+    ? calculateAffordability(cash, creditTighteningActive, noNewDebt, ipoState, rng)
+    : { base: cash * 4, stretched: cash * 4, stretchFactor: 0, ipoBonus: 0 };
+  const weights = getAffordabilityWeights(affordResult.stretched, cash);
+
+  // Helper to pick a tier for a deal
+  const pickTier = (preferredTier?: DealSizePreference): DealSizeTier => {
+    if (preferredTier && preferredTier !== 'any') return preferredTier as DealSizeTier;
+    if (rng) return pickWeightedTier(weights, rng);
+    // Fallback without RNG: pick first tier with highest weight
+    let best: DealSizeTier = 'micro';
+    let bestW = 0;
+    for (const t of TIER_ORDER) {
+      if (weights[t] > bestW) { bestW = weights[t]; best = t; }
+    }
+    return best;
+  };
+
   // Shared options to pass lastEventType, maxRounds, credit tightening, and deal inflation for pricing
   const heatOpts: DealGenerationOptions = { lastEventType, maxRounds, creditTighteningActive, dealInflation };
 
   // 1. Generate deals based on M&A focus (if set)
   if (maFocus?.sectorId && pipeline.length < MAX_DEALS) {
-    // Add 2 deals in focus sector with preferred size
     for (let i = 0; i < 2; i++) {
       if (pipeline.length >= MAX_DEALS) break;
-      pipeline.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda, heatOpts, rng));
-      dealIdx++;
+      const t = pickTier(maFocus.sizePreference);
+      pipeline.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda, heatOpts, rng, t, affordResult.stretched));
+
     }
   }
 
@@ -1061,7 +1081,7 @@ export function generateDealPipeline(
   if (maSourcingActive && maSourcingTier >= 1 && pipeline.length < MAX_DEALS) {
     const focusSector = maFocus?.sectorId ?? pickWeightedSector(round, maxRounds, rng);
     const sourcingOptions: DealGenerationOptions = {
-      freshnessBonus: 1, // Focus deals last 3 rounds
+      freshnessBonus: 1,
       source: 'sourced',
       lastEventType,
       maxRounds,
@@ -1070,7 +1090,6 @@ export function generateDealPipeline(
       dealInflation,
     };
 
-    // Tier 2+: sub-type targeting + quality floor
     if (maSourcingTier >= 2 && maFocus?.subType) {
       sourcingOptions.subType = maFocus.subType;
       sourcingOptions.qualityFloor = 2;
@@ -1082,21 +1101,23 @@ export function generateDealPipeline(
     // +2 focus-sector deals
     for (let i = 0; i < 2; i++) {
       if (pipeline.length >= MAX_DEALS) break;
-      pipeline.push(generateDealWithSize(focusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda, sourcingOptions, rng));
-      dealIdx++;
+      const t = pickTier(maFocus?.sizePreference || 'any');
+      pipeline.push(generateDealWithSize(focusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda, sourcingOptions, rng, t, affordResult.stretched));
+
     }
 
-    // Tier 2+: 1-2 sub-type matched deals (on top of the 2 above)
+    // Tier 2+: 1-2 sub-type matched deals
     if (maSourcingTier >= 2 && maFocus?.subType && maFocus?.sectorId) {
       const subTypeCount = maSourcingTier >= 3 ? randomInt(2, 3, rng) : randomInt(1, 2, rng);
       for (let i = 0; i < subTypeCount; i++) {
         if (pipeline.length >= MAX_DEALS) break;
+        const t = pickTier(maFocus.sizePreference || 'any');
         pipeline.push(generateDealWithSize(
           maFocus.sectorId, round, maFocus.sizePreference || 'any', portfolioEbitda,
           { ...sourcingOptions, subType: maFocus.subType },
-          rng
+          rng, t, affordResult.stretched
         ));
-        dealIdx++;
+  
       }
     }
 
@@ -1105,22 +1126,23 @@ export function generateDealPipeline(
       const proprietarySector = maFocus?.sectorId ?? focusSector;
       for (let i = 0; i < 2; i++) {
         if (pipeline.length >= MAX_DEALS) break;
+        const t = pickTier(maFocus?.sizePreference || 'any');
         pipeline.push(generateDealWithSize(
           proprietarySector, round, maFocus?.sizePreference || 'any', portfolioEbitda,
-        {
-          subType: maFocus?.subType ?? undefined,
-          qualityFloor: 3,
-          source: 'proprietary',
-          multipleDiscount: 0.15,
-          freshnessBonus: 1,
-          lastEventType,
-          maxRounds,
-          creditTighteningActive,
-          dealInflation,
-        },
-        rng
-      ));
-        dealIdx++;
+          {
+            subType: maFocus?.subType ?? undefined,
+            qualityFloor: 3,
+            source: 'proprietary',
+            multipleDiscount: 0.15,
+            freshnessBonus: 1,
+            lastEventType,
+            maxRounds,
+            creditTighteningActive,
+            dealInflation,
+          },
+          rng, t, affordResult.stretched
+        ));
+  
       }
     }
   }
@@ -1130,67 +1152,91 @@ export function generateDealPipeline(
     const focusDeals = portfolioFocusTier >= 2 ? 2 : 1;
     for (let i = 0; i < focusDeals; i++) {
       if (pipeline.length >= MAX_DEALS) break;
-      pipeline.push(generateDealWithSize(portfolioFocusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda, heatOpts, rng));
-      dealIdx++;
+      const t = pickTier(maFocus?.sizePreference || 'any');
+      pipeline.push(generateDealWithSize(portfolioFocusSector, round, maFocus?.sizePreference || 'any', portfolioEbitda, heatOpts, rng, t, affordResult.stretched));
+
     }
   }
 
   // 3. Ensure sector variety - add deals from sectors not in pipeline
   const missingSectors = allSectorIds.filter(s => !sectorsInPipeline.has(s));
-  // L-5/M-11: Fisher-Yates shuffle to avoid biased sort comparator
   const shuffledMissing = fisherYatesShuffle(missingSectors, rng);
-
-  // Early rounds: bias toward small/medium deals so players can afford first acquisitions
-  // Round 1: mostly small, 1-2 medium for variety
-  // Round 2: mix of small and medium
-  const isEarlyRound = round <= 2;
-  const getEarlyRoundSize = (index: number): DealSizePreference => {
-    if (!isEarlyRound) return maFocus?.sizePreference || 'any';
-    if (round === 1) return index < 2 ? 'medium' : 'small';
-    return index < 3 ? 'medium' : 'small'; // round 2
-  };
-  let earlyDealIndex = pipeline.length; // track index for size rotation
 
   for (const sectorId of shuffledMissing.slice(0, 3)) {
     if (pipeline.length >= MAX_DEALS) break;
-    const size = getEarlyRoundSize(earlyDealIndex++);
-    pipeline.push(generateDealWithSize(sectorId, round, size, portfolioEbitda, heatOpts, rng));
-    dealIdx++;
+    const t = pickTier();
+    pipeline.push(generateDealWithSize(sectorId, round, 'any', portfolioEbitda, heatOpts, rng, t, affordResult.stretched));
+
   }
 
   // 4. Fill remaining slots with weighted random deals
-  // H-4: Compute target once before loop to prevent infinite loop
   const targetPipelineLength = Math.min(MAX_DEALS, pipeline.length + targetNewDeals);
   while (pipeline.length < targetPipelineLength) {
     const sectorId = pickWeightedSector(round, maxRounds, rng);
-    const size = getEarlyRoundSize(earlyDealIndex++);
-    pipeline.push(generateDealWithSize(sectorId, round, size, portfolioEbitda, heatOpts, rng));
-    dealIdx++;
+    const t = pickTier();
+    pipeline.push(generateDealWithSize(sectorId, round, 'any', portfolioEbitda, heatOpts, rng, t, affordResult.stretched));
+
   }
 
   // Ensure at least 4 deals available
   while (pipeline.length < 4) {
     const sectorId = pickWeightedSector(round, maxRounds, rng);
-    const size = getEarlyRoundSize(earlyDealIndex++);
-    pipeline.push(generateDealWithSize(sectorId, round, size, portfolioEbitda, heatOpts, rng));
-    dealIdx++;
+    const t = pickTier();
+    pipeline.push(generateDealWithSize(sectorId, round, 'any', portfolioEbitda, heatOpts, rng, t, affordResult.stretched));
+
+  }
+
+  // Post-gen scarcity: enforce TIER_PIPELINE_COUNTS max per tier
+  const tierCounts: Record<DealSizeTier, number> = {
+    micro: 0, small: 0, mid_market: 0, upper_mid: 0,
+    institutional: 0, marquee: 0, trophy: 0,
+  };
+  // Count only new deals (freshness === 2) for scarcity enforcement
+  const newDealIndices: number[] = [];
+  for (let i = 0; i < pipeline.length; i++) {
+    if (pipeline[i].freshness >= 2) {
+      newDealIndices.push(i);
+    }
+  }
+  // Shuffle new deal indices for fair removal
+  const shuffledNew = rng ? fisherYatesShuffle(newDealIndices, rng) : [...newDealIndices];
+  const toRemove = new Set<number>();
+  for (const idx of shuffledNew) {
+    const deal = pipeline[idx];
+    const dealTier = getTierForEbitda(deal.business.ebitda);
+    tierCounts[dealTier] = (tierCounts[dealTier] || 0) + 1;
+    if (tierCounts[dealTier] > TIER_PIPELINE_COUNTS[dealTier].max) {
+      toRemove.add(idx);
+    }
+  }
+  if (toRemove.size > 0) {
+    pipeline = pipeline.filter((_, i) => !toRemove.has(i));
   }
 
   return pipeline;
 }
 
+
 // Generate distressed deals during Financial Crisis (3-4 deals at 30-50% off, Q2-3)
 export function generateDistressedDeals(
   round: number,
   maxRounds: number = 20,
-  rng?: SeededRng
+  rng?: SeededRng,
+  cash: number = 0,
 ): Deal[] {
   const deals: Deal[] = [];
   const count = randomInt(3, 4, rng);
 
+  // Compute affordability internally for tier selection
+  const affordResult = rng
+    ? calculateAffordability(cash, true, false, null, rng) // credit tightening = true during crisis
+    : { base: cash, stretched: cash, stretchFactor: 0, ipoBonus: 0 };
+  const tierWeights = getAffordabilityWeights(affordResult.stretched, cash);
+
   for (let i = 0; i < count; i++) {
     const sectorId = pickWeightedSector(round, maxRounds, rng);
     const multipleDiscount = 0.30 + (rng ? rng.next() : Math.random()) * 0.20; // 30-50% off
+    const tier = rng ? pickWeightedTier(tierWeights, rng) : 'micro';
 
     deals.push(generateDealWithSize(
       sectorId,
@@ -1205,7 +1251,9 @@ export function generateDistressedDeals(
         maxRounds,
         creditTighteningActive: true,
       },
-      rng
+      rng,
+      tier,
+      affordResult.stretched,
     ));
   }
 
@@ -1223,14 +1271,22 @@ export function generateDistressedDeals(
 export function generateRecessionDeals(
   round: number,
   maxRounds: number = 20,
-  rng?: SeededRng
+  rng?: SeededRng,
+  cash: number = 0,
 ): Deal[] {
   const deals: Deal[] = [];
   const count = randomInt(1, 2, rng);
 
+  // Compute affordability internally for tier selection
+  const affordResult = rng
+    ? calculateAffordability(cash, false, false, null, rng)
+    : { base: cash * 4, stretched: cash * 4, stretchFactor: 0, ipoBonus: 0 };
+  const tierWeights = getAffordabilityWeights(affordResult.stretched, cash);
+
   for (let i = 0; i < count; i++) {
     const sectorId = pickWeightedSector(round, maxRounds, rng);
     const multipleDiscount = 0.15 + (rng ? rng.next() : Math.random()) * 0.10; // 15-25% off
+    const tier = rng ? pickWeightedTier(tierWeights, rng) : 'micro';
 
     deals.push(generateDealWithSize(
       sectorId,
@@ -1245,7 +1301,9 @@ export function generateRecessionDeals(
         maxRounds,
         lastEventType: 'global_recession',
       },
-      rng
+      rng,
+      tier,
+      affordResult.stretched,
     ));
   }
 
@@ -1271,8 +1329,22 @@ export function generateSourcedDeals(
   creditTighteningActive: boolean = false,
   rng?: SeededRng,
   dealInflation: number = 0,
+  cash: number = 0,
+  ipoState: IPOState | null = null,
+  noNewDebt: boolean = false,
 ): Deal[] {
   const deals: Deal[] = [];
+
+  // Compute affordability for tier selection
+  const affordResult = rng
+    ? calculateAffordability(cash, creditTighteningActive, noNewDebt, ipoState, rng)
+    : { base: cash * 4, stretched: cash * 4, stretchFactor: 0, ipoBonus: 0 };
+  const weights = getAffordabilityWeights(affordResult.stretched, cash);
+  const pickTier = (pref: DealSizePreference = 'any'): DealSizeTier => {
+    if (pref !== 'any') return pref as DealSizeTier;
+    if (rng) return pickWeightedTier(weights, rng);
+    return 'small';
+  };
 
   // Build options based on MA sourcing tier
   const sourcingOptions: DealGenerationOptions = { source: 'sourced', maxRounds, creditTighteningActive, maSourcingTier: maSourcingTier as MASourcingTier, dealInflation };
@@ -1289,25 +1361,26 @@ export function generateSourcedDeals(
 
   // If M&A focus is set, 2 of 3 deals will be in that sector
   if (maFocus?.sectorId) {
-    deals.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda, sourcingOptions, rng));
-    deals.push(generateDealWithSize(maFocus.sectorId, round, maFocus.sizePreference, portfolioEbitda, sourcingOptions, rng));
+    const pref = maFocus.sizePreference;
+    deals.push(generateDealWithSize(maFocus.sectorId, round, pref, portfolioEbitda, sourcingOptions, rng, pickTier(pref), affordResult.stretched));
+    deals.push(generateDealWithSize(maFocus.sectorId, round, pref, portfolioEbitda, sourcingOptions, rng, pickTier(pref), affordResult.stretched));
 
     // Third deal from a different sector for variety
     const otherSector = portfolioFocusSector && portfolioFocusSector !== maFocus.sectorId
       ? portfolioFocusSector
       : pickWeightedSector(round, maxRounds, rng);
-    deals.push(generateDealWithSize(otherSector, round, maFocus.sizePreference, portfolioEbitda, sourcingOptions, rng));
+    deals.push(generateDealWithSize(otherSector, round, pref, portfolioEbitda, sourcingOptions, rng, pickTier(pref), affordResult.stretched));
   } else if (portfolioFocusSector) {
     // No M&A focus but have portfolio focus - generate deals in that sector
-    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda, sourcingOptions, rng));
-    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda, sourcingOptions, rng));
-    deals.push(generateDealWithSize(pickWeightedSector(round, maxRounds, rng), round, 'any', portfolioEbitda, sourcingOptions, rng));
+    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda, sourcingOptions, rng, pickTier(), affordResult.stretched));
+    deals.push(generateDealWithSize(portfolioFocusSector, round, 'any', portfolioEbitda, sourcingOptions, rng, pickTier(), affordResult.stretched));
+    deals.push(generateDealWithSize(pickWeightedSector(round, maxRounds, rng), round, 'any', portfolioEbitda, sourcingOptions, rng, pickTier(), affordResult.stretched));
   } else {
     // No focus set - generate diverse deals
     // M-11: Fisher-Yates shuffle to avoid biased sort comparator
     const sectors = fisherYatesShuffle([...SECTOR_LIST], rng).slice(0, 3);
     sectors.forEach(sector => {
-      deals.push(generateDealWithSize(sector.id, round, 'any', portfolioEbitda, sourcingOptions, rng));
+      deals.push(generateDealWithSize(sector.id, round, 'any', portfolioEbitda, sourcingOptions, rng, pickTier(), affordResult.stretched));
     });
   }
 
@@ -1328,13 +1401,28 @@ export function generateProactiveOutreachDeals(
   creditTighteningActive: boolean = false,
   rng?: SeededRng,
   dealInflation: number = 0,
+  cash: number = 0,
+  ipoState: IPOState | null = null,
+  noNewDebt: boolean = false,
 ): Deal[] {
   const deals: Deal[] = [];
   const sectorId = maFocus.sectorId ?? pickWeightedSector(round, maxRounds, rng);
 
+  // Compute affordability for tier selection
+  const affordResult = rng
+    ? calculateAffordability(cash, creditTighteningActive, noNewDebt, ipoState, rng)
+    : { base: cash * 4, stretched: cash * 4, stretchFactor: 0, ipoBonus: 0 };
+  const weights = getAffordabilityWeights(affordResult.stretched, cash);
+  const pref = maFocus.sizePreference || 'any';
+  const pickTier = (): DealSizeTier => {
+    if (pref !== 'any') return pref as DealSizeTier;
+    if (rng) return pickWeightedTier(weights, rng);
+    return 'small';
+  };
+
   for (let i = 0; i < 2; i++) {
     deals.push(generateDealWithSize(
-      sectorId, round, maFocus.sizePreference || 'any', portfolioEbitda,
+      sectorId, round, pref, portfolioEbitda,
       {
         subType: maFocus.subType ?? undefined,
         qualityFloor: 3,
@@ -1343,7 +1431,9 @@ export function generateProactiveOutreachDeals(
         creditTighteningActive,
         dealInflation,
       },
-      rng
+      rng,
+      pickTier(),
+      affordResult.stretched,
     ));
   }
 

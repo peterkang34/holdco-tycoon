@@ -72,4 +72,7 @@ export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   { pattern: /recurring.*bonus.*platform|platform.*recurring.*bonus/i, reason: 'Platform bonuses are ONE-TIME mutations at forge time.' },
   { pattern: /grace period/i, reason: 'Grace period not implemented in engine. Holdco amortizes from round 1.' },
   { pattern: /growth permanently reduced/i, reason: 'Integration growth drag is now proportional and decaying, not permanent. Changed in v26.' },
+  { pattern: /Small \(\$500k-\$1\.5M\)/i, reason: 'Old 3-tier deal size system removed in v28. Now 7-tier affordability system.', allow: ['changelog.ts'] },
+  { pattern: /Medium \(\$1\.5M-\$3M\)/i, reason: 'Old 3-tier deal size system removed in v28. Now 7-tier affordability system.', allow: ['changelog.ts'] },
+  { pattern: /Large \(\$3M\+\)/i, reason: 'Old 3-tier deal size system removed in v28. Now 7-tier affordability system.', allow: ['changelog.ts'] },
 ];

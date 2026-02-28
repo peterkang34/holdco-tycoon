@@ -43,30 +43,44 @@ describe('calculateSizeTierPremium', () => {
     expect(result.premium).toBeLessThanOrEqual(1.5);
   });
 
-  it('should return institutional_pe tier for $10-20M EBITDA', () => {
+  it('should return institutional_pe tier for $10-25M EBITDA', () => {
     const result = calculateSizeTierPremium(15000); // $15M
     expect(result.tier).toBe('institutional_pe');
     expect(result.premium).toBeGreaterThanOrEqual(1.5);
     expect(result.premium).toBeLessThanOrEqual(2.5);
   });
 
-  it('should return large_pe tier for $20M+ EBITDA', () => {
-    const result = calculateSizeTierPremium(25000); // $25M
+  it('should return large_pe tier for $25-50M EBITDA', () => {
+    const result = calculateSizeTierPremium(35000); // $35M
     expect(result.tier).toBe('large_pe');
     expect(result.premium).toBeGreaterThanOrEqual(2.5);
     expect(result.premium).toBeLessThanOrEqual(3.5);
   });
 
-  it('should cap premium at $30M EBITDA', () => {
-    const at30 = calculateSizeTierPremium(30000);
-    const at50 = calculateSizeTierPremium(50000);
-    expect(at30.premium).toBeCloseTo(3.5, 1);
-    expect(at50.premium).toBeCloseTo(3.5, 1);
+  it('should return mega_pe tier for $50-100M EBITDA', () => {
+    const result = calculateSizeTierPremium(75000); // $75M
+    expect(result.tier).toBe('mega_pe');
+    expect(result.premium).toBeGreaterThanOrEqual(3.5);
+    expect(result.premium).toBeLessThanOrEqual(4.5);
   });
 
-  it('should produce smooth interpolation across boundaries', () => {
+  it('should return strategic_public tier for $100M+ EBITDA', () => {
+    const result = calculateSizeTierPremium(200000); // $200M
+    expect(result.tier).toBe('strategic_public');
+    expect(result.premium).toBeGreaterThanOrEqual(4.5);
+    expect(result.premium).toBeLessThanOrEqual(5.5);
+  });
+
+  it('should cap strategic_public premium at $300M EBITDA', () => {
+    const at300 = calculateSizeTierPremium(300000);
+    const at500 = calculateSizeTierPremium(500000);
+    expect(at300.premium).toBeCloseTo(5.5, 1);
+    expect(at500.premium).toBeCloseTo(5.5, 1);
+  });
+
+  it('should produce smooth interpolation up to $300M', () => {
     const premiums: number[] = [];
-    for (let ebitda = 0; ebitda <= 30000; ebitda += 500) {
+    for (let ebitda = 0; ebitda <= 300000; ebitda += 5000) {
       premiums.push(calculateSizeTierPremium(ebitda).premium);
     }
     // Each premium should be >= the previous (monotonically increasing)

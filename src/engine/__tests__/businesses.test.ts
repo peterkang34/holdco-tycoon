@@ -147,35 +147,53 @@ describe('generateDeal', () => {
 });
 
 describe('generateDealWithSize', () => {
-  it('should generate smaller deals with "small" preference', () => {
-    const smallDeals: number[] = [];
-    const anyDeals: number[] = [];
-
-    for (let i = 0; i < 30; i++) {
-      smallDeals.push(generateDealWithSize('agency', 5, 'small').business.ebitda);
-      anyDeals.push(generateDealWithSize('agency', 5, 'any').business.ebitda);
+  it('should generate micro-tier deals with EBITDA in $500K-$1.5M range', () => {
+    for (let i = 0; i < 20; i++) {
+      const deal = generateDealWithSize('agency', 5, 'micro');
+      expect(deal.business.ebitda).toBeGreaterThanOrEqual(500);
+      expect(deal.business.ebitda).toBeLessThanOrEqual(1500);
     }
-
-    const avgSmall = smallDeals.reduce((a, b) => a + b, 0) / smallDeals.length;
-    const avgAny = anyDeals.reduce((a, b) => a + b, 0) / anyDeals.length;
-
-    // Small deals should on average have lower EBITDA
-    expect(avgSmall).toBeLessThan(avgAny * 1.1); // Allow some randomness tolerance
   });
 
-  it('should generate larger deals with "large" preference', () => {
-    const largeDeals: number[] = [];
-    const anyDeals: number[] = [];
-
-    for (let i = 0; i < 30; i++) {
-      largeDeals.push(generateDealWithSize('agency', 5, 'large').business.ebitda);
-      anyDeals.push(generateDealWithSize('agency', 5, 'any').business.ebitda);
+  it('should generate institutional-tier deals with EBITDA in $25M-$50M range', () => {
+    for (let i = 0; i < 20; i++) {
+      const deal = generateDealWithSize('agency', 5, 'institutional');
+      expect(deal.business.ebitda).toBeGreaterThanOrEqual(25000);
+      expect(deal.business.ebitda).toBeLessThanOrEqual(50000);
     }
+  });
 
-    const avgLarge = largeDeals.reduce((a, b) => a + b, 0) / largeDeals.length;
-    const avgAny = anyDeals.reduce((a, b) => a + b, 0) / anyDeals.length;
+  it('should generate trophy-tier deals with EBITDA >= $75M', async () => {
+    const { SeededRng } = await import('../../engine/rng');
+    const rng = new SeededRng(42);
+    for (let i = 0; i < 10; i++) {
+      const deal = generateDealWithSize('saas', 10, 'trophy', 0, {}, rng, 'trophy', 1000000);
+      expect(deal.business.ebitda).toBeGreaterThanOrEqual(75000);
+    }
+  });
 
-    expect(avgLarge).toBeGreaterThan(avgAny * 0.9);
+  it('should enforce quality floors per tier', () => {
+    for (let i = 0; i < 30; i++) {
+      const deal = generateDealWithSize('agency', 5, 'institutional');
+      // Institutional tier has quality floor of 3
+      expect(deal.business.qualityRating).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('should apply entry multiple adder for higher tiers', () => {
+    const microDeals: number[] = [];
+    const institutionalDeals: number[] = [];
+    for (let i = 0; i < 30; i++) {
+      const micro = generateDealWithSize('saas', 5, 'micro');
+      const inst = generateDealWithSize('saas', 5, 'institutional');
+      // Implied multiple = acquisitionPrice / ebitda
+      microDeals.push(micro.business.acquisitionPrice / micro.business.ebitda);
+      institutionalDeals.push(inst.business.acquisitionPrice / inst.business.ebitda);
+    }
+    const avgMicro = microDeals.reduce((a, b) => a + b, 0) / microDeals.length;
+    const avgInst = institutionalDeals.reduce((a, b) => a + b, 0) / institutionalDeals.length;
+    // Institutional has +1.0x adder, so average multiple should be notably higher
+    expect(avgInst).toBeGreaterThan(avgMicro + 0.5);
   });
 
   it('should set freshness to 2 (deals last 2 years)', () => {
@@ -699,18 +717,18 @@ describe('Revenue & Margin: generateDealWithSize', () => {
     resetBusinessIdCounter();
   });
 
-  it('should scale revenue when generating larger deals', () => {
-    const smallDeals: number[] = [];
-    const largeDeals: number[] = [];
+  it('should scale revenue when generating larger tier deals', () => {
+    const microDeals: number[] = [];
+    const midMarketDeals: number[] = [];
     for (let i = 0; i < 30; i++) {
-      const small = generateDealWithSize('saas', 5, 'small');
-      const large = generateDealWithSize('saas', 5, 'large');
-      smallDeals.push(small.business.revenue);
-      largeDeals.push(large.business.revenue);
+      const micro = generateDealWithSize('saas', 5, 'micro');
+      const midMarket = generateDealWithSize('saas', 5, 'mid_market');
+      microDeals.push(micro.business.revenue);
+      midMarketDeals.push(midMarket.business.revenue);
     }
-    const avgSmall = smallDeals.reduce((a, b) => a + b, 0) / smallDeals.length;
-    const avgLarge = largeDeals.reduce((a, b) => a + b, 0) / largeDeals.length;
-    expect(avgLarge).toBeGreaterThan(avgSmall);
+    const avgMicro = microDeals.reduce((a, b) => a + b, 0) / microDeals.length;
+    const avgMidMarket = midMarketDeals.reduce((a, b) => a + b, 0) / midMarketDeals.length;
+    expect(avgMidMarket).toBeGreaterThan(avgMicro);
   });
 
   it('should maintain revenue × margin ≈ EBITDA relationship in deals', () => {

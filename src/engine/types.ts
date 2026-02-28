@@ -24,8 +24,8 @@ export type GameDuration = 'standard' | 'quick';  // 20 or 10 rounds
 
 export type ConcentrationLevel = 'low' | 'medium' | 'high';
 
-export type BuyerPoolTier = 'individual' | 'small_pe' | 'lower_middle_pe' | 'institutional_pe' | 'large_pe';
-export type BuyerType = 'individual' | 'family_office' | 'small_pe' | 'lower_middle_pe' | 'institutional_pe' | 'large_pe' | 'strategic';
+export type BuyerPoolTier = 'individual' | 'small_pe' | 'lower_middle_pe' | 'institutional_pe' | 'large_pe' | 'mega_pe' | 'strategic_public';
+export type BuyerType = 'individual' | 'family_office' | 'small_pe' | 'lower_middle_pe' | 'institutional_pe' | 'large_pe' | 'mega_pe' | 'strategic_public' | 'strategic';
 
 export interface BuyerProfile {
   name: string;
@@ -310,7 +310,8 @@ export type DistressLevel = 'comfortable' | 'elevated' | 'stressed' | 'breach';
 
 export type GamePhase = 'collect' | 'event' | 'allocate' | 'restructure';
 
-export type DealSizePreference = 'small' | 'medium' | 'large' | 'any';
+export type DealSizeTier = 'micro' | 'small' | 'mid_market' | 'upper_mid' | 'institutional' | 'marquee' | 'trophy';
+export type DealSizePreference = DealSizeTier | 'any';
 
 export interface MAFocus {
   sectorId: SectorId | null; // null = any sector

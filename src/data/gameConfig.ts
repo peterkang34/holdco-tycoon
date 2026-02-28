@@ -1,4 +1,4 @@
-import type { GameDifficulty, GameDuration } from '../engine/types';
+import type { GameDifficulty, GameDuration, DealSizeTier } from '../engine/types';
 
 export const DIFFICULTY_CONFIG = {
   easy: {
@@ -172,6 +172,59 @@ export const DEAL_INFLATION_RATE = 0.5;       // +0.5x per year past start
 export const DEAL_INFLATION_CAP = 3.0;        // max +3.0x
 export const DEAL_INFLATION_CRISIS_RESET = 2.0; // Financial Crisis reduces by 2.0x
 export const DEAL_INFLATION_CRISIS_DURATION = 2; // crisis reset lasts 2 rounds
+
+// ── 7-Tier EBITDA System ──
+
+export const DEAL_SIZE_TIERS: Record<DealSizeTier, { min: number; max: number | null; qualityFloor: number | undefined; multipleAdder: number }> = {
+  micro:         { min: 500,    max: 1500,   qualityFloor: undefined, multipleAdder: 0   },
+  small:         { min: 1500,   max: 4000,   qualityFloor: undefined, multipleAdder: 0   },
+  mid_market:    { min: 4000,   max: 10000,  qualityFloor: undefined, multipleAdder: 0   },
+  upper_mid:     { min: 10000,  max: 25000,  qualityFloor: 2,        multipleAdder: 0.5 },
+  institutional: { min: 25000,  max: 50000,  qualityFloor: 3,        multipleAdder: 1.0 },
+  marquee:       { min: 50000,  max: 75000,  qualityFloor: 3,        multipleAdder: 1.5 },
+  trophy:        { min: 75000,  max: null,   qualityFloor: 4,        multipleAdder: 2.0 },
+};
+
+// Affordability
+export const AFFORDABILITY_LBO_MULTIPLIER = 4;
+export const STRETCH_FACTOR_MAX = 0.50;
+export const IPO_AFFORDABILITY_DISCOUNT = 0.25;
+
+// Pipeline concentration penalty
+export const CONCENTRATION_CASH_THRESHOLD = 0.60;
+export const CONCENTRATION_WEIGHT_PENALTY = 0.30;
+
+// Trophy tier scaling
+export const TROPHY_BASE_MIN = 75000;
+export const TROPHY_BASE_MAX = 150000;
+export const TROPHY_SCALE_ACTIVATION = 600000;
+export const TROPHY_SCALE_CAP = 4.0;
+
+// Buyer premium cap
+export const BUYER_PREMIUM_EBITDA_CAP = 300000;
+export const BUYER_PREMIUM_MAX = 5.5;
+
+// Pipeline scarcity
+export const TIER_PIPELINE_COUNTS: Record<DealSizeTier, { min: number; max: number }> = {
+  micro:         { min: 4, max: 6 },
+  small:         { min: 4, max: 6 },
+  mid_market:    { min: 3, max: 5 },
+  upper_mid:     { min: 3, max: 4 },
+  institutional: { min: 2, max: 4 },
+  marquee:       { min: 2, max: 3 },
+  trophy:        { min: 1, max: 2 },
+};
+
+// Pipeline tier floor costs (min EBITDA * typical entry multiple)
+export const TIER_FLOOR_COSTS: Record<DealSizeTier, number> = {
+  micro:         2500,
+  small:         7500,
+  mid_market:    24000,
+  upper_mid:     70000,
+  institutional: 200000,
+  marquee:       425000,
+  trophy:        675000,
+};
 
 // ── 20-Year Mode: Final Countdown ──
 

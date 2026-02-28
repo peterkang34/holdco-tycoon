@@ -598,6 +598,42 @@ export function migrateV26ToV27(): void {
 }
 
 /**
+ * v27→v28: 7-tier EBITDA system
+ * Map old sizePreference values to new DealSizeTier values:
+ *   'small' → 'micro' (old small was $500K-$1.5M = new micro)
+ *   'medium' → 'small' (old medium was $1.5M-$3M ≈ new small)
+ *   'large' → 'mid_market' (old large was $3M+ ≈ new mid_market)
+ *   'any' → 'any' (unchanged)
+ */
+function migrateV27ToV28(): void {
+  const v27Key = 'holdco-tycoon-save-v27';
+  const v28Key = 'holdco-tycoon-save-v28';
+  if (localStorage.getItem(v28Key)) return;
+  try {
+    const raw = localStorage.getItem(v27Key);
+    if (!raw) return;
+    const v27Data = JSON.parse(raw);
+
+    // Map sizePreference in maFocus (handles null/undefined/missing gracefully)
+    if (v27Data.state?.maFocus) {
+      const sizeMap: Record<string, string> = {
+        small: 'micro',
+        medium: 'small',
+        large: 'mid_market',
+        any: 'any',
+      };
+      const oldPref = v27Data.state.maFocus.sizePreference;
+      v27Data.state.maFocus.sizePreference = sizeMap[oldPref] ?? 'any';
+    }
+
+    localStorage.setItem(v28Key, JSON.stringify(v27Data));
+    localStorage.removeItem(v27Key);
+  } catch (e) {
+    console.error('v27→v28 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -620,4 +656,5 @@ export function runAllMigrations(): void {
   migrateV24ToV25();
   migrateV25ToV26();
   migrateV26ToV27();
+  migrateV27ToV28();
 }

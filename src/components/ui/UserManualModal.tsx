@@ -249,6 +249,29 @@ function AcquiringContent() {
         sourced, or proprietary (the rarest and best).
       </P>
 
+      <SubHeading>Deal Size Tiers</SubHeading>
+      <P>
+        Deals are categorized into 7 tiers based on EBITDA. The deals you see scale with what you can
+        afford &mdash; your cash multiplied by leverage, with a random stretch factor each round.
+        Higher tiers have quality floors and entry multiple premiums that compress returns.
+      </P>
+      <DataTable
+        headers={['Tier', 'EBITDA Range', 'Quality Floor', 'Multiple Adder']}
+        rows={[
+          ['Micro', '$500K-$1.5M', 'None', '+0.0x'],
+          ['Small', '$1.5M-$4M', 'None', '+0.0x'],
+          ['Mid-Market', '$4M-$10M', 'None', '+0.0x'],
+          ['Upper-Mid', '$10M-$25M', 'Q2+', '+0.5x'],
+          ['Institutional', '$25M-$50M', 'Q3+', '+1.0x'],
+          ['Marquee', '$50M-$75M', 'Q3+', '+1.5x'],
+          ['Trophy', '$75M+', 'Q4+', '+2.0x'],
+        ]}
+      />
+      <P>
+        Use M&amp;A Focus to target a specific tier. Higher tiers appear less frequently in the
+        pipeline &mdash; Trophy deals are capped at 1-2 per round regardless of your wealth.
+      </P>
+
       <SubHeading>Deal Heat</SubHeading>
       <P>
         Each deal has a competitive heat level that affects the effective price you pay:
