@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { MetricCard } from '../ui/MetricCard';
 
 // ── Types ────────────────────────────────────────────────────────
@@ -67,6 +67,10 @@ export function FeedbackTab({ token }: { token: string }) {
   const [statusFilter, setStatusFilter] = useState<'all' | FeedbackStatus>('all');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
 
+  // Ref to avoid stale closure in updateEntry
+  const feedbackRef = useRef(feedbackData);
+  feedbackRef.current = feedbackData;
+
   // Fetch feedback data
   useEffect(() => {
     fetch('/api/admin/feedback', {
@@ -86,11 +90,12 @@ export function FeedbackTab({ token }: { token: string }) {
     id: string,
     updates: { status?: FeedbackStatus; priority?: FeedbackPriority; note?: string }
   ) => {
-    if (!feedbackData) return;
+    const data = feedbackRef.current;
+    if (!data) return;
     setUpdatingId(id);
 
-    // Find current entry to get existing fields
-    const current = feedbackData.entries.find(e => e.id === id);
+    // Read from ref (always current) to avoid stale closure
+    const current = data.entries.find(e => e.id === id);
     if (!current) { setUpdatingId(null); return; }
 
     const patchBody = {
@@ -103,7 +108,8 @@ export function FeedbackTab({ token }: { token: string }) {
     // Optimistic update
     setFeedbackData(prev => {
       if (!prev) return prev;
-      const oldStatus = current.status;
+      const entry = prev.entries.find(e => e.id === id);
+      const oldStatus = entry?.status ?? current.status;
       const newStatus = patchBody.status;
       const newStatusCounts = { ...prev.statusCounts };
       if (oldStatus !== newStatus) {
@@ -138,11 +144,17 @@ export function FeedbackTab({ token }: { token: string }) {
         if (refetch.ok) setFeedbackData(await refetch.json());
       }
     } catch {
-      // Revert on network error
+      // Revert on network error — refetch
+      try {
+        const refetch = await fetch('/api/admin/feedback', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (refetch.ok) setFeedbackData(await refetch.json());
+      } catch { /* truly offline — optimistic state stands */ }
     } finally {
       setUpdatingId(null);
     }
-  }, [feedbackData, token]);
+  }, [token]);
 
   // Sort: unresolved first, bugs before features, newest within same status
   const sortedEntries = useMemo(() => {
@@ -192,7 +204,7 @@ export function FeedbackTab({ token }: { token: string }) {
       </div>
 
       {/* Type filter pills */}
-      <div className="flex gap-2 mb-2">
+      <div className="flex gap-2 mb-2 flex-wrap">
         {(['all', 'bug', 'feature', 'other'] as const).map(f => (
           <button
             key={f}
@@ -200,7 +212,7 @@ export function FeedbackTab({ token }: { token: string }) {
             className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
               typeFilter === f
                 ? 'bg-accent text-white'
-                : 'bg-bg-secondary text-text-muted hover:text-text-primary'
+                : 'bg-white/8 text-text-muted hover:text-text-primary'
             }`}
           >
             {f === 'all' ? 'All Types' : f.charAt(0).toUpperCase() + f.slice(1)}
@@ -215,7 +227,7 @@ export function FeedbackTab({ token }: { token: string }) {
           className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
             statusFilter === 'all'
               ? 'bg-accent text-white'
-              : 'bg-bg-secondary text-text-muted hover:text-text-primary'
+              : 'bg-white/8 text-text-muted hover:text-text-primary'
           }`}
         >
           All Statuses
@@ -227,7 +239,7 @@ export function FeedbackTab({ token }: { token: string }) {
             className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
               statusFilter === s
                 ? STATUS_BADGE[s]
-                : 'bg-bg-secondary text-text-muted hover:text-text-primary'
+                : 'bg-white/8 text-text-muted hover:text-text-primary'
             }`}
           >
             {STATUS_LABELS[s]}
@@ -242,7 +254,7 @@ export function FeedbackTab({ token }: { token: string }) {
             key={entry.id}
             className={`card p-4 transition-opacity ${
               entry.status === 'deployed' ? 'opacity-50' : ''
-            } ${entry.priority === 'critical' ? 'border-l-2 border-l-danger' : ''}`}
+            } ${entry.priority === 'critical' ? 'shadow-[inset_3px_0_0_var(--color-danger)]' : ''}`}
           >
             <div className="flex items-start justify-between gap-3 mb-2">
               <div className="flex items-center gap-2 flex-wrap">
@@ -254,23 +266,23 @@ export function FeedbackTab({ token }: { token: string }) {
                 <span className={`text-xs px-2 py-0.5 rounded font-medium ${TYPE_BADGE[entry.type]}`}>
                   {entry.type}
                 </span>
-                {/* Priority badge (bugs only) */}
+                {/* Priority badge */}
                 {entry.priority && (
                   <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
                     entry.priority === 'critical' ? 'bg-danger/30 text-danger' :
                     entry.priority === 'high' ? 'bg-warning/20 text-warning' :
-                    'bg-white/5 text-text-muted'
+                    'bg-white/5 text-text-secondary'
                   }`}>
                     {entry.priority}
                   </span>
                 )}
               </div>
-              <span className="text-[10px] text-text-muted shrink-0">
+              <span className="text-[10px] text-text-secondary shrink-0">
                 {new Date(entry.date).toLocaleString()}
               </span>
             </div>
 
-            <p className="text-sm text-text-primary whitespace-pre-wrap mb-3">{entry.message}</p>
+            <p className="text-sm text-text-primary whitespace-pre-wrap break-words mb-3">{entry.message}</p>
 
             {/* Context tags */}
             <div className="flex flex-wrap gap-1.5 mb-3">
@@ -293,18 +305,19 @@ export function FeedbackTab({ token }: { token: string }) {
                 <span className="text-[10px] bg-white/5 text-text-muted px-1.5 py-0.5 rounded">{entry.context.device}</span>
               )}
               {entry.email && (
-                <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded">{entry.email}</span>
+                <span className="text-[10px] bg-accent/10 text-accent px-1.5 py-0.5 rounded max-w-[200px] truncate" title={entry.email}>{entry.email}</span>
               )}
             </div>
 
             {/* Admin controls */}
-            <div className="flex items-center gap-3 pt-2 border-t border-border/30">
+            <div className="flex items-center gap-3 pt-2 border-t border-border/30 flex-wrap">
               {/* Status dropdown */}
               <select
+                aria-label="Status"
                 value={entry.status}
                 onChange={(e) => updateEntry(entry.id, { status: e.target.value as FeedbackStatus })}
                 disabled={updatingId === entry.id}
-                className="text-xs bg-bg-primary border border-border rounded px-2 py-1 text-text-secondary focus:outline-none focus:border-accent"
+                className="appearance-none text-xs bg-bg-primary border border-border rounded px-2 py-1 text-text-secondary focus:outline-none focus:border-accent"
               >
                 {STATUS_ORDER.map(s => (
                   <option key={s} value={s}>{STATUS_LABELS[s]}</option>
@@ -314,12 +327,13 @@ export function FeedbackTab({ token }: { token: string }) {
               {/* Priority dropdown (bugs only) */}
               {entry.type === 'bug' && (
                 <select
+                  aria-label="Priority"
                   value={entry.priority || ''}
                   onChange={(e) => updateEntry(entry.id, {
                     priority: e.target.value ? e.target.value as FeedbackPriority : undefined,
                   })}
                   disabled={updatingId === entry.id}
-                  className="text-xs bg-bg-primary border border-border rounded px-2 py-1 text-text-secondary focus:outline-none focus:border-accent"
+                  className="appearance-none text-xs bg-bg-primary border border-border rounded px-2 py-1 text-text-secondary focus:outline-none focus:border-accent"
                 >
                   <option value="">No priority</option>
                   {PRIORITIES.map(p => (
@@ -331,7 +345,9 @@ export function FeedbackTab({ token }: { token: string }) {
               {/* Note input */}
               <input
                 type="text"
+                aria-label="Admin note"
                 placeholder="Admin note..."
+                key={entry.id + (entry.updatedAt || '')}
                 defaultValue={entry.note || ''}
                 maxLength={500}
                 onBlur={(e) => {
@@ -341,12 +357,12 @@ export function FeedbackTab({ token }: { token: string }) {
                   }
                 }}
                 disabled={updatingId === entry.id}
-                className="flex-1 text-xs bg-bg-primary border border-border rounded px-2 py-1 text-text-secondary placeholder:text-text-muted/50 focus:outline-none focus:border-accent"
+                className="flex-1 min-w-[120px] text-xs bg-bg-primary border border-border rounded px-2 py-1 text-text-secondary placeholder:text-text-muted/50 focus:outline-none focus:border-accent"
               />
 
-              {updatingId === entry.id && (
-                <span className="text-[10px] text-text-muted animate-pulse">Saving...</span>
-              )}
+              <span aria-live="polite" className="text-[10px] text-text-muted">
+                {updatingId === entry.id && <span className="animate-pulse">Saving...</span>}
+              </span>
             </div>
           </div>
         ))}

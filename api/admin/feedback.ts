@@ -33,9 +33,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: `priority must be one of: ${VALID_PRIORITIES.join(', ')}` });
       }
 
-      // Sanitize optional note
-      const sanitizedNote = note
-        ? String(note).slice(0, 500).replace(/[<>]/g, '')
+      // Sanitize note (allow empty string to clear)
+      const sanitizedNote = typeof note === 'string'
+        ? note.slice(0, 500).replace(/[<>]/g, '').trim()
         : undefined;
 
       const statusObj: Record<string, unknown> = {
