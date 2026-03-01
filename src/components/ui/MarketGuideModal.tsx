@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { SECTOR_LIST } from '../../data/sectors';
+import { SECTOR_LIST_STANDARD } from '../../data/sectors';
 import { formatMoney, formatPercent } from '../../engine/types';
 
 interface MarketGuideModalProps {
@@ -12,7 +12,7 @@ export function MarketGuideModal({ onClose }: MarketGuideModalProps) {
   const [sortBy, setSortBy] = useState<SortBy>('multiple');
 
   // Calculate derived metrics for each sector
-  const sectorsWithMetrics = SECTOR_LIST.map(sector => {
+  const sectorsWithMetrics = SECTOR_LIST_STANDARD.map(sector => {
     const avgMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
     const avgEbitda = (sector.baseEbitda[0] + sector.baseEbitda[1]) / 2;
     const avgGrowth = (sector.organicGrowthRange[0] + sector.organicGrowthRange[1]) / 2;

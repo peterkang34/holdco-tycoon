@@ -22,7 +22,7 @@ import {
 } from '../../engine/types';
 import { getDistressRestrictions, calculateCovenantHeadroom } from '../../engine/distress';
 import { EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EQUITY_ISSUANCE_SENTIMENT_PENALTY, EARNOUT_EXPIRATION_YEARS, MIN_FOUNDER_OWNERSHIP, MIN_PUBLIC_FOUNDER_OWNERSHIP, IPO_MIN_EBITDA, IPO_MIN_BUSINESSES, IPO_MIN_AVG_QUALITY, IPO_MIN_PLATFORMS } from '../../data/gameConfig';
-import { SECTOR_LIST } from '../../data/sectors';
+import { SECTOR_LIST, SECTOR_LIST_STANDARD } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
 import { generateDealStructures, getStructureLabel, getStructureDescription } from '../../engine/deals';
@@ -1484,7 +1484,7 @@ export function AllocatePhase({
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   >
                     <option value="">Any Sector</option>
-                    {SECTOR_LIST.map(sector => (
+                    {(isFamilyOfficeMode ? SECTOR_LIST : SECTOR_LIST_STANDARD).map(sector => (
                       <option key={sector.id} value={sector.id}>
                         {sector.emoji} {sector.name}
                       </option>

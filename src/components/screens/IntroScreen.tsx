@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { SectorId, GameDifficulty, GameDuration } from '../../engine/types';
-import { SECTOR_LIST } from '../../data/sectors';
+import { SECTOR_LIST_STANDARD } from '../../data/sectors';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { ChangelogModal } from '../ui/ChangelogModal';
 import { UserManualModal } from '../ui/UserManualModal';
@@ -51,9 +51,9 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
       return;
     }
     const sector = selectedSector === 'random'
-      ? SECTOR_LIST[challengeData?.seed != null
-          ? Math.abs(challengeData.seed) % SECTOR_LIST.length
-          : Math.floor(Math.random() * SECTOR_LIST.length)].id
+      ? SECTOR_LIST_STANDARD[challengeData?.seed != null
+          ? Math.abs(challengeData.seed) % SECTOR_LIST_STANDARD.length
+          : Math.floor(Math.random() * SECTOR_LIST_STANDARD.length)].id
       : selectedSector;
     onStart(holdcoName.trim(), sector, selectedDifficulty, selectedDuration, challengeData?.seed);
   };
@@ -65,7 +65,7 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
       return;
     }
     const sector = selectedSector === 'random'
-      ? SECTOR_LIST[Math.abs(createdChallengeSeed!) % SECTOR_LIST.length].id
+      ? SECTOR_LIST_STANDARD[Math.abs(createdChallengeSeed!) % SECTOR_LIST_STANDARD.length].id
       : selectedSector;
     // Start with the created challenge seed
     onStart(holdcoName.trim(), sector, challengeDifficulty, challengeDuration, createdChallengeSeed!);
@@ -282,7 +282,7 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
                 <span className="text-[11px] text-text-muted ml-2">— sector revealed on launch</span>
               </button>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-                {SECTOR_LIST.map(sector => (
+                {SECTOR_LIST_STANDARD.map(sector => (
                   <button
                     key={sector.id}
                     type="button"
