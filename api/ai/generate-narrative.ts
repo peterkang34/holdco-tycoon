@@ -100,6 +100,54 @@ ${context.narrativeToneGuidance ? `- VOICE/TONE: ${context.narrativeToneGuidance
 Write 3-4 sentences in a shareholder letter style. Keep it under 80 words. Respond with just the narrative text.`;
 }
 
+function buildFamilyOfficeChroniclePrompt(context: Record<string, unknown>): string {
+  // Build strategic context section
+  const strategicLines: string[] = [];
+  if (context.platformCount && (context.platformCount as number) > 0) {
+    strategicLines.push(`- Platforms: ${context.platformCount} (with ${context.totalBoltOns || 0} bolt-on acquisitions)`);
+  }
+  if (context.sectors) strategicLines.push(`- Sectors: ${context.sectors}`);
+  if (context.founderEquityValue) strategicLines.push(`- Founder Equity Value: ${context.founderEquityValue}`);
+  const strategicSection = strategicLines.length > 0 ? `\nSTRATEGIC POSITION:\n${strategicLines.join('\n')}` : '';
+
+  return `You are writing the annual chronicle for a family office — a generational wealth institution managing a permanent capital portfolio. This is NOT a startup holdco or PE fund. The tone should be contemplative, institutional, and legacy-focused — think stewardship, permanence, and generational wealth.
+
+FAMILY OFFICE: ${context.holdcoName} Family Office
+${context.foRound || `YEAR: ${context.year}`}
+
+FAMILY OFFICE CONTEXT:
+- Starting Capital: ${context.foStartingCash || 'N/A'}
+- Philanthropy Committed: ${context.foPhilanthropyAmount || 'N/A'}
+- Current MOIC: ${context.foCurrentMOIC || 'N/A'}
+
+KEY FINANCIALS:
+${context.totalRevenue ? `- Revenue: ${context.totalRevenue}${context.revenueGrowth ? ` [${context.revenueGrowth} YoY]` : ''}\n` : ''}- EBITDA: ${context.totalEbitda}${context.prevTotalEbitda ? ` (prior: ${context.prevTotalEbitda})` : ''}${context.ebitdaGrowth ? ` [${context.ebitdaGrowth} YoY]` : ''}
+${context.avgMargin ? `- Avg EBITDA Margin: ${context.avgMargin}${context.marginChange ? ` [${context.marginChange} vs prior year]` : ''}\n` : ''}- Net Debt/EBITDA: ${context.leverage}
+- FCF: ${context.fcf}
+- Portfolio: ${context.portfolioCount} companies
+${strategicSection}
+
+THIS YEAR'S ACTIVITY:
+${context.actions || 'A quiet year of stewardship and portfolio monitoring'}
+
+MARKET: ${context.marketConditions || 'Normal'}
+${context.concerns ? `\nCONCERNS: ${context.concerns}` : ''}
+${context.positives ? `\nBRIGHT SPOTS: ${context.positives}` : ''}
+
+WRITING GUIDELINES:
+- Frame everything through the lens of institutional stewardship and generational permanence
+- This is a family office deploying permanent capital — not a fund with a return deadline
+- If the portfolio includes a pro sports franchise, reference it as a legacy/trophy asset
+- Lead with the most significant development (acquisition, operational progress, strategic positioning)
+- Mention specific actions taken (acquisitions by name, improvements) when available
+- Include financial context but frame it around MOIC progression and capital deployment
+- Use ONLY the exact financial figures provided above — do NOT invent, calculate, or round your own numbers
+- Do NOT mention portfolio quality ratings or scores
+${context.narrativeToneGuidance ? `- VOICE/TONE: ${context.narrativeToneGuidance}` : ''}
+
+Write 3-4 sentences in a shareholder letter style befitting a family office annual review. Keep it under 80 words. Respond with just the narrative text.`;
+}
+
 function buildDealStoryPrompt(context: Record<string, unknown>): string {
   const archetypeContext = context.sellerArchetype ? `\nSELLER ARCHETYPE: ${String(context.sellerArchetype).replace(/_/g, ' ')}` : '';
   const archetypeGuidance: Record<string, string> = {
@@ -163,7 +211,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         prompt = buildBusinessUpdatePrompt(context);
         break;
       case 'year_chronicle':
-        prompt = buildYearChroniclePrompt(context);
+        prompt = context.isFamilyOfficeMode
+          ? buildFamilyOfficeChroniclePrompt(context)
+          : buildYearChroniclePrompt(context);
         break;
       case 'deal_story':
         prompt = buildDealStoryPrompt(context);

@@ -60,6 +60,12 @@ export interface ChronicleContext {
   narrativeToneGuidance?: string;
   // Game progression
   maxRounds?: number;
+  // Family Office mode
+  isFamilyOfficeMode?: boolean;
+  foStartingCash?: string;
+  foPhilanthropyAmount?: string;
+  foCurrentMOIC?: string;
+  foRound?: string;
 }
 
 /**
@@ -296,7 +302,7 @@ export function buildChronicleContext(state: GameState): ChronicleContext {
     sectors,
   );
 
-  return {
+  const context: ChronicleContext = {
     holdcoName: state.holdcoName,
     year: state.round,
     totalEbitda: formatMoney(metrics.totalEbitda),
@@ -334,4 +340,19 @@ export function buildChronicleContext(state: GameState): ChronicleContext {
     narrativeToneGuidance: getNarrativePhase(state.round, state.maxRounds).toneGuidance,
     maxRounds: state.maxRounds,
   };
+
+  // Family Office mode — override tone and add FO-specific fields
+  if (state.isFamilyOfficeMode && state.familyOfficeState) {
+    const fo = state.familyOfficeState;
+    const foFEV = calculateFounderEquityValue(state);
+    const currentMOIC = fo.foStartingCash > 0 ? foFEV / fo.foStartingCash : 0;
+    context.isFamilyOfficeMode = true;
+    context.foStartingCash = formatMoney(fo.foStartingCash);
+    context.foPhilanthropyAmount = formatMoney(fo.philanthropyDeduction);
+    context.foCurrentMOIC = `${currentMOIC.toFixed(2)}x`;
+    context.foRound = `Year ${state.round} of ${state.maxRounds}`;
+    context.narrativeToneGuidance = 'Contemplative and institutional. This is a family office — emphasize stewardship, generational permanence, and legacy building. Avoid startup energy or scrappy holdco vibes.';
+  }
+
+  return context;
 }

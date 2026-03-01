@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'March 1, 2026',
+    title: 'Family Office Overhaul',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Family Office tutorial modal — a 4-page amber-themed walkthrough explains FO capital, restrictions, scoring, and strategy when you first enter FO mode.',
+          'AI narratives now recognize Family Office mode — year chronicles reference stewardship, legacy, MOIC progress, and institutional tone instead of generic holdco building.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 1, 2026',
     title: 'Shareholder Distributions Redesign',
     sections: [
       {

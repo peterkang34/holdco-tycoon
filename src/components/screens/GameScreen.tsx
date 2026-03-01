@@ -13,6 +13,7 @@ import { EventPhase } from '../phases/EventPhase';
 import { AllocatePhase } from '../phases/AllocatePhase';
 import { RestructurePhase } from '../phases/RestructurePhase';
 import { InstructionsModal } from '../ui/InstructionsModal';
+import { FamilyOfficeTutorialModal } from '../ui/FamilyOfficeTutorialModal';
 import { AnnualReportModal } from '../ui/AnnualReportModal';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { UserManualModal } from '../ui/UserManualModal';
@@ -30,6 +31,7 @@ import { MIN_OPCOS_FOR_SHARED_SERVICES } from '../../data/sharedServices';
 import { buildChallengeUrl, copyToClipboard } from '../../utils/challenge';
 
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
+const FO_TUTORIAL_SEEN_KEY = 'holdco-tycoon-fo-tutorial-seen-v1';
 
 const IMPROVEMENT_LABELS: Record<string, string> = {
   operating_playbook: 'Operating Playbook',
@@ -57,6 +59,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   const [showFeedback, setShowFeedback] = useState(false);
   const [drilldownMetric, setDrilldownMetric] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [showFOTutorial, setShowFOTutorial] = useState(false);
 
   const {
     holdcoName,
@@ -186,6 +189,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     executeIPO,
     declineIPO,
     isFamilyOfficeMode,
+    familyOfficeState,
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;
@@ -573,6 +577,22 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     localStorage.setItem(TUTORIAL_SEEN_KEY, 'true');
   };
 
+  // Show FO tutorial on first FO game start
+  useEffect(() => {
+    if (isFamilyOfficeMode && round === 1) {
+      const hasSeenFOTutorial = localStorage.getItem(FO_TUTORIAL_SEEN_KEY);
+      if (!hasSeenFOTutorial) {
+        setShowFOTutorial(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount only
+
+  const handleCloseFOTutorial = () => {
+    setShowFOTutorial(false);
+    localStorage.setItem(FO_TUTORIAL_SEEN_KEY, 'true');
+  };
+
   // Check for game over
   useEffect(() => {
     if (gameOver) {
@@ -915,6 +935,15 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
           startingCash={cash}
           maxRounds={maxRounds}
           onClose={handleCloseTutorial}
+        />
+      )}
+
+      {/* FO Tutorial Modal */}
+      {showFOTutorial && familyOfficeState && (
+        <FamilyOfficeTutorialModal
+          foStartingCash={familyOfficeState.foStartingCash}
+          philanthropyDeduction={familyOfficeState.philanthropyDeduction}
+          onClose={handleCloseFOTutorial}
         />
       )}
 
