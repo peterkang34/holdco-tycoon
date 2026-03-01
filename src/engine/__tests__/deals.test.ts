@@ -6,7 +6,7 @@ import {
   getStructureDescription,
 } from '../deals';
 import { createMockDeal, createMockDealStructure } from './helpers';
-import { DealStructure } from '../types';
+import { Deal, DealStructure, IPOState } from '../types';
 
 describe('generateDealStructures', () => {
   it('should include all-cash option when player can afford it', () => {
@@ -432,5 +432,178 @@ describe('Rollover Equity', () => {
     // The seed-based check should result in roughly 50% — at least one hit and one miss across 5 deals
     expect(someHit).toBe(true);
     expect(someMiss).toBe(true);
+  });
+});
+
+// ── Equity Raise Minimum / Credit Freeze Tests ──
+// Validates that the hypotheticalStructures pattern (AllocatePhase fix)
+// correctly discovers the cheapest available deal structure under
+// various credit states, so the equity raise suggested minimum is dynamic.
+
+describe('Cheapest available structure under credit freeze states', () => {
+  // Helper: simulate the AllocatePhase hypotheticalStructures pattern
+  // Pass effectivePrice as playerCash to see ALL structures that would be available
+  function getCheapestCashRequired(
+    deal: Deal,
+    creditTightening: boolean,
+    noNewDebt: boolean,
+    ipoState?: IPOState,
+  ) {
+    const hypotheticalStructures = generateDealStructures(
+      deal,
+      deal.effectivePrice, // simulate infinite cash (enough for any structure)
+      0.07,
+      creditTightening,
+      20,
+      noNewDebt,
+      0,
+      'standard',
+      undefined,
+      ipoState,
+    );
+    if (hypotheticalStructures.length === 0) return null;
+    const minCash = Math.min(...hypotheticalStructures.map(s => s.cashRequired));
+    const minPct = Math.round((minCash / deal.effectivePrice) * 100);
+    return { structures: hypotheticalStructures, minCash, minPct };
+  }
+
+  it('normal state: LBO at 25% equity is cheapest structure', () => {
+    const deal = createMockDeal({ askingPrice: 4000, effectivePrice: 4000 });
+    const result = getCheapestCashRequired(deal, false, false);
+    expect(result).not.toBeNull();
+    // LBO (seller_note_bank_debt) requires 25% equity — cheapest available
+    const lbo = result!.structures.find(s => s.type === 'seller_note_bank_debt');
+    expect(lbo).toBeDefined();
+    expect(lbo!.cashRequired).toBe(Math.round(4000 * 0.25)); // 1000
+    expect(result!.minCash).toBe(1000);
+    expect(result!.minPct).toBe(25);
+  });
+
+  it('credit tightening (no bank debt, no LBO): seller note at 40% is cheapest', () => {
+    const deal = createMockDeal({ askingPrice: 4000, effectivePrice: 4000 });
+    const result = getCheapestCashRequired(deal, true, false);
+    expect(result).not.toBeNull();
+    // Bank debt and LBO should be gone
+    expect(result!.structures.find(s => s.type === 'bank_debt')).toBeUndefined();
+    expect(result!.structures.find(s => s.type === 'seller_note_bank_debt')).toBeUndefined();
+    // Seller note requires 40% equity — cheapest remaining
+    const sellerNote = result!.structures.find(s => s.type === 'seller_note');
+    expect(sellerNote).toBeDefined();
+    expect(sellerNote!.cashRequired).toBe(Math.round(4000 * 0.40)); // 1600
+    expect(result!.minCash).toBe(1600);
+    expect(result!.minPct).toBe(40);
+  });
+
+  it('covenant breach (noNewDebt): only all-cash and earnout available', () => {
+    // Use deal_earnout ID which has seed % 10 >= 4 (earnout check passes)
+    const deal = createMockDeal({ id: 'deal_earnout', askingPrice: 4000, effectivePrice: 4000 });
+    deal.business.qualityRating = 4; // must be >= 3 for earnout
+    const result = getCheapestCashRequired(deal, false, true);
+    expect(result).not.toBeNull();
+    // All debt structures should be blocked
+    expect(result!.structures.find(s => s.type === 'seller_note')).toBeUndefined();
+    expect(result!.structures.find(s => s.type === 'bank_debt')).toBeUndefined();
+    expect(result!.structures.find(s => s.type === 'seller_note_bank_debt')).toBeUndefined();
+    expect(result!.structures.find(s => s.type === 'rollover_equity')).toBeUndefined();
+    // All-cash and earnout should both be present
+    const allCash = result!.structures.find(s => s.type === 'all_cash');
+    const earnout = result!.structures.find(s => s.type === 'earnout');
+    expect(allCash).toBeDefined();
+    expect(earnout).toBeDefined();
+    // Earnout at 55% upfront is cheaper than all-cash at 100%
+    expect(earnout!.cashRequired).toBe(Math.round(4000 * 0.55)); // 2200
+    expect(allCash!.cashRequired).toBe(4000);
+    expect(result!.minCash).toBe(2200);
+    expect(result!.minPct).toBe(55);
+  });
+
+  it('covenant breach without earnout: all-cash at 100% is only option', () => {
+    // Use a low-quality deal that won't qualify for earnout
+    const deal = createMockDeal({ askingPrice: 4000, effectivePrice: 4000 });
+    deal.business.qualityRating = 2; // below earnout threshold of 3
+    const result = getCheapestCashRequired(deal, false, true);
+    expect(result).not.toBeNull();
+    // Only all-cash should be available
+    expect(result!.structures.length).toBe(1);
+    expect(result!.structures[0].type).toBe('all_cash');
+    expect(result!.minCash).toBe(4000);
+    expect(result!.minPct).toBe(100);
+  });
+
+  it('share-funded public company during covenant breach: cashRequired=0 is cheapest', () => {
+    const deal = createMockDeal({ askingPrice: 4000, effectivePrice: 4000 });
+    deal.business.qualityRating = 2; // no earnout, keep it simple
+    const mockIPO: IPOState = {
+      isPublic: true,
+      stockPrice: 50,
+      sharesOutstanding: 1000,
+      preIPOShares: 800,
+      marketSentiment: 0.1,
+      earningsExpectations: 1050,
+      ipoRound: 5,
+      initialStockPrice: 40,
+      consecutiveMisses: 0,
+      shareFundedDealsThisRound: 0,
+    };
+    const result = getCheapestCashRequired(deal, false, true, mockIPO);
+    expect(result).not.toBeNull();
+    // share_funded should be present with cashRequired=0
+    const shareFunded = result!.structures.find(s => s.type === 'share_funded');
+    expect(shareFunded).toBeDefined();
+    expect(shareFunded!.cashRequired).toBe(0);
+    // It should be the cheapest, beating all-cash at 100%
+    expect(result!.minCash).toBe(0);
+    expect(result!.minPct).toBe(0);
+  });
+
+  it('pro sports during credit tightening: only all-cash available (seller notes and bank debt blocked)', () => {
+    const deal = createMockDeal({ askingPrice: 10000, effectivePrice: 10000 });
+    deal.business.sectorId = 'proSports';
+    deal.business.qualityRating = 4;
+    // Credit tightening blocks bank_debt and LBO; pro sports blocks seller_note and earnout
+    const result = getCheapestCashRequired(deal, true, false);
+    expect(result).not.toBeNull();
+    // Pro sports blocks: seller_note, earnout, LBO, rollover_equity
+    // Credit tightening blocks: bank_debt, LBO
+    // Net: only all-cash survives
+    expect(result!.structures.find(s => s.type === 'seller_note')).toBeUndefined();
+    expect(result!.structures.find(s => s.type === 'bank_debt')).toBeUndefined();
+    expect(result!.structures.find(s => s.type === 'seller_note_bank_debt')).toBeUndefined();
+    expect(result!.structures.find(s => s.type === 'earnout')).toBeUndefined();
+    expect(result!.structures.length).toBe(1);
+    expect(result!.structures[0].type).toBe('all_cash');
+    expect(result!.minCash).toBe(10000);
+    expect(result!.minPct).toBe(100);
+  });
+
+  it('pro sports normal state: bank debt at 75% equity is cheapest (no seller notes)', () => {
+    const deal = createMockDeal({ askingPrice: 10000, effectivePrice: 10000 });
+    deal.business.sectorId = 'proSports';
+    deal.business.qualityRating = 4;
+    const result = getCheapestCashRequired(deal, false, false);
+    expect(result).not.toBeNull();
+    // Pro sports allows: all_cash and bank_debt only
+    const bankDebt = result!.structures.find(s => s.type === 'bank_debt');
+    expect(bankDebt).toBeDefined();
+    expect(bankDebt!.cashRequired).toBe(Math.round(10000 * 0.75)); // 7500
+    // Bank debt at 75% equity is cheaper than all-cash at 100%
+    expect(result!.minCash).toBe(7500);
+    expect(result!.minPct).toBe(75);
+  });
+
+  it('dynamic minPct scales with deal price (not hardcoded to 25%)', () => {
+    // Verify the percentage is the same regardless of deal price (structure is fractional)
+    const cheapDeal = createMockDeal({ askingPrice: 2000, effectivePrice: 2000 });
+    const expensiveDeal = createMockDeal({ askingPrice: 20000, effectivePrice: 20000 });
+    const cheapResult = getCheapestCashRequired(cheapDeal, false, false);
+    const expensiveResult = getCheapestCashRequired(expensiveDeal, false, false);
+    expect(cheapResult).not.toBeNull();
+    expect(expensiveResult).not.toBeNull();
+    // Both should have 25% minimum (LBO)
+    expect(cheapResult!.minPct).toBe(25);
+    expect(expensiveResult!.minPct).toBe(25);
+    // But absolute cash amounts differ
+    expect(cheapResult!.minCash).toBe(500);   // 2000 * 0.25
+    expect(expensiveResult!.minCash).toBe(5000); // 20000 * 0.25
   });
 });
