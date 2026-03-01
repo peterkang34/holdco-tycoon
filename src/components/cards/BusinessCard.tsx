@@ -528,7 +528,7 @@ export function BusinessCard({
                 )}
 
               </div>
-              {onDesignatePlatform && !isPlatform && (
+              {onDesignatePlatform && !isPlatform && business.sectorId !== 'proSports' && (
                 <div>
                   <div className="flex gap-2">
                     <button
