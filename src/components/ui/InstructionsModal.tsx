@@ -185,7 +185,7 @@ export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, 
             <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
               <span className="text-lg">4️⃣</span>
               <div>
-                <p className="font-bold">Distribute to Owners</p>
+                <p className="font-bold">Shareholder Distributions</p>
                 <p className="text-sm text-text-muted">When reinvestment opportunities are limited</p>
               </div>
             </div>

@@ -84,6 +84,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     initialRaiseAmount,
     totalBuybacks,
     totalDistributions,
+    founderDistributionsReceived,
+    metricsHistory,
     metrics,
     focusBonus,
     requiresRestructuring: _requiresRestructuring,
@@ -845,6 +847,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             founderShares={founderShares}
             totalBuybacks={totalBuybacks}
             totalDistributions={totalDistributions}
+            founderDistributionsReceived={founderDistributionsReceived}
+            avgRoiic={metricsHistory.length > 0 ? metricsHistory.reduce((sum, h) => sum + h.metrics.roiic, 0) / metricsHistory.length : 0}
+            netDebtToEbitda={metrics.netDebtToEbitda}
             intrinsicValuePerShare={metrics.intrinsicValuePerShare}
             onAcquire={handleAcquire}
             onAcquireTuckIn={handleAcquireTuckIn}

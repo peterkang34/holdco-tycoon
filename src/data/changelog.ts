@@ -12,6 +12,21 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'March 1, 2026',
+    title: 'Shareholder Distributions Redesign',
+    sections: [
+      {
+        heading: 'UI Improvements',
+        items: [
+          'Distribution card now shows your founder share alongside total distributions — see exactly how dilution affects your take-home.',
+          'Dynamic scoring guidance replaces the static text wall — tells you whether now is a good time to distribute based on your ROIIC and leverage.',
+          'In Full Game mode, progressive hints build anticipation as your founder wealth grows toward key milestones.',
+          'Instructions modal updated to match the new card name.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 1, 2026',
     title: 'Feedback Polish',
     sections: [
       {

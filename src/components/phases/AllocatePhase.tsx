@@ -79,6 +79,9 @@ interface AllocatePhaseProps {
   founderShares: number;
   totalBuybacks: number;
   totalDistributions: number;
+  founderDistributionsReceived: number;
+  avgRoiic: number;
+  netDebtToEbitda: number;
   intrinsicValuePerShare: number;
   lastEventType?: string;
   onAcquire: (deal: Deal, structure: DealStructure) => void;
@@ -152,6 +155,9 @@ export function AllocatePhase({
   founderShares,
   totalBuybacks: _totalBuybacks,
   totalDistributions,
+  founderDistributionsReceived,
+  avgRoiic,
+  netDebtToEbitda,
   intrinsicValuePerShare,
   lastEventType,
   onAcquire,
@@ -2712,48 +2718,143 @@ export function AllocatePhase({
             </div>
 
             {/* Distribute */}
-            <div className="card">
-              <h4 className="font-bold mb-3">Distribute to Owners</h4>
-              <p className="text-sm text-text-muted mb-2">
-                Returns cash to shareholders. Distributed: {formatMoney(totalDistributions)}
-              </p>
-              <div className="flex gap-2 mb-3">
-                <div className="flex-1 relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={distributeAmount}
-                    onChange={(e) => {
-                      const raw = e.target.value.replace(/[^0-9]/g, '');
-                      setDistributeAmount(raw);
-                    }}
-                    placeholder="1,000,000"
-                    className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-sm"
-                  />
+            {(() => {
+              const ownershipPct = Math.floor((founderShares / sharesOutstanding) * 100);
+              const hasOutsideOwners = founderShares < sharesOutstanding;
+              const isStandard = duration === 'standard';
+              const showFOHints = isStandard && !isFamilyOfficeMode;
+              const founderDist = founderDistributionsReceived;
+
+              // Card border warmth based on founder distributions
+              const cardBorderClass = showFOHints && founderDist >= 1000000
+                ? 'border-amber-500/30'
+                : showFOHints && founderDist >= 800000
+                ? 'border-amber-500/20'
+                : showFOHints && founderDist >= 500000
+                ? 'border-amber-500/10'
+                : '';
+
+              // Dynamic scoring guidance (uses game-average ROIIC to match scoring.ts)
+              const defaultGuidance = { text: 'Hierarchy: reinvest at high returns → deleverage → buyback → distribute.', color: 'text-text-muted' };
+              const scoringGuidance = totalEbitda === 0 ? defaultGuidance
+                : avgRoiic < 0.15 && netDebtToEbitda < 2.0
+                ? { text: 'ROIIC is low and leverage is healthy — good time to distribute.', color: 'text-emerald-400' }
+                : avgRoiic >= 0.20
+                ? { text: 'ROIIC is strong — reinvesting may create more value.', color: 'text-amber-400' }
+                : netDebtToEbitda > 2.5
+                ? { text: 'Leverage is elevated — consider deleveraging first.', color: 'text-red-400' }
+                : defaultGuidance;
+
+              // FO Whisper tiers
+              const foWhisper = !showFOHints ? null
+                : founderDist >= 1000000 ? { text: `${formatMoney(founderDist)} in founder wealth. This changes the endgame.`, bg: 'bg-amber-500/15' }
+                : founderDist >= 800000 ? { text: `${formatMoney(founderDist)} accumulated. A fortune like this opens doors that didn't exist before.`, bg: 'bg-amber-500/10' }
+                : founderDist >= 500000 ? { text: `${formatMoney(founderDist)} in founder wealth. Founders who build real capital find new opportunities waiting.`, bg: 'bg-amber-500/5' }
+                : founderDist >= 100000 ? { text: `${formatMoney(founderDist)} in personal wealth and counting.`, bg: '' }
+                : null;
+
+              // Progress bar
+              const showProgressBar = showFOHints && founderDist > 0 && founderDist < 1000000;
+              const progressPct = showProgressBar
+                ? Math.min(100, (founderDist / 1000000) * 100)
+                : 0;
+
+              // Input preview values
+              const parsedInput = parseInt(distributeAmount) || 0;
+              const internalPreview = Math.round(parsedInput / 1000);
+              const founderPreview = hasOutsideOwners ? Math.round(internalPreview * ownershipPct / 100) : internalPreview;
+
+              return (
+                <div className={`card ${cardBorderClass}`}>
+                  <h4 className="font-bold mb-3">Shareholder Distributions</h4>
+
+                  {/* Hero totals */}
+                  <div className="mb-3">
+                    <div className="flex items-baseline gap-2">
+                      <span className="text-text-muted text-sm">Total distributed</span>
+                      <span className="text-lg font-mono font-semibold">{formatMoney(totalDistributions)}</span>
+                    </div>
+                    {hasOutsideOwners && (
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-sm text-text-muted">Your share ({ownershipPct}%)</span>
+                        <span className="text-sm font-mono">{formatMoney(founderDist)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Input + Button */}
+                  <div className="flex gap-2 mb-3">
+                    <div className="flex-1 relative">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={distributeAmount}
+                        onChange={(e) => {
+                          const raw = e.target.value.replace(/[^0-9]/g, '');
+                          setDistributeAmount(raw);
+                        }}
+                        placeholder="1,000,000"
+                        className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 sm:py-2 text-sm"
+                      />
+                    </div>
+                    <button
+                      onClick={() => {
+                        const dollars = parseInt(distributeAmount) || 0;
+                        const internalAmount = Math.round(dollars / 1000);
+                        if (internalAmount > 0) {
+                          onDistribute(internalAmount);
+                          setDistributeAmount('');
+                        }
+                      }}
+                      disabled={!distributeAmount || parsedInput < 1000 || internalPreview > cash || !distressRestrictions.canDistribute}
+                      className="btn-primary text-sm min-h-[44px]"
+                    >
+                      {!distressRestrictions.canDistribute ? 'Blocked' : 'Distribute'}
+                    </button>
+                  </div>
+
+                  {/* Conversion preview + founder preview */}
+                  {distributeAmount && parsedInput >= 1000 && (
+                    <p className="text-xs text-text-muted mt-1 mb-2">
+                      = {formatMoney(internalPreview)}
+                      {hasOutsideOwners && isStandard && (
+                        <span> total → {formatMoney(founderPreview)} to you ({ownershipPct}%)</span>
+                      )}
+                    </p>
+                  )}
+
+                  {/* Dynamic scoring guidance */}
+                  <p className={`text-xs ${scoringGuidance.color} mb-2`}>
+                    {scoringGuidance.text}
+                  </p>
+
+                  {/* FO Whisper (20yr only) */}
+                  {foWhisper && (
+                    <p className={`text-xs italic text-amber-300/80 ${foWhisper.bg ? `${foWhisper.bg} rounded px-2 py-1.5` : ''} mb-2`}>
+                      {foWhisper.text}
+                    </p>
+                  )}
+
+                  {/* Progress bar (20yr only, < $1B) */}
+                  {showProgressBar && (
+                    <div
+                      className="h-1 bg-white/5 rounded-full overflow-hidden mb-1"
+                      role="progressbar"
+                      aria-valuenow={Math.round(progressPct)}
+                      aria-valuemin={0}
+                      aria-valuemax={100}
+                      aria-label={`Founder distributions progress: ${formatMoney(founderDist)}`}
+                    >
+                      <div
+                        className="h-full bg-amber-400/30 rounded-full transition-all"
+                        style={{ width: `${progressPct}%` }}
+                      />
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={() => {
-                    const dollars = parseInt(distributeAmount) || 0;
-                    const internalAmount = Math.round(dollars / 1000);
-                    if (internalAmount > 0) {
-                      onDistribute(internalAmount);
-                      setDistributeAmount('');
-                    }
-                  }}
-                  disabled={!distributeAmount || (parseInt(distributeAmount) || 0) < 1000 || Math.round((parseInt(distributeAmount) || 0) / 1000) > cash || !distressRestrictions.canDistribute}
-                  className="btn-primary text-sm min-h-[44px]"
-                >
-                  {!distressRestrictions.canDistribute ? 'Blocked' : 'Distribute'}
-                </button>
-              </div>
-              {distributeAmount && parseInt(distributeAmount) >= 1000 && (
-                <p className="text-xs text-text-muted mt-1 mb-2">= {formatMoney(Math.round(parseInt(distributeAmount) / 1000))}</p>
-              )}
-              <p className="text-xs text-text-muted">
-                <strong>Scoring:</strong> Distributing when ROIIC is low and leverage is healthy earns points. But distributing while ROIIC is high (should reinvest) or leverage is high (should deleverage) costs points. Hoarding excess cash also hurts. Follow the hierarchy: reinvest → deleverage → buyback → distribute.
-              </p>
-            </div>
+              );
+            })()}
             </>}
           </div>
           </div>
