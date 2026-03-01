@@ -884,6 +884,11 @@ export function generateDealWithSize(
     adjustedEbitda = rng
       ? generateTrophyEbitda(affordability ?? 0, rng)
       : tierConfig.min + Math.round(Math.random() * tierConfig.min); // fallback without RNG
+    // Pro Sports franchises: cap EBITDA to realistic operating income range
+    // Real-world: NFL ~$100-300M, NBA ~$50-200M, MLB ~$30-100M, NHL ~$20-80M
+    if (sectorId === 'proSports') {
+      adjustedEbitda = Math.min(adjustedEbitda, 350000); // $350M cap
+    }
   } else {
     const minEbitda = tierConfig.min;
     const maxEbitda = tierConfig.max!;

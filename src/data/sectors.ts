@@ -496,7 +496,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     emoji: '🏟️',
     color: '#D4AF37',
     baseEbitda: [15000, 60000],
-    acquisitionMultiple: [15.0, 35.0],
+    acquisitionMultiple: [12.0, 30.0],
     volatility: 0.04,
     capexRate: 0.20,
     organicGrowthRange: [0.06, 0.15],
