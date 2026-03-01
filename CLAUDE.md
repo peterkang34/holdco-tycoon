@@ -71,7 +71,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
 - **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v32`
-- **Tests**: Vitest in `src/engine/__tests__/` — 1342 tests across 23 suites (incl. display-proofreader + playtest system)
+- **Tests**: Vitest in `src/engine/__tests__/` — 1344 tests across 23 suites (incl. display-proofreader + playtest system)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Rollover Equity**: 6th deal structure — seller reinvests ~25% (standard) or ~20% (quick) as equity; gated behind M&A Tier 2+, Q3+, non-distressed archetypes, noNewDebt; exit split applied AFTER debt payoff; FEV deducts rollover claims; note rate 5%
@@ -86,7 +86,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/engine/affordability.ts` — 7-tier affordability engine (calculateAffordability, getAffordabilityWeights, pickWeightedTier, generateTrophyEbitda)
 - `src/hooks/chronicleContext.ts` — AI chronicle context builder
 - `src/engine/helpers.ts` — Shared helpers (clampMargin, capGrowthRate, applyEbitdaFloor)
-- `src/engine/__tests__/display-proofreader.test.ts` — 241 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
+- `src/engine/__tests__/display-proofreader.test.ts` — 243 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
 - `src/data/mechanicsCopy.ts` — Centralized registry for mechanic descriptions (debt labels, waterfall labels, countdown functions, banned patterns)
 - `src/data/gameConfig.ts` — Game constants and configuration
 - `src/components/screens/GameScreen.tsx` — Main game screen (phase routing, toast handlers)
@@ -141,6 +141,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety. Current: v32
 - **Integrated platforms**: Margin/growth bonuses are ONE-TIME mutations at forge time (clamped via `clampMargin`/`capGrowthRate`); multiple expansion + recession resistance are automatic via engine; platform sale bonus is tiered by `multipleExpansion` (0.3x for 2.0x+, 0.5x otherwise) via `getPlatformSaleBonus()`
 - **16 sectors, ~98 sub-types**: 15 standard + 1 FO-exclusive (proSports). Overlaps resolved (no cross-sector sub-type duplication); sectors.ts is authoritative
+- **proSports restrictions**: Pro sports teams are standalone trophy assets — blocked from mergers, tuck-ins, platform designation, and platform eligibility. Guards in `useGame.ts` (acquireTuckIn, mergeBusinesses, addToIntegratedPlatform) + `platforms.ts` (checkPlatformEligibility, checkNearEligiblePlatforms) + AllocatePhase UI filters
 - **Platform thresholds scale by mode**: `INTEGRATION_THRESHOLD_MULTIPLIER` in gameConfig.ts (Easy-Std 1.0, Easy-Quick 0.7, Normal-Std 0.7, Normal-Quick 0.5)
 - **Turnaround quality improvements are permanent mutations** — qualityRating changes at resolution; qualityImprovedTiers tracks cumulative tiers for exit premium
 - **Portfolio fatigue**: 4+ simultaneous turnarounds = -10ppt success rate penalty; warn in UI
@@ -151,7 +152,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **Rollover equity exit split**: Applied AFTER debt payoff (`playerProceeds = netProceeds * (1 - rolloverPct)`); merges use EBITDA-weighted average; tuck-ins have rolloverPct: 0 (parent's pct covers); platform sales use per-constituent split with `Math.max(0, ...)` floor; FEV deducts rollover claims from portfolio value; gated behind `!noNewDebt`
 - **20-Year Mode features are gated on `duration === 'standard'`** — Deal Inflation, Succession Events, IPO, Family Office all check mode. 10-year mode stays untouched except compressed narrative tone (3 phases instead of 5)
 - **Deal Inflation applies AFTER quality adjustment, BEFORE competitive position** — in `businesses.ts` deal generation. Financial Crisis resets inflation by -2.0x for 2 rounds via `dealInflationState.crisisResetRoundsRemaining`
-- **IPO stock price is derived, not random** — `EV / totalShares * (1 + marketSentiment)`. Earnings expectations = prior EBITDA * 1.05. 2 consecutive misses = analyst downgrade (-0.10 sentiment). Max 1 share-funded deal/round — dilutes ownership naturally (no extra penalty). Performance-based 5-18% public company bonus (base 5% + stock appreciation + earnings + sentiment + platforms). `MIN_PUBLIC_FOUNDER_OWNERSHIP = 0.10` (vs 51% private). `IPO_MIN_PLATFORMS = 1`. Share-funded requires stock price >= $1.00. Purple card in deal structure picker. Works for standalone + tuck-in acquisitions
+- **IPO stock price is derived, not random** — `EV / totalShares * (1 + marketSentiment)`. Earnings expectations = prior EBITDA * 1.05. 2 consecutive misses = analyst downgrade (-0.10 sentiment). Share-funded deals unlimited per round — dilutes ownership naturally (no extra penalty). Performance-based 5-18% public company bonus (base 5% + stock appreciation + earnings + sentiment + platforms). `MIN_PUBLIC_FOUNDER_OWNERSHIP = 0.10` (vs 51% private). `IPO_MIN_PLATFORMS = 1`. Share-funded requires stock price >= $1.00. Purple card in deal structure picker. Works for standalone + tuck-in acquisitions
 - **Family Office V2 is real holdco gameplay** — 5 rounds of actual deal flow/improvements/M&A using 75% of accumulated distributions (25% upfront philanthropy). Snapshot/reset/restore pattern: main game state serialized to `mainGameSnapshot`, state reset for FO play, restored on completion. FO performance → MOIC → 1.0-1.5x multiplier on Adjusted FEV. Pro Sports Franchises sector exclusive to FO mode. Capital tab becomes "Debt" (only debt management available; equity raises/distributions/buybacks/IPO/turnarounds blocked). Restructuring during FO applies 0.80x penalty to FO FEV before MOIC calc. Eligibility: $1B+ distributions + B+ grade + 3 Q4+ businesses + 2 businesses held 10+ years. Legacy grades: Enduring/Influential/Established/Fragile. Test shortcut: `#/fo-test`
 - **Succession events fire once per business** — `successionResolved: boolean` prevents repeats. 8+ years held, Q3+, 20yr mode only. Quality drops immediately; 3 choices (invest, promote, sell) with shared services interaction on promote path
 - **Behavioral copy must come from `mechanicsCopy.ts`** — never hardcode debt descriptions directly in components; if changing mechanic behavior, update mechanicsCopy.ts AND add old description to BANNED_COPY_PATTERNS

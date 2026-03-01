@@ -35,12 +35,12 @@ import { RollUpGuideModal } from '../ui/RollUpGuideModal';
 import { ImprovementModal } from '../modals/ImprovementModal';
 import { TurnaroundModal } from '../modals/TurnaroundModal';
 import { isAIEnabled } from '../../services/aiGeneration';
-import { checkPlatformEligibility, calculateIntegrationCost, getEligibleBusinessesForExistingPlatform, calculateAddToPlatformCost } from '../../engine/platforms';
+import { checkPlatformEligibility, checkNearEligiblePlatforms, calculateIntegrationCost, getEligibleBusinessesForExistingPlatform, calculateAddToPlatformCost } from '../../engine/platforms';
 import { getPlatformSaleBonus } from '../../data/gameConfig';
 import { getEligiblePrograms, canUnlockTier } from '../../engine/turnarounds';
 import { TURNAROUND_TIER_CONFIG, getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
 import { TURNAROUND_FATIGUE_THRESHOLD, IPO_MIN_ROUND } from '../../data/gameConfig';
-import { checkIPOEligibility, canShareFundedDeal } from '../../engine/ipo';
+import { checkIPOEligibility } from '../../engine/ipo';
 import type { IPOState } from '../../engine/types';
 import { DEBT_LABELS, DEBT_EXPLAINER } from '../../data/mechanicsCopy';
 import { useIsMobile } from '../../hooks/useMediaQuery';
@@ -493,11 +493,11 @@ export function AllocatePhase({
     return [...manualPlatforms, ...uniqueForged];
   };
 
-  // Merge eligibility: need 2+ businesses in same sector
+  // Merge eligibility: need 2+ businesses in same sector (pro sports excluded)
   const getMergeableSectors = () => {
     const sectorCounts: Record<string, Business[]> = {};
     activeBusinesses.forEach(b => {
-      if (!b.parentPlatformId) { // Only standalone or platform businesses, not bolt-ons
+      if (!b.parentPlatformId && b.sectorId !== 'proSports') { // Only standalone or platform businesses, not bolt-ons; exclude pro sports
         if (!sectorCounts[b.sectorId]) sectorCounts[b.sectorId] = [];
         sectorCounts[b.sectorId].push(b);
       }
@@ -509,6 +509,11 @@ export function AllocatePhase({
   // Integrated Platform eligibility
   const eligiblePlatformRecipes = useMemo(
     () => checkPlatformEligibility(businesses, integratedPlatforms, difficulty, duration),
+    [businesses, integratedPlatforms, difficulty, duration]
+  );
+
+  const nearEligibleRecipes = useMemo(
+    () => checkNearEligiblePlatforms(businesses, integratedPlatforms, difficulty, duration),
     [businesses, integratedPlatforms, difficulty, duration]
   );
 
@@ -1335,6 +1340,51 @@ export function AllocatePhase({
               </div>
             )}
 
+            {/* Near-Eligible Platform Integrations (sub-types met, EBITDA not yet) */}
+            {nearEligibleRecipes.length > 0 && (
+              <div className="card bg-white/5 border border-white/10 mb-6">
+                <h3 className="font-bold text-text-secondary mb-1">Platforms in Progress</h3>
+                <p className="text-sm text-text-muted mb-4">
+                  You have the right business mix — grow your sector EBITDA to unlock these integrations.
+                </p>
+                <div className="space-y-3">
+                  {nearEligibleRecipes.map(({ recipe, matchingBusinesses, sectorEbitda, scaledThreshold }) => {
+                    const progress = Math.min(sectorEbitda / scaledThreshold, 0.99);
+                    const progressPct = Math.round(progress * 100);
+                    const sectorEmojis = recipe.sectorId
+                      ? SECTORS[recipe.sectorId]?.emoji ?? ''
+                      : (recipe.crossSectorIds ?? []).map(sid => SECTORS[sid]?.emoji).filter(Boolean).join(' ');
+                    return (
+                      <div key={recipe.id} className="bg-white/5 rounded-lg p-4">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <h4 className="font-bold text-sm text-text-secondary break-words">{sectorEmojis} {recipe.name}</h4>
+                          <span className="text-xs text-text-muted whitespace-nowrap flex-shrink-0">Almost Ready</span>
+                        </div>
+                        <p className="text-xs text-text-muted mb-2 break-words">{recipe.description}</p>
+                        <p className="text-xs text-text-muted mb-1">Matching businesses:</p>
+                        <div className="flex flex-wrap gap-1 mb-3">
+                          {matchingBusinesses.map(b => (
+                            <span key={b.id} className="text-xs bg-white/10 px-2 py-1 rounded truncate max-w-full inline-block">
+                              {SECTORS[b.sectorId].emoji} {b.name} ({b.subType})
+                            </span>
+                          ))}
+                        </div>
+                        <div className="text-xs text-text-muted mb-1">
+                          Sector EBITDA: <span className="font-mono text-text-secondary">{formatMoney(sectorEbitda)}</span> / <span className="font-mono">{formatMoney(scaledThreshold)}</span> required
+                        </div>
+                        <div className="w-full bg-white/10 rounded-full h-2 mt-1">
+                          <div
+                            className="bg-purple-500/60 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${progressPct}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-text-muted mt-1 text-right font-mono">{progressPct}%</p>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
             {activeBusinesses.length > 0 && (
               <div className="mb-3">
@@ -2114,7 +2164,7 @@ export function AllocatePhase({
                 const sentimentBarColor = sentimentPct >= 10 ? 'bg-green-400' : sentimentPct >= 0 ? 'bg-green-400/70' : sentimentPct >= -10 ? 'bg-yellow-400' : 'bg-red-400';
                 const sentimentBarWidth = Math.abs(sentimentPct) / 30 * 100; // max sentiment is ±0.3
                 const totalEbitdaForTarget = businesses.filter(b => b.status === 'active').reduce((s, b) => s + b.ebitda, 0);
-                const shareFundedRemaining = canShareFundedDeal({ ipoState, businesses, duration, round, cash, totalDebt, sharesOutstanding, interestRate } as any) ? 1 : 0;
+                const shareFundedThisRound = ipoState.shareFundedDealsThisRound;
 
                 return (
                   <div className="card">
@@ -2146,8 +2196,8 @@ export function AllocatePhase({
                       </div>
                       <div>
                         <p className="text-text-muted text-xs">Share-Funded Deals</p>
-                        <p className="font-mono font-bold text-lg">{shareFundedRemaining}/1</p>
-                        <p className="text-xs text-text-muted">remaining this round</p>
+                        <p className="font-mono font-bold text-lg">{shareFundedThisRound}</p>
+                        <p className="text-xs text-text-muted">this round</p>
                       </div>
                     </div>
                     {ipoState.consecutiveMisses >= 1 && (
@@ -2799,7 +2849,7 @@ export function AllocatePhase({
                   <div>
                     <label className="block text-sm text-text-muted mb-2">First Business</label>
                     <div className="space-y-1 max-h-[200px] overflow-y-auto rounded-lg border border-white/10 p-1">
-                      {activeBusinesses.filter(b => !b.parentPlatformId).map(biz => (
+                      {activeBusinesses.filter(b => !b.parentPlatformId && b.sectorId !== 'proSports').map(biz => (
                         <button
                           key={biz.id}
                           type="button"
@@ -2829,7 +2879,7 @@ export function AllocatePhase({
                         <p className="text-xs text-text-muted px-3 py-2">Select first business</p>
                       ) : (
                         activeBusinesses
-                          .filter(b => b.sectorId === mergeSelection.first?.sectorId && b.id !== mergeSelection.first?.id && !b.parentPlatformId)
+                          .filter(b => b.sectorId === mergeSelection.first?.sectorId && b.id !== mergeSelection.first?.id && !b.parentPlatformId && b.sectorId !== 'proSports')
                           .map(biz => (
                             <button
                               key={biz.id}

@@ -1265,6 +1265,11 @@ export const useGameStore = create<GameStore>()(
       acquireTuckIn: (deal: Deal, structure: DealStructure, targetPlatformId: string) => {
         const state = get();
 
+        // Guard: pro sports teams cannot be tuck-ins or tucked into
+        if (deal.business.sectorId === 'proSports') return;
+        const targetBiz = state.businesses.find(b => b.id === targetPlatformId);
+        if (targetBiz?.sectorId === 'proSports') return;
+
         // Guard: no acquisitions during restructuring
         if (state.requiresRestructuring) return;
 
@@ -1558,6 +1563,12 @@ export const useGameStore = create<GameStore>()(
 
         if (!biz1 || !biz2) {
           useToastStore.getState().addToast({ message: 'Merge failed: one or both businesses not found', type: 'danger' });
+          return;
+        }
+
+        // Guard: pro sports teams cannot be merged
+        if (biz1.sectorId === 'proSports' || biz2.sectorId === 'proSports') {
+          useToastStore.getState().addToast({ message: 'Pro sports franchises cannot be merged', type: 'danger' });
           return;
         }
 
@@ -3968,6 +3979,9 @@ export const useGameStore = create<GameStore>()(
 
         const business = state.businesses.find(b => b.id === businessId && b.status === 'active');
         if (!business || business.integratedPlatformId) return;
+
+        // Guard: pro sports teams cannot be added to platforms
+        if (business.sectorId === 'proSports') return;
 
         const recipe = getRecipeById(platform.recipeId);
         if (!recipe) return;

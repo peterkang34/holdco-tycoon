@@ -491,7 +491,7 @@ describe('Share-Funded Deals (Sprint 5)', () => {
     expect(canShareFundedDeal(state)).toBe(false);
   });
 
-  it('should allow one share-funded deal per round', () => {
+  it('should allow share-funded deals when public (no per-round cap)', () => {
     const state = createMockGameState({
       ipoState: {
         isPublic: true, stockPrice: 100, sharesOutstanding: 1200, preIPOShares: 1000,
@@ -502,15 +502,15 @@ describe('Share-Funded Deals (Sprint 5)', () => {
     expect(canShareFundedDeal(state)).toBe(true);
   });
 
-  it('should block after max deals reached', () => {
+  it('should allow multiple share-funded deals per round (cap removed)', () => {
     const state = createMockGameState({
       ipoState: {
         isPublic: true, stockPrice: 100, sharesOutstanding: 1200, preIPOShares: 1000,
         marketSentiment: 0, earningsExpectations: 80000, ipoRound: 16, initialStockPrice: 100,
-        consecutiveMisses: 0, shareFundedDealsThisRound: IPO_SHARE_FUNDED_DEALS_PER_ROUND,
+        consecutiveMisses: 0, shareFundedDealsThisRound: 5,
       },
     });
-    expect(canShareFundedDeal(state)).toBe(false);
+    expect(canShareFundedDeal(state)).toBe(true);
   });
 
   it('should calculate correct share-funded terms', () => {
@@ -598,7 +598,7 @@ describe('IPO Constants Validation', () => {
   });
 
   it('should have correct share/bonus constants', () => {
-    expect(IPO_SHARE_FUNDED_DEALS_PER_ROUND).toBe(1);
+    expect(IPO_SHARE_FUNDED_DEALS_PER_ROUND).toBe(1); // deprecated, kept for compat
     expect(IPO_FEV_BONUS_BASE).toBe(0.05);
     expect(IPO_FEV_BONUS_MAX).toBe(0.18);
   });

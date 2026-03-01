@@ -34,7 +34,7 @@ export const EV_WATERFALL_LABELS = {
 export const SHARE_FUNDED_LABELS = {
   name: 'Share-Funded (Stock)',
   behavior: 'Issue new shares to fund acquisition — no cash, but dilutes ownership naturally',
-  limit: 'Max 1 per round',
+  limit: 'Unlimited per round',
 } as const;
 
 export const DEBT_EXPLAINER =
@@ -84,4 +84,6 @@ export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   { pattern: /dilution penalty/i, reason: 'IPO dilution penalty removed in v29. No extra penalty beyond natural ownership dilution.', allow: ['changelog.ts'] },
   { pattern: /stay.private bonus/i, reason: 'Stay-private bonus removed in v29. Replaced by public company bonus.', allow: ['changelog.ts'] },
   { pattern: /escalating dilution.*regardless|same.*discount.*public.*private/i, reason: 'Post-IPO equity raises issue at stock price (no discount). Only private companies use escalating discount.' },
+  { pattern: /permanent ownership reduction/i, reason: 'Share dilution is reversible via buybacks. Removed "permanent" in v33.' },
+  { pattern: /max 1 per round/i, reason: 'Share-funded deal cap removed. Unlimited per round now.', allow: ['changelog.ts'] },
 ];

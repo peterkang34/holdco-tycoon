@@ -450,7 +450,7 @@ export interface IPOState {
   ipoRound: number;
   initialStockPrice: number;
   consecutiveMisses: number;
-  shareFundedDealsThisRound: number; // max 1/round
+  shareFundedDealsThisRound: number; // count for this round (display only)
 }
 
 // ── 20-Year Mode: Family Office Endgame ──

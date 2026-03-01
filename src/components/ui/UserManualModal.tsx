@@ -755,8 +755,9 @@ function PlatformsContent() {
 
       <SubHeading>EBITDA Thresholds by Mode</SubHeading>
       <P>
-        Each recipe has a base EBITDA threshold that the constituent businesses must collectively meet.
-        This threshold is scaled by your game mode:
+        Each recipe has a base EBITDA threshold. This threshold is measured against your total EBITDA from ALL
+        businesses in the relevant sector(s) — not just the ones matching the recipe. Any business contributing
+        EBITDA to the sector counts toward the threshold. This is scaled by your game mode:
       </P>
       <DataTable
         headers={['Mode', 'Threshold Multiplier']}
@@ -1433,7 +1434,7 @@ function TwentyYearContent() {
         <><strong>Earnings expectations</strong> are set at prior EBITDA &times; 1.05 &mdash; analysts expect 5% growth every year</>,
         <><strong>Beat earnings:</strong> +8% market sentiment. <strong>Miss earnings:</strong> -15% sentiment</>,
         <><strong>2 consecutive misses:</strong> analyst downgrade (-10% additional sentiment)</>,
-        <><strong>Share-funded acquisitions:</strong> max 1 per round — dilutes ownership naturally (no extra penalty)</>,
+        <><strong>Share-funded acquisitions:</strong> unlimited per round — dilutes ownership naturally (no extra penalty)</>,
         <><strong>Ownership floor:</strong> drops from 51% to 10% after IPO, allowing more aggressive equity issuance</>,
       ]} />
 
@@ -1471,7 +1472,7 @@ function TwentyYearContent() {
       <BulletList items={[
         <><strong>Philanthropy deduction:</strong> 25% of your distributions are committed to philanthropy upfront before play begins</>,
         <><strong>Starting cash:</strong> remaining 75% of distributions becomes your FO operating capital</>,
-        <><strong>Pro Sports Franchises:</strong> exclusive FO sector — trophy assets with the highest multiples (15-35x) but lowest margins (5-18%)</>,
+        <><strong>Pro Sports Franchises:</strong> exclusive FO sector — trophy assets with the highest multiples (15-35x) but lowest margins (5-18%). Pro sports teams cannot be merged, used as tuck-in targets, or designated as platforms — they operate as standalone trophy assets</>,
         <><strong>Premium deals:</strong> all FO deals are Q3+ quality with late-game pricing</>,
         <><strong>Debt tab:</strong> the Capital tab becomes &ldquo;Debt&rdquo; in FO mode — only debt management is available. Equity raises, distributions, buybacks, IPO, and turnarounds are blocked</>,
         <><strong>Restructuring penalty:</strong> if you restructure during FO, your FO FEV is reduced by 20% before MOIC calculation</>,

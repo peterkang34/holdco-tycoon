@@ -1434,7 +1434,7 @@ describe('Display Proofreader', () => {
     it('Strategy B: UserManualModal documents share-funded acquisitions', () => {
       const manual = readComponent('components/ui/UserManualModal.tsx');
       expect(manual).toContain('Share-funded acquisitions');
-      expect(manual).toContain('max 1 per round');
+      expect(manual).toContain('unlimited per round');
       expect(manual).toContain('dilutes ownership naturally');
     });
 
@@ -1453,7 +1453,8 @@ describe('Display Proofreader', () => {
       expect(IPO_MIN_PLATFORMS).toBe(1);
     });
 
-    it('Strategy A: IPO_SHARE_FUNDED_DEALS_PER_ROUND matches manual claim of 1', () => {
+    it('Strategy A: IPO_SHARE_FUNDED_DEALS_PER_ROUND is deprecated (cap removed)', () => {
+      // Constant kept for backward compat but no longer used as a gate
       expect(IPO_SHARE_FUNDED_DEALS_PER_ROUND).toBe(1);
     });
 

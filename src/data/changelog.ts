@@ -12,6 +12,38 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 28, 2026',
+    title: 'Pro Sports Franchise Restrictions',
+    sections: [
+      {
+        heading: 'Balance Changes',
+        items: [
+          'Pro Sports Franchises in Family Office mode now operate as standalone trophy assets — merging, tuck-in acquisitions, and platform designation are disabled for this business type.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 28, 2026',
+    title: 'Bug Fixes & QoL',
+    sections: [
+      {
+        heading: 'Fixes',
+        items: [
+          'Platform eligibility now shows progress — see which platform recipes you\'re close to unlocking with a sector EBITDA progress bar, so the threshold requirement is no longer invisible.',
+          'Share-funded deal card no longer claims dilution is "permanent" — buybacks can reclaim shares as intended.',
+          'Removed ghost "scoring penalty per dilution event" copy from share-funded deals — that mechanic was removed in a prior update.',
+        ],
+      },
+      {
+        heading: 'Balance Changes',
+        items: [
+          'Share-funded acquisitions are now unlimited per round — the old 1-per-round cap has been removed. Build your empire with stock.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 28, 2026',
     title: 'Early-Game UX & Event System Overhaul',
     sections: [
       {

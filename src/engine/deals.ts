@@ -6,7 +6,6 @@ import {
   ROLLOVER_MIN_QUALITY,
   ROLLOVER_MIN_MA_TIER,
   ROLLOVER_EXCLUDED_ARCHETYPES,
-  IPO_SHARE_FUNDED_DEALS_PER_ROUND,
 } from '../data/gameConfig';
 import { calculateShareFundedTerms } from './ipo';
 
@@ -173,8 +172,8 @@ export function generateDealStructures(
     }
   }
 
-  // Option G: Share-Funded (public companies only, max 1/round, requires meaningful stock price; not for pro sports)
-  if (!isProSports && ipoState?.isPublic && ipoState.shareFundedDealsThisRound < IPO_SHARE_FUNDED_DEALS_PER_ROUND && ipoState.stockPrice >= 1.0) {
+  // Option G: Share-Funded (public companies only, requires meaningful stock price; not for pro sports)
+  if (!isProSports && ipoState?.isPublic && ipoState.stockPrice >= 1.0) {
     const terms = calculateShareFundedTerms(askingPrice, ipoState);
     structures.push({
       type: 'share_funded',
@@ -276,7 +275,7 @@ export function getStructureDescription(structure: DealStructure): string {
     case 'share_funded': {
       const terms = structure.shareTerms;
       if (!terms) return 'Issue new shares to fund the acquisition. No cash required but dilutes your ownership.';
-      return `Issue ${terms.sharesToIssue.toLocaleString()} shares to fund the acquisition — ${(terms.dilutionPct * 100).toFixed(1)}% dilution. No cash outlay, but permanent ownership reduction plus a scoring penalty per dilution event.`;
+      return `Issue ${terms.sharesToIssue.toLocaleString()} shares to fund the acquisition — ${(terms.dilutionPct * 100).toFixed(1)}% dilution. No cash outlay, but dilutes your ownership. Use buybacks later to reclaim shares.`;
     }
   }
 }

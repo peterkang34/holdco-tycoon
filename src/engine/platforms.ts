@@ -40,8 +40,8 @@ export function checkPlatformEligibility(
 ): { recipe: PlatformRecipe; eligibleBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number }[] {
   const activeBusinesses = businesses.filter(b => b.status === 'active' || b.status === 'integrated');
   const alreadyForgedIds = new Set(existingPlatforms.map(p => p.recipeId));
-  // Exclude businesses already part of a platform
-  const availableBusinesses = activeBusinesses.filter(b => !b.integratedPlatformId);
+  // Exclude businesses already part of a platform, and pro sports (ineligible for platforms)
+  const availableBusinesses = activeBusinesses.filter(b => !b.integratedPlatformId && b.sectorId !== 'proSports');
 
   const eligible: { recipe: PlatformRecipe; eligibleBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number }[] = [];
 
@@ -102,6 +102,86 @@ export function checkPlatformEligibility(
   }
 
   return eligible;
+}
+
+/**
+ * Check which platform recipes a player is CLOSE to being eligible for.
+ * Returns recipes where:
+ * 1. Sub-type requirements ARE met (enough matching businesses with distinct sub-types)
+ * 2. EBITDA threshold is NOT yet met
+ * 3. The recipe hasn't already been forged
+ *
+ * This lets the UI show a "progress toward unlock" indicator so players
+ * understand why a platform isn't available yet.
+ */
+export function checkNearEligiblePlatforms(
+  businesses: Business[],
+  existingPlatforms: IntegratedPlatform[],
+  difficulty: GameDifficulty,
+  duration: GameDuration
+): { recipe: PlatformRecipe; matchingBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number }[] {
+  const activeBusinesses = businesses.filter(b => b.status === 'active' || b.status === 'integrated');
+  const alreadyForgedIds = new Set(existingPlatforms.map(p => p.recipeId));
+  // Exclude businesses already part of a platform, and pro sports (ineligible for platforms)
+  const availableBusinesses = activeBusinesses.filter(b => !b.integratedPlatformId && b.sectorId !== 'proSports');
+
+  const nearEligible: { recipe: PlatformRecipe; matchingBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number }[] = [];
+
+  for (const recipe of PLATFORM_RECIPES) {
+    // Skip already forged
+    if (alreadyForgedIds.has(recipe.id)) continue;
+
+    // Find businesses that match this recipe's required sub-types
+    let matchingBusinesses: Business[];
+
+    if (recipe.sectorId) {
+      matchingBusinesses = availableBusinesses.filter(
+        b => b.sectorId === recipe.sectorId && recipe.requiredSubTypes.includes(b.subType)
+      );
+    } else if (recipe.crossSectorIds) {
+      matchingBusinesses = availableBusinesses.filter(
+        b => recipe.crossSectorIds!.includes(b.sectorId) && recipe.requiredSubTypes.includes(b.subType)
+      );
+    } else {
+      continue;
+    }
+
+    // Check distinct sub-type count — must pass for near-eligible
+    const distinctSubTypes = new Set(matchingBusinesses.map(b => b.subType));
+    if (distinctSubTypes.size < recipe.minSubTypes) continue;
+
+    // For cross-sector, require at least 1 business from each sector
+    if (recipe.crossSectorIds) {
+      const sectorsRepresented = new Set(matchingBusinesses.map(b => b.sectorId));
+      const allSectorsPresent = recipe.crossSectorIds.every(s => sectorsRepresented.has(s));
+      if (!allSectorsPresent) continue;
+    }
+
+    // Calculate sector EBITDA (all active businesses in relevant sectors)
+    let sectorEbitda: number;
+    if (recipe.sectorId) {
+      sectorEbitda = activeBusinesses
+        .filter(b => b.sectorId === recipe.sectorId)
+        .reduce((sum, b) => sum + b.ebitda, 0);
+    } else {
+      sectorEbitda = activeBusinesses
+        .filter(b => recipe.crossSectorIds!.includes(b.sectorId))
+        .reduce((sum, b) => sum + b.ebitda, 0);
+    }
+
+    // EBITDA threshold must NOT be met (inverted from checkPlatformEligibility)
+    const scaledThreshold = getScaledThreshold(recipe.baseEbitdaThreshold, difficulty, duration);
+    if (sectorEbitda >= scaledThreshold) continue; // Already fully eligible — skip
+
+    nearEligible.push({
+      recipe,
+      matchingBusinesses,
+      sectorEbitda,
+      scaledThreshold,
+    });
+  }
+
+  return nearEligible;
 }
 
 /**

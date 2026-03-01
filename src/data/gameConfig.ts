@@ -313,6 +313,7 @@ export const IPO_MIN_ROUND = 16;
 export const IPO_EARNINGS_MISS_PENALTY = 0.15;
 export const IPO_EARNINGS_BEAT_BONUS = 0.08;
 export const IPO_CONSECUTIVE_MISS_THRESHOLD = 2;
+/** @deprecated No longer used as a gate — share-funded deals are uncapped. Kept for test/migration compat. */
 export const IPO_SHARE_FUNDED_DEALS_PER_ROUND = 1;
 export const IPO_FEV_BONUS_BASE = 0.05;
 export const IPO_FEV_BONUS_MAX = 0.18;

@@ -15,7 +15,6 @@ import {
   IPO_EARNINGS_MISS_PENALTY,
   IPO_EARNINGS_BEAT_BONUS,
   IPO_CONSECUTIVE_MISS_THRESHOLD,
-  IPO_SHARE_FUNDED_DEALS_PER_ROUND,
   IPO_FEV_BONUS_BASE,
   IPO_FEV_BONUS_MAX,
 } from '../data/gameConfig';
@@ -175,7 +174,7 @@ export function processEarningsResult(
  */
 export function canShareFundedDeal(state: GameState): boolean {
   if (!state.ipoState?.isPublic) return false;
-  return state.ipoState.shareFundedDealsThisRound < IPO_SHARE_FUNDED_DEALS_PER_ROUND;
+  return true;
 }
 
 /**
