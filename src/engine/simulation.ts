@@ -918,8 +918,12 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
         adjustedProb = 0; // Need 4+ active businesses
       }
       if (eventDef.type === 'portfolio_equity_demand') {
-        const eligible = activeBusinesses.filter(b => b.dueDiligence.operatorQuality === 'strong' && b.qualityRating >= 4);
-        if (eligible.length === 0) adjustedProb = 0;
+        if (state.isFamilyOfficeMode) {
+          adjustedProb = 0; // No equity dilution events in FO — cap table is locked
+        } else {
+          const eligible = activeBusinesses.filter(b => b.dueDiligence.operatorQuality === 'strong' && b.qualityRating >= 4);
+          if (eligible.length === 0) adjustedProb = 0;
+        }
       }
       if (eventDef.type === 'portfolio_seller_note_renego') {
         const eligible = activeBusinesses.filter(b => b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining >= 2);

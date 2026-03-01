@@ -19,6 +19,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         items: [
           'Family Office tutorial modal — a 4-page amber-themed walkthrough explains FO capital, restrictions, scoring, and strategy when you first enter FO mode.',
           'AI narratives now recognize Family Office mode — year chronicles reference stewardship, legacy, MOIC progress, and institutional tone instead of generic holdco building.',
+          'Equity demand events no longer fire in Family Office mode — cap table is locked during FO play.',
         ],
       },
     ],
