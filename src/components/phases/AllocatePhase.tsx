@@ -529,6 +529,15 @@ export function AllocatePhase({
     if (!selectedDeal) return null;
 
     const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening, maxRoundsFromStore ?? 20, !distressRestrictions.canTakeDebt, maSourcing?.tier ?? 0, duration ?? 'standard', selectedDeal.sellerArchetype, ipoState ?? undefined);
+
+    // Compute minimum cash required based on cheapest available deal structure
+    // (pass full deal price as cash to see ALL structures that would be available)
+    const hypotheticalStructures = generateDealStructures(selectedDeal, selectedDeal.effectivePrice, interestRate, creditTightening, maxRoundsFromStore ?? 20, !distressRestrictions.canTakeDebt, maSourcing?.tier ?? 0, duration ?? 'standard', selectedDeal.sellerArchetype, ipoState ?? undefined);
+    const minCashForDeal = hypotheticalStructures.length > 0
+      ? Math.min(...hypotheticalStructures.map(s => s.cashRequired))
+      : selectedDeal.effectivePrice;
+    const minCashPct = Math.round((minCashForDeal / selectedDeal.effectivePrice) * 100);
+
     const availablePlatformsForDeal = getPlatformsForSector(selectedDeal.business.sectorId);
     const canTuckIn = availablePlatformsForDeal.length > 0;
 
@@ -681,7 +690,7 @@ export function AllocatePhase({
               <span className="text-sm text-text-muted">Your Cash:</span>
               <span className="font-mono font-bold text-sm">{formatMoney(cash)}</span>
             </div>
-            <span className="text-xs text-text-muted">Min. down payment (25%): {formatMoney(selectedDeal.effectivePrice * 0.25)}</span>
+            <span className="text-xs text-text-muted">Min. down payment ({minCashPct}%): {formatMoney(minCashForDeal)}</span>
           </div>
 
           <h4 className="font-bold mb-4">Choose Deal Structure</h4>
@@ -691,13 +700,13 @@ export function AllocatePhase({
               <div className="text-center mb-6">
                 <p className="text-warning font-medium text-base mb-2">Not enough cash for this deal</p>
                 <p className="text-sm">
-                  Need at least {formatMoney(selectedDeal.effectivePrice * 0.25)} (25% of {formatMoney(selectedDeal.effectivePrice)})
+                  Need at least {formatMoney(minCashForDeal)} ({minCashPct}% of {formatMoney(selectedDeal.effectivePrice)})
                 </p>
                 <p className="text-sm">
-                  You have {formatMoney(cash)} — shortfall: <span className="text-warning font-mono">{formatMoney(Math.max(0, selectedDeal.effectivePrice * 0.25 - cash))}</span>
+                  You have {formatMoney(cash)} — shortfall: <span className="text-warning font-mono">{formatMoney(Math.max(0, minCashForDeal - cash))}</span>
                 </p>
               </div>
-              {/* In-modal equity raise for Scenario A (hidden in FO mode) */}
+              {/* In-modal equity raise (hidden in FO mode) */}
               {isFamilyOfficeMode ? (
                 <div className="border border-white/10 bg-white/5 rounded-lg p-4">
                   <p className="text-sm text-text-secondary">
@@ -705,7 +714,7 @@ export function AllocatePhase({
                   </p>
                 </div>
               ) : (() => {
-                const shortfall = Math.max(0, Math.round(selectedDeal.effectivePrice * 0.25) - cash);
+                const shortfall = Math.max(0, Math.round(minCashForDeal) - cash);
                 const suggestedRaise = Math.ceil(shortfall / 100) * 100;
                 const canRaise = !raiseBlocked && !atOwnershipFloor;
                 const parsedAmount = parseInt(modalEquityAmount) || 0;
