@@ -201,11 +201,11 @@ function App() {
     return (
       <div className="min-h-screen bg-bg-primary text-text-primary overflow-x-hidden">
         {screen === 'familyOfficeResults' ? (
-          <FamilyOfficeScreen onComplete={() => {
+          <FamilyOfficeScreen isTestMode onComplete={() => {
             window.scrollTo(0, 0);
             setIsFoTest(false);
             window.location.hash = '';
-            setScreen('gameOver');
+            setScreen('intro');
           }} />
         ) : screen === 'game' ? (
           <GameScreen onGameOver={handleGameOver} onResetGame={handlePlayAgain} showTutorial={false} isChallenge={false} />

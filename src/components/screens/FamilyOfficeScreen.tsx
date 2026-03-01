@@ -1,8 +1,10 @@
 import { useGameStore } from '../../hooks/useGame';
 import { formatMoney } from '../../engine/types';
+import { PHILANTHROPY_STORIES } from '../../data/philanthropyStories';
 
 interface FamilyOfficeScreenProps {
   onComplete: () => void;
+  isTestMode?: boolean;
 }
 
 const GRADE_COLORS: Record<string, string> = {
@@ -19,15 +21,18 @@ const GRADE_BG: Record<string, string> = {
   Fragile: 'from-red-500/20 to-orange-500/20',
 };
 
-export function FamilyOfficeScreen({ onComplete }: FamilyOfficeScreenProps) {
+export function FamilyOfficeScreen({ onComplete, isTestMode }: FamilyOfficeScreenProps) {
   const familyOfficeState = useGameStore(s => s.familyOfficeState);
   const holdcoName = useGameStore(s => s.holdcoName);
+  const seed = useGameStore(s => s.seed);
 
   if (!familyOfficeState?.legacyScore) {
     return (
       <div className="min-h-screen px-4 sm:px-8 py-8 pb-16 max-w-2xl mx-auto flex flex-col items-center justify-center">
         <p className="text-text-muted">Family Office data not available.</p>
-        <button onClick={onComplete} className="btn-primary mt-4">Continue to Results</button>
+        <button onClick={onComplete} className="btn-primary mt-4">
+          {isTestMode ? 'Back to Menu' : 'Continue to Results'}
+        </button>
       </div>
     );
   }
@@ -35,6 +40,9 @@ export function FamilyOfficeScreen({ onComplete }: FamilyOfficeScreenProps) {
   const ls = familyOfficeState.legacyScore;
   const gradeColor = GRADE_COLORS[ls.grade] || 'text-text-primary';
   const gradeBg = GRADE_BG[ls.grade] || 'from-white/10 to-white/5';
+
+  const philanthropyAmount = familyOfficeState.philanthropyDeduction;
+  const story = PHILANTHROPY_STORIES[seed % PHILANTHROPY_STORIES.length];
 
   return (
     <div className="min-h-screen px-4 sm:px-8 py-8 pb-16 max-w-2xl mx-auto">
@@ -66,17 +74,25 @@ export function FamilyOfficeScreen({ onComplete }: FamilyOfficeScreenProps) {
         </div>
       </div>
 
-      {familyOfficeState.philanthropyDeduction > 0 && (
-        <div className="card mb-8 border-green-500/20">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-green-400">Philanthropy Contribution</span>
-            <span className="ml-auto font-mono text-green-400">{formatMoney(familyOfficeState.philanthropyDeduction)}</span>
+      {philanthropyAmount > 0 && (
+        <div className="card mb-8 border-green-500/30 bg-gradient-to-br from-green-500/10 to-emerald-500/5">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="text-2xl">{story.emoji}</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-green-400">{story.category}</span>
+          </div>
+          <h3 className="text-lg font-bold text-green-300 mb-2">{story.title}</h3>
+          <p className="text-sm text-text-secondary leading-relaxed mb-3">
+            {story.narrative(formatMoney(philanthropyAmount))}
+          </p>
+          <div className="border-t border-green-500/20 pt-3 flex justify-between items-center">
+            <span className="text-xs text-text-muted">Philanthropy Contribution</span>
+            <span className="font-mono text-green-400 font-bold">{formatMoney(philanthropyAmount)}</span>
           </div>
         </div>
       )}
 
       <button onClick={onComplete} className="btn-primary text-lg py-4 w-full">
-        Continue to Results
+        {isTestMode ? 'Back to Menu' : 'Continue to Results'}
       </button>
     </div>
   );

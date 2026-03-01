@@ -12,6 +12,24 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 28, 2026',
+    title: 'Family Office Polish',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Philanthropy impact stories — the Family Office completion screen now shows a curated narrative about how your philanthropy contribution made a difference, with stories spanning arts & culture, global health, higher education, environmental conservation, and more.',
+        ],
+      },
+      {
+        heading: 'Fixes',
+        items: [
+          'FO test mode (#/fo-test) no longer routes to the leaderboard — the button now says "Back to Menu" and returns to the intro screen.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 28, 2026',
     title: 'Pro Sports Franchise Updates',
     sections: [
       {

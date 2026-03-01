@@ -1470,7 +1470,7 @@ function TwentyYearContent() {
 
       <P><strong>Family Office mechanics:</strong></P>
       <BulletList items={[
-        <><strong>Philanthropy deduction:</strong> 25% of your distributions are committed to philanthropy upfront before play begins</>,
+        <><strong>Philanthropy deduction:</strong> 25% of your distributions are committed to philanthropy upfront before play begins. On completion, you&rsquo;ll see a story about the specific impact your gift made — from funding community arts centers to building clean water infrastructure in developing nations</>,
         <><strong>Starting cash:</strong> remaining 75% of distributions becomes your FO operating capital</>,
         <><strong>Pro Sports Franchises:</strong> exclusive FO sector — trophy assets with the highest multiples (15-35x) but lowest margins (5-18%). Pro sports teams cannot be merged, used as tuck-in targets, or designated as platforms — they operate as standalone trophy assets. Owning a franchise guarantees a bonus sports event every year (championship runs, draft picks, scandals, media deals) in addition to your normal event</>,
         <><strong>Premium deals:</strong> all FO deals are Q3+ quality with late-game pricing</>,
