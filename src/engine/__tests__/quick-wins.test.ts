@@ -116,6 +116,7 @@ function createTestState(overrides: Partial<GameState> = {}): GameState {
     turnaroundTier: 0,
     activeTurnarounds: [],
     currentEvent: null,
+    pendingProSportsEvent: null,
     eventHistory: [],
     creditTighteningRoundsRemaining: 0,
     inflationRoundsRemaining: 0,

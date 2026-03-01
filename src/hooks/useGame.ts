@@ -60,6 +60,7 @@ import {
   getSectorFocusEbitdaBonus,
   applyOrganicGrowth,
   generateEvent,
+  generateGuaranteedProSportsEvent,
   applyEventEffects,
   calculateMetrics,
   recordHistoricalMetrics,
@@ -374,6 +375,7 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   turnaroundTier: 0 as TurnaroundTier,
   activeTurnarounds: [],
   currentEvent: null,
+  pendingProSportsEvent: null,
   eventHistory: [],
   creditTighteningRoundsRemaining: 0,
   inflationRoundsRemaining: 0,
@@ -704,6 +706,13 @@ export const useGameStore = create<GameStore>()(
         // Generate event (seeded for challenge mode determinism)
         const event = generateEvent(state as GameState, roundStreams.events);
 
+        // Generate guaranteed proSports event if player owns a franchise
+        // Uses cosmetic stream fork to avoid disturbing the event RNG
+        const proSportsEvent = generateGuaranteedProSportsEvent(
+          state as GameState,
+          roundStreams.cosmetic.fork('proSportsGuaranteed'),
+        );
+
         // Recompute totalDebt from holdco loan + per-business bank debt
         const newTotalDebt = computeTotalDebt(updatedBusinesses, updatedHoldcoLoanBalance);
 
@@ -727,6 +736,11 @@ export const useGameStore = create<GameStore>()(
           return;
         }
 
+        // Skip pending proSports event if primary event already IS a proSports event
+        // (sector events embed sectorId in their id: event_{round}_{sectorId}_{title})
+        const primaryIsProSports = event?.type === 'sector_event'
+          && event.id.includes('_proSports_');
+
         let gameState: GameState = {
           ...state,
           businesses: updatedBusinesses,
@@ -735,6 +749,7 @@ export const useGameStore = create<GameStore>()(
           holdcoLoanBalance: updatedHoldcoLoanBalance,
           holdcoLoanRoundsRemaining: updatedHoldcoLoanRoundsRemaining,
           currentEvent: event,
+          pendingProSportsEvent: primaryIsProSports ? null : (proSportsEvent ?? null),
           requiresRestructuring,
           phase: requiresRestructuring ? 'restructure' as GamePhase : 'event' as GamePhase,
         };
@@ -857,6 +872,26 @@ export const useGameStore = create<GameStore>()(
 
       advanceToAllocate: () => {
         const state = get();
+
+        // If there's a pending proSports event, show it before advancing to allocate
+        if (state.pendingProSportsEvent) {
+          const proEvent = state.pendingProSportsEvent;
+          let updatedState: GameState = {
+            ...state,
+            currentEvent: proEvent,
+            pendingProSportsEvent: null,
+            eventHistory: [...state.eventHistory, proEvent],
+          };
+          // Apply effects with seeded RNG for challenge mode determinism
+          const proSportsRng = createRngStreams(state.seed, state.round).cosmetic.fork('proSportsEffects');
+          updatedState = applyEventEffects(updatedState, proEvent, proSportsRng);
+          set({
+            ...updatedState,
+            metrics: calculateMetrics(updatedState),
+          });
+          return; // Stay in event phase — next advanceToAllocate will proceed normally
+        }
+
         const focusBonus = calculateSectorFocusBonus(state.businesses);
 
         const totalPortfolioEbitda = state.businesses
@@ -4419,7 +4454,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v32', // v32: Early-game UX & Event System Overhaul — SMB broker, quiet year cap, filler events, pipeline safety net
+      name: 'holdco-tycoon-save-v33', // v33: Guaranteed pro sports events — pendingProSportsEvent field
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

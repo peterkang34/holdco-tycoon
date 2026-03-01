@@ -1255,6 +1255,34 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
   };
 }
 
+/**
+ * Generate a guaranteed proSports sector event for players who own a pro sports franchise.
+ * Called separately from the main event pipeline — fires every round a proSports biz is owned.
+ */
+export function generateGuaranteedProSportsEvent(state: GameState, rng?: SeededRng): GameEvent | null {
+  const activeBusinesses = state.businesses.filter(b => b.status === 'active' || b.status === 'integrated');
+  const proSportsBusinesses = activeBusinesses.filter(b => b.sectorId === 'proSports');
+  if (proSportsBusinesses.length === 0) return null;
+
+  const proSportsEvents = SECTOR_EVENTS.filter(e => e.sectorId === 'proSports');
+  if (proSportsEvents.length === 0) return null;
+
+  // Pick a random proSports event (uniform — probabilities don't matter for guaranteed events)
+  const eventDef = pickRandom(proSportsEvents, rng)!;
+  const affectedBusiness = eventDef.affectsAll ? undefined : pickRandom(proSportsBusinesses, rng)!;
+
+  return {
+    id: `event_${state.round}_prosports_guaranteed_${eventDef.title.replace(/\s+/g, '_')}`,
+    type: 'sector_event',
+    title: eventDef.title,
+    description: eventDef.description,
+    effect: eventDef.effectDescription,
+    tip: eventDef.tip,
+    tipSource: eventDef.tipSource,
+    affectedBusinessId: affectedBusiness?.id,
+  };
+}
+
 export function applyEventEffects(state: GameState, event: GameEvent, rng?: SeededRng): GameState {
   let newState = { ...state };
   const impacts: EventImpact[] = [];

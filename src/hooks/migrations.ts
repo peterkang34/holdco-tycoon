@@ -761,6 +761,30 @@ function migrateV31ToV32(): void {
 }
 
 /**
+ * v32→v33: Guaranteed pro sports events.
+ * Adds pendingProSportsEvent field.
+ */
+function migrateV32ToV33(): void {
+  const v32Key = 'holdco-tycoon-save-v32';
+  const v33Key = 'holdco-tycoon-save-v33';
+  if (localStorage.getItem(v33Key)) return;
+  try {
+    const raw = localStorage.getItem(v32Key);
+    if (!raw) return;
+    const v32Data = JSON.parse(raw);
+
+    if (v32Data.state?.pendingProSportsEvent === undefined) {
+      v32Data.state.pendingProSportsEvent = null;
+    }
+
+    localStorage.setItem(v33Key, JSON.stringify(v32Data));
+    localStorage.removeItem(v32Key);
+  } catch (e) {
+    console.error('v32→v33 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -788,4 +812,5 @@ export function runAllMigrations(): void {
   migrateV29ToV30();
   migrateV30ToV31();
   migrateV31ToV32();
+  migrateV32ToV33();
 }

@@ -526,6 +526,7 @@ export interface GameState {
 
   // Events
   currentEvent: GameEvent | null;
+  pendingProSportsEvent: GameEvent | null;
   eventHistory: GameEvent[];
   creditTighteningRoundsRemaining: number;
   inflationRoundsRemaining: number;

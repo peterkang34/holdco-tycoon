@@ -189,6 +189,7 @@ function initializeGameState(config: {
     maFocus: { sectorId: null, sizePreference: 'any', subType: null },
     maSourcing: { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 },
     currentEvent: null,
+    pendingProSportsEvent: null,
     eventHistory: [],
     creditTighteningRoundsRemaining: 0,
     inflationRoundsRemaining: 0,

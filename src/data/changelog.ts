@@ -12,12 +12,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 28, 2026',
-    title: 'Pro Sports Franchise Restrictions',
+    title: 'Pro Sports Franchise Updates',
     sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Guaranteed sports events — owning a pro sports franchise now triggers a bonus sports event every year (championship runs, draft picks, scandals, media deals, and more), in addition to your normal event. The drama of franchise ownership is now front and center.',
+        ],
+      },
       {
         heading: 'Balance Changes',
         items: [
-          'Pro Sports Franchises in Family Office mode now operate as standalone trophy assets — merging, tuck-in acquisitions, and platform designation are disabled for this business type.',
+          'Pro Sports Franchises now operate as standalone trophy assets — merging, tuck-in acquisitions, and platform designation are disabled for this business type.',
         ],
       },
     ],

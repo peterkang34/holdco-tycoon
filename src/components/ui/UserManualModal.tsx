@@ -1472,7 +1472,7 @@ function TwentyYearContent() {
       <BulletList items={[
         <><strong>Philanthropy deduction:</strong> 25% of your distributions are committed to philanthropy upfront before play begins</>,
         <><strong>Starting cash:</strong> remaining 75% of distributions becomes your FO operating capital</>,
-        <><strong>Pro Sports Franchises:</strong> exclusive FO sector — trophy assets with the highest multiples (15-35x) but lowest margins (5-18%). Pro sports teams cannot be merged, used as tuck-in targets, or designated as platforms — they operate as standalone trophy assets</>,
+        <><strong>Pro Sports Franchises:</strong> exclusive FO sector — trophy assets with the highest multiples (15-35x) but lowest margins (5-18%). Pro sports teams cannot be merged, used as tuck-in targets, or designated as platforms — they operate as standalone trophy assets. Owning a franchise guarantees a bonus sports event every year (championship runs, draft picks, scandals, media deals) in addition to your normal event</>,
         <><strong>Premium deals:</strong> all FO deals are Q3+ quality with late-game pricing</>,
         <><strong>Debt tab:</strong> the Capital tab becomes &ldquo;Debt&rdquo; in FO mode — only debt management is available. Equity raises, distributions, buybacks, IPO, and turnarounds are blocked</>,
         <><strong>Restructuring penalty:</strong> if you restructure during FO, your FO FEV is reduced by 20% before MOIC calculation</>,
