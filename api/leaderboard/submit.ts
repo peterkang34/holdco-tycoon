@@ -17,12 +17,12 @@ const HOLDCO_NAME_REGEX = /^[A-Za-z0-9 &'.,\-]+$/;
 
 function gradeMatchesScore(grade: Grade, score: number): boolean {
   switch (grade) {
-    case 'S': return score >= 90;
-    case 'A': return score >= 75 && score < 90;
-    case 'B': return score >= 60 && score < 75;
-    case 'C': return score >= 40 && score < 60;
-    case 'D': return score >= 20 && score < 40;
-    case 'F': return score < 20;
+    case 'S': return score >= 95;
+    case 'A': return score >= 82 && score < 95;
+    case 'B': return score >= 65 && score < 82;
+    case 'C': return score >= 45 && score < 65;
+    case 'D': return score >= 25 && score < 45;
+    case 'F': return score < 25;
   }
 }
 

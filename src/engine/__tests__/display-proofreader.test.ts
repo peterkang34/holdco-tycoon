@@ -169,14 +169,14 @@ describe('Display Proofreader', () => {
       expect(maxPoints).toBe(100);
     });
 
-    it('grade thresholds: S>=90, A>=75, B>=60, C>=40, D>=20, F<20', () => {
-      // From scoring.ts lines 313-331
-      const thresholds = { S: 90, A: 75, B: 60, C: 40, D: 20, F: 0 };
-      expect(thresholds.S).toBe(90);
-      expect(thresholds.A).toBe(75);
-      expect(thresholds.B).toBe(60);
-      expect(thresholds.C).toBe(40);
-      expect(thresholds.D).toBe(20);
+    it('grade thresholds: S>=95, A>=82, B>=65, C>=45, D>=25, F<25', () => {
+      // From scoring.ts grade assignment logic
+      const thresholds = { S: 95, A: 82, B: 65, C: 45, D: 25, F: 0 };
+      expect(thresholds.S).toBe(95);
+      expect(thresholds.A).toBe(82);
+      expect(thresholds.B).toBe(65);
+      expect(thresholds.C).toBe(45);
+      expect(thresholds.D).toBe(25);
     });
 
     it('UserManualModal scoring table matches engine (Strategy B)', () => {

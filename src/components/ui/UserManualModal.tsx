@@ -1164,7 +1164,7 @@ function ScoringContent() {
           ['FCF/Share Growth', '20', 'How much free cash flow per share grew over the game (target: 4x for 20yr, 2x for 10yr)'],
           ['Portfolio ROIC', '15', 'Return on invested capital — are you earning above your cost of capital? (target: 25%+ for 20yr, 20%+ for 10yr)'],
           ['Capital Deployment', '15', 'Average MOIC across investments (net of business debt) + Return on Incremental Invested Capital (ROIIC)'],
-          ['Balance Sheet Health', '15', 'Ending leverage ratio with steep penalties above 3.5x, plus penalties for over-leveraging, covenant breaches, and restructuring'],
+          ['Balance Sheet Health', '15', 'Leverage discipline — optimal range is 1.5-2.5x net debt/EBITDA, with penalties for being too conservative (<1x) or too aggressive (>3.5x), plus permanent penalties for over-leveraging, covenant breaches, and restructuring'],
           ['Strategic Discipline', '15', 'Sector focus, shared services usage, capital return discipline, deal quality'],
         ]}
       />
@@ -1173,12 +1173,12 @@ function ScoringContent() {
       <DataTable
         headers={['Grade', 'Score Range', 'Title']}
         rows={[
-          ['S', '90-100', 'Master Allocator'],
-          ['A', '75-89', 'Skilled Compounder'],
-          ['B', '60-74', 'Solid Builder'],
-          ['C', '40-59', 'Emerging Operator'],
-          ['D', '20-39', 'Apprentice'],
-          ['F', '0-19', 'Blown Up (or Bankrupt)'],
+          ['S', '95-100', 'Master Allocator'],
+          ['A', '82-94', 'Skilled Compounder'],
+          ['B', '65-81', 'Solid Builder'],
+          ['C', '45-64', 'Emerging Operator'],
+          ['D', '25-44', 'Apprentice'],
+          ['F', '0-24', 'Blown Up (or Bankrupt)'],
         ]}
       />
 

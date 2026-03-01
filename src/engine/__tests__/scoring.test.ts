@@ -187,15 +187,15 @@ describe('calculateFinalScore', () => {
     expect(score.valueCreation).toBeLessThanOrEqual(20);
   });
 
-  it('should give S grade for total >= 90', () => {
+  it('should give S grade for total >= 95', () => {
     // This is hard to achieve in practice, but we can test the grading logic
     const state = createScoringState();
     const score = calculateFinalScore(state);
-    if (score.total >= 90) expect(score.grade).toBe('S');
-    else if (score.total >= 75) expect(score.grade).toBe('A');
-    else if (score.total >= 60) expect(score.grade).toBe('B');
-    else if (score.total >= 40) expect(score.grade).toBe('C');
-    else if (score.total >= 20) expect(score.grade).toBe('D');
+    if (score.total >= 95) expect(score.grade).toBe('S');
+    else if (score.total >= 82) expect(score.grade).toBe('A');
+    else if (score.total >= 65) expect(score.grade).toBe('B');
+    else if (score.total >= 45) expect(score.grade).toBe('C');
+    else if (score.total >= 25) expect(score.grade).toBe('D');
     else expect(score.grade).toBe('F');
   });
 

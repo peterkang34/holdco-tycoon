@@ -233,15 +233,19 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   // 5. Balance Sheet Health (15 points max)
   let balanceSheetHealth = 0;
 
-  // Net Debt/EBITDA component
+  // Net Debt/EBITDA component — optimal leverage is 1.5-2.5x (real PE sweet spot)
   if (metrics.netDebtToEbitda < 1.0) {
-    balanceSheetHealth = 15;
+    balanceSheetHealth = 12; // Too conservative — not deploying capital efficiently
+  } else if (metrics.netDebtToEbitda < 1.5) {
+    // Linear ramp from 12 to 15
+    balanceSheetHealth = 12 + ((metrics.netDebtToEbitda - 1.0) / 0.5) * 3;
   } else if (metrics.netDebtToEbitda < 2.5) {
-    balanceSheetHealth = 10 + ((2.5 - metrics.netDebtToEbitda) / 1.5) * 5;
+    balanceSheetHealth = 15; // Sweet spot
   } else if (metrics.netDebtToEbitda < 3.5) {
-    balanceSheetHealth = 5 + ((3.5 - metrics.netDebtToEbitda) / 1.0) * 5;
+    // Linear decline from 15 to 7
+    balanceSheetHealth = 15 - ((metrics.netDebtToEbitda - 2.5) / 1.0) * 8;
   } else {
-    balanceSheetHealth = Math.max(0, 5 - (metrics.netDebtToEbitda - 3.5) * 3);
+    balanceSheetHealth = Math.max(0, 7 - (metrics.netDebtToEbitda - 3.5) * 3);
   }
 
   // Penalty for ever going above 4x
@@ -340,19 +344,19 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   let grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
   let title: string;
 
-  if (total >= 90) {
+  if (total >= 95) {
     grade = 'S';
     title = "Master Allocator - You'd make Buffett proud";
-  } else if (total >= 75) {
+  } else if (total >= 82) {
     grade = 'A';
     title = 'Skilled Compounder - Constellation-level discipline';
-  } else if (total >= 60) {
+  } else if (total >= 65) {
     grade = 'B';
     title = 'Solid Builder - Your holdco has real potential';
-  } else if (total >= 40) {
+  } else if (total >= 45) {
     grade = 'C';
     title = 'Emerging Operator - Room to sharpen your allocation instincts';
-  } else if (total >= 20) {
+  } else if (total >= 25) {
     grade = 'D';
     title = 'Apprentice - Study the playbook and try again';
   } else {

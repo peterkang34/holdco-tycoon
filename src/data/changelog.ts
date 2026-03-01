@@ -12,6 +12,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'March 1, 2026',
+    title: 'Scoring Rebalance',
+    sections: [
+      {
+        heading: 'Balance Changes',
+        items: [
+          'Tighter grade thresholds — S-rank now requires 95+ (was 90+), and all other grades shifted up accordingly. Earning an S should feel like a real achievement, not a participation trophy.',
+          'Balance sheet scoring rewards optimal leverage — the 1.5-2.5x net debt/EBITDA sweet spot now earns full marks (15 pts). Being too conservative (<1x) caps you at 12 pts, reflecting real PE where zero leverage means leaving returns on the table.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 1, 2026',
     title: 'PE Playbook Update',
     sections: [
       {

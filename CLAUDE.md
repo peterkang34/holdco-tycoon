@@ -86,7 +86,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/engine/affordability.ts` — 7-tier affordability engine (calculateAffordability, getAffordabilityWeights, pickWeightedTier, generateTrophyEbitda)
 - `src/hooks/chronicleContext.ts` — AI chronicle context builder
 - `src/engine/helpers.ts` — Shared helpers (clampMargin, capGrowthRate, applyEbitdaFloor)
-- `src/engine/__tests__/display-proofreader.test.ts` — 243 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
+- `src/engine/__tests__/display-proofreader.test.ts` — 261 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
 - `src/data/mechanicsCopy.ts` — Centralized registry for mechanic descriptions (debt labels, waterfall labels, countdown functions, banned patterns)
 - `src/data/gameConfig.ts` — Game constants and configuration
 - `src/components/screens/GameScreen.tsx` — Main game screen (phase routing, toast handlers)
@@ -123,7 +123,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 8. **Playtest Coverage** — If adding a new game mechanic, add a key to `FEATURE_REGISTRY` in `src/engine/__tests__/playtest/coverage.ts`, wire up `coverage.record()` in `simulator.ts`, and update a strategy or the hard-to-trigger list in `playtest.test.ts` (see instructions in coverage.ts)
 
 ## Display Proofreader (MANDATORY)
-- **`display-proofreader.test.ts`** — 243 tests that validate UI copy matches engine constants
+- **`display-proofreader.test.ts`** — 261 tests that validate UI copy matches engine constants
 - **When changing ANY game mechanic**: ALWAYS update UserManualModal.tsx to reflect the change (user rule: manual must ALWAYS be updated automatically)
 - **When changing ANY engine constant** (rates, thresholds, formulas, scoring weights): update the proofreader test AND the UI copy (UserManualModal, CollectPhase, DealCard, etc.)
 - **When changing ANY UI copy** that references numbers/mechanics: update the proofreader test to assert the new value
