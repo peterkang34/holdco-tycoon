@@ -20,6 +20,7 @@ import {
   COMPLEXITY_ACTIVATION_THRESHOLD,
   COMPLEXITY_ACTIVATION_THRESHOLD_QUICK,
   COMPLEXITY_COST_PER_OPCO,
+  COMPLEXITY_COST_EXPONENT,
   COMPLEXITY_MAX_MARGIN_COMPRESSION,
   COMPETITIVE_POSITION_PREMIUM,
 } from '../../data/gameConfig';
@@ -176,8 +177,32 @@ describe('calculateComplexityCost', () => {
     expect(result.netCost).toBeGreaterThan(0);
   });
 
-  it('caps cost at 3% of revenue', () => {
-    // 15 businesses: excess = 15 - 4 = 11, fraction = 11 * 0.003 = 0.033, capped at 0.03
+  it('scales non-linearly in standard mode (exponent 1.3)', () => {
+    // 7 businesses: excess = 7 - 4 = 3, fraction = 3^1.3 * 0.003
+    const result = calculateComplexityCost(
+      makeBizzes(7),
+      [],
+      100000,
+      'standard',
+    );
+    const expectedFraction = Math.pow(3, COMPLEXITY_COST_EXPONENT) * COMPLEXITY_COST_PER_OPCO;
+    expect(result.grossCostFraction).toBeCloseTo(expectedFraction, 6);
+    expect(result.grossCostFraction).toBeGreaterThan(3 * COMPLEXITY_COST_PER_OPCO); // more than linear
+  });
+
+  it('scales linearly in quick mode (exponent 1.0)', () => {
+    // 7 businesses in quick mode: excess = 7 - 3 = 4, fraction = 4^1.0 * 0.003 = 0.012
+    const result = calculateComplexityCost(
+      makeBizzes(7),
+      [],
+      100000,
+      'quick',
+    );
+    expect(result.grossCostFraction).toBeCloseTo(4 * COMPLEXITY_COST_PER_OPCO, 6);
+  });
+
+  it('caps cost at 4% of revenue', () => {
+    // 15 businesses: excess = 15 - 4 = 11, fraction = 11^1.3 * 0.003 ≈ 0.070, capped at 0.04
     const result = calculateComplexityCost(
       makeBizzes(15),
       [],
@@ -185,7 +210,7 @@ describe('calculateComplexityCost', () => {
       'standard',
     );
     expect(result.grossCostFraction).toBe(COMPLEXITY_MAX_MARGIN_COMPRESSION);
-    expect(result.grossCost).toBe(Math.round(100000 * 0.03));
+    expect(result.grossCost).toBe(Math.round(100000 * 0.04));
   });
 
   it('shared services offset reduces net cost', () => {

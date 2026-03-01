@@ -12,6 +12,29 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'March 1, 2026',
+    title: 'Feedback Polish',
+    sections: [
+      {
+        heading: 'UI Improvements',
+        items: [
+          'Complexity cost now shows shared services offset math in the cash flow waterfall — see exactly how much your infrastructure investment saves.',
+          'Multiple spread uses a 5-color gradient (green → blue → yellow → orange → red) instead of binary green/red, so you can read value creation at a glance.',
+          'Market cycle tooltip now shows the last 4 global events as colored dots with sentiment scores, explaining how the current phase was determined.',
+          'Moat tier tooltip now shows a progress bar toward the next tier plus a factor-by-factor checklist of what\'s active and what to improve.',
+          'Ownership history now shows a colored quality dot and annotation — founder-owned businesses get a small improvement bonus, while multi-sponsor assets face diminishing returns.',
+        ],
+      },
+      {
+        heading: 'Balance Changes',
+        items: [
+          'Portfolio complexity cost now scales non-linearly in Full Game mode (exponent 1.3×) — adding a 6th business costs slightly more than a 5th, and the penalty accelerates from there. Quick Play stays linear. Cap raised from 3% to 4% of revenue to preserve strategic signal at larger portfolios.',
+          'Ownership history now affects improvement efficacy: founder-owned businesses (+10%), one prior backer (neutral), two backers (-5%), three+ (-10%).',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 1, 2026',
     title: 'Scoring Rebalance',
     sections: [
       {

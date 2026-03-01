@@ -394,9 +394,24 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
           </p>
         </div>
         {deal.business.ownershipHistory && (
-          <p className="text-text-muted mt-1.5 italic text-[11px] leading-relaxed">
-            {deal.business.ownershipHistory}
-          </p>
+          <div className="flex items-start gap-1.5 mt-1.5">
+            <span className={`w-2 h-2 rounded-full mt-1 shrink-0 ${
+              deal.business.priorOwnershipCount === 0 ? 'bg-accent' :
+              deal.business.priorOwnershipCount === 1 ? 'bg-blue-400' :
+              deal.business.priorOwnershipCount === 2 ? 'bg-yellow-400' :
+              'bg-red-400'
+            }`} />
+            <p className="text-text-muted italic text-[11px] leading-relaxed">
+              {deal.business.ownershipHistory}
+              <span className="not-italic ml-1">
+                {deal.business.priorOwnershipCount === 0
+                  ? '— improvement bonus'
+                  : deal.business.priorOwnershipCount >= 2
+                  ? '— reduced improvement gains'
+                  : ''}
+              </span>
+            </p>
+          </div>
         )}
       </div>
 

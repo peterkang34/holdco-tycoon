@@ -3,7 +3,7 @@ import { Business, IntegratedPlatform, ActiveTurnaround, formatMoney, formatPerc
 import { getProgramById } from '../../data/turnaroundPrograms';
 import { SECTORS } from '../../data/sectors';
 import { calculateExitValuation } from '../../engine/simulation';
-import { calculateDeRiskingPremium, getMoatTier } from '../../engine/buyers';
+import { calculateDeRiskingPremiumBreakdown, getMoatTier, type MoatTier } from '../../engine/buyers';
 import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
 import { debtCountdownLabel, earnoutTargetLabel, earnoutCountdownLabel, MOAT_TIER_LABELS } from '../../data/mechanicsCopy';
 import { Tooltip } from '../ui/Tooltip';
@@ -76,10 +76,22 @@ export function BusinessCard({
   const isGrowing = business.ebitda > business.acquisitionEbitda;
   const isDeclining = business.ebitda < business.peakEbitda * 0.7;
 
-  // Moat tier based on de-risking premium
-  const deRiskingPremium = useMemo(() => calculateDeRiskingPremium(business), [business]);
+  // Moat tier based on de-risking premium (with factor breakdown)
+  const deRiskingBreakdown = useMemo(() => calculateDeRiskingPremiumBreakdown(business), [business]);
+  const deRiskingPremium = deRiskingBreakdown.total;
   const moatTier = useMemo(() => getMoatTier(deRiskingPremium), [deRiskingPremium]);
   const moatLabel = MOAT_TIER_LABELS[moatTier];
+
+  // Next moat tier threshold
+  const MOAT_THRESHOLDS: { tier: MoatTier; min: number }[] = [
+    { tier: 'Narrow', min: 0 },
+    { tier: 'Moderate', min: 0.3 },
+    { tier: 'Wide', min: 0.7 },
+    { tier: 'Fortress', min: 1.0 },
+  ];
+  const currentTierIndex = MOAT_THRESHOLDS.findIndex(t => t.tier === moatTier);
+  const nextTier = currentTierIndex < MOAT_THRESHOLDS.length - 1 ? MOAT_THRESHOLDS[currentTierIndex + 1] : null;
+  const gapToNext = nextTier ? Math.max(0, nextTier.min - deRiskingPremium) : 0;
 
   // Multiple spread — entry vs exit
   const multipleSpread = exitValuation.totalMultiple - business.acquisitionMultiple;
@@ -309,7 +321,13 @@ export function BusinessCard({
           <div className="flex items-center justify-between text-xs mb-2 px-1">
             <Tooltip
               trigger={
-                <span className={`font-mono ${multipleSpread >= 0 ? 'text-accent' : 'text-danger'}`}>
+                <span className={`font-mono ${
+                  multipleSpread >= 2.0 ? 'text-accent' :
+                  multipleSpread >= 0.5 ? 'text-blue-400' :
+                  multipleSpread >= 0 ? 'text-yellow-400' :
+                  multipleSpread >= -1.0 ? 'text-orange-400' :
+                  'text-danger'
+                }`}>
                   {business.acquisitionMultiple.toFixed(1)}x → {exitValuation.totalMultiple.toFixed(1)}x
                   <span className="ml-1 font-bold">
                     {multipleSpread >= 0 ? '+' : ''}{multipleSpread.toFixed(1)}x spread
@@ -327,9 +345,42 @@ export function BusinessCard({
                 </span>
               }
               align="right"
-              width="w-48"
+              width="w-64"
             >
               <p className="text-sm text-text-secondary font-normal">{moatLabel.tip}</p>
+              {/* Moat progression bar */}
+              <div className="flex items-center gap-1 mt-2 mb-1">
+                {MOAT_THRESHOLDS.map((t, i) => {
+                  const isActive = i <= currentTierIndex;
+                  const tierLabel = MOAT_TIER_LABELS[t.tier];
+                  return (
+                    <div key={t.tier} className={`flex-1 h-1.5 rounded-full ${isActive ? tierLabel.bg.replace('/20', '/60') : 'bg-white/10'}`} />
+                  );
+                })}
+              </div>
+              <div className="flex justify-between text-[9px] text-text-muted font-normal mb-2">
+                <span>Narrow</span>
+                <span>Fortress</span>
+              </div>
+              {/* Factor breakdown */}
+              <div className="space-y-1 pt-1 border-t border-white/10">
+                {deRiskingBreakdown.factors.map((f) => (
+                  <div key={f.label} className="flex items-center gap-1.5 text-[10px] font-normal">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${f.active ? 'bg-accent' : 'bg-white/20'}`} />
+                    <span className={f.active ? 'text-text-secondary' : 'text-text-muted'}>
+                      {f.active ? f.label : f.hint ?? f.label}
+                    </span>
+                    {f.active && (
+                      <span className="text-accent ml-auto font-mono">+{f.contribution.toFixed(1)}x</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {nextTier && gapToNext > 0 && (
+                <p className="text-[10px] text-text-muted mt-1.5 pt-1 border-t border-white/10 font-normal">
+                  +{gapToNext.toFixed(1)}x more for {nextTier.tier} Moat
+                </p>
+              )}
             </Tooltip>
           </div>
 

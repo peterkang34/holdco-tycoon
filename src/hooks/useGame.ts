@@ -176,7 +176,7 @@ const FOUNDER_OWNERSHIP = 0.80;
 const STARTING_SHARES = 1000;
 const FOUNDER_SHARES = 800;
 const STARTING_INTEREST_RATE = 0.07;
-import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EQUITY_ISSUANCE_SENTIMENT_PENALTY, IMPROVEMENT_COST_FLOOR, QUALITY_IMPROVEMENT_MULTIPLIER, MIN_FOUNDER_OWNERSHIP, MIN_PUBLIC_FOUNDER_OWNERSHIP } from '../data/gameConfig';
+import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EQUITY_ISSUANCE_SENTIMENT_PENALTY, IMPROVEMENT_COST_FLOOR, QUALITY_IMPROVEMENT_MULTIPLIER, MIN_FOUNDER_OWNERSHIP, MIN_PUBLIC_FOUNDER_OWNERSHIP, getOwnershipImprovementModifier } from '../data/gameConfig';
 import { calculateStockPrice } from '../engine/ipo';
 import { clampMargin, capGrowthRate, applyEbitdaFloor } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
@@ -1978,9 +1978,12 @@ export const useGameStore = create<GameStore>()(
 
         // Quality multiplier: higher quality businesses get more from improvements
         const qualityMult = QUALITY_IMPROVEMENT_MULTIPLIER[business.qualityRating as 1|2|3|4|5] ?? 1.0;
-        if (marginBoost > 0) marginBoost *= qualityMult;
-        if (revenueBoost > 0) revenueBoost *= qualityMult;
-        if (growthBoost > 0) growthBoost *= qualityMult;
+        // Ownership modifier: founder-owned businesses have more low-hanging fruit
+        const ownershipMult = getOwnershipImprovementModifier(business.priorOwnershipCount ?? 0);
+        const combinedMult = qualityMult * ownershipMult;
+        if (marginBoost > 0) marginBoost *= combinedMult;
+        if (revenueBoost > 0) revenueBoost *= combinedMult;
+        if (growthBoost > 0) growthBoost *= combinedMult;
 
         const updatedBusinesses = state.businesses.map(b => {
           if (b.id !== businessId) return b;

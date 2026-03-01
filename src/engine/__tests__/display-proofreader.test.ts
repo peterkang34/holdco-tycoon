@@ -81,6 +81,8 @@ import {
   EARLY_GAME_AFFORDABLE_THRESHOLD,
   COMPLEXITY_ACTIVATION_THRESHOLD,
   COMPLEXITY_COST_PER_OPCO,
+  COMPLEXITY_COST_EXPONENT,
+  COMPLEXITY_COST_EXPONENT_QUICK,
   COMPLEXITY_MAX_MARGIN_COMPRESSION,
   COMPETITIVE_POSITION_PREMIUM,
   FILLER_TAX_STRATEGY_COST_MIN,
@@ -1896,8 +1898,16 @@ describe('Display Proofreader', () => {
       expect(COMPLEXITY_COST_PER_OPCO).toBe(0.003);
     });
 
-    it('COMPLEXITY_MAX_MARGIN_COMPRESSION = 0.03 (3ppt cap)', () => {
-      expect(COMPLEXITY_MAX_MARGIN_COMPRESSION).toBe(0.03);
+    it('COMPLEXITY_MAX_MARGIN_COMPRESSION = 0.04 (4ppt cap)', () => {
+      expect(COMPLEXITY_MAX_MARGIN_COMPRESSION).toBe(0.04);
+    });
+
+    it('COMPLEXITY_COST_EXPONENT = 1.3 (non-linear standard mode)', () => {
+      expect(COMPLEXITY_COST_EXPONENT).toBe(1.3);
+    });
+
+    it('COMPLEXITY_COST_EXPONENT_QUICK = 1.0 (linear quick mode)', () => {
+      expect(COMPLEXITY_COST_EXPONENT_QUICK).toBe(1.0);
     });
 
     it('simulation.ts has calculateComplexityCost function (Strategy B)', () => {
@@ -1905,6 +1915,12 @@ describe('Display Proofreader', () => {
       expect(sim).toContain('calculateComplexityCost');
       expect(sim).toContain('COMPLEXITY_ACTIVATION_THRESHOLD');
       expect(sim).toContain('COMPLEXITY_COST_PER_OPCO');
+      expect(sim).toContain('COMPLEXITY_COST_EXPONENT');
+    });
+
+    it('UserManualModal mentions non-linear complexity scaling (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('non-linearly');
     });
 
     it('CollectPhase displays complexity cost line (Strategy B)', () => {

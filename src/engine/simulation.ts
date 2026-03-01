@@ -105,6 +105,8 @@ import {
   COMPLEXITY_COST_PER_OPCO,
   COMPLEXITY_SHARED_SERVICE_OFFSET,
   COMPLEXITY_MAX_MARGIN_COMPRESSION,
+  COMPLEXITY_COST_EXPONENT,
+  COMPLEXITY_COST_EXPONENT_QUICK,
 } from '../data/gameConfig';
 import { getPlatformMultipleExpansion, getPlatformRecessionModifier } from './platforms';
 import { getTurnaroundExitPremium } from './turnarounds';
@@ -365,7 +367,8 @@ export function calculateComplexityCost(
   }
 
   const excessCount = effectiveCount - (threshold - 1);
-  const grossCostFraction = Math.min(excessCount * COMPLEXITY_COST_PER_OPCO, COMPLEXITY_MAX_MARGIN_COMPRESSION);
+  const exponent = duration === 'quick' ? COMPLEXITY_COST_EXPONENT_QUICK : COMPLEXITY_COST_EXPONENT;
+  const grossCostFraction = Math.min(Math.pow(excessCount, exponent) * COMPLEXITY_COST_PER_OPCO, COMPLEXITY_MAX_MARGIN_COMPRESSION);
   const grossCost = Math.round(totalRevenue * grossCostFraction);
 
   const activeSSCount = sharedServices.filter(s => s.active).length;

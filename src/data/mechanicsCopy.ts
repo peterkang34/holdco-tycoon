@@ -81,7 +81,7 @@ export type MarketCyclePhase = keyof typeof MARKET_CYCLE_LABELS;
 export const COMPLEXITY_COST_LABELS = {
   name: 'Portfolio Complexity',
   behavior: 'Cash deduction when portfolio exceeds complexity threshold without sufficient shared services to offset.',
-  tip: 'As your portfolio grows past the complexity threshold, coordination costs mount. Each active shared service offsets ~33% of the cost. Maximum compression: 3ppt of total revenue.',
+  tip: 'As your portfolio grows past the complexity threshold, coordination costs mount. Each active shared service offsets ~33% of the cost. Maximum compression: 4ppt of total revenue.',
 } as const;
 
 export const BANNED_COPY_PATTERNS: ReadonlyArray<{
@@ -109,4 +109,5 @@ export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   { pattern: /escalating dilution.*regardless|same.*discount.*public.*private/i, reason: 'Post-IPO equity raises issue at stock price (no discount). Only private companies use escalating discount.' },
   { pattern: /permanent ownership reduction/i, reason: 'Share dilution is reversible via buybacks. Removed "permanent" in v33.' },
   { pattern: /max 1 per round/i, reason: 'Share-funded deal cap removed. Unlimited per round now.', allow: ['changelog.ts'] },
+  { pattern: /prior ownership doesn.t mechanically affect/i, reason: 'Ownership history now affects improvement efficacy. Changed in v35.' },
 ];

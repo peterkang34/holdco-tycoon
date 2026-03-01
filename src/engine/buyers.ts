@@ -51,36 +51,74 @@ export function calculateSizeTierPremium(ebitda: number): SizeTierResult {
 // ── De-Risking Premium ─────────────────────────────────────────────
 // Composite premium based on business quality signals
 
-export function calculateDeRiskingPremium(business: Business): number {
-  let premium = 0;
+export interface DeRiskingFactor {
+  label: string;
+  contribution: number;
+  active: boolean;
+  hint?: string; // qualitative hint for inactive factors
+}
+
+export interface DeRiskingBreakdown {
+  total: number;
+  factors: DeRiskingFactor[];
+}
+
+export function calculateDeRiskingPremiumBreakdown(business: Business): DeRiskingBreakdown {
+  const factors: DeRiskingFactor[] = [];
 
   // Low revenue concentration: +0.3x
-  if (business.dueDiligence.revenueConcentration === 'low') {
-    premium += 0.3;
-  }
+  const hasLowConcentration = business.dueDiligence.revenueConcentration === 'low';
+  factors.push({
+    label: 'Diversified revenue',
+    contribution: hasLowConcentration ? 0.3 : 0,
+    active: hasLowConcentration,
+    hint: hasLowConcentration ? undefined : 'Diversify customer base',
+  });
 
   // Strong operator: +0.3x
-  if (business.dueDiligence.operatorQuality === 'strong') {
-    premium += 0.3;
-  }
+  const hasStrongOp = business.dueDiligence.operatorQuality === 'strong';
+  factors.push({
+    label: 'Strong operator',
+    contribution: hasStrongOp ? 0.3 : 0,
+    active: hasStrongOp,
+    hint: hasStrongOp ? undefined : 'Professionalize management',
+  });
 
-  // Platform with bolt-ons: logarithmic, caps at ~1.2x for very large platforms
-  if (business.isPlatform && business.platformScale > 0) {
-    premium += Math.min(1.2, Math.log2(business.platformScale + 1) * 0.35);
-  }
+  // Platform with bolt-ons: logarithmic, caps at ~1.2x
+  const platformContribution = (business.isPlatform && business.platformScale > 0)
+    ? Math.min(1.2, Math.log2(business.platformScale + 1) * 0.35)
+    : 0;
+  factors.push({
+    label: 'Platform scale',
+    contribution: platformContribution,
+    active: platformContribution > 0,
+    hint: platformContribution > 0 ? undefined : 'Build platform with bolt-ons',
+  });
 
   // 2+ improvements: +0.2x
-  if (business.improvements.length >= 2) {
-    premium += 0.2;
-  }
+  const hasImprovements = business.improvements.length >= 2;
+  factors.push({
+    label: 'Operational improvements',
+    contribution: hasImprovements ? 0.2 : 0,
+    active: hasImprovements,
+    hint: hasImprovements ? undefined : `Apply ${2 - business.improvements.length} more improvement${2 - business.improvements.length > 1 ? 's' : ''}`,
+  });
 
   // 90%+ retention: +0.2x
-  if (business.dueDiligence.customerRetention >= 90) {
-    premium += 0.2;
-  }
+  const hasRetention = business.dueDiligence.customerRetention >= 90;
+  factors.push({
+    label: 'High retention',
+    contribution: hasRetention ? 0.2 : 0,
+    active: hasRetention,
+    hint: hasRetention ? undefined : 'Retention below 90%',
+  });
 
-  // Cap at 1.5x
-  return Math.min(1.5, premium);
+  const rawTotal = factors.reduce((sum, f) => sum + f.contribution, 0);
+  return { total: Math.min(1.5, rawTotal), factors };
+}
+
+export function calculateDeRiskingPremium(business: Business): number {
+  return calculateDeRiskingPremiumBreakdown(business).total;
 }
 
 // ── Moat Tier ──────────────────────────────────────────────────────

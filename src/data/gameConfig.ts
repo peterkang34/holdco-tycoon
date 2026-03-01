@@ -390,10 +390,27 @@ export const FILLER_REPUTATION_HEAT_REDUCTION = 1; // -1 heat tier on next acqui
 
 export const COMPLEXITY_ACTIVATION_THRESHOLD = 5;        // Standard mode
 export const COMPLEXITY_ACTIVATION_THRESHOLD_QUICK = 4;  // Quick mode
-export const COMPLEXITY_COST_PER_OPCO = 0.003;           // 0.3% of total revenue per excess opco
+export const COMPLEXITY_COST_PER_OPCO = 0.003;           // 0.3% of total revenue per excess opco (base rate)
+export const COMPLEXITY_COST_EXPONENT = 1.3;             // Standard mode: non-linear scaling (steeper at 5+)
+export const COMPLEXITY_COST_EXPONENT_QUICK = 1.0;       // Quick mode: linear (preserves viability)
 export const COMPLEXITY_SHARED_SERVICE_OFFSET = 1 / 3;   // Each active SS offsets ~33%
-export const COMPLEXITY_MAX_MARGIN_COMPRESSION = 0.03;   // 3ppt cap
+export const COMPLEXITY_MAX_MARGIN_COMPRESSION = 0.04;   // 4ppt cap
 export const MAX_ACTIVE_SHARED_SERVICES = 3;             // Max SS that can be active simultaneously
+
+// ── Ownership History Effects ──
+
+/** Improvement efficacy modifier by prior ownership count: founder-owned gets a bonus, multi-PE gets a penalty */
+export const OWNERSHIP_IMPROVEMENT_MODIFIER: Record<number, number> = {
+  0: 1.10,   // founder-owned: +10% improvement efficacy
+  1: 1.00,   // one prior backer: neutral
+  2: 0.95,   // two backers: -5%
+  3: 0.90,   // three+: -10%
+};
+
+/** Get the ownership-based improvement modifier (defaults to the 3+ value for high counts) */
+export function getOwnershipImprovementModifier(priorOwnershipCount: number): number {
+  return OWNERSHIP_IMPROVEMENT_MODIFIER[Math.min(priorOwnershipCount, 3)] ?? 0.90;
+}
 
 // ── Competitive Position Premium ──
 

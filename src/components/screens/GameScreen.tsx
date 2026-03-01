@@ -783,7 +783,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             cashBeforeDebtPayments={cashBeforeDebtPayments}
             interestPenalty={getDistressRestrictions(metrics.distressLevel).interestPenalty}
             capexReduction={capexReduction}
-            complexityCost={complexityCost.netCost}
+            complexityCost={complexityCost}
             onContinue={advanceToEvent}
           />
         );
@@ -1031,18 +1031,58 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
           {/* Market Cycle Indicator */}
           {eventHistory.length > 0 && (() => {
             const cycleLabel = MARKET_CYCLE_LABELS[marketCyclePhase];
+            // Last 4 global events for history dots
+            const EVENT_DOT_WEIGHTS: Record<string, number> = {
+              global_bull_market: 2, global_interest_cut: 1, global_quiet: 0,
+              global_inflation: -1, global_interest_hike: -1, global_credit_tightening: -1,
+              global_recession: -2, global_financial_crisis: -3,
+            };
+            const EVENT_SHORT_NAMES: Record<string, string> = {
+              global_bull_market: 'Bull Market', global_interest_cut: 'Rate Cut', global_quiet: 'Quiet Period',
+              global_inflation: 'Inflation', global_interest_hike: 'Rate Hike', global_credit_tightening: 'Credit Tightening',
+              global_recession: 'Recession', global_financial_crisis: 'Financial Crisis',
+            };
+            const recentGlobalEvents = eventHistory
+              .filter(e => e.type.startsWith('global_'))
+              .slice(-4);
             return (
               <Tooltip
                 trigger={
-                  <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ml-auto ${cycleLabel.bg} ${cycleLabel.color}`}>
+                  <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ml-auto flex items-center gap-1.5 ${cycleLabel.bg} ${cycleLabel.color}`}>
                     {marketCyclePhase}
+                    {recentGlobalEvents.length > 0 && (
+                      <span className="flex gap-0.5">
+                        {recentGlobalEvents.map((e, i) => {
+                          const w = EVENT_DOT_WEIGHTS[e.type] ?? 0;
+                          const dotColor = w >= 2 ? 'bg-green-400' : w >= 1 ? 'bg-blue-400' : w === 0 ? 'bg-gray-400' : w >= -1 ? 'bg-orange-400' : 'bg-red-400';
+                          return <span key={i} className={`w-1.5 h-1.5 rounded-full ${dotColor}`} />;
+                        })}
+                      </span>
+                    )}
                   </span>
                 }
                 align="right"
-                width="w-56"
+                width="w-64"
               >
                 <p className="text-sm text-text-secondary font-normal">{cycleLabel.tip}</p>
-                <p className="text-xs text-text-muted mt-1 font-normal">Based on the last 4 global events. Informational only — does not affect engine behavior.</p>
+                {recentGlobalEvents.length > 0 && (
+                  <div className="mt-2 pt-2 border-t border-white/10 space-y-1">
+                    <p className="text-xs text-text-muted font-normal">Recent events:</p>
+                    {recentGlobalEvents.map((e, i) => {
+                      const w = EVENT_DOT_WEIGHTS[e.type] ?? 0;
+                      const dotColor = w >= 2 ? 'bg-green-400' : w >= 1 ? 'bg-blue-400' : w === 0 ? 'bg-gray-400' : w >= -1 ? 'bg-orange-400' : 'bg-red-400';
+                      const sign = w > 0 ? '+' : '';
+                      return (
+                        <div key={i} className="flex items-center gap-2 text-xs font-normal">
+                          <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
+                          <span className="text-text-secondary">{EVENT_SHORT_NAMES[e.type] ?? e.type}</span>
+                          <span className="text-text-muted ml-auto">({sign}{w})</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="text-xs text-text-muted mt-2 font-normal">Based on the last 4 global events. Informational only — does not affect engine behavior.</p>
               </Tooltip>
             );
           })()}

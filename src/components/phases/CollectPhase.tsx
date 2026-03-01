@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Business, formatMoney, formatPercent } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
-import { calculatePortfolioTax, TAX_RATE } from '../../engine/simulation';
+import { calculatePortfolioTax, TAX_RATE, ComplexityCostBreakdown } from '../../engine/simulation';
 import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
 import { debtCountdownLabel } from '../../data/mechanicsCopy';
 
@@ -23,7 +23,7 @@ interface CollectPhaseProps {
   cashBeforeDebtPayments?: number;
   interestPenalty?: number;
   capexReduction?: number;
-  complexityCost?: number;
+  complexityCost?: number | ComplexityCostBreakdown;
   onContinue: () => void;
 }
 
@@ -123,9 +123,13 @@ export function CollectPhase({
   cashBeforeDebtPayments: _cashBeforeDebtPayments,
   interestPenalty,
   capexReduction = 0,
-  complexityCost = 0,
+  complexityCost: complexityCostProp = 0,
   onContinue
 }: CollectPhaseProps) {
+  // Support both legacy number and full breakdown object
+  const complexityBreakdown: ComplexityCostBreakdown | null =
+    typeof complexityCostProp === 'object' ? complexityCostProp : null;
+  const complexityCost = typeof complexityCostProp === 'object' ? complexityCostProp.netCost : complexityCostProp;
   const [expandedBusiness, setExpandedBusiness] = useState<string | null>(null);
   const [showTaxDetails, setShowTaxDetails] = useState(false);
   const activeBusinesses = businesses.filter(b => b.status === 'active');
@@ -561,6 +565,11 @@ export function CollectPhase({
               <div className="flex items-center gap-2">
                 <span className="text-lg">🏗️</span>
                 <span className="text-text-secondary">Portfolio Complexity</span>
+                {complexityBreakdown && complexityBreakdown.activeSSCount > 0 && (
+                  <span className="text-xs text-accent">
+                    {formatMoney(complexityBreakdown.grossCost)} − {formatMoney(complexityBreakdown.grossCost - complexityBreakdown.netCost)} offset
+                  </span>
+                )}
               </div>
               <span className="font-mono text-warning">-{formatMoney(complexityCost)}</span>
             </div>

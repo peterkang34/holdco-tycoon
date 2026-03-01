@@ -400,10 +400,18 @@ function AcquiringContent() {
       <P>
         Each deal shows the business&apos;s prior ownership history in due diligence. Businesses range
         from founder-owned (no prior institutional sponsors) to heavily sponsored (3+ prior PE sponsors).
-        Prior ownership doesn&apos;t mechanically affect the business, but signals how much operational
-        optimization has already been done &mdash; founder-owned businesses often have more low-hanging
-        fruit, while multi-sponsor assets may have already been squeezed.
+        Ownership history directly affects <strong>improvement efficacy</strong> &mdash; founder-owned
+        businesses have more low-hanging fruit, while multi-sponsor assets have already been optimized.
       </P>
+      <DataTable
+        headers={['Prior Owners', 'Improvement Modifier']}
+        rows={[
+          ['0 (Founder-owned)', '+10% improvement gains'],
+          ['1 (One prior backer)', 'No modifier'],
+          ['2 (Two backers)', '-5% improvement gains'],
+          ['3+ (Heavily sponsored)', '-10% improvement gains'],
+        ]}
+      />
 
       <SubHeading>Tuck-in Acquisitions</SubHeading>
       <P>
@@ -968,7 +976,8 @@ function SharedServicesContent() {
       <P>
         Growing your portfolio past <strong>5 active businesses</strong> (4 in Quick Play) without
         sufficient shared services incurs a <strong>complexity cost</strong> &mdash; a cash deduction
-        of 0.3% of total revenue per excess entity, capped at 3%. This reflects the real-world
+        that scales non-linearly with excess entities (exponent 1.3×), capped at 4% of revenue.
+        Quick Play uses linear scaling. This reflects the real-world
         coordination overhead of managing a sprawling portfolio.
       </P>
       <BulletList items={[
@@ -1045,9 +1054,28 @@ function SellingContent() {
       <SubHeading>Moat Tier &amp; Multiple Spread</SubHeading>
       <P>
         Each business displays a <strong>moat tier badge</strong> (Narrow, Moderate, Wide, or Fortress) based on
-        the de-risking premium earned from quality signals like low revenue concentration, strong operators,
-        growing trends, high retention, and competitive position. A stronger moat means buyers pay more.
+        the de-risking premium earned from quality signals. Tap the badge to see your current factor breakdown
+        and what you need for the next tier. A stronger moat means buyers pay more at exit.
       </P>
+      <DataTable
+        headers={['Factor', 'Contribution']}
+        rows={[
+          ['Diversified revenue (low concentration)', '+0.3x'],
+          ['Strong operator', '+0.3x'],
+          ['Platform scale (with bolt-ons)', 'Up to +1.2x'],
+          ['2+ improvements applied', '+0.2x'],
+          ['90%+ customer retention', '+0.2x'],
+        ]}
+      />
+      <DataTable
+        headers={['Tier', 'Threshold']}
+        rows={[
+          ['Narrow', '< 0.3x premium'],
+          ['Moderate', '0.3x+'],
+          ['Wide', '0.7x+'],
+          ['Fortress', '1.0x+'],
+        ]}
+      />
       <P>
         The <strong>multiple spread</strong> shows the gap between your entry (acquisition) multiple and the
         current exit multiple. A positive spread means you&apos;ve created value through operations, quality
