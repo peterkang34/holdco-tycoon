@@ -1277,9 +1277,22 @@ export const useGameStore = create<GameStore>()(
 
         if (state.cash < structure.cashRequired) return;
 
+        // Apply reputation building heat reduction if active
+        let effectiveDeal = deal;
+        let consumeHeatReduction = false;
+        if (state.nextAcquisitionHeatReduction && state.nextAcquisitionHeatReduction > 0) {
+          const heatTiers: DealHeat[] = ['cold', 'warm', 'hot', 'contested'];
+          const currentIdx = heatTiers.indexOf(deal.heat);
+          if (currentIdx > 0) {
+            const newIdx = Math.max(0, currentIdx - state.nextAcquisitionHeatReduction);
+            effectiveDeal = { ...deal, heat: heatTiers[newIdx] };
+          }
+          consumeHeatReduction = true;
+        }
+
         // Contested deal snatch check — 40% chance another buyer outbids you
         const tuckInStreams = createRngStreams(state.seed, state.round);
-        if (deal.heat === 'contested' && tuckInStreams.market.fork(deal.id).next() < 0.40) {
+        if (effectiveDeal.heat === 'contested' && tuckInStreams.market.fork(deal.id).next() < 0.40) {
           set({
             dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
             acquisitionsThisRound: state.acquisitionsThisRound + 1,
@@ -1520,12 +1533,13 @@ export const useGameStore = create<GameStore>()(
                 synergies,
                 restructuringCost,
                 growthDragPenalty,
-                heat: deal.heat,
+                heat: effectiveDeal.heat,
                 sizeRatio,
                 sizeRatioTier,
               },
             },
           ],
+          ...(consumeHeatReduction ? { nextAcquisitionHeatReduction: 0 } : {}),
           metrics: calculateMetrics({
             ...state,
             cash: tuckInCash,
@@ -3727,6 +3741,9 @@ export const useGameStore = create<GameStore>()(
       fillerTaxInvest: () => {
         const state = get();
         if (!state.currentEvent || state.currentEvent.type !== 'filler_tax_strategy') return;
+        // Guard: need at least one active business to boost
+        const activeBusinesses = state.businesses.filter(b => b.status === 'active');
+        if (activeBusinesses.length === 0) return;
         // Parse cost from event effect string
         const costMatch = state.currentEvent.effect.match(/Pay \$([0-9.]+[KM]?)/);
         const cost = costMatch ? parseInt(costMatch[1].replace('K', '')) : randomInt(FILLER_TAX_STRATEGY_COST_MIN, FILLER_TAX_STRATEGY_COST_MAX);
