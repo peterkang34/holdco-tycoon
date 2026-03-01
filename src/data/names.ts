@@ -85,6 +85,11 @@ const SECTOR_NAME_PARTS: Record<string, NameParts> = {
     cores: ['Waste', 'Environmental', 'Disposal', 'Recycling', 'Sanitation', 'Haul', 'Green', 'Clean', 'Recovery', 'Resource', 'Eco', 'Site', 'Land', 'Water', 'Remediation', 'Container', 'Roll', 'Bin', 'Transfer', 'Collection'],
     suffixes: ['Services', 'Environmental', 'Waste Services', 'Disposal', 'Solutions', 'Industries', 'Management', 'Group', 'Inc', ''],
   },
+  proSports: {
+    prefixes: ['Austin', 'Nashville', 'Portland', 'Charlotte', 'Salt Lake', 'San Diego', 'Sacramento', 'Memphis', 'Louisville', 'Columbus', 'Jacksonville', 'Oklahoma City', 'St. Louis', 'Las Vegas', 'Richmond', 'Raleigh', 'Hartford', 'Omaha', 'Tucson', 'Norfolk'],
+    cores: ['Wolves', 'Hawks', 'Titans', 'Blaze', 'Thunder', 'Vipers', 'Stallions', 'Grizzlies', 'Storm', 'Kings', 'Falcons', 'Raptors', 'Surge', 'Coyotes', 'Phoenix', 'Mustangs', 'Fury', 'Sharks', 'Lions', 'Comets'],
+    suffixes: ['FC', 'SC', '', '', '', '', '', '', '', ''],
+  },
 };
 
 // Sub-type → suffixes map: ensures the name suffix matches the business sub-type
@@ -200,6 +205,12 @@ const SUBTYPE_SUFFIXES: Record<string, string[]> = {
   'Environmental Remediation': ['Remediation', 'Environmental', 'Restoration', 'Cleanup', 'Environmental Services'],
   'Portable Sanitation': ['Sanitation', 'Portable Services', 'Site Services', 'Restrooms', 'Sanitation Co'],
   'Industrial Waste Management': ['Industrial', 'Waste Management', 'Environmental Services', 'Hazmat', 'Industrial Waste'],
+  // Pro Sports sub-types
+  'Premier Football Franchise': ['', '', '', '', ''],
+  'Elite Basketball Franchise': ['', '', '', '', ''],
+  'Baseball Franchise': ['', '', '', '', ''],
+  'Hockey / Arena Sports': ['', '', '', '', ''],
+  'Global Football Club': ['FC', 'SC', 'United', 'City FC', 'Athletic'],
 };
 
 // Track used names to avoid duplicates within a game
@@ -242,18 +253,32 @@ function buildName(parts: NameParts, rng?: SeededRng): string {
   }
 }
 
+function buildTeamName(parts: NameParts, subTypeSuffixes: string[] | undefined, rng?: SeededRng): string {
+  const rand = () => rng ? rng.next() : Math.random();
+  const city = parts.prefixes[Math.floor(rand() * parts.prefixes.length)];
+  const mascot = parts.cores[Math.floor(rand() * parts.cores.length)];
+  const suffixes = subTypeSuffixes || parts.suffixes;
+  const suffix = suffixes[Math.floor(rand() * suffixes.length)];
+  // Always "City Mascot" or "City Mascot FC" — never concatenated
+  return [city, mascot, suffix].filter(Boolean).join(' ');
+}
+
 export function getRandomBusinessName(sectorId: string, subType?: string, rng?: SeededRng): string {
   const rand = () => rng ? rng.next() : Math.random();
   const sectorParts = SECTOR_NAME_PARTS[sectorId] || SECTOR_NAME_PARTS.agency;
+  const subTypeSuffs = subType ? SUBTYPE_SUFFIXES[subType] : undefined;
 
   // If sub-type has specific suffixes, override the sector-wide ones
-  const parts: NameParts = subType && SUBTYPE_SUFFIXES[subType]
-    ? { ...sectorParts, suffixes: SUBTYPE_SUFFIXES[subType] }
+  const parts: NameParts = subTypeSuffs
+    ? { ...sectorParts, suffixes: subTypeSuffs }
     : sectorParts;
+
+  // Pro sports: always use "City Mascot [Suffix]" format
+  const useTeamName = sectorId === 'proSports';
 
   // Try up to 20 times to get a unique name
   for (let i = 0; i < 20; i++) {
-    const name = buildName(parts, rng);
+    const name = useTeamName ? buildTeamName(parts, subTypeSuffs, rng) : buildName(parts, rng);
     if (!usedNames.has(name)) {
       usedNames.add(name);
       return name;
