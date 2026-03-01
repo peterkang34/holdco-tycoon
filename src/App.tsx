@@ -238,9 +238,9 @@ function App() {
                     <button
                       key={amount}
                       onClick={() => setFoTestAmount(amount)}
-                      className={`py-2 px-1 rounded text-sm font-medium transition-colors ${
+                      className={`py-3 px-1 rounded text-sm font-medium transition-colors ${
                         foTestAmount === amount
-                          ? 'bg-accent-primary text-white'
+                          ? 'bg-accent text-white'
                           : 'bg-white/10 text-text-secondary hover:bg-white/15'
                       }`}
                     >

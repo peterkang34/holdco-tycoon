@@ -200,7 +200,7 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
             </button>
           )}
           <span className="text-2xl">{sector.emoji}</span>
-          <div>
+          <div className="min-w-0">
             <h3 className="font-bold truncate">{deal.business.name}</h3>
             <p className="text-xs text-text-muted truncate">{deal.business.subType}</p>
           </div>

@@ -19,6 +19,7 @@ interface DashboardProps {
   diversificationBonus?: boolean; // Has 4+ unique sectors
   covenantBreachRounds?: number; // Consecutive rounds in breach
   isPublic?: boolean; // Whether the company is public (post-IPO)
+  isFamilyOfficeMode?: boolean;
   onMetricClick?: (key: string) => void;
 }
 
@@ -37,6 +38,7 @@ export function Dashboard({
   diversificationBonus,
   covenantBreachRounds,
   isPublic,
+  isFamilyOfficeMode,
   onMetricClick,
 }: DashboardProps) {
   const getCashStatus = () => {
@@ -86,7 +88,7 @@ export function Dashboard({
       {/* Progress Bar */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-sm text-text-muted">Year {round} of {totalRounds}</span>
+          <span className="text-sm text-text-muted">{isFamilyOfficeMode ? `FO Round ${round} of ${totalRounds}` : `Year ${round} of ${totalRounds}`}</span>
           <div className="flex items-center gap-2">
             {round >= FINAL_COUNTDOWN_START_ROUND && totalRounds === 20 && (
               <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 animate-pulse">

@@ -1002,6 +1002,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         diversificationBonus={diversificationBonus}
         covenantBreachRounds={covenantBreachRounds}
         isPublic={ipoState?.isPublic}
+        isFamilyOfficeMode={isFamilyOfficeMode}
         onMetricClick={setDrilldownMetric}
       />
 
