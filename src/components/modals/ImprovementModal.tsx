@@ -41,6 +41,8 @@ export function ImprovementModal({
   const appliedTypes = new Set(business.improvements.map(i => i.type));
   const remainingYears = maxRounds - round;
 
+  const isProSports = business.sectorId === 'proSports';
+
   const improvements: {
     type: OperationalImprovementType;
     name: string;
@@ -52,7 +54,89 @@ export function ImprovementModal({
     extraBenefit?: string;
     available: boolean;
     unavailableReason?: string;
-  }[] = [
+  }[] = isProSports ? [
+    {
+      type: 'operating_playbook',
+      name: 'Salary Cap Management System',
+      description: 'Hire cap specialists and build proprietary tools to model contract structures. Every dollar of cap space is a competitive weapon.',
+      costPercent: 0.12,
+      ebitdaBoostMin: 0.08,
+      ebitdaBoostMax: 0.08,
+      growthBoost: 0,
+      extraBenefit: 'Reduced earnings volatility',
+      available: !appliedTypes.has('operating_playbook'),
+      unavailableReason: 'Already applied',
+    },
+    {
+      type: 'pricing_model',
+      name: 'Sponsorship Sales Blitz',
+      description: 'Hire an aggressive sponsorship team to renegotiate existing deals and land new category sponsors. Every surface in the stadium is inventory.',
+      costPercent: 0.10,
+      ebitdaBoostMin: 0.05,
+      ebitdaBoostMax: 0.12,
+      growthBoost: 0.01,
+      available: !appliedTypes.has('pricing_model'),
+      unavailableReason: 'Already applied',
+    },
+    {
+      type: 'service_expansion',
+      name: 'Premium Seating & Hospitality',
+      description: 'Redesign luxury suites, add field-level hospitality zones, and launch a VIP membership club. The high-end fan experience is where the real money is.',
+      costPercent: 0.20,
+      ebitdaBoostMin: 0.10,
+      ebitdaBoostMax: 0.18,
+      growthBoost: 0,
+      available: !appliedTypes.has('service_expansion'),
+      unavailableReason: 'Already applied',
+    },
+    {
+      type: 'fix_underperformance',
+      name: 'Coaching Staff Overhaul',
+      description: 'Recruit a championship-caliber coaching staff with coordinators who bring proven systems. Great coaching turns roster depth into wins.',
+      costPercent: 0.12,
+      ebitdaBoostMin: Math.max(0, (business.peakEbitda * 0.8 - business.ebitda) / business.ebitda),
+      ebitdaBoostMax: Math.max(0, (business.peakEbitda * 0.8 - business.ebitda) / business.ebitda),
+      growthBoost: 0,
+      available: !appliedTypes.has('fix_underperformance') && business.ebitda < business.peakEbitda * 0.8,
+      unavailableReason: appliedTypes.has('fix_underperformance') ? 'Already applied' : 'Team is performing well',
+    },
+    {
+      type: 'recurring_revenue_conversion',
+      name: 'Youth Academy & Development',
+      description: 'Build a comprehensive development pipeline from grassroots to pro roster. The best franchises grow their own stars.',
+      costPercent: 0.25,
+      ebitdaBoostMin: 0,
+      ebitdaBoostMax: 0,
+      growthBoost: 0.03,
+      extraBenefit: '-2ppt margin now, +0.50x exit premium',
+      available: !appliedTypes.has('recurring_revenue_conversion'),
+      unavailableReason: 'Already applied',
+    },
+    {
+      type: 'management_professionalization',
+      name: 'Elite GM & Front Office',
+      description: 'Poach a top-tier GM from a rival franchise and build out a world-class scouting network across three continents.',
+      costPercent: 0.18,
+      ebitdaBoostMin: 0.03,
+      ebitdaBoostMax: 0.06,
+      growthBoost: 0.01,
+      extraBenefit: 'Upgrades operator quality, +0.30x exit premium',
+      available: !appliedTypes.has('management_professionalization'),
+      unavailableReason: 'Already applied',
+    },
+    {
+      type: 'digital_transformation',
+      name: 'Sports Analytics & Performance Lab',
+      description: 'Build a world-class analytics operation with player tracking, injury prediction, biomechanics lab, and in-game decision modeling.',
+      costPercent: 0.22,
+      ebitdaBoostMin: 0.04,
+      ebitdaBoostMax: 0.08,
+      growthBoost: 0.02,
+      extraBenefit: 'Defends margins against drift',
+      available: !appliedTypes.has('digital_transformation'),
+      unavailableReason: 'Already applied',
+    },
+  ] : [
     {
       type: 'operating_playbook',
       name: 'Install Operating Playbook',
