@@ -988,15 +988,20 @@ export const useGameStore = create<GameStore>()(
         const finalPipelineIds = new Set(finalPipeline.map(d => d.id));
         const cleanedPassedIds = state.passedDealIds.filter(id => finalPipelineIds.has(id));
 
-        set({
-          phase: 'allocate',
+        const allocateState = {
+          ...state,
+          phase: 'allocate' as const,
           dealPipeline: finalPipeline,
           passedDealIds: cleanedPassedIds,
           consolidationBoomSectorId: clearedBoomSectorId,
-          actionsThisRound: [],
+          actionsThisRound: [] as typeof state.actionsThisRound,
           focusBonus,
           lastAcquisitionResult: null,
           lastIntegrationOutcome: null,
+        };
+        set({
+          ...allocateState,
+          metrics: calculateMetrics(allocateState),
         });
       },
 
@@ -2205,6 +2210,7 @@ export const useGameStore = create<GameStore>()(
           effectivePrice = metrics.intrinsicValuePerShare * (1 - discount);
         }
         const newShares = Math.round((amount / effectivePrice) * 1000) / 1000;
+        if (newShares <= 0) return;
 
         // Calculate what ownership would be after issuance
         const newTotalShares = state.sharesOutstanding + newShares;
@@ -3441,13 +3447,15 @@ export const useGameStore = create<GameStore>()(
           state.requiresRestructuring || state.covenantBreachRounds >= 1,
         );
 
+        const srcState = { ...state, cash: state.cash - cost };
         set({
-          cash: state.cash - cost,
+          ...srcState,
           dealPipeline: [...state.dealPipeline, ...newDeals],
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'source_deals', round: state.round, details: { cost, dealsGenerated: newDeals.length } },
           ],
+          metrics: calculateMetrics(srcState),
         });
       },
 
@@ -3765,13 +3773,15 @@ export const useGameStore = create<GameStore>()(
           state.requiresRestructuring || state.covenantBreachRounds >= 1,
         );
 
+        const outState = { ...state, cash: state.cash - PROACTIVE_OUTREACH_COST };
         set({
-          cash: state.cash - PROACTIVE_OUTREACH_COST,
+          ...outState,
           dealPipeline: [...state.dealPipeline, ...newDeals],
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'proactive_outreach' as const, round: state.round, details: { cost: PROACTIVE_OUTREACH_COST, dealsGenerated: newDeals.length } },
           ],
+          metrics: calculateMetrics(outState),
         });
       },
 
@@ -3791,13 +3801,15 @@ export const useGameStore = create<GameStore>()(
           brokerInflation,
         );
 
+        const smbState = { ...state, cash: state.cash - SMB_BROKER_COST };
         set({
-          cash: state.cash - SMB_BROKER_COST,
+          ...smbState,
           dealPipeline: [...state.dealPipeline, newDeal],
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'smb_broker' as const, round: state.round, details: { cost: SMB_BROKER_COST } },
           ],
+          metrics: calculateMetrics(smbState),
         });
       },
 

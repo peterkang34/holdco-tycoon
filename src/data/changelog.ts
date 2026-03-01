@@ -22,6 +22,13 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Equity demand events no longer fire in Family Office mode — cap table is locked during FO play.',
         ],
       },
+      {
+        heading: 'Bug Fixes',
+        items: [
+          'Fixed equity raises being incorrectly blocked after sourcing deals — metrics now recalculate after every cash-changing action so intrinsic value per share stays accurate.',
+          'Equity raise error messages now show the actual reason (negative equity vs. ownership floor vs. cooldown) instead of always blaming the 51% floor.',
+        ],
+      },
     ],
   },
   {

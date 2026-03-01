@@ -21,7 +21,7 @@ import { FeedbackModal } from '../ui/FeedbackModal';
 import { MetricDrilldownModal } from '../ui/MetricDrilldownModal';
 import { ToastContainer } from '../ui/ToastContainer';
 import { calculateFounderEquityValue, calculateFounderPersonalWealth } from '../../engine/scoring';
-import { calculateComplexityCost, getMarketCycleIndicator } from '../../engine/simulation';
+import { calculateComplexityCost, getMarketCycleIndicator, calculateMetrics } from '../../engine/simulation';
 import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
 import { MARKET_CYCLE_LABELS } from '../../data/mechanicsCopy';
 import { Tooltip } from '../ui/Tooltip';
@@ -399,10 +399,18 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     const newState = useGameStore.getState();
     const newShares = newState.sharesOutstanding;
     if (newShares === prevShares) {
-      const ipoPublic = newState.ipoState?.isPublic;
+      // Diagnose actual rejection reason
+      const freshMetrics = calculateMetrics(newState);
+      let detail: string;
+      if (freshMetrics.intrinsicValuePerShare <= 0) {
+        detail = 'Portfolio equity is negative — pay down debt first';
+      } else {
+        const ipoPublic = newState.ipoState?.isPublic;
+        detail = `Would breach ${ipoPublic ? '10' : '51'}% founder ownership floor`;
+      }
       addToast({
         message: 'Equity raise blocked',
-        detail: `Would breach ${ipoPublic ? '10' : '51'}% founder ownership floor`,
+        detail,
         type: 'warning',
       });
     } else {

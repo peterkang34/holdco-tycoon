@@ -387,13 +387,14 @@ export function AllocatePhase({
   const effectivePricePerShare = isPublic ? (ipoState?.stockPrice ?? 0) : intrinsicValuePerShare * equityDiscount;
   const raiseCooldownBlocked = lastBuybackRound > 0 && round - lastBuybackRound < EQUITY_BUYBACK_COOLDOWN;
   const buybackCooldownBlocked = lastEquityRaiseRound > 0 && round - lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN;
-  const raiseBlocked = raiseCooldownBlocked || intrinsicValuePerShare <= 0;
+  const negativeEquity = intrinsicValuePerShare <= 0;
+  const raiseBlocked = raiseCooldownBlocked || negativeEquity;
   const raiseCooldownRemainder = raiseCooldownBlocked ? EQUITY_BUYBACK_COOLDOWN - (round - lastBuybackRound) : 0;
   // Max raise before hitting ownership floor: founderShares / (sharesOutstanding + maxNewShares) = effectiveOwnershipFloor
   const effectiveOwnershipFloor = ipoState?.isPublic ? MIN_PUBLIC_FOUNDER_OWNERSHIP : MIN_FOUNDER_OWNERSHIP;
   const maxNewShares = Math.max(0, (founderShares / effectiveOwnershipFloor) - sharesOutstanding);
-  const maxRaiseAmount = Math.floor(maxNewShares * effectivePricePerShare); // in $k (internal)
-  const atOwnershipFloor = maxRaiseAmount <= 0;
+  const maxRaiseAmount = negativeEquity ? 0 : Math.floor(maxNewShares * effectivePricePerShare); // in $k (internal)
+  const atOwnershipFloor = !negativeEquity && maxRaiseAmount <= 0;
   const ownershipFloorPct = Math.round(effectiveOwnershipFloor * 100);
   const buybackCooldownRemainder = buybackCooldownBlocked ? EQUITY_BUYBACK_COOLDOWN - (round - lastEquityRaiseRound) : 0;
   const aiEnabled = isAIEnabled();
@@ -780,7 +781,7 @@ export function AllocatePhase({
                       </>
                     ) : (
                       <p className="text-sm text-warning">
-                        {atOwnershipFloor ? `At ${ownershipFloorPct}% ownership floor — must maintain majority control.` : raiseCooldownBlocked ? `Cooldown: buyback in Y${lastBuybackRound} — wait ${raiseCooldownRemainder} more yr` : 'Cannot raise equity at this time.'}
+                        {negativeEquity ? 'Portfolio equity is negative — pay down debt to enable equity raises.' : atOwnershipFloor ? `At ${ownershipFloorPct}% ownership floor — must maintain majority control.` : raiseCooldownBlocked ? `Cooldown: buyback in Y${lastBuybackRound} — wait ${raiseCooldownRemainder} more yr` : 'Cannot raise equity at this time.'}
                       </p>
                     )}
                   </div>
@@ -1675,7 +1676,7 @@ export function AllocatePhase({
                 </span>
                 <span className="hidden sm:inline text-white/20">|</span>
                 <span className="text-text-muted text-xs sm:text-sm">
-                  {atOwnershipFloor ? `At ${ownershipFloorPct}% ownership floor` : isPublic ? `Market price${raiseCooldownBlocked ? ` (cooldown: ${raiseCooldownRemainder}yr)` : ''}` : `Next raise: ${equityRaisesUsed > 0 ? `${Math.round((1 - equityDiscount) * 100)}% discount` : 'no discount'}${raiseCooldownBlocked ? ` (cooldown: ${raiseCooldownRemainder}yr)` : ''}`}
+                  {negativeEquity ? 'Negative equity' : atOwnershipFloor ? `At ${ownershipFloorPct}% ownership floor` : isPublic ? `Market price${raiseCooldownBlocked ? ` (cooldown: ${raiseCooldownRemainder}yr)` : ''}` : `Next raise: ${equityRaisesUsed > 0 ? `${Math.round((1 - equityDiscount) * 100)}% discount` : 'no discount'}${raiseCooldownBlocked ? ` (cooldown: ${raiseCooldownRemainder}yr)` : ''}`}
                 </span>
               </div>
             )}
@@ -2443,6 +2444,9 @@ export function AllocatePhase({
                   </>
                 )}
               </div>
+              {negativeEquity && (
+                <p className="text-xs text-warning mb-4">Portfolio equity is negative — pay down debt to enable equity raises.</p>
+              )}
               {atOwnershipFloor && (
                 <p className="text-xs text-warning mb-4">At {ownershipFloorPct}% ownership floor — must maintain majority control. Buy back shares to raise more equity later.</p>
               )}
