@@ -11,6 +11,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 1, 2026',
+    title: 'PE Playbook Update',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Multiple spread indicator — every BusinessCard now shows the gap between your entry multiple and the current exit multiple, so you can see at a glance how much value you\'ve created (or destroyed).',
+          'Moat tier badge — businesses now display a moat rating (Narrow → Moderate → Wide → Fortress) based on the de-risking premium from quality signals like low revenue concentration, strong operators, and market leadership.',
+          'Market cycle indicator — a new informational badge shows the current market environment (Expansion, Growth, Stable, Contraction, or Crisis) derived from recent global events. Purely informational — use it to time your acquisitions and exits.',
+          'Ownership history — deals now show prior institutional ownership history in due diligence. Founder-owned businesses are typically less optimized, while multi-sponsor assets may have less low-hanging fruit.',
+          'Competitive position premium — market leaders (competitive position: "leader") now earn a +0.2x exit multiple premium, reflecting the acquirer\'s willingness to pay up for dominant positions.',
+        ],
+      },
+      {
+        heading: 'Balance Changes',
+        items: [
+          'Portfolio complexity cost — growing past 5 active businesses (4 in Quick Play) without shared services now incurs a cash deduction of 0.3% of total revenue per excess entity, capped at 3%. Each active shared service offsets ~33% of this cost, so investing in infrastructure before scaling is rewarded.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'February 28, 2026',
     title: 'Family Office Polish',
     sections: [

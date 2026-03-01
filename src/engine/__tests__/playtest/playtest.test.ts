@@ -94,6 +94,8 @@ describe.each(MODES)('$label Playtest', ({ difficulty, duration }) => {
       'smb_broker_used',
       // Early-game safety net requires Normal mode rounds 1-3 + specific pipeline RNG
       'early_game_safety_net',
+      // Complexity cost requires 5+ active businesses without full shared services
+      'complexity_cost_triggered',
     ];
 
     for (const strategy of strategies) {

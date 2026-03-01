@@ -77,6 +77,7 @@ function createTestBusiness(overrides: Partial<Business> = {}): Business {
     synergiesRealized: 0,
     totalAcquisitionCost: 4000,
     rolloverEquityPct: 0,
+    priorOwnershipCount: 0,
     ...overrides,
   };
 }

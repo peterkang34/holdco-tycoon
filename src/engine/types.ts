@@ -153,6 +153,10 @@ export interface Business {
 
   // Dynamic narratives
   storyBeats?: StoryBeat[]; // Narrative events that happened to this business
+
+  // Multi-sponsor deal history
+  priorOwnershipCount: number; // 0 = founder-owned, 1+ = PE-backed
+  ownershipHistory?: string; // Narrative text about prior ownership
 }
 
 export interface StoryBeat {
@@ -689,6 +693,7 @@ export interface ExitValuation {
   mergerPremium: number; // exit premium for well-balanced mergers
   integratedPlatformPremium: number; // exit premium for being part of an integrated platform
   turnaroundPremium: number; // exit premium for businesses that improved 2+ quality tiers
+  competitivePositionPremium: number;
   deRiskingPremium: number;
   ruleOf40Premium: number;
   marginExpansionPremium: number;

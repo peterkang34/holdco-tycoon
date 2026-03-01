@@ -396,6 +396,15 @@ function AcquiringContent() {
         <><strong>Distressed:</strong> Seller under financial pressure. Steep discount and low competition, but weak operations and higher integration risk. Not eligible for rollover equity. More common at Q1-2.</>,
       ]} />
 
+      <SubHeading>Ownership History</SubHeading>
+      <P>
+        Each deal shows the business&apos;s prior ownership history in due diligence. Businesses range
+        from founder-owned (no prior institutional sponsors) to heavily sponsored (3+ prior PE sponsors).
+        Prior ownership doesn&apos;t mechanically affect the business, but signals how much operational
+        optimization has already been done &mdash; founder-owned businesses often have more low-hanging
+        fruit, while multi-sponsor assets may have already been squeezed.
+      </P>
+
       <SubHeading>Tuck-in Acquisitions</SubHeading>
       <P>
         If you have a business designated as a platform, you can acquire compatible businesses
@@ -954,6 +963,24 @@ function SharedServicesContent() {
         M&amp;A Sourcing Tier 1 &mdash; think of it as the upgrade path: Small Biz Broker &rarr; Source
         Deals &rarr; Proactive Outreach.
       </P>
+
+      <SubHeading>Portfolio Complexity Cost</SubHeading>
+      <P>
+        Growing your portfolio past <strong>5 active businesses</strong> (4 in Quick Play) without
+        sufficient shared services incurs a <strong>complexity cost</strong> &mdash; a cash deduction
+        of 0.3% of total revenue per excess entity, capped at 3%. This reflects the real-world
+        coordination overhead of managing a sprawling portfolio.
+      </P>
+      <BulletList items={[
+        'Each active shared service offsets ~33% of the complexity cost',
+        'All 3 shared services active = 100% offset (no complexity cost)',
+        'Integrated platform constituents count as 1 entity, not individually',
+        'Shown as "Portfolio Complexity" in the cash flow waterfall',
+      ]} />
+      <HighlightBox variant="tip">
+        <strong>Invest in infrastructure before scaling.</strong> Shared services don&apos;t just provide
+        operational benefits &mdash; they also insulate you from the coordination costs of a large portfolio.
+      </HighlightBox>
     </>
   );
 }
@@ -978,6 +1005,7 @@ function SellingContent() {
         <><strong>Platform Premium:</strong> Logarithmic curve based on platform scale (~+1.0x at Scale 5, continues growing for larger platforms)</>,
         <><strong>Integrated Platform Premium:</strong> +1.0 to +2.0x for businesses in forged platforms</>,
         <><strong>Turnaround Premium:</strong> +0.25x for businesses improved 2+ quality tiers</>,
+        <><strong>Competitive Position Premium:</strong> +0.2x for market leaders (competitive position rated &quot;leader&quot; in due diligence)</>,
         <><strong>Market Conditions:</strong> +0.5x during bull markets, -0.5x during recessions</>,
       ]} />
       <HighlightBox>
@@ -1014,6 +1042,18 @@ function SellingContent() {
         and distressed sales.
       </P>
 
+      <SubHeading>Moat Tier &amp; Multiple Spread</SubHeading>
+      <P>
+        Each business displays a <strong>moat tier badge</strong> (Narrow, Moderate, Wide, or Fortress) based on
+        the de-risking premium earned from quality signals like low revenue concentration, strong operators,
+        growing trends, high retention, and competitive position. A stronger moat means buyers pay more.
+      </P>
+      <P>
+        The <strong>multiple spread</strong> shows the gap between your entry (acquisition) multiple and the
+        current exit multiple. A positive spread means you&apos;ve created value through operations, quality
+        improvements, and time. Growing this spread is the core of value creation in PE.
+      </P>
+
     </>
   );
 }
@@ -1041,6 +1081,14 @@ function EventsContent() {
           ['Quiet Year', 'Nothing significant happens; a chance to execute your plan undisturbed. Capped at 2 per game (10yr) or 4 per game (20yr).'],
         ]}
       />
+
+      <SubHeading>Market Cycle Indicator</SubHeading>
+      <P>
+        A market cycle badge appears in the game header showing the current economic environment
+        (Expansion, Growth, Stable, Contraction, or Crisis). This is derived from the last 4 global
+        events and is purely informational — it does not change any engine behavior, but can help you
+        time capital deployment decisions.
+      </P>
 
       <SubHeading>Recession Sensitivity by Sector</SubHeading>
       <P>

@@ -386,6 +386,19 @@ export const FILLER_REPUTATION_COST_MIN = 100;
 export const FILLER_REPUTATION_COST_MAX = 200;
 export const FILLER_REPUTATION_HEAT_REDUCTION = 1; // -1 heat tier on next acquisition
 
+// ── Portfolio Complexity Cost ──
+
+export const COMPLEXITY_ACTIVATION_THRESHOLD = 5;        // Standard mode
+export const COMPLEXITY_ACTIVATION_THRESHOLD_QUICK = 4;  // Quick mode
+export const COMPLEXITY_COST_PER_OPCO = 0.003;           // 0.3% of total revenue per excess opco
+export const COMPLEXITY_SHARED_SERVICE_OFFSET = 1 / 3;   // Each active SS offsets ~33%
+export const COMPLEXITY_MAX_MARGIN_COMPRESSION = 0.03;   // 3ppt cap
+export const MAX_ACTIVE_SHARED_SERVICES = 3;             // Max SS that can be active simultaneously
+
+// ── Competitive Position Premium ──
+
+export const COMPETITIVE_POSITION_PREMIUM = 0.2; // +0.2x exit multiple for market leaders
+
 // Type helpers for consumers
 export type DifficultyConfig = typeof DIFFICULTY_CONFIG;
 export type DurationConfig = typeof DURATION_CONFIG;

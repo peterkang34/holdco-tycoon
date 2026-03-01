@@ -83,6 +83,18 @@ export function calculateDeRiskingPremium(business: Business): number {
   return Math.min(1.5, premium);
 }
 
+// ── Moat Tier ──────────────────────────────────────────────────────
+// Map de-risking premium to named competitive moat tier
+
+export type MoatTier = 'Narrow' | 'Moderate' | 'Wide' | 'Fortress';
+
+export function getMoatTier(deRiskingPremium: number): MoatTier {
+  if (deRiskingPremium >= 1.0) return 'Fortress';
+  if (deRiskingPremium >= 0.7) return 'Wide';
+  if (deRiskingPremium >= 0.3) return 'Moderate';
+  return 'Narrow';
+}
+
 // ── Buyer Name Pools ───────────────────────────────────────────────
 
 const PE_FUND_NAMES = [

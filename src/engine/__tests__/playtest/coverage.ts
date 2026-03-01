@@ -89,6 +89,9 @@ export const FEATURE_REGISTRY = {
   deal_inflation: 'deal_inflation',
   integration_drag: 'integration_drag',
 
+  // Portfolio complexity (1)
+  complexity_cost_triggered: 'complexity_cost_triggered',
+
   // Scoring (1)
   scoring_completed: 'scoring_completed',
 

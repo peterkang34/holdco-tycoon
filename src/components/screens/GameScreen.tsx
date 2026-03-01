@@ -20,7 +20,10 @@ import { FeedbackModal } from '../ui/FeedbackModal';
 import { MetricDrilldownModal } from '../ui/MetricDrilldownModal';
 import { ToastContainer } from '../ui/ToastContainer';
 import { calculateFounderEquityValue, calculateFounderPersonalWealth } from '../../engine/scoring';
+import { calculateComplexityCost, getMarketCycleIndicator } from '../../engine/simulation';
 import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
+import { MARKET_CYCLE_LABELS } from '../../data/mechanicsCopy';
+import { Tooltip } from '../ui/Tooltip';
 import { updateSessionRound, trackEventChoice } from '../../services/telemetry';
 import { hasSeenNudge, dismissNudge } from '../../hooks/useNudges';
 import { MIN_OPCOS_FOR_SHARED_SERVICES } from '../../data/sharedServices';
@@ -747,6 +750,17 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     return 0.05 * scaleMultiplier;
   }, [sharedServices, activeBusinesses]);
 
+  // Compute complexity cost for CollectPhase display
+  const complexityCost = useMemo(() => {
+    const totalRevenue = activeBusinesses.reduce((sum, b) => sum + b.revenue, 0);
+    return calculateComplexityCost(businesses, sharedServices, totalRevenue, duration, integratedPlatforms);
+  }, [businesses, sharedServices, activeBusinesses, duration, integratedPlatforms]);
+
+  // Market cycle indicator — derived from trailing global events
+  const marketCyclePhase = useMemo(() => {
+    return getMarketCycleIndicator(eventHistory);
+  }, [eventHistory]);
+
   const renderPhase = () => {
     switch (phase) {
       case 'collect':
@@ -769,6 +783,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             cashBeforeDebtPayments={cashBeforeDebtPayments}
             interestPenalty={getDistressRestrictions(metrics.distressLevel).interestPenalty}
             capexReduction={capexReduction}
+            complexityCost={complexityCost.netCost}
             onContinue={advanceToEvent}
           />
         );
@@ -985,7 +1000,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             </button>
           </div>
         </div>
-        {/* Phase indicator — compact on mobile, full on desktop */}
+        {/* Phase indicator + Market Cycle — compact on mobile, full on desktop */}
         <div className="flex items-center gap-1.5 sm:gap-3 mt-1.5 sm:mt-2 text-xs sm:text-sm">
           <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ${
             phase === 'collect' ? 'bg-accent text-bg-primary' :
@@ -1013,6 +1028,24 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             <span className="sm:hidden">Allocate</span>
             <span className="hidden sm:inline">3. Allocate</span>
           </span>
+          {/* Market Cycle Indicator */}
+          {eventHistory.length > 0 && (() => {
+            const cycleLabel = MARKET_CYCLE_LABELS[marketCyclePhase];
+            return (
+              <Tooltip
+                trigger={
+                  <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded-full ml-auto ${cycleLabel.bg} ${cycleLabel.color}`}>
+                    {marketCyclePhase}
+                  </span>
+                }
+                align="right"
+                width="w-56"
+              >
+                <p className="text-sm text-text-secondary font-normal">{cycleLabel.tip}</p>
+                <p className="text-xs text-text-muted mt-1 font-normal">Based on the last 4 global events. Informational only — does not affect engine behavior.</p>
+              </Tooltip>
+            );
+          })()}
         </div>
       </div>
 

@@ -23,6 +23,7 @@ interface CollectPhaseProps {
   cashBeforeDebtPayments?: number;
   interestPenalty?: number;
   capexReduction?: number;
+  complexityCost?: number;
   onContinue: () => void;
 }
 
@@ -122,6 +123,7 @@ export function CollectPhase({
   cashBeforeDebtPayments: _cashBeforeDebtPayments,
   interestPenalty,
   capexReduction = 0,
+  complexityCost = 0,
   onContinue
 }: CollectPhaseProps) {
   const [expandedBusiness, setExpandedBusiness] = useState<string | null>(null);
@@ -159,7 +161,7 @@ export function CollectPhase({
   const uncappedTotalEarnouts = uncappedActiveEarnouts + integratedDebt.earnouts;
 
   // Net FCF WITHOUT earn-outs (to determine how much cash is available for earn-outs)
-  const netFcfBeforeEarnouts = totalBusinessFcf + uncappedActiveEarnouts - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - turnaroundCost - integratedDebt.sellerNotes - integratedDebt.bankDebt;
+  const netFcfBeforeEarnouts = totalBusinessFcf + uncappedActiveEarnouts - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - turnaroundCost - complexityCost - integratedDebt.sellerNotes - integratedDebt.bankDebt;
   const availableForEarnouts = Math.max(0, cash + netFcfBeforeEarnouts);
 
   // Cap earn-outs at available cash (matches store's Math.min logic)
@@ -247,7 +249,7 @@ export function CollectPhase({
           <div>
             <p className="text-text-muted">HoldCo</p>
             <p className="font-mono font-bold text-sm sm:text-lg text-danger">
-              -{formatMoney(holdcoInterest + sharedServicesCost + maSourcingCost)}
+              -{formatMoney(holdcoInterest + sharedServicesCost + maSourcingCost + complexityCost)}
             </p>
           </div>
           <div className="border-l border-white/20 pl-2 sm:pl-4">
@@ -551,6 +553,16 @@ export function CollectPhase({
                 <span className="text-text-secondary">M&A Sourcing Team</span>
               </div>
               <span className="font-mono text-warning">-{formatMoney(maSourcingCost)}</span>
+            </div>
+          )}
+
+          {complexityCost > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🏗️</span>
+                <span className="text-text-secondary">Portfolio Complexity</span>
+              </div>
+              <span className="font-mono text-warning">-{formatMoney(complexityCost)}</span>
             </div>
           )}
 

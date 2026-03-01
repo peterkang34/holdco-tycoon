@@ -785,6 +785,44 @@ function migrateV32ToV33(): void {
 }
 
 /**
+ * v33→v34: Multi-sponsor deal history — priorOwnershipCount + ownershipHistory on businesses.
+ */
+function migrateV33ToV34(): void {
+  const v33Key = 'holdco-tycoon-save-v33';
+  const v34Key = 'holdco-tycoon-save-v34';
+  if (localStorage.getItem(v34Key)) return;
+  try {
+    const raw = localStorage.getItem(v33Key);
+    if (!raw) return;
+    const v33Data = JSON.parse(raw);
+
+    // Backfill priorOwnershipCount on all business-like objects
+    const backfillBusiness = (b: any) => ({
+      ...b,
+      priorOwnershipCount: b.priorOwnershipCount ?? 0,
+    });
+
+    if (Array.isArray(v33Data.state?.businesses)) {
+      v33Data.state.businesses = v33Data.state.businesses.map(backfillBusiness);
+    }
+    if (Array.isArray(v33Data.state?.exitedBusinesses)) {
+      v33Data.state.exitedBusinesses = v33Data.state.exitedBusinesses.map(backfillBusiness);
+    }
+    if (Array.isArray(v33Data.state?.dealPipeline)) {
+      v33Data.state.dealPipeline = v33Data.state.dealPipeline.map((d: any) => ({
+        ...d,
+        business: d.business ? backfillBusiness(d.business) : d.business,
+      }));
+    }
+
+    localStorage.setItem(v34Key, JSON.stringify(v33Data));
+    localStorage.removeItem(v33Key);
+  } catch (e) {
+    console.error('v33→v34 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -813,4 +851,5 @@ export function runAllMigrations(): void {
   migrateV30ToV31();
   migrateV31ToV32();
   migrateV32ToV33();
+  migrateV33ToV34();
 }

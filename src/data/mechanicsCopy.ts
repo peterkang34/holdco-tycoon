@@ -61,6 +61,29 @@ export const SMB_BROKER_LABELS = {
   behavior: '$75K for 1 micro-tier deal from a Main Street broker. Available from round 1. Disabled when M&A Sourcing Tier 1 is active.',
 } as const;
 
+export const MOAT_TIER_LABELS = {
+  Narrow: { color: 'text-red-400', bg: 'bg-red-500/20', tip: 'Narrow moat — low de-risking premium. Improve quality signals to strengthen.' },
+  Moderate: { color: 'text-yellow-400', bg: 'bg-yellow-500/20', tip: 'Moderate moat — growing competitive advantages. Keep building quality signals.' },
+  Wide: { color: 'text-blue-400', bg: 'bg-blue-500/20', tip: 'Wide moat — strong de-risking premium. Buyers pay up for defensibility.' },
+  Fortress: { color: 'text-accent', bg: 'bg-accent/20', tip: 'Fortress moat — maximum de-risking premium. This business is a buyer magnet.' },
+} as const;
+
+export const MARKET_CYCLE_LABELS = {
+  Expansion: { color: 'text-accent', bg: 'bg-accent/20', tip: 'Strong tailwinds — favorable for acquisitions and exits. Capital is abundant.' },
+  Growth: { color: 'text-blue-400', bg: 'bg-blue-500/20', tip: 'Positive momentum — good conditions for disciplined capital deployment.' },
+  Stable: { color: 'text-yellow-400', bg: 'bg-yellow-500/20', tip: 'Neutral conditions — focus on operations and value creation over deal-making.' },
+  Contraction: { color: 'text-orange-400', bg: 'bg-orange-500/20', tip: 'Headwinds building — conserve cash and stress-test your portfolio.' },
+  Crisis: { color: 'text-red-400', bg: 'bg-red-500/20', tip: 'Severe downturn — protect cash flow and avoid overleveraging. Opportunities for contrarian buyers.' },
+} as const;
+
+export type MarketCyclePhase = keyof typeof MARKET_CYCLE_LABELS;
+
+export const COMPLEXITY_COST_LABELS = {
+  name: 'Portfolio Complexity',
+  behavior: 'Cash deduction when portfolio exceeds complexity threshold without sufficient shared services to offset.',
+  tip: 'As your portfolio grows past the complexity threshold, coordination costs mount. Each active shared service offsets ~33% of the cost. Maximum compression: 3ppt of total revenue.',
+} as const;
+
 export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   pattern: RegExp;
   reason: string;

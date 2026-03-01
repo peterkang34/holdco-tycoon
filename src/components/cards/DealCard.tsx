@@ -393,6 +393,11 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
             {dueDiligence.competitivePositionText}
           </p>
         </div>
+        {deal.business.ownershipHistory && (
+          <p className="text-text-muted mt-1.5 italic text-[11px] leading-relaxed">
+            {deal.business.ownershipHistory}
+          </p>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2 mt-4 pt-3 border-t border-white/10">

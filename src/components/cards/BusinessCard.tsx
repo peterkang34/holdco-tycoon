@@ -3,8 +3,9 @@ import { Business, IntegratedPlatform, ActiveTurnaround, formatMoney, formatPerc
 import { getProgramById } from '../../data/turnaroundPrograms';
 import { SECTORS } from '../../data/sectors';
 import { calculateExitValuation } from '../../engine/simulation';
+import { calculateDeRiskingPremium, getMoatTier } from '../../engine/buyers';
 import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
-import { debtCountdownLabel, earnoutTargetLabel, earnoutCountdownLabel } from '../../data/mechanicsCopy';
+import { debtCountdownLabel, earnoutTargetLabel, earnoutCountdownLabel, MOAT_TIER_LABELS } from '../../data/mechanicsCopy';
 import { Tooltip } from '../ui/Tooltip';
 
 interface BusinessCardProps {
@@ -74,6 +75,14 @@ export function BusinessCard({
 
   const isGrowing = business.ebitda > business.acquisitionEbitda;
   const isDeclining = business.ebitda < business.peakEbitda * 0.7;
+
+  // Moat tier based on de-risking premium
+  const deRiskingPremium = useMemo(() => calculateDeRiskingPremium(business), [business]);
+  const moatTier = useMemo(() => getMoatTier(deRiskingPremium), [deRiskingPremium]);
+  const moatLabel = MOAT_TIER_LABELS[moatTier];
+
+  // Multiple spread — entry vs exit
+  const multipleSpread = exitValuation.totalMultiple - business.acquisitionMultiple;
 
   if (compact && !collapsible) {
     return (
@@ -296,6 +305,34 @@ export function BusinessCard({
 
       {showDetails && (
         <>
+          {/* Multiple Spread + Moat */}
+          <div className="flex items-center justify-between text-xs mb-2 px-1">
+            <Tooltip
+              trigger={
+                <span className={`font-mono ${multipleSpread >= 0 ? 'text-accent' : 'text-danger'}`}>
+                  {business.acquisitionMultiple.toFixed(1)}x → {exitValuation.totalMultiple.toFixed(1)}x
+                  <span className="ml-1 font-bold">
+                    {multipleSpread >= 0 ? '+' : ''}{multipleSpread.toFixed(1)}x spread
+                  </span>
+                </span>
+              }
+              width="w-56"
+            >
+              <p className="text-sm text-text-secondary font-normal">The gap between your entry and current exit multiple. Growing this spread through operations, scale, and time is the core of value creation.</p>
+            </Tooltip>
+            <Tooltip
+              trigger={
+                <span className={`text-[10px] px-1.5 py-0.5 rounded ${moatLabel.bg} ${moatLabel.color}`}>
+                  {moatTier} Moat
+                </span>
+              }
+              align="right"
+              width="w-48"
+            >
+              <p className="text-sm text-text-secondary font-normal">{moatLabel.tip}</p>
+            </Tooltip>
+          </div>
+
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 text-[11px] sm:text-xs mb-3">
             <div>
               <p className="text-text-muted">Invested</p>
@@ -412,6 +449,12 @@ export function BusinessCard({
                   <div className="flex justify-between text-accent">
                     <span>De-risking Factors</span>
                     <span className="font-mono">+{exitValuation.deRiskingPremium.toFixed(1)}x</span>
+                  </div>
+                )}
+                {exitValuation.competitivePositionPremium > 0 && (
+                  <div className="flex justify-between text-accent">
+                    <span>Competitive Position (Leader)</span>
+                    <span className="font-mono">+{exitValuation.competitivePositionPremium.toFixed(1)}x</span>
                   </div>
                 )}
                 {exitValuation.platformPremium > 0 && (

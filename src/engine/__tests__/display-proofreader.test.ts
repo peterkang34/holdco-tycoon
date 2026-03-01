@@ -79,6 +79,10 @@ import {
   QUIET_YEAR_CAP_STANDARD,
   EARLY_GAME_SAFETY_NET_MAX_ROUND,
   EARLY_GAME_AFFORDABLE_THRESHOLD,
+  COMPLEXITY_ACTIVATION_THRESHOLD,
+  COMPLEXITY_COST_PER_OPCO,
+  COMPLEXITY_MAX_MARGIN_COMPRESSION,
+  COMPETITIVE_POSITION_PREMIUM,
   FILLER_TAX_STRATEGY_COST_MIN,
   FILLER_TAX_STRATEGY_COST_MAX,
   FILLER_TAX_STRATEGY_MARGIN_BOOST,
@@ -1876,6 +1880,135 @@ describe('Display Proofreader', () => {
       const businesses = readComponent('engine/businesses.ts');
       expect(businesses).toContain('EARLY_GAME_SAFETY_NET_MAX_ROUND');
       expect(businesses).toContain('EARLY_GAME_AFFORDABLE_THRESHOLD');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // PORTFOLIO COMPLEXITY COST
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Portfolio Complexity Cost', () => {
+    it('COMPLEXITY_ACTIVATION_THRESHOLD = 5', () => {
+      expect(COMPLEXITY_ACTIVATION_THRESHOLD).toBe(5);
+    });
+
+    it('COMPLEXITY_COST_PER_OPCO = 0.003 (0.3% of revenue per excess opco)', () => {
+      expect(COMPLEXITY_COST_PER_OPCO).toBe(0.003);
+    });
+
+    it('COMPLEXITY_MAX_MARGIN_COMPRESSION = 0.03 (3ppt cap)', () => {
+      expect(COMPLEXITY_MAX_MARGIN_COMPRESSION).toBe(0.03);
+    });
+
+    it('simulation.ts has calculateComplexityCost function (Strategy B)', () => {
+      const sim = readComponent('engine/simulation.ts');
+      expect(sim).toContain('calculateComplexityCost');
+      expect(sim).toContain('COMPLEXITY_ACTIVATION_THRESHOLD');
+      expect(sim).toContain('COMPLEXITY_COST_PER_OPCO');
+    });
+
+    it('CollectPhase displays complexity cost line (Strategy B)', () => {
+      const collectPhase = readComponent('components/phases/CollectPhase.tsx');
+      expect(collectPhase).toContain('Portfolio Complexity');
+      expect(collectPhase).toContain('complexityCost');
+    });
+
+    it('mechanicsCopy.ts has complexity cost labels (Strategy B)', () => {
+      const copy = readComponent('data/mechanicsCopy.ts');
+      expect(copy).toContain('COMPLEXITY_COST_LABELS');
+      expect(copy).toContain('Portfolio Complexity');
+    });
+
+    it('useGame.ts deducts complexity cost in waterfall (Strategy B)', () => {
+      const useGame = readComponent('hooks/useGame.ts');
+      expect(useGame).toContain('calculateComplexityCost');
+      expect(useGame).toContain('complexityCost');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // COMPETITIVE POSITION PREMIUM
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Competitive Position Premium', () => {
+    it('COMPETITIVE_POSITION_PREMIUM = 0.2', () => {
+      expect(COMPETITIVE_POSITION_PREMIUM).toBe(0.2);
+    });
+
+    it('simulation.ts includes competitivePositionPremium in exit valuation (Strategy B)', () => {
+      const sim = readComponent('engine/simulation.ts');
+      expect(sim).toContain('competitivePositionPremium');
+      expect(sim).toContain('COMPETITIVE_POSITION_PREMIUM');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // MOAT TIER & MARKET CYCLE
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Moat Tier & Market Cycle', () => {
+    it('buyers.ts has getMoatTier function (Strategy B)', () => {
+      const buyers = readComponent('engine/buyers.ts');
+      expect(buyers).toContain('getMoatTier');
+      expect(buyers).toContain('Narrow');
+      expect(buyers).toContain('Moderate');
+      expect(buyers).toContain('Wide');
+      expect(buyers).toContain('Fortress');
+    });
+
+    it('BusinessCard displays moat tier badge (Strategy B)', () => {
+      const card = readComponent('components/cards/BusinessCard.tsx');
+      expect(card).toContain('getMoatTier');
+      expect(card).toContain('MOAT_TIER_LABELS');
+    });
+
+    it('BusinessCard displays multiple spread (Strategy B)', () => {
+      const card = readComponent('components/cards/BusinessCard.tsx');
+      expect(card).toContain('multipleSpread');
+      expect(card).toContain('acquisitionMultiple');
+    });
+
+    it('simulation.ts has getMarketCycleIndicator function (Strategy B)', () => {
+      const sim = readComponent('engine/simulation.ts');
+      expect(sim).toContain('getMarketCycleIndicator');
+      expect(sim).toContain('EVENT_CYCLE_WEIGHTS');
+    });
+
+    it('GameScreen displays market cycle indicator (Strategy B)', () => {
+      const screen = readComponent('components/screens/GameScreen.tsx');
+      expect(screen).toContain('getMarketCycleIndicator');
+      expect(screen).toContain('MARKET_CYCLE_LABELS');
+    });
+
+    it('mechanicsCopy.ts has moat tier and market cycle labels (Strategy B)', () => {
+      const copy = readComponent('data/mechanicsCopy.ts');
+      expect(copy).toContain('MOAT_TIER_LABELS');
+      expect(copy).toContain('MARKET_CYCLE_LABELS');
+      expect(copy).toContain('Narrow');
+      expect(copy).toContain('Expansion');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // MULTI-SPONSOR DEAL HISTORY
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Multi-Sponsor Deal History', () => {
+    it('businesses.ts has ownership generation functions (Strategy B)', () => {
+      const biz = readComponent('engine/businesses.ts');
+      expect(biz).toContain('generatePriorOwnershipCount');
+      expect(biz).toContain('generateOwnershipHistory');
+      expect(biz).toContain('OWNERSHIP_COUNT_WEIGHTS');
+    });
+
+    it('DealCard displays ownership history (Strategy B)', () => {
+      const card = readComponent('components/cards/DealCard.tsx');
+      expect(card).toContain('ownershipHistory');
+    });
+
+    it('types.ts has priorOwnershipCount field (Strategy B)', () => {
+      const types = readComponent('engine/types.ts');
+      expect(types).toContain('priorOwnershipCount');
     });
   });
 });

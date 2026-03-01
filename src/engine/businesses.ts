@@ -310,6 +310,7 @@ export function generateBusiness(
     synergiesRealized: 0,
     totalAcquisitionCost: acquisitionPrice,
     rolloverEquityPct: 0,
+    priorOwnershipCount: 0,
   };
 }
 
@@ -357,6 +358,54 @@ export function assignSellerArchetype(quality: QualityRating, rng?: SeededRng): 
     if (roll <= 0) return w.archetype;
   }
   return 'retiring_founder';
+}
+
+// ── Prior Ownership Count (Multi-Sponsor Deal History) ─────────────
+// Weighted by seller archetype — higher counts for institutional sellers
+
+const OWNERSHIP_COUNT_WEIGHTS: Record<SellerArchetype, number[]> = {
+  retiring_founder:  [0.70, 0.20, 0.10],           // mostly founder-owned
+  burnt_out_operator: [0.50, 0.30, 0.20],           // some prior backing
+  accidental_holdco: [0.20, 0.30, 0.30, 0.20],     // divestitures have institutional history
+  distressed_seller: [0.30, 0.30, 0.25, 0.15],     // mixed
+  mbo_candidate:     [0.10, 0.40, 0.30, 0.20],     // MBOs often have PE backing
+  franchise_breakaway: [0.30, 0.40, 0.30],          // moderate history
+};
+
+export function generatePriorOwnershipCount(archetype: SellerArchetype, rng?: SeededRng): number {
+  const weights = OWNERSHIP_COUNT_WEIGHTS[archetype];
+  let roll = rng ? rng.next() : Math.random();
+  for (let i = 0; i < weights.length; i++) {
+    roll -= weights[i];
+    if (roll <= 0) return i;
+  }
+  return weights.length - 1;
+}
+
+export function generateOwnershipHistory(count: number, rng?: SeededRng): string {
+  if (count === 0) return 'Founder-owned since inception.';
+
+  const histories: Record<number, string[]> = {
+    1: [
+      'One prior institutional backer provided growth capital and operational support.',
+      'Previously backed by a small PE fund that helped professionalize management.',
+      'Prior sponsor invested in technology infrastructure before exiting.',
+    ],
+    2: [
+      'Two prior sponsors: initial backer drove growth, second extracted pricing optimization but neglected talent pipeline.',
+      'Two institutional owners — first focused on market expansion, second on margin improvement.',
+      'Two PE sponsors have cycled through, each optimizing different operational levers.',
+    ],
+    3: [
+      'Well-traveled asset: multiple PE sponsors have optimized different levers. Most low-hanging fruit already captured.',
+      'Three prior owners — growth, efficiency, and platform development have all been attempted.',
+      'Heavily sponsored history. Operational playbooks well-established but upside may be limited.',
+    ],
+  };
+
+  const options = histories[Math.min(count, 3)] || histories[3];
+  const idx = Math.floor((rng ? rng.next() : Math.random()) * options.length);
+  return options[idx];
 }
 
 function getArchetypeHeatModifier(archetype: SellerArchetype): number {
@@ -915,6 +964,10 @@ export function generateDealWithSize(
   // Assign seller archetype
   const sellerArchetype = assignSellerArchetype(quality, rng);
 
+  // Generate prior ownership history
+  const priorOwnershipCount = generatePriorOwnershipCount(sellerArchetype, rng);
+  const ownershipHistory = generateOwnershipHistory(priorOwnershipCount, rng);
+
   // Apply archetype operator quality override
   const archetypeOperator = getArchetypeOperatorQuality(sellerArchetype, rng);
   let adjustedBusiness = business;
@@ -1007,6 +1060,8 @@ export function generateDealWithSize(
       peakRevenue: adjustedRevenue,
       organicGrowthRate: finalGrowthRate,
       revenueGrowthRate: finalRevenueGrowthRate,
+      priorOwnershipCount,
+      ownershipHistory,
     },
     askingPrice: finalAskingPrice,
     freshness,

@@ -65,6 +65,7 @@ import {
   calculateMetrics,
   recordHistoricalMetrics,
   calculateExitValuation,
+  calculateComplexityCost,
 } from '../engine/simulation';
 import { executeDealStructure } from '../engine/deals';
 import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue, calculateFounderEquityValue, calculateFounderPersonalWealth } from '../engine/scoring';
@@ -553,7 +554,19 @@ export const useGameStore = create<GameStore>()(
           updatedHoldcoLoanRoundsRemaining = state.holdcoLoanRoundsRemaining - 1;
         }
 
-        let newCash = state.cash + annualFcf - holdcoLoanPayment - sharedServicesCost - maSourcingCost - turnaroundTierCost - turnaroundProgramCosts;
+        // Calculate portfolio complexity cost
+        const totalRevenue = state.businesses
+          .filter(b => b.status === 'active')
+          .reduce((sum, b) => sum + b.revenue, 0);
+        const complexityCost = calculateComplexityCost(
+          state.businesses,
+          state.sharedServices,
+          totalRevenue,
+          state.duration,
+          state.integratedPlatforms,
+        );
+
+        let newCash = state.cash + annualFcf - holdcoLoanPayment - sharedServicesCost - maSourcingCost - turnaroundTierCost - turnaroundProgramCosts - complexityCost.netCost;
 
         // Pay opco-level debt (seller notes, earnouts, bank debt interest)
         // This aligns with the waterfall display — all deductions happen at collection time
@@ -1379,6 +1392,7 @@ export const useGameStore = create<GameStore>()(
             parentPlatformId: targetPlatformId, integrationOutcome: outcomeSF, synergiesRealized: synergiesSF,
             totalAcquisitionCost: deal.effectivePrice, acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0,
             rolloverEquityPct: 0, integratedPlatformId: platform.integratedPlatformId,
+            priorOwnershipCount: deal.business.priorOwnershipCount ?? 0,
           };
           const restructuringCostSF = outcomeSF === 'failure' ? Math.round(Math.abs(deal.business.ebitda) * INTEGRATION_RESTRUCTURING_PCT) : 0;
           const growthDragPenaltySF = outcomeSF === 'failure' ? calculateIntegrationGrowthPenalty(deal.business.ebitda, platform.ebitda, false) : 0;
@@ -1488,6 +1502,7 @@ export const useGameStore = create<GameStore>()(
           rolloverEquityPct: 0, // Tuck-ins: bolt-on has 0 rollover; parent's pct applies at exit
           // Propagate integratedPlatformId if the target platform belongs to a forged integrated platform
           integratedPlatformId: platform.integratedPlatformId,
+          priorOwnershipCount: deal.business.priorOwnershipCount ?? 0,
         };
 
         // Failed integration: restructuring cost + proportional decaying growth drag on platform
@@ -1749,6 +1764,7 @@ export const useGameStore = create<GameStore>()(
           acquisitionSizeTierPremium: calculateSizeTierPremium(combinedEbitda).premium,
           wasMerged: true,
           mergerBalanceRatio: mergerBalanceRatio,
+          priorOwnershipCount: Math.max(biz1.priorOwnershipCount ?? 0, biz2.priorOwnershipCount ?? 0),
         };
 
         // Remove old businesses, add merged one, and update bolt-on parent references
@@ -4454,7 +4470,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v33', // v33: Guaranteed pro sports events — pendingProSportsEvent field
+      name: 'holdco-tycoon-save-v34', // v34: Multi-sponsor deal history, complexity cost, moat tiers, market cycle, competitive position premium
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

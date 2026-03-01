@@ -29,6 +29,7 @@ import {
   calculateMetrics,
   recordHistoricalMetrics,
   calculateExitValuation,
+  calculateComplexityCost,
 } from '../../simulation';
 import {
   generateDealPipeline,
@@ -280,7 +281,22 @@ function simulateCollectToEvent(state: GameState, coverage: PlaytestCoverage): G
     updatedHoldcoLoanRoundsRemaining = state.holdcoLoanRoundsRemaining - 1;
   }
 
-  let newCash = state.cash + annualFcf - holdcoLoanPayment - sharedServicesCost - maSourcingCost - turnaroundTierCost - turnaroundProgramCosts;
+  // Complexity cost
+  const totalRevenue = state.businesses
+    .filter(b => b.status === 'active')
+    .reduce((sum, b) => sum + b.revenue, 0);
+  const complexityCost = calculateComplexityCost(
+    state.businesses,
+    state.sharedServices,
+    totalRevenue,
+    state.duration,
+    state.integratedPlatforms,
+  );
+  if (complexityCost.netCost > 0) {
+    coverage.record('complexity_cost_triggered', state.round);
+  }
+
+  let newCash = state.cash + annualFcf - holdcoLoanPayment - sharedServicesCost - maSourcingCost - turnaroundTierCost - turnaroundProgramCosts - complexityCost.netCost;
 
   // Opco-level debt waterfall
   let opcoDebtAdjustment = 0;

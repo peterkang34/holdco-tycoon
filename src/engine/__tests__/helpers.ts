@@ -55,6 +55,7 @@ export function createMockBusiness(overrides: Partial<Business> = {}): Business 
     totalAcquisitionCost: 4000,
     qualityImprovedTiers: 0,
     rolloverEquityPct: 0,
+    priorOwnershipCount: 0,
     ...overrides,
   };
 }
@@ -115,6 +116,7 @@ export function createMockDeal(overrides: Partial<Deal> = {}): Deal {
       synergiesRealized: business.synergiesRealized,
       totalAcquisitionCost: business.totalAcquisitionCost,
       rolloverEquityPct: business.rolloverEquityPct,
+      priorOwnershipCount: business.priorOwnershipCount,
     },
     askingPrice: 4000,
     freshness: 2,

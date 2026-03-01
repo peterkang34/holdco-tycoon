@@ -99,6 +99,12 @@ import {
   FILLER_AUDIT_LIGHT_CHANCE,
   FILLER_REPUTATION_COST_MIN,
   FILLER_REPUTATION_COST_MAX,
+  COMPETITIVE_POSITION_PREMIUM,
+  COMPLEXITY_ACTIVATION_THRESHOLD,
+  COMPLEXITY_ACTIVATION_THRESHOLD_QUICK,
+  COMPLEXITY_COST_PER_OPCO,
+  COMPLEXITY_SHARED_SERVICE_OFFSET,
+  COMPLEXITY_MAX_MARGIN_COMPRESSION,
 } from '../data/gameConfig';
 import { getPlatformMultipleExpansion, getPlatformRecessionModifier } from './platforms';
 import { getTurnaroundExitPremium } from './turnarounds';
@@ -174,6 +180,11 @@ export function calculateExitValuation(
   // De-risking premium — composite de-risking factor
   const deRiskingPremium = calculateDeRiskingPremium(business);
 
+  // Competitive position premium — market leaders command higher multiples
+  const competitivePositionPremium = business.dueDiligence.competitivePosition === 'leader'
+    ? COMPETITIVE_POSITION_PREMIUM
+    : 0;
+
   // Rule of 40 Premium (SaaS/education only)
   let ruleOf40Premium = 0;
   if (business.sectorId === 'saas' || business.sectorId === 'education') {
@@ -210,7 +221,7 @@ export function calculateExitValuation(
   // Sum EARNED premiums (growth, quality, improvements, etc.) — subject to aggregate cap
   const rawEarnedPremiums = growthPremium + qualityPremium + platformPremium + holdPremium +
     improvementsPremium + marketModifier + sizeTierPremium + deRiskingPremium +
-    ruleOf40Premium + marginExpansionPremium + mergerPremium + turnaroundPremium;
+    competitivePositionPremium + ruleOf40Premium + marginExpansionPremium + mergerPremium + turnaroundPremium;
 
   // Cap earned premiums to prevent runaway multiples
   // Floor scales with platform scale — platforms get more headroom
@@ -256,6 +267,7 @@ export function calculateExitValuation(
     mergerPremium,
     integratedPlatformPremium,
     turnaroundPremium,
+    competitivePositionPremium,
     deRiskingPremium,
     ruleOf40Premium,
     marginExpansionPremium,
@@ -267,6 +279,100 @@ export function calculateExitValuation(
     yearsHeld,
     commentary,
   };
+}
+
+// ── Market Cycle Indicator ────────────────────────────────────────
+// Derives cycle phase from trailing global events. Pure UI indicator — no engine impact.
+
+export type MarketCyclePhase = 'Expansion' | 'Growth' | 'Stable' | 'Contraction' | 'Crisis';
+
+const EVENT_CYCLE_WEIGHTS: Partial<Record<string, number>> = {
+  global_bull_market: 2,
+  global_interest_cut: 1,
+  global_quiet: 0,
+  global_inflation: -1,
+  global_interest_hike: -1,
+  global_credit_tightening: -1,
+  global_recession: -2,
+  global_financial_crisis: -3,
+};
+
+export function getMarketCycleIndicator(eventHistory: { type: string }[]): MarketCyclePhase {
+  // Look at last 4 global events
+  const globalEvents = eventHistory
+    .filter(e => e.type.startsWith('global_'))
+    .slice(-4);
+
+  if (globalEvents.length === 0) return 'Stable';
+
+  const score = globalEvents.reduce((sum, e) => sum + (EVENT_CYCLE_WEIGHTS[e.type] ?? 0), 0);
+
+  if (score > 2) return 'Expansion';
+  if (score >= 1) return 'Growth';
+  if (score >= -1) return 'Stable';
+  if (score >= -2) return 'Contraction';
+  return 'Crisis';
+}
+
+// ── Portfolio Complexity Cost ─────────────────────────────────────
+// Cash deduction from waterfall when portfolio grows past threshold without sufficient shared services.
+
+export interface ComplexityCostBreakdown {
+  effectiveCount: number;
+  threshold: number;
+  excessCount: number;
+  grossCostFraction: number;
+  grossCost: number;
+  activeSSCount: number;
+  offsetFraction: number;
+  netCost: number;
+}
+
+export function calculateComplexityCost(
+  businesses: Business[],
+  sharedServices: { active: boolean }[],
+  totalRevenue: number,
+  duration: GameDuration,
+  integratedPlatforms: IntegratedPlatform[] = [],
+): ComplexityCostBreakdown {
+  const threshold = duration === 'quick'
+    ? COMPLEXITY_ACTIVATION_THRESHOLD_QUICK
+    : COMPLEXITY_ACTIVATION_THRESHOLD;
+
+  // Count "effective" active businesses — platform constituents count as 1 entity
+  const activeBusinesses = businesses.filter(b => b.status === 'active');
+  const integratedBusinessIds = new Set(
+    integratedPlatforms.flatMap(p => p.constituentBusinessIds)
+  );
+
+  let effectiveCount = 0;
+  for (const b of activeBusinesses) {
+    if (integratedBusinessIds.has(b.id)) {
+      // Skip individual constituents — the platform counts as 1
+      continue;
+    }
+    effectiveCount++;
+  }
+  // Add 1 for each integrated platform (they count as single entities)
+  effectiveCount += integratedPlatforms.filter(p =>
+    p.constituentBusinessIds.some(id =>
+      activeBusinesses.some(b => b.id === id)
+    )
+  ).length;
+
+  if (effectiveCount < threshold) {
+    return { effectiveCount, threshold, excessCount: 0, grossCostFraction: 0, grossCost: 0, activeSSCount: 0, offsetFraction: 0, netCost: 0 };
+  }
+
+  const excessCount = effectiveCount - (threshold - 1);
+  const grossCostFraction = Math.min(excessCount * COMPLEXITY_COST_PER_OPCO, COMPLEXITY_MAX_MARGIN_COMPRESSION);
+  const grossCost = Math.round(totalRevenue * grossCostFraction);
+
+  const activeSSCount = sharedServices.filter(s => s.active).length;
+  const offsetFraction = Math.min(1, activeSSCount * COMPLEXITY_SHARED_SERVICE_OFFSET);
+  const netCost = Math.round(grossCost * (1 - offsetFraction));
+
+  return { effectiveCount, threshold, excessCount, grossCostFraction, grossCost, activeSSCount, offsetFraction, netCost };
 }
 
 export function calculateAnnualFcf(

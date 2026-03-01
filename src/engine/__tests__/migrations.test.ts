@@ -424,8 +424,8 @@ describe('runAllMigrations', () => {
 
     // v9 should be consumed
     expect(localStorageMock.getItem('holdco-tycoon-save-v9')).toBeNull();
-    // Final v33 should exist (chain goes through all migrations including v32→v33)
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v33')!);
+    // Final v34 should exist (chain goes through all migrations including v33→v34)
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v34')!);
     expect(result.state.difficulty).toBe('easy');
     expect(result.state.maxRounds).toBe(20);
     expect(result.state.founderDistributionsReceived).toBeDefined();
@@ -471,6 +471,8 @@ describe('runAllMigrations', () => {
     expect(result.state.nextAcquisitionHeatReduction).toBe(0);
     // v32→v33 fields (Guaranteed pro sports events)
     expect(result.state.pendingProSportsEvent).toBeNull();
+    // v33→v34 fields (Prior ownership count)
+    expect(result.state.businesses[0].priorOwnershipCount).toBe(0);
   });
 
   it('should be safe to call multiple times (idempotent)', () => {
