@@ -737,6 +737,30 @@ function migrateV30ToV31(): void {
 }
 
 /**
+ * v31→v32: Early-game UX & Event System Overhaul.
+ * Adds nextAcquisitionHeatReduction field (reputation building filler event).
+ */
+function migrateV31ToV32(): void {
+  const v31Key = 'holdco-tycoon-save-v31';
+  const v32Key = 'holdco-tycoon-save-v32';
+  if (localStorage.getItem(v32Key)) return;
+  try {
+    const raw = localStorage.getItem(v31Key);
+    if (!raw) return;
+    const v31Data = JSON.parse(raw);
+
+    if (v31Data.state?.nextAcquisitionHeatReduction === undefined) {
+      v31Data.state.nextAcquisitionHeatReduction = 0;
+    }
+
+    localStorage.setItem(v32Key, JSON.stringify(v31Data));
+    localStorage.removeItem(v31Key);
+  } catch (e) {
+    console.error('v31→v32 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -763,4 +787,5 @@ export function runAllMigrations(): void {
   migrateV28ToV29();
   migrateV29ToV30();
   migrateV30ToV31();
+  migrateV31ToV32();
 }

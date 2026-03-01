@@ -343,6 +343,48 @@ export const DURATION_SUBTITLE = {
   standard: 'Build your legacy',
 } as const;
 
+// ── Small Business Broker (Early-Game Deal Sourcing) ──
+
+export const SMB_BROKER_COST = 75; // $75K
+export const SMB_BROKER_CHEAP_SECTORS = ['agency', 'homeServices', 'b2bServices', 'education', 'autoServices'] as const;
+export const SMB_BROKER_QUALITY_WEIGHTS = { 1: 0.20, 2: 0.30, 3: 0.50 } as const;
+
+// ── Quiet Year Frequency Cap ──
+
+export const QUIET_YEAR_CAP_QUICK = 2;   // max 2 quiet years in 10yr game
+export const QUIET_YEAR_CAP_STANDARD = 4; // max 4 quiet years in 20yr game
+
+// ── Early-Game Pipeline Safety Net ──
+
+export const EARLY_GAME_SAFETY_NET_MAX_ROUND = 3;
+export const EARLY_GAME_AFFORDABLE_THRESHOLD = 2; // cash multiplier for affordability check
+
+// ── Filler Event Constants ──
+
+export const FILLER_TAX_STRATEGY_COST_MIN = 150;
+export const FILLER_TAX_STRATEGY_COST_MAX = 250;
+export const FILLER_TAX_STRATEGY_MARGIN_BOOST = 0.01; // +1ppt
+export const FILLER_TAX_STRATEGY_DURATION = 2; // rounds
+export const FILLER_TAX_STRATEGY_WRITEOFF = 50; // $50K
+
+export const FILLER_CONFERENCE_COST_MIN = 100;
+export const FILLER_CONFERENCE_COST_MAX = 150;
+export const FILLER_CONFERENCE_FREE_DEAL_CHANCE = 0.40; // 40% chance if sending team for free
+
+export const FILLER_AUDIT_COST_MIN = 200;
+export const FILLER_AUDIT_COST_MAX = 350;
+export const FILLER_AUDIT_SUCCESS_CHANCE = 0.40;  // 40% chance +1.5ppt margin
+export const FILLER_AUDIT_MARGIN_BOOST = 0.015;   // +1.5ppt
+export const FILLER_AUDIT_ISSUE_CHANCE = 0.15;    // 15% chance compliance issue
+export const FILLER_AUDIT_ISSUE_COST = 100;        // $100K
+export const FILLER_AUDIT_ISSUE_MARGIN_HIT = 0.01; // -1ppt for 1 round
+export const FILLER_AUDIT_LIGHT_CHANCE = 0.30;    // 30% chance on light review
+export const FILLER_AUDIT_LIGHT_MARGIN_BOOST = 0.005; // +0.5ppt
+
+export const FILLER_REPUTATION_COST_MIN = 100;
+export const FILLER_REPUTATION_COST_MAX = 200;
+export const FILLER_REPUTATION_HEAT_REDUCTION = 1; // -1 heat tier on next acquisition
+
 // Type helpers for consumers
 export type DifficultyConfig = typeof DIFFICULTY_CONFIG;
 export type DurationConfig = typeof DURATION_CONFIG;

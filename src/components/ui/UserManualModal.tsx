@@ -944,6 +944,15 @@ function SharedServicesContent() {
       <P>
         Without M&amp;A Sourcing, you can attempt 2 acquisitions per year.
       </P>
+
+      <SubHeading>Small Business Broker</SubHeading>
+      <P>
+        Before you can afford a full M&amp;A Sourcing team, the <strong>Small Business Broker</strong> gives
+        you an early deal-sourcing option. Available from round 1 for <strong>$75K</strong>, it generates
+        1 micro-tier deal in your focus sector. The broker is automatically disabled once you unlock
+        M&amp;A Sourcing Tier 1 &mdash; think of it as the upgrade path: Small Biz Broker &rarr; Source
+        Deals &rarr; Proactive Outreach.
+      </P>
     </>
   );
 }
@@ -1028,7 +1037,7 @@ function EventsContent() {
           ['Inflation', 'Margin compression across portfolio; costs rise faster than revenue'],
           ['Credit Tightening', 'Bank debt unavailable for several rounds; LBO structures blocked; deal heat reduced by 1 tier (fewer competing buyers)'],
           ['Financial Crisis', 'Exit multiples -1.0x. Interest rate +2%. Existing bank debt rates +1.5%. Credit tightening for 2 rounds. 3-4 distressed deals appear at 30-50% off. ~2% probability — devastating for leveraged players, but a gift for cash-rich allocators.'],
-          ['Quiet Year', 'Nothing significant happens; a chance to execute your plan undisturbed'],
+          ['Quiet Year', 'Nothing significant happens; a chance to execute your plan undisturbed. Capped at 2 per game (10yr) or 4 per game (20yr).'],
         ]}
       />
 
@@ -1083,6 +1092,10 @@ function EventsContent() {
           ['Seller Deception', 'Business acquired within 2 rounds (non-cash structure)', 'Invest in Turnaround (20% EBITDA, 65% restore chance) · Fire Sale (sell at 60% fair value) · Absorb Hit (free, stays dropped)'],
           ['Working Capital Crunch', 'Business acquired in the previous round', 'Inject Cash (full cost, no penalty) · Emergency Credit ($50% cost, +1% interest) · Absorb Hit (-10% revenue for 2 rounds)'],
           ['Management Succession', '20yr mode, business held 8+ years, Q3+', 'Invest in External Hire ($300-500K, 75% restore) · Promote from Within (free, 50%+ restore) · Sell Business (85% fair value)'],
+          ['Tax Strategy Review', 'Filler event (no specific trigger)', 'Optimize Deductions (safe tax savings) · Aggressive Filing (higher savings, audit risk) · Skip (no effect)'],
+          ['Industry Conference', 'Filler event (no specific trigger)', 'Network for Deals (chance at a bonus deal) · Recruit Talent (growth/quality boost) · Skip (no effect)'],
+          ['Operational Audit', 'Filler event (no specific trigger)', 'Invest in Improvements (margin boost) · Cut Costs (short-term cash, margin risk) · Skip (no effect)'],
+          ['Reputation Building', 'Filler event (no specific trigger)', 'PR Investment (exit multiple boost) · Community Engagement (quality boost) · Stay Quiet (no effect)'],
         ]}
       />
     </>

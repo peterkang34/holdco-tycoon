@@ -33,6 +33,7 @@ import {
   enhanceDealsWithAI,
   generateSourcedDeals,
   generateProactiveOutreachDeals,
+  generateSMBBrokerDeal,
   getMaxAcquisitions,
   generateDealWithSize,
   pickWeightedSector,
@@ -69,7 +70,7 @@ import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue
 import { getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
 
-import type { GameDifficulty, GameDuration, GameActionType } from '../engine/types';
+import type { GameDifficulty, GameDuration, GameActionType, DealHeat } from '../engine/types';
 import { generateRandomSeed, createRngStreams } from '../engine/rng';
 import { checkIPOEligibility, executeIPO as executeIPOEngine, processEarningsResult } from '../engine/ipo';
 import {
@@ -81,6 +82,26 @@ import {
   FO_DEAL_INFLATION,
   FO_MA_SOURCING_TIER,
   FO_MAX_ROUNDS,
+  SMB_BROKER_COST,
+  FILLER_TAX_STRATEGY_COST_MIN,
+  FILLER_TAX_STRATEGY_COST_MAX,
+  FILLER_TAX_STRATEGY_MARGIN_BOOST,
+  FILLER_TAX_STRATEGY_WRITEOFF,
+  FILLER_CONFERENCE_COST_MIN,
+  FILLER_CONFERENCE_COST_MAX,
+  FILLER_CONFERENCE_FREE_DEAL_CHANCE,
+  FILLER_AUDIT_COST_MIN,
+  FILLER_AUDIT_COST_MAX,
+  FILLER_AUDIT_SUCCESS_CHANCE,
+  FILLER_AUDIT_MARGIN_BOOST,
+  FILLER_AUDIT_ISSUE_CHANCE,
+  FILLER_AUDIT_ISSUE_COST,
+  FILLER_AUDIT_ISSUE_MARGIN_HIT,
+  FILLER_AUDIT_LIGHT_CHANCE,
+  FILLER_AUDIT_LIGHT_MARGIN_BOOST,
+  FILLER_REPUTATION_COST_MIN,
+  FILLER_REPUTATION_COST_MAX,
+  FILLER_REPUTATION_HEAT_REDUCTION,
 } from '../data/gameConfig';
 
 /** Recompute totalDebt from holdco loan + per-business bank debt */
@@ -250,6 +271,20 @@ interface GameStore extends GameState {
 
   setMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference, subType?: string | null) => void;
 
+  // Small Business Broker (early-game deal sourcing)
+  smbBrokerDealFlow: () => void;
+
+  // Filler event choices
+  fillerTaxInvest: () => void;
+  fillerTaxWriteoff: () => void;
+  fillerConferenceAttend: () => void;
+  fillerConferenceFree: () => void;
+  fillerAuditFull: () => void;
+  fillerAuditLight: () => void;
+  fillerReputationInvest: () => void;
+  fillerReputationFree: () => void;
+  fillerPass: () => void;
+
   // MA Sourcing
   upgradeMASourcing: () => void;
   toggleMASourcing: () => void;
@@ -369,6 +404,7 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   ipoState: null,
   familyOfficeState: null,
   isFamilyOfficeMode: false,
+  nextAcquisitionHeatReduction: 0,
 };
 
 export const useGameStore = create<GameStore>()(
@@ -389,7 +425,7 @@ export const useGameStore = create<GameStore>()(
 
         const round1Streams = createRngStreams(gameSeed, 1);
         const startingBusiness = createStartingBusiness(startingSector, diffConfig.startingEbitda, diffConfig.startingMultipleCap, round1Streams.cosmetic);
-        const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds, false, round1Streams.deals, 0, diffConfig.initialCash, null, false);
+        const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds, false, round1Streams.deals, 0, diffConfig.initialCash, null, false, false, difficulty);
 
         // Holdco loan setup: Normal mode gets a structured loan, Easy mode has none
         const holdcoLoanBalance = diffConfig.startingDebt;
@@ -859,6 +895,7 @@ export const useGameStore = create<GameStore>()(
           state.ipoState ?? null,
           state.requiresRestructuring || state.covenantBreachRounds >= 1,
           state.isFamilyOfficeMode ?? false,
+          state.difficulty,
         );
 
         // Inject distressed deals during Financial Crisis (bypass MAX_DEALS cap)
@@ -1124,9 +1161,22 @@ export const useGameStore = create<GameStore>()(
 
         if (state.cash < structure.cashRequired) return;
 
+        // Apply reputation building heat reduction if active
+        let effectiveDeal = deal;
+        let consumeHeatReduction = false;
+        if (state.nextAcquisitionHeatReduction && state.nextAcquisitionHeatReduction > 0) {
+          const heatTiers: DealHeat[] = ['cold', 'warm', 'hot', 'contested'];
+          const currentIdx = heatTiers.indexOf(deal.heat);
+          if (currentIdx > 0) {
+            const newIdx = Math.max(0, currentIdx - state.nextAcquisitionHeatReduction);
+            effectiveDeal = { ...deal, heat: heatTiers[newIdx] };
+          }
+          consumeHeatReduction = true;
+        }
+
         // Contested deal snatch check — 40% chance another buyer outbids you
         const acqStreams = createRngStreams(state.seed, state.round);
-        if (deal.heat === 'contested' && acqStreams.market.fork(deal.id).next() < 0.40) {
+        if (effectiveDeal.heat === 'contested' && acqStreams.market.fork(deal.id).next() < 0.40) {
           set({
             dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
             acquisitionsThisRound: state.acquisitionsThisRound + 1,
@@ -1155,6 +1205,7 @@ export const useGameStore = create<GameStore>()(
             dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
             acquisitionsThisRound: state.acquisitionsThisRound + 1,
             lastAcquisitionResult: 'success',
+            nextAcquisitionHeatReduction: consumeHeatReduction ? 0 : state.nextAcquisitionHeatReduction,
             actionsThisRound: [...state.actionsThisRound, {
               type: 'acquire', round: state.round,
               details: { businessId: newBusiness.id, businessName: deal.business.name, sector: SECTORS[deal.business.sectorId].name, structure: 'share_funded', price: deal.effectivePrice, askingPrice: deal.effectivePrice, heat: deal.heat },
@@ -1192,6 +1243,7 @@ export const useGameStore = create<GameStore>()(
           dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
           acquisitionsThisRound: state.acquisitionsThisRound + 1,
           lastAcquisitionResult: 'success',
+          nextAcquisitionHeatReduction: consumeHeatReduction ? 0 : state.nextAcquisitionHeatReduction,
           actionsThisRound: [
             ...state.actionsThisRound,
             {
@@ -3410,7 +3462,7 @@ export const useGameStore = create<GameStore>()(
         const foInitialPipeline = generateDealPipeline(
           [], 1, undefined, undefined, undefined, 0,
           FO_MA_SOURCING_TIER, true, undefined, FO_MAX_ROUNDS,
-          false, round1Streams.deals, FO_DEAL_INFLATION, foStartingCash, null, false, true,
+          false, round1Streams.deals, FO_DEAL_INFLATION, foStartingCash, null, false, true, state.difficulty,
         );
 
         set({
@@ -3641,6 +3693,198 @@ export const useGameStore = create<GameStore>()(
             ...state.actionsThisRound,
             { type: 'proactive_outreach' as const, round: state.round, details: { cost: PROACTIVE_OUTREACH_COST, dealsGenerated: newDeals.length } },
           ],
+        });
+      },
+
+      smbBrokerDealFlow: () => {
+        const state = get();
+        // Guard: disabled when MA Sourcing Tier 1+ is active
+        if (state.maSourcing.active && state.maSourcing.tier >= 1) return;
+        if (state.cash < SMB_BROKER_COST) return;
+
+        const priorBrokerCount = state.actionsThisRound.filter(a => a.type === 'smb_broker').length;
+        const brokerStreams = createRngStreams(state.seed, state.round);
+        const brokerInflation = calculateDealInflation(state.round, state.duration, state.dealInflationState);
+        const newDeal = generateSMBBrokerDeal(
+          state.round,
+          state.maxRounds,
+          brokerStreams.deals.fork(`smb-broker-${priorBrokerCount}`),
+          brokerInflation,
+        );
+
+        set({
+          cash: state.cash - SMB_BROKER_COST,
+          dealPipeline: [...state.dealPipeline, newDeal],
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'smb_broker' as const, round: state.round, details: { cost: SMB_BROKER_COST } },
+          ],
+        });
+      },
+
+      // ── Filler Event Choice Handlers ──
+
+      fillerTaxInvest: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'filler_tax_strategy') return;
+        // Parse cost from event effect string
+        const costMatch = state.currentEvent.effect.match(/Pay \$([0-9.]+[KM]?)/);
+        const cost = costMatch ? parseInt(costMatch[1].replace('K', '')) : randomInt(FILLER_TAX_STRATEGY_COST_MIN, FILLER_TAX_STRATEGY_COST_MAX);
+        if (state.cash < cost) return;
+        const targetId = state.currentEvent.affectedBusinessId;
+        const businesses = state.businesses.map(b => {
+          if (b.id === targetId && b.status === 'active') {
+            return { ...b, ebitdaMargin: clampMargin(b.ebitdaMargin + FILLER_TAX_STRATEGY_MARGIN_BOOST) };
+          }
+          return b;
+        });
+        set({
+          cash: state.cash - cost,
+          businesses,
+          currentEvent: null,
+          eventHistory: [...state.eventHistory, state.currentEvent],
+        });
+      },
+
+      fillerTaxWriteoff: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'filler_tax_strategy') return;
+        set({
+          cash: state.cash + FILLER_TAX_STRATEGY_WRITEOFF,
+          currentEvent: null,
+          eventHistory: [...state.eventHistory, state.currentEvent],
+        });
+      },
+
+      fillerConferenceAttend: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'filler_industry_conference') return;
+        const costMatch = state.currentEvent.effect.match(/Pay \$([0-9.]+[KM]?)/);
+        const cost = costMatch ? parseInt(costMatch[1].replace('K', '')) : randomInt(FILLER_CONFERENCE_COST_MIN, FILLER_CONFERENCE_COST_MAX);
+        if (state.cash < cost) return;
+        const confStreams = createRngStreams(state.seed, state.round);
+        const confInflation = calculateDealInflation(state.round, state.duration, state.dealInflationState);
+        const deal = generateSMBBrokerDeal(state.round, state.maxRounds, confStreams.deals.fork('conf-attend'), confInflation);
+        // Conference deal is warm heat
+        const warmDeal = { ...deal, heat: 'warm' as const, source: 'brokered' as const };
+        set({
+          cash: state.cash - cost,
+          dealPipeline: [...state.dealPipeline, warmDeal],
+          currentEvent: null,
+          eventHistory: [...state.eventHistory, state.currentEvent],
+        });
+      },
+
+      fillerConferenceFree: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'filler_industry_conference') return;
+        const confStreams = createRngStreams(state.seed, state.round);
+        const roll = confStreams.events.fork('conf-free').next();
+        if (roll < FILLER_CONFERENCE_FREE_DEAL_CHANCE) {
+          const confInflation = calculateDealInflation(state.round, state.duration, state.dealInflationState);
+          const deal = generateSMBBrokerDeal(state.round, state.maxRounds, confStreams.deals.fork('conf-free-deal'), confInflation);
+          set({
+            dealPipeline: [...state.dealPipeline, { ...deal, heat: 'warm' as const }],
+            currentEvent: null,
+            eventHistory: [...state.eventHistory, state.currentEvent],
+          });
+        } else {
+          set({
+            currentEvent: null,
+            eventHistory: [...state.eventHistory, state.currentEvent],
+          });
+        }
+      },
+
+      fillerAuditFull: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'filler_operational_audit') return;
+        const costMatch = state.currentEvent.effect.match(/Pay \$([0-9.]+[KM]?)/);
+        const cost = costMatch ? parseInt(costMatch[1].replace('K', '')) : randomInt(FILLER_AUDIT_COST_MIN, FILLER_AUDIT_COST_MAX);
+        if (state.cash < cost) return;
+        const auditStreams = createRngStreams(state.seed, state.round);
+        const auditRng = auditStreams.events.fork('audit-full');
+        const roll = auditRng.next();
+        const activeBusinesses = state.businesses.filter(b => b.status === 'active');
+        if (activeBusinesses.length === 0) {
+          set({ cash: state.cash - cost, currentEvent: null, eventHistory: [...state.eventHistory, state.currentEvent] });
+          return;
+        }
+        const targetBiz = activeBusinesses[Math.floor(auditRng.next() * activeBusinesses.length)];
+        let businesses = state.businesses;
+        let cashAdjust = -cost;
+        if (roll < FILLER_AUDIT_SUCCESS_CHANCE) {
+          // Success: +1.5ppt permanent margin
+          businesses = businesses.map(b =>
+            b.id === targetBiz.id ? { ...b, ebitdaMargin: clampMargin(b.ebitdaMargin + FILLER_AUDIT_MARGIN_BOOST) } : b
+          );
+        } else if (roll < FILLER_AUDIT_SUCCESS_CHANCE + FILLER_AUDIT_ISSUE_CHANCE) {
+          // Compliance issue: -$100K, -1ppt for 1 round
+          cashAdjust -= FILLER_AUDIT_ISSUE_COST;
+          businesses = businesses.map(b =>
+            b.id === targetBiz.id ? { ...b, ebitdaMargin: clampMargin(b.ebitdaMargin - FILLER_AUDIT_ISSUE_MARGIN_HIT) } : b
+          );
+        }
+        // Remaining probability: nothing extra happens (just the cost)
+        set({
+          cash: state.cash + cashAdjust,
+          businesses,
+          currentEvent: null,
+          eventHistory: [...state.eventHistory, state.currentEvent],
+        });
+      },
+
+      fillerAuditLight: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'filler_operational_audit') return;
+        const auditStreams = createRngStreams(state.seed, state.round);
+        const roll = auditStreams.events.fork('audit-light').next();
+        const activeBusinesses = state.businesses.filter(b => b.status === 'active');
+        if (roll < FILLER_AUDIT_LIGHT_CHANCE && activeBusinesses.length > 0) {
+          const rngPick = auditStreams.events.fork('audit-light-pick');
+          const targetBiz = activeBusinesses[Math.floor(rngPick.next() * activeBusinesses.length)];
+          const businesses = state.businesses.map(b =>
+            b.id === targetBiz.id ? { ...b, ebitdaMargin: clampMargin(b.ebitdaMargin + FILLER_AUDIT_LIGHT_MARGIN_BOOST) } : b
+          );
+          set({ businesses, currentEvent: null, eventHistory: [...state.eventHistory, state.currentEvent] });
+        } else {
+          set({ currentEvent: null, eventHistory: [...state.eventHistory, state.currentEvent] });
+        }
+      },
+
+      fillerReputationInvest: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'filler_reputation_building') return;
+        const costMatch = state.currentEvent.effect.match(/Pay \$([0-9.]+[KM]?)/);
+        const cost = costMatch ? parseInt(costMatch[1].replace('K', '')) : randomInt(FILLER_REPUTATION_COST_MIN, FILLER_REPUTATION_COST_MAX);
+        if (state.cash < cost) return;
+        set({
+          cash: state.cash - cost,
+          nextAcquisitionHeatReduction: FILLER_REPUTATION_HEAT_REDUCTION,
+          currentEvent: null,
+          eventHistory: [...state.eventHistory, state.currentEvent],
+        });
+      },
+
+      fillerReputationFree: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'filler_reputation_building') return;
+        const repStreams = createRngStreams(state.seed, state.round);
+        const repInflation = calculateDealInflation(state.round, state.duration, state.dealInflationState);
+        const deal = generateSMBBrokerDeal(state.round, state.maxRounds, repStreams.deals.fork('rep-free'), repInflation);
+        set({
+          dealPipeline: [...state.dealPipeline, { ...deal, heat: 'warm' as const }],
+          currentEvent: null,
+          eventHistory: [...state.eventHistory, state.currentEvent],
+        });
+      },
+
+      fillerPass: () => {
+        const state = get();
+        if (!state.currentEvent) return;
+        set({
+          currentEvent: null,
+          eventHistory: [...state.eventHistory, state.currentEvent],
         });
       },
 
@@ -4144,7 +4388,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v31', // v31: Family Office V2 — real holdco mechanics, Pro Sports sector
+      name: 'holdco-tycoon-save-v32', // v32: Early-game UX & Event System Overhaul — SMB broker, quiet year cap, filler events, pipeline safety net
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -4210,6 +4454,7 @@ export const useGameStore = create<GameStore>()(
         ipoState: state.ipoState,
         familyOfficeState: state.familyOfficeState,
         isFamilyOfficeMode: state.isFamilyOfficeMode,
+        nextAcquisitionHeatReduction: state.nextAcquisitionHeatReduction,
       }),
       onRehydrateStorage: () => (state) => {
         if (state && state.holdcoName) {

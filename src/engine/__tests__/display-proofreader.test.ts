@@ -72,6 +72,32 @@ import {
   BUYER_PREMIUM_EBITDA_CAP,
   BUYER_PREMIUM_MAX,
   EQUITY_ISSUANCE_SENTIMENT_PENALTY,
+  SMB_BROKER_COST,
+  SMB_BROKER_CHEAP_SECTORS,
+  SMB_BROKER_QUALITY_WEIGHTS,
+  QUIET_YEAR_CAP_QUICK,
+  QUIET_YEAR_CAP_STANDARD,
+  EARLY_GAME_SAFETY_NET_MAX_ROUND,
+  EARLY_GAME_AFFORDABLE_THRESHOLD,
+  FILLER_TAX_STRATEGY_COST_MIN,
+  FILLER_TAX_STRATEGY_COST_MAX,
+  FILLER_TAX_STRATEGY_MARGIN_BOOST,
+  FILLER_TAX_STRATEGY_DURATION,
+  FILLER_TAX_STRATEGY_WRITEOFF,
+  FILLER_CONFERENCE_COST_MIN,
+  FILLER_CONFERENCE_COST_MAX,
+  FILLER_CONFERENCE_FREE_DEAL_CHANCE,
+  FILLER_AUDIT_COST_MIN,
+  FILLER_AUDIT_COST_MAX,
+  FILLER_AUDIT_SUCCESS_CHANCE,
+  FILLER_AUDIT_MARGIN_BOOST,
+  FILLER_AUDIT_ISSUE_CHANCE,
+  FILLER_AUDIT_ISSUE_COST,
+  FILLER_AUDIT_LIGHT_CHANCE,
+  FILLER_AUDIT_LIGHT_MARGIN_BOOST,
+  FILLER_REPUTATION_COST_MIN,
+  FILLER_REPUTATION_COST_MAX,
+  FILLER_REPUTATION_HEAT_REDUCTION,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
 import {
@@ -81,6 +107,7 @@ import {
   earnoutTargetLabel,
   earnoutCountdownLabel,
   BANNED_COPY_PATTERNS,
+  SMB_BROKER_LABELS,
 } from '../../data/mechanicsCopy';
 import { getStructureLabel } from '../deals';
 
@@ -1714,6 +1741,140 @@ describe('Display Proofreader', () => {
       const buyers = readComponent('engine/buyers.ts');
       expect(buyers).toContain('mega_pe');
       expect(buyers).toContain('strategic_public');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // SMALL BUSINESS BROKER
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Small Business Broker', () => {
+    it('SMB_BROKER_COST = 75 ($75K)', () => {
+      expect(SMB_BROKER_COST).toBe(75);
+    });
+
+    it('SMB_BROKER_CHEAP_SECTORS has 5 sectors', () => {
+      expect(SMB_BROKER_CHEAP_SECTORS).toHaveLength(5);
+      expect(SMB_BROKER_CHEAP_SECTORS).toContain('agency');
+      expect(SMB_BROKER_CHEAP_SECTORS).toContain('homeServices');
+      expect(SMB_BROKER_CHEAP_SECTORS).toContain('b2bServices');
+      expect(SMB_BROKER_CHEAP_SECTORS).toContain('education');
+      expect(SMB_BROKER_CHEAP_SECTORS).toContain('autoServices');
+    });
+
+    it('SMB_BROKER_QUALITY_WEIGHTS: 20% Q1, 30% Q2, 50% Q3', () => {
+      expect(SMB_BROKER_QUALITY_WEIGHTS[1]).toBe(0.20);
+      expect(SMB_BROKER_QUALITY_WEIGHTS[2]).toBe(0.30);
+      expect(SMB_BROKER_QUALITY_WEIGHTS[3]).toBe(0.50);
+    });
+
+    it('SMB_BROKER_LABELS has name and behavior (Strategy A)', () => {
+      expect(SMB_BROKER_LABELS.name).toBe('Small Business Broker');
+      expect(SMB_BROKER_LABELS.behavior).toContain('$75K');
+      expect(SMB_BROKER_LABELS.behavior).toContain('micro-tier');
+    });
+
+    it('AllocatePhase contains broker button with green border (Strategy B)', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('Hire Small Biz Broker');
+      expect(allocate).toContain('border-green');
+    });
+
+    it('UserManualModal documents Small Business Broker (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Small Business Broker');
+      expect(manual).toContain('$75K');
+    });
+
+    it('businesses.ts has generateSMBBrokerDeal function (Strategy B)', () => {
+      const businesses = readComponent('engine/businesses.ts');
+      expect(businesses).toContain('generateSMBBrokerDeal');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // QUIET YEAR CAP & FILLER EVENTS
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Quiet Year Cap & Filler Events', () => {
+    it('QUIET_YEAR_CAP_QUICK = 2, QUIET_YEAR_CAP_STANDARD = 4', () => {
+      expect(QUIET_YEAR_CAP_QUICK).toBe(2);
+      expect(QUIET_YEAR_CAP_STANDARD).toBe(4);
+    });
+
+    it('Filler Tax Strategy constants are calibrated', () => {
+      expect(FILLER_TAX_STRATEGY_COST_MIN).toBe(150);
+      expect(FILLER_TAX_STRATEGY_COST_MAX).toBe(250);
+      expect(FILLER_TAX_STRATEGY_MARGIN_BOOST).toBe(0.01);
+      expect(FILLER_TAX_STRATEGY_DURATION).toBe(2);
+      expect(FILLER_TAX_STRATEGY_WRITEOFF).toBe(50);
+    });
+
+    it('Filler Conference constants are calibrated', () => {
+      expect(FILLER_CONFERENCE_COST_MIN).toBe(100);
+      expect(FILLER_CONFERENCE_COST_MAX).toBe(150);
+      expect(FILLER_CONFERENCE_FREE_DEAL_CHANCE).toBe(0.40);
+    });
+
+    it('Filler Audit constants are calibrated', () => {
+      expect(FILLER_AUDIT_COST_MIN).toBe(200);
+      expect(FILLER_AUDIT_COST_MAX).toBe(350);
+      expect(FILLER_AUDIT_SUCCESS_CHANCE).toBe(0.40);
+      expect(FILLER_AUDIT_MARGIN_BOOST).toBe(0.015);
+      expect(FILLER_AUDIT_ISSUE_CHANCE).toBe(0.15);
+      expect(FILLER_AUDIT_ISSUE_COST).toBe(100);
+      expect(FILLER_AUDIT_LIGHT_CHANCE).toBe(0.30);
+      expect(FILLER_AUDIT_LIGHT_MARGIN_BOOST).toBe(0.005);
+    });
+
+    it('Filler Reputation constants are calibrated', () => {
+      expect(FILLER_REPUTATION_COST_MIN).toBe(100);
+      expect(FILLER_REPUTATION_COST_MAX).toBe(200);
+      expect(FILLER_REPUTATION_HEAT_REDUCTION).toBe(1);
+    });
+
+    it('UserManualModal mentions quiet year cap (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Capped');
+    });
+
+    it('simulation.ts has isQuietYearCapped helper (Strategy B)', () => {
+      const sim = readComponent('engine/simulation.ts');
+      expect(sim).toContain('isQuietYearCapped');
+    });
+
+    it('simulation.ts has generateFillerEvent function (Strategy B)', () => {
+      const sim = readComponent('engine/simulation.ts');
+      expect(sim).toContain('generateFillerEvent');
+    });
+
+    it('events.ts has FILLER_EVENTS array (Strategy B)', () => {
+      const events = readComponent('data/events.ts');
+      expect(events).toContain('FILLER_EVENTS');
+      expect(events).toContain('filler_tax_strategy');
+      expect(events).toContain('filler_industry_conference');
+      expect(events).toContain('filler_operational_audit');
+      expect(events).toContain('filler_reputation_building');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // EARLY-GAME PIPELINE SAFETY NET
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Early-Game Pipeline Safety Net', () => {
+    it('EARLY_GAME_SAFETY_NET_MAX_ROUND = 3', () => {
+      expect(EARLY_GAME_SAFETY_NET_MAX_ROUND).toBe(3);
+    });
+
+    it('EARLY_GAME_AFFORDABLE_THRESHOLD = 2 (cash multiplier)', () => {
+      expect(EARLY_GAME_AFFORDABLE_THRESHOLD).toBe(2);
+    });
+
+    it('businesses.ts contains safety net logic (Strategy B)', () => {
+      const businesses = readComponent('engine/businesses.ts');
+      expect(businesses).toContain('EARLY_GAME_SAFETY_NET_MAX_ROUND');
+      expect(businesses).toContain('EARLY_GAME_AFFORDABLE_THRESHOLD');
     });
   });
 });

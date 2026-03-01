@@ -91,6 +91,12 @@ export const FEATURE_REGISTRY = {
 
   // Scoring (1)
   scoring_completed: 'scoring_completed',
+
+  // SMB Broker & Early Game (4)
+  smb_broker_used: 'smb_broker_used',
+  quiet_year_capped: 'quiet_year_capped',
+  filler_event_choice: 'filler_event_choice',
+  early_game_safety_net: 'early_game_safety_net',
 } as const;
 
 export type FeatureKey = keyof typeof FEATURE_REGISTRY;

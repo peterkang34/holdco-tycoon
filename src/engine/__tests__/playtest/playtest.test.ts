@@ -90,6 +90,10 @@ describe.each(MODES)('$label Playtest', ({ difficulty, duration }) => {
       'family_office_entered',
       'succession_choice',
       'legacy_scored',
+      // SMB broker is a store-level action not exercised by simulator strategies
+      'smb_broker_used',
+      // Early-game safety net requires Normal mode rounds 1-3 + specific pipeline RNG
+      'early_game_safety_net',
     ];
 
     for (const strategy of strategies) {

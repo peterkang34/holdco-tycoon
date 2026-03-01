@@ -347,7 +347,11 @@ export type EventType =
   | 'portfolio_seller_deception'
   | 'portfolio_working_capital_crunch'
   | 'sector_consolidation_boom'
-  | 'portfolio_management_succession';
+  | 'portfolio_management_succession'
+  | 'filler_tax_strategy'
+  | 'filler_industry_conference'
+  | 'filler_operational_audit'
+  | 'filler_reputation_building';
 
 export interface EventChoice {
   label: string;
@@ -573,6 +577,9 @@ export interface GameState {
   // Family Office mode (reuses GameScreen with holdco mechanics)
   isFamilyOfficeMode?: boolean;
 
+  // Reputation building: next acquisition gets heat reduction
+  nextAcquisitionHeatReduction?: number;
+
   // 20-Year Mode features
   dealInflationState: DealInflationState;
   ipoState: IPOState | null;
@@ -605,7 +612,8 @@ export type GameActionType =
   | 'unlock_turnaround_tier'
   | 'start_turnaround'
   | 'turnaround_resolved'
-  | 'ipo';
+  | 'ipo'
+  | 'smb_broker';
 
 export interface GameAction {
   type: GameActionType;

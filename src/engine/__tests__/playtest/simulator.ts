@@ -441,6 +441,10 @@ function simulateCollectToEvent(state: GameState, coverage: PlaytestCoverage): G
     } else if (event.type === 'sector_event' || event.type === 'sector_consolidation_boom') {
       coverage.record('event_sector', state.round);
     }
+    if (event.type.startsWith('filler_')) {
+      coverage.record('quiet_year_capped', state.round);
+      coverage.record('filler_event_choice', state.round);
+    }
   }
 
   // Referral deal injection
@@ -629,6 +633,15 @@ function simulateAllocatePhase(
     state.ipoState ?? null,
     state.requiresRestructuring || state.covenantBreachRounds >= 1,
   );
+
+  // Early-game safety net: Normal mode, rounds 1-3, check for brokered micro deals
+  if (
+    state.difficulty === 'normal' &&
+    state.round <= 3 &&
+    pipeline.some(d => d.source === 'brokered' && d.business.ebitda <= 500)
+  ) {
+    coverage.record('early_game_safety_net', state.round);
+  }
 
   let gameState = {
     ...state,
@@ -970,6 +983,11 @@ function simulateAllocatePhase(
       ],
     };
     gameState.totalDebt = computeTotalDebt(gameState.businesses, gameState.holdcoLoanBalance);
+  }
+
+  // Track SMB broker usage
+  if (gameState.actionsThisRound.some(a => a.type === 'smb_broker')) {
+    coverage.record('smb_broker_used', state.round);
   }
 
   return {

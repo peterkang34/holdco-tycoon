@@ -110,6 +110,12 @@
     transform: scale(0.97);
   }
 
+  .btn-secondary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+  }
+
   .metric-positive {
     color: var(--color-accent);
   }

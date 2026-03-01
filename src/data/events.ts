@@ -1328,6 +1328,39 @@ export const SECTOR_EVENTS: SectorEventDefinition[] = [
   },
 ];
 
+// ── Filler Events (replace Quiet Year when cap is reached) ──
+
+export const FILLER_EVENTS: EventDefinition[] = [
+  {
+    type: 'filler_tax_strategy',
+    title: 'Tax Strategy Opportunity',
+    description: 'Your accountant identifies a tax optimization strategy that could improve margins at your lowest-performing business.',
+    probability: 0,
+    effectDescription: 'Pay $150-250K for +1ppt margin on lowest-margin opco for 2 rounds, take $50K write-off, or pass',
+  },
+  {
+    type: 'filler_industry_conference',
+    title: 'Industry Conference',
+    description: 'A major industry conference is coming up. It could be a chance to source a deal or build relationships.',
+    probability: 0,
+    effectDescription: 'Pay $100-150K for 1 micro deal (warm), send team free (40% chance of deal), or skip',
+  },
+  {
+    type: 'filler_operational_audit',
+    title: 'Operational Audit',
+    description: 'A consulting firm offers a deep operational review of one of your businesses. Results could be great — or reveal hidden problems.',
+    probability: 0,
+    effectDescription: 'Pay $200-350K: 40% chance +1.5ppt margin (permanent), 15% risk of compliance issue. Light review (free, 30% chance +0.5ppt). Or decline.',
+  },
+  {
+    type: 'filler_reputation_building',
+    title: 'Reputation Building',
+    description: 'An opportunity to invest in your reputation as a buyer. Good reputation means better deal terms.',
+    probability: 0,
+    effectDescription: 'Pay $100-200K for -1 heat tier on next acquisition, host free networking event (adds 1 warm deal), or pass',
+  },
+];
+
 export function getEventsForSector(sectorId: SectorId): SectorEventDefinition[] {
   return SECTOR_EVENTS.filter(event => event.sectorId === sectorId);
 }

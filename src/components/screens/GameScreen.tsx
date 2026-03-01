@@ -139,6 +139,16 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     upgradeMASourcing,
     toggleMASourcing,
     proactiveOutreach,
+    smbBrokerDealFlow,
+    fillerTaxInvest,
+    fillerTaxWriteoff,
+    fillerConferenceAttend,
+    fillerConferenceFree,
+    fillerAuditFull,
+    fillerAuditLight,
+    fillerReputationInvest,
+    fillerReputationFree,
+    fillerPass,
     forgeIntegratedPlatform,
     addToIntegratedPlatform,
     sellPlatform,
@@ -223,6 +233,16 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       case 'successionInvest': successionInvest(); break;
       case 'successionPromote': successionPromote(); break;
       case 'successionSell': successionSell(); break;
+      // Filler event choices
+      case 'fillerTaxInvest': fillerTaxInvest(); break;
+      case 'fillerTaxWriteoff': fillerTaxWriteoff(); break;
+      case 'fillerConferenceAttend': fillerConferenceAttend(); break;
+      case 'fillerConferenceFree': fillerConferenceFree(); break;
+      case 'fillerAuditFull': fillerAuditFull(); break;
+      case 'fillerAuditLight': fillerAuditLight(); break;
+      case 'fillerReputationInvest': fillerReputationInvest(); break;
+      case 'fillerReputationFree': fillerReputationFree(); break;
+      case 'fillerPass': fillerPass(); break;
     }
     // Only advance if the action succeeded (cleared currentEvent)
     // If it failed (e.g., insufficient cash), event stays on screen
@@ -472,6 +492,15 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       type: 'info',
     });
   }, [proactiveOutreach, addToast]);
+
+  const handleSMBBroker = useCallback(() => {
+    smbBrokerDealFlow();
+    addToast({
+      message: 'Small biz broker hired',
+      detail: '1 micro deal sourced — $75K',
+      type: 'info',
+    });
+  }, [smbBrokerDealFlow, addToast]);
 
   const handleForgePlatform = useCallback((recipeId: string, businessIds: string[], platformName: string, cost: number) => {
     forgeIntegratedPlatform(recipeId, businessIds);
@@ -817,6 +846,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
 
             onImprove={handleImprove}
             onEndRound={endRound}
+            onSMBBroker={handleSMBBroker}
             onSourceDeals={handleSourceDeals}
             maFocus={maFocus}
             onSetMAFocus={setMAFocus}

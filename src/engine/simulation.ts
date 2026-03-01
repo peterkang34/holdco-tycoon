@@ -20,7 +20,7 @@ import {
 } from './types';
 import type { SeededRng } from './rng';
 import { SECTORS } from '../data/sectors';
-import { GLOBAL_EVENTS, PORTFOLIO_EVENTS, SECTOR_EVENTS, SectorEventDefinition } from '../data/events';
+import { GLOBAL_EVENTS, PORTFOLIO_EVENTS, SECTOR_EVENTS, SectorEventDefinition, FILLER_EVENTS } from '../data/events';
 import {
   calculateSizeTierPremium,
   calculateDeRiskingPremium,
@@ -83,6 +83,22 @@ import {
   SUCCESSION_QUALITY_DROP,
   SUCCESSION_SELL_DISCOUNT,
   SUCCESSION_PROB,
+  QUIET_YEAR_CAP_QUICK,
+  QUIET_YEAR_CAP_STANDARD,
+  FILLER_TAX_STRATEGY_COST_MIN,
+  FILLER_TAX_STRATEGY_COST_MAX,
+  FILLER_TAX_STRATEGY_DURATION,
+  FILLER_TAX_STRATEGY_WRITEOFF,
+  FILLER_CONFERENCE_COST_MIN,
+  FILLER_CONFERENCE_COST_MAX,
+  FILLER_CONFERENCE_FREE_DEAL_CHANCE,
+  FILLER_AUDIT_COST_MIN,
+  FILLER_AUDIT_COST_MAX,
+  FILLER_AUDIT_SUCCESS_CHANCE,
+  FILLER_AUDIT_ISSUE_CHANCE,
+  FILLER_AUDIT_LIGHT_CHANCE,
+  FILLER_REPUTATION_COST_MIN,
+  FILLER_REPUTATION_COST_MAX,
 } from '../data/gameConfig';
 import { getPlatformMultipleExpansion, getPlatformRecessionModifier } from './platforms';
 import { getTurnaroundExitPremium } from './turnarounds';
@@ -642,6 +658,107 @@ export function applyOrganicGrowth(
   };
 }
 
+/** Check if the quiet year cap has been reached for this game */
+function isQuietYearCapped(state: GameState): boolean {
+  const cap = state.maxRounds <= 10 ? QUIET_YEAR_CAP_QUICK : QUIET_YEAR_CAP_STANDARD;
+  const quietCount = state.eventHistory.filter(e => e.type === 'global_quiet').length;
+  return quietCount >= cap;
+}
+
+/** Generate a filler event (choice-based) when quiet year is capped */
+function generateFillerEvent(state: GameState, rng?: SeededRng): GameEvent {
+  const activeBusinesses = state.businesses.filter(b => b.status === 'active');
+  // Filter filler events to avoid repeats
+  const usedFillerTypes = new Set(
+    state.eventHistory
+      .filter(e => e.type.startsWith('filler_'))
+      .map(e => e.type)
+  );
+  const eligible = FILLER_EVENTS.filter(e => !usedFillerTypes.has(e.type));
+  const pool = eligible.length > 0 ? eligible : FILLER_EVENTS; // If all used, allow repeats
+
+  const chosen = pickRandom(pool, rng)!;
+  const round = state.round;
+
+  switch (chosen.type) {
+    case 'filler_tax_strategy': {
+      const cost = randomInt(FILLER_TAX_STRATEGY_COST_MIN, FILLER_TAX_STRATEGY_COST_MAX, rng);
+      const lowestMarginBiz = activeBusinesses.length > 0
+        ? activeBusinesses.reduce((a, b) => a.ebitdaMargin < b.ebitdaMargin ? a : b)
+        : null;
+      const bizName = lowestMarginBiz?.name ?? 'your business';
+      return {
+        id: `event_${round}_filler_tax`,
+        type: 'filler_tax_strategy',
+        title: chosen.title,
+        description: `${chosen.description} A tax consultant proposes optimizing ${bizName}'s structure.`,
+        effect: `Pay ${formatMoney(cost)} for +1ppt margin on ${bizName} for ${FILLER_TAX_STRATEGY_DURATION} rounds, take ${formatMoney(FILLER_TAX_STRATEGY_WRITEOFF)} write-off, or pass`,
+        affectedBusinessId: lowestMarginBiz?.id,
+        choices: [
+          { label: `Invest ${formatMoney(cost)}`, description: `+1ppt margin on ${bizName} for ${FILLER_TAX_STRATEGY_DURATION} rounds`, action: 'fillerTaxInvest', variant: 'positive' as const },
+          { label: `Write-off ${formatMoney(FILLER_TAX_STRATEGY_WRITEOFF)}`, description: `Receive ${formatMoney(FILLER_TAX_STRATEGY_WRITEOFF)} tax write-off`, action: 'fillerTaxWriteoff', variant: 'neutral' as const },
+          { label: 'Pass', description: 'No action', action: 'fillerPass', variant: 'negative' as const },
+        ],
+      };
+    }
+    case 'filler_industry_conference': {
+      const cost = randomInt(FILLER_CONFERENCE_COST_MIN, FILLER_CONFERENCE_COST_MAX, rng);
+      return {
+        id: `event_${round}_filler_conference`,
+        type: 'filler_industry_conference',
+        title: chosen.title,
+        description: chosen.description,
+        effect: `Pay ${formatMoney(cost)} for 1 micro deal (warm heat), send team for free (${Math.round(FILLER_CONFERENCE_FREE_DEAL_CHANCE * 100)}% chance of deal), or skip`,
+        choices: [
+          { label: `Attend ${formatMoney(cost)}`, description: '1 guaranteed micro deal (warm heat)', action: 'fillerConferenceAttend', variant: 'positive' as const },
+          { label: 'Send Team (Free)', description: `${Math.round(FILLER_CONFERENCE_FREE_DEAL_CHANCE * 100)}% chance of 1 deal`, action: 'fillerConferenceFree', variant: 'neutral' as const },
+          { label: 'Skip', description: 'No action', action: 'fillerPass', variant: 'negative' as const },
+        ],
+      };
+    }
+    case 'filler_operational_audit': {
+      const cost = randomInt(FILLER_AUDIT_COST_MIN, FILLER_AUDIT_COST_MAX, rng);
+      return {
+        id: `event_${round}_filler_audit`,
+        type: 'filler_operational_audit',
+        title: chosen.title,
+        description: chosen.description,
+        effect: `Pay ${formatMoney(cost)}: ${Math.round(FILLER_AUDIT_SUCCESS_CHANCE * 100)}% chance +1.5ppt margin (permanent), ${Math.round(FILLER_AUDIT_ISSUE_CHANCE * 100)}% risk of compliance issue. Light review (free, ${Math.round(FILLER_AUDIT_LIGHT_CHANCE * 100)}% chance +0.5ppt). Or decline.`,
+        choices: [
+          { label: `Full Audit ${formatMoney(cost)}`, description: `${Math.round(FILLER_AUDIT_SUCCESS_CHANCE * 100)}% +1.5ppt permanent, ${Math.round(FILLER_AUDIT_ISSUE_CHANCE * 100)}% compliance risk`, action: 'fillerAuditFull', variant: 'positive' as const },
+          { label: 'Light Review (Free)', description: `${Math.round(FILLER_AUDIT_LIGHT_CHANCE * 100)}% chance +0.5ppt on 1 opco`, action: 'fillerAuditLight', variant: 'neutral' as const },
+          { label: 'Decline', description: 'No action', action: 'fillerPass', variant: 'negative' as const },
+        ],
+      };
+    }
+    case 'filler_reputation_building': {
+      const cost = randomInt(FILLER_REPUTATION_COST_MIN, FILLER_REPUTATION_COST_MAX, rng);
+      return {
+        id: `event_${round}_filler_reputation`,
+        type: 'filler_reputation_building',
+        title: chosen.title,
+        description: chosen.description,
+        effect: `Pay ${formatMoney(cost)} for -1 heat tier on next acquisition, host free event (adds 1 warm deal), or pass`,
+        choices: [
+          { label: `Invest ${formatMoney(cost)}`, description: 'Next acquisition gets -1 heat tier (better pricing)', action: 'fillerReputationInvest', variant: 'positive' as const },
+          { label: 'Host Event (Free)', description: 'Adds 1 warm deal to pipeline', action: 'fillerReputationFree', variant: 'neutral' as const },
+          { label: 'Pass', description: 'No action', action: 'fillerPass', variant: 'negative' as const },
+        ],
+      };
+    }
+    default: {
+      // Fallback — shouldn't happen
+      return {
+        id: `event_${round}_quiet`,
+        type: 'global_quiet',
+        title: 'Quiet Year',
+        description: 'Markets are stable. Business as usual.',
+        effect: 'No special effects this year',
+      };
+    }
+  }
+}
+
 export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | null {
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
   const sharedServicesBenefits = calculateSharedServicesBenefits(state);
@@ -653,6 +770,10 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
   for (const eventDef of GLOBAL_EVENTS) {
     cumulativeProb += eventDef.probability;
     if (globalRoll < cumulativeProb) {
+      // Quiet year cap: if capped, skip to portfolio/sector events
+      if (eventDef.type === 'global_quiet' && isQuietYearCapped(state)) {
+        break;
+      }
       const isQuickGame = state.maxRounds <= 10;
       let effect = eventDef.effectDescription;
       if (eventDef.type === 'global_credit_tightening') {
@@ -1121,7 +1242,10 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
     }
   }
 
-  // Quiet year
+  // Quiet year — or filler event if cap reached
+  if (isQuietYearCapped(state)) {
+    return generateFillerEvent(state, rng);
+  }
   return {
     id: `event_${state.round}_quiet`,
     type: 'global_quiet',
@@ -1648,6 +1772,10 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
     }
 
     case 'global_quiet':
+    case 'filler_tax_strategy':
+    case 'filler_industry_conference':
+    case 'filler_operational_audit':
+    case 'filler_reputation_building':
     default:
       break;
   }
@@ -1657,7 +1785,9 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
     || event.type === 'portfolio_seller_note_renego' || event.type === 'portfolio_key_man_risk'
     || event.type === 'portfolio_earnout_dispute' || event.type === 'portfolio_supplier_shift'
     || event.type === 'portfolio_seller_deception' || event.type === 'portfolio_working_capital_crunch'
-    || event.type === 'portfolio_management_succession';
+    || event.type === 'portfolio_management_succession'
+    || event.type === 'filler_tax_strategy' || event.type === 'filler_industry_conference'
+    || event.type === 'filler_operational_audit' || event.type === 'filler_reputation_building';
 
   // Attach impacts to the event in state
   newState.currentEvent = !hasChoices && impacts.length > 0

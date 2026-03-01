@@ -12,6 +12,26 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 28, 2026',
+    title: 'Early-Game UX & Event System Overhaul',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Small Business Broker — a new $75K deal-sourcing option available from round 1. Generates 1 micro-tier deal in your focus sector. Automatically disabled once you unlock M&A Sourcing Tier 1 (upgrade path: Small Biz Broker → Source Deals → Proactive Outreach).',
+          '4 new filler events with player choices: Tax Strategy Review (optimize deductions vs. aggressive filing), Industry Conference (network for deals vs. recruit talent vs. skip), Operational Audit (invest in improvements vs. cut costs), and Reputation Building (PR investment vs. community engagement vs. stay quiet).',
+          'Early-game pipeline safety net — Normal mode rounds 1-3 now ensures at least 1 affordable deal appears in the pipeline, preventing dead starts.',
+        ],
+      },
+      {
+        heading: 'Balance Changes',
+        items: [
+          'Quiet Year frequency cap — Quiet Years are now limited to a maximum of 2 per game in 10-year mode and 4 per game in 20-year mode, preventing long stretches of uneventful gameplay.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'February 28, 2026',
     title: 'Family Office V2 — Real Holdco Mechanics',
     sections: [
       {

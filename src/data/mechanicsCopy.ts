@@ -56,6 +56,11 @@ export function earnoutCountdownLabel(yearsLeft: number): string {
   return `${yearsLeft}yr left`;
 }
 
+export const SMB_BROKER_LABELS = {
+  name: 'Small Business Broker',
+  behavior: '$75K for 1 micro-tier deal from a Main Street broker. Available from round 1. Disabled when M&A Sourcing Tier 1 is active.',
+} as const;
+
 export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   pattern: RegExp;
   reason: string;

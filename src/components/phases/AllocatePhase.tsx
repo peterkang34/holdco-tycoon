@@ -52,6 +52,7 @@ const STARTING_SHARES = 1000;
 const DEAL_SOURCING_COST_BASE = 500; // $500k
 const DEAL_SOURCING_COST_TIER1 = 300; // $300k with MA Sourcing Tier 1+
 const PROACTIVE_OUTREACH_COST = 400; // $400k (Tier 3 only)
+const SMB_BROKER_COST_LOCAL = 75; // $75k — Small Business Broker
 
 interface AllocatePhaseProps {
   businesses: Business[];
@@ -95,6 +96,7 @@ interface AllocatePhaseProps {
 
   onImprove: (businessId: string, improvementType: OperationalImprovementType) => void;
   onEndRound: () => void;
+  onSMBBroker: () => void;
   onSourceDeals: () => void;
   maFocus: MAFocus;
   onSetMAFocus: (sectorId: SectorId | null, sizePreference: DealSizePreference, subType?: string | null) => void;
@@ -167,6 +169,7 @@ export function AllocatePhase({
 
   onImprove,
   onEndRound,
+  onSMBBroker,
   onSourceDeals,
   maFocus,
   onSetMAFocus,
@@ -1489,6 +1492,30 @@ export function AllocatePhase({
                 <p className="text-xs text-accent mt-3">
                   Your M&A focus will generate more {SECTORS[maFocus.sectorId].name} deals next year.
                 </p>
+              )}
+
+              {/* Small Business Broker — available before MA Sourcing Tier 1 */}
+              {!(maSourcing.active && maSourcing.tier >= 1) && (
+                <div className="mt-4 pt-4 border-t border-white/10">
+                  <div className="flex items-center justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium">Hire Small Biz Broker</p>
+                      <p className="text-xs text-text-muted">
+                        Source 1 affordable micro deal from a Main Street broker
+                      </p>
+                    </div>
+                    <button
+                      onClick={onSMBBroker}
+                      disabled={cash < SMB_BROKER_COST_LOCAL}
+                      aria-label="Hire Small Business Broker for $75K"
+                      className={`btn-secondary text-sm whitespace-nowrap ${
+                        cash >= SMB_BROKER_COST_LOCAL ? 'border-green-500' : ''
+                      }`}
+                    >
+                      Broker ({formatMoney(SMB_BROKER_COST_LOCAL)})
+                    </button>
+                  </div>
+                </div>
               )}
 
               {/* Source Additional Deals */}

@@ -33,6 +33,8 @@ import {
   DEAL_SIZE_TIERS,
   TIER_PIPELINE_COUNTS,
   FO_QUALITY_FLOOR,
+  EARLY_GAME_SAFETY_NET_MAX_ROUND,
+  EARLY_GAME_AFFORDABLE_THRESHOLD,
 } from '../data/gameConfig';
 import type { DealInflationState, GameDuration, IPOState } from './types';
 import { SECTORS, SECTOR_LIST, SECTOR_LIST_STANDARD } from '../data/sectors';
@@ -1037,6 +1039,7 @@ export function generateDealPipeline(
   ipoState: IPOState | null = null,
   noNewDebt: boolean = false,
   isFamilyOfficeMode: boolean = false,
+  difficulty: 'easy' | 'normal' = 'easy',
 ): Deal[] {
   // Age existing deals first
   let pipeline = currentPipeline.map(deal => ({
@@ -1238,6 +1241,44 @@ export function generateDealPipeline(
       }
       return deal;
     });
+  }
+
+  // Early-game pipeline safety net: Normal mode, rounds 1-3, ensure ≥1 affordable deal
+  if (
+    difficulty === 'normal' &&
+    round <= EARLY_GAME_SAFETY_NET_MAX_ROUND &&
+    !isFamilyOfficeMode &&
+    pipeline.length > 0
+  ) {
+    const affordableThreshold = cash * EARLY_GAME_AFFORDABLE_THRESHOLD;
+    const hasAffordable = pipeline.some(d => d.askingPrice <= affordableThreshold);
+    if (!hasAffordable) {
+      // Find the most expensive deal and replace it with an affordable micro deal
+      let mostExpIdx = 0;
+      for (let i = 1; i < pipeline.length; i++) {
+        if (pipeline[i].askingPrice > pipeline[mostExpIdx].askingPrice) {
+          mostExpIdx = i;
+        }
+      }
+      const cheapSectors: SectorId[] = ['agency', 'homeServices', 'b2bServices', 'education', 'autoServices'];
+      const safetySector = pickRandom(cheapSectors, rng)!;
+      // Q1-Q2 quality only (decent but not gems)
+      const safetyQuality: QualityRating = (rng ? rng.next() : Math.random()) < 0.4 ? 1 : 2;
+      const safetyDeal = generateDealWithSize(
+        safetySector, round, 'micro', 0,
+        { source: 'brokered', maxRounds, dealInflation },
+        rng, 'micro', affordableThreshold,
+      );
+      pipeline[mostExpIdx] = {
+        ...safetyDeal,
+        business: {
+          ...safetyDeal.business,
+          qualityRating: safetyQuality,
+        },
+        heat: 'cold' as DealHeat,
+        source: 'brokered',
+      };
+    }
   }
 
   return pipeline;
@@ -1465,6 +1506,55 @@ export function generateProactiveOutreachDeals(
   }
 
   return deals;
+}
+
+/**
+ * Generate a single micro-tier deal from cheap sectors for the Small Business Broker.
+ * Quality weighted: 20% Q1 / 30% Q2 / 50% Q3. Cold/warm heat only.
+ */
+export function generateSMBBrokerDeal(
+  round: number,
+  maxRounds: number = 20,
+  rng?: SeededRng,
+  dealInflation: number = 0,
+): Deal {
+  const cheapSectors: SectorId[] = ['agency', 'homeServices', 'b2bServices', 'education', 'autoServices'];
+  const sectorId = pickRandom(cheapSectors, rng)!;
+
+  // Weighted quality: 20% Q1, 30% Q2, 50% Q3
+  const qRoll = rng ? rng.next() : Math.random();
+  let quality: QualityRating;
+  if (qRoll < 0.20) quality = 1;
+  else if (qRoll < 0.50) quality = 2;
+  else quality = 3;
+
+  const deal = generateDealWithSize(
+    sectorId,
+    round,
+    'micro',
+    0,
+    {
+      qualityFloor: undefined,
+      source: 'brokered',
+      maxRounds,
+      dealInflation,
+    },
+    rng,
+    'micro',
+    undefined,
+  );
+
+  // Force quality and cap heat at warm
+  const heat: DealHeat = (rng ? rng.next() : Math.random()) < 0.5 ? 'cold' : 'warm';
+  return {
+    ...deal,
+    business: {
+      ...deal.business,
+      qualityRating: quality,
+    },
+    heat,
+    source: 'brokered',
+  };
 }
 
 export function createStartingBusiness(sectorId: SectorId = 'agency', targetEbitdaParam: number = 1000, multipleCap?: number, rng?: SeededRng): Business {
