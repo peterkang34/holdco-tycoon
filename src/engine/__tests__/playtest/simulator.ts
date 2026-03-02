@@ -50,7 +50,7 @@ import { getDistressRestrictions } from '../../distress';
 import { createRngStreams } from '../../rng';
 import { resolveTurnaround, calculateTurnaroundCost, getTurnaroundDuration } from '../../turnarounds';
 import { checkPlatformEligibility, calculateIntegrationCost, forgePlatform } from '../../platforms';
-import { processEarningsResult } from '../../ipo';
+import { processEarningsResult, calculateStockPrice } from '../../ipo';
 
 // Data imports
 import { DIFFICULTY_CONFIG, DURATION_CONFIG, EARNOUT_EXPIRATION_YEARS, COVENANT_BREACH_ROUNDS_THRESHOLD, KEY_MAN_SUCCESSION_ROUNDS, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, MIN_FOUNDER_OWNERSHIP } from '../../../data/gameConfig';
@@ -958,19 +958,29 @@ function simulateAllocatePhase(
     if (!blocked && gameState.cash > 2000) {
       const buybackAmount = Math.round(gameState.cash * 0.1);
       const metrics = calculateMetrics(gameState);
-      if (metrics.intrinsicValuePerShare > 0) {
+      // Branch pricing: public → stock price, private → intrinsic value (mirrors useGame.buybackShares)
+      const isPublicCo = !!gameState.ipoState?.isPublic;
+      const pricePerShare = isPublicCo ? calculateStockPrice(gameState) : metrics.intrinsicValuePerShare;
+      if (pricePerShare > 0) {
         const sharesToBuy = Math.min(
-          Math.round(buybackAmount / metrics.intrinsicValuePerShare),
+          Math.round(buybackAmount / pricePerShare),
           gameState.sharesOutstanding - gameState.founderShares - 1, // Keep at least 1 non-founder share
         );
         if (sharesToBuy > 0) {
           gameState = {
             ...gameState,
-            cash: gameState.cash - Math.round(sharesToBuy * metrics.intrinsicValuePerShare),
+            cash: gameState.cash - Math.round(sharesToBuy * pricePerShare),
             sharesOutstanding: gameState.sharesOutstanding - sharesToBuy,
-            totalBuybacks: gameState.totalBuybacks + Math.round(sharesToBuy * metrics.intrinsicValuePerShare),
+            totalBuybacks: gameState.totalBuybacks + Math.round(sharesToBuy * pricePerShare),
             lastBuybackRound: gameState.round,
           };
+          // Sync IPO state shares after buyback
+          if (isPublicCo && gameState.ipoState) {
+            gameState.ipoState = {
+              ...gameState.ipoState,
+              sharesOutstanding: gameState.sharesOutstanding,
+            };
+          }
           coverage.record('buyback', state.round);
         }
       }

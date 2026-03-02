@@ -45,7 +45,8 @@ function getAdjustedFEV(entry: LeaderboardEntry): number {
   const multiplier = entry.submittedMultiplier
     ?? (difficulty === 'easy' ? 1.0 : 1.35);
   const restructuringPenalty = entry.hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0;
-  return Math.round(raw * multiplier * restructuringPenalty);
+  const foMultiplier = entry.foMultiplier ?? 1.0;
+  return Math.round(raw * multiplier * restructuringPenalty * foMultiplier);
 }
 
 function getEntryDifficulty(entry: LeaderboardEntry): GameDifficulty {

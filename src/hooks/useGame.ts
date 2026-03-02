@@ -925,6 +925,11 @@ export const useGameStore = create<GameStore>()(
           : calculateDealInflation(state.round, state.duration, state.dealInflationState);
 
         // Generate new deals with M&A focus, portfolio synergies, and affordability
+        // Collect owned pro sports sub-types for uniqueness filtering
+        const ownedProSportsSubTypes = state.businesses
+          .filter(b => b.sectorId === 'proSports' && (b.status === 'active' || b.status === 'integrated'))
+          .map(b => b.subType);
+
         const newPipeline = generateDealPipeline(
           state.dealPipeline,
           state.round,
@@ -944,6 +949,7 @@ export const useGameStore = create<GameStore>()(
           state.requiresRestructuring || state.covenantBreachRounds >= 1,
           state.isFamilyOfficeMode ?? false,
           state.difficulty,
+          ownedProSportsSubTypes,
         );
 
         // Inject distressed deals during Financial Crisis (bypass MAX_DEALS cap)
@@ -1204,6 +1210,14 @@ export const useGameStore = create<GameStore>()(
 
         // Guard: no acquisitions during restructuring
         if (state.requiresRestructuring) return;
+
+        // Guard: only one of each pro sports franchise sub-type allowed
+        if (deal.business.sectorId === 'proSports') {
+          const ownedSubTypes = state.businesses
+            .filter(b => b.sectorId === 'proSports' && (b.status === 'active' || b.status === 'integrated'))
+            .map(b => b.subType);
+          if (ownedSubTypes.includes(deal.business.subType)) return;
+        }
 
         // Enforce distress restrictions — covenant breach blocks new acquisitions
         const restrictions = getDistressRestrictions(calculateMetrics(state).distressLevel);
@@ -2267,13 +2281,26 @@ export const useGameStore = create<GameStore>()(
 
         trackFeatureUsed('buyback', state.round);
 
+        const isPublic = !!state.ipoState?.isPublic;
+
         const metrics = calculateMetrics(state);
         // Enforce distress restrictions — covenant breach blocks buybacks
         const restrictions = getDistressRestrictions(metrics.distressLevel);
         if (!restrictions.canBuyback) return;
         // M-5: Guard against division by zero or negative intrinsic value
         if (metrics.intrinsicValuePerShare <= 0) return;
-        let sharesRepurchased = Math.round((amount / metrics.intrinsicValuePerShare) * 1000) / 1000;
+
+        // Branch pricing: public → stock price, private → intrinsic value (mirrors issueEquity)
+        let effectivePrice: number;
+        if (isPublic) {
+          const stockPrice = calculateStockPrice(state);
+          if (stockPrice <= 0) return;
+          effectivePrice = stockPrice;
+        } else {
+          effectivePrice = metrics.intrinsicValuePerShare;
+        }
+
+        let sharesRepurchased = Math.round((amount / effectivePrice) * 1000) / 1000;
 
         // Can only buy back non-founder shares (outside investors' shares)
         const outsideShares = state.sharesOutstanding - state.founderShares;
@@ -2289,13 +2316,23 @@ export const useGameStore = create<GameStore>()(
         }
         const newFounderOwnership = state.founderShares / newTotalShares;
 
-        const buybackState = {
+        const buybackState: typeof state = {
           ...state,
           cash: state.cash - amount,
           sharesOutstanding: newTotalShares,
           totalBuybacks: state.totalBuybacks + amount,
           lastBuybackRound: state.round,
         };
+
+        // Post-IPO: sync IPO state shares and recalculate stock price
+        if (isPublic && buybackState.ipoState) {
+          buybackState.ipoState = {
+            ...buybackState.ipoState,
+            sharesOutstanding: newTotalShares,
+          };
+          buybackState.ipoState.stockPrice = calculateStockPrice(buybackState);
+        }
+
         set({
           ...buybackState,
           actionsThisRound: [
@@ -3432,7 +3469,7 @@ export const useGameStore = create<GameStore>()(
         const priorSourceCount = state.actionsThisRound.filter(a => a.type === 'source_deals').length;
         const srcStreams = createRngStreams(state.seed, state.round);
         const srcInflation = calculateDealInflation(state.round, state.duration, state.dealInflationState);
-        const newDeals = generateSourcedDeals(
+        let newDeals = generateSourcedDeals(
           state.round,
           state.maFocus,
           focusBonus?.focusGroup,
@@ -3446,6 +3483,17 @@ export const useGameStore = create<GameStore>()(
           state.ipoState ?? null,
           state.requiresRestructuring || state.covenantBreachRounds >= 1,
         );
+
+        // Filter out pro sports deals for sub-types the player already owns
+        const srcOwnedProSports = state.businesses
+          .filter(b => b.sectorId === 'proSports' && (b.status === 'active' || b.status === 'integrated'))
+          .map(b => b.subType);
+        if (srcOwnedProSports.length > 0) {
+          newDeals = newDeals.filter(d =>
+            d.business.sectorId !== 'proSports' ||
+            !srcOwnedProSports.includes(d.business.subType)
+          );
+        }
 
         const srcState = { ...state, cash: state.cash - cost };
         set({
@@ -3550,6 +3598,7 @@ export const useGameStore = create<GameStore>()(
           [], 1, undefined, undefined, undefined, 0,
           FO_MA_SOURCING_TIER, true, undefined, FO_MAX_ROUNDS,
           false, round1Streams.deals, FO_DEAL_INFLATION, foStartingCash, null, false, true, state.difficulty,
+          [], // no owned pro sports yet at FO start
         );
 
         set({
@@ -3760,7 +3809,7 @@ export const useGameStore = create<GameStore>()(
         const priorOutreachCount = state.actionsThisRound.filter(a => a.type === 'proactive_outreach').length;
         const outStreams = createRngStreams(state.seed, state.round);
         const outInflation = calculateDealInflation(state.round, state.duration, state.dealInflationState);
-        const newDeals = generateProactiveOutreachDeals(
+        let newDeals = generateProactiveOutreachDeals(
           state.round,
           state.maFocus,
           totalPortfolioEbitda,
@@ -3772,6 +3821,17 @@ export const useGameStore = create<GameStore>()(
           state.ipoState ?? null,
           state.requiresRestructuring || state.covenantBreachRounds >= 1,
         );
+
+        // Filter out pro sports deals for sub-types the player already owns
+        const outOwnedProSports = state.businesses
+          .filter(b => b.sectorId === 'proSports' && (b.status === 'active' || b.status === 'integrated'))
+          .map(b => b.subType);
+        if (outOwnedProSports.length > 0) {
+          newDeals = newDeals.filter(d =>
+            d.business.sectorId !== 'proSports' ||
+            !outOwnedProSports.includes(d.business.subType)
+          );
+        }
 
         const outState = { ...state, cash: state.cash - PROACTIVE_OUTREACH_COST };
         set({

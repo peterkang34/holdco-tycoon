@@ -1095,6 +1095,7 @@ export function generateDealPipeline(
   noNewDebt: boolean = false,
   isFamilyOfficeMode: boolean = false,
   difficulty: 'easy' | 'normal' = 'easy',
+  ownedProSportsSubTypes: string[] = [],
 ): Deal[] {
   // Age existing deals first
   let pipeline = currentPipeline.map(deal => ({
@@ -1334,6 +1335,14 @@ export function generateDealPipeline(
         source: 'brokered',
       };
     }
+  }
+
+  // Pro Sports uniqueness: remove deals for sub-types the player already owns
+  if (ownedProSportsSubTypes.length > 0) {
+    pipeline = pipeline.filter(deal =>
+      deal.business.sectorId !== 'proSports' ||
+      !ownedProSportsSubTypes.includes(deal.business.subType)
+    );
   }
 
   return pipeline;

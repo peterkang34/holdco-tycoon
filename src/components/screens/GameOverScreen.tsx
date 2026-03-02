@@ -594,7 +594,7 @@ export function GameOverScreen({
       )}
 
       {/* Founder Equity Value - Hero Display */}
-      <div className={`card mb-6 bg-gradient-to-r ${hasRestructured ? 'from-red-900/20 to-orange-900/20 border-red-500/30' : 'from-accent/20 to-accent-secondary/20 border-accent/30'}`}>
+      <div className={`card mb-6 bg-gradient-to-r ${hasRestructured ? 'from-red-900/20 to-orange-900/20 border-red-500/30' : foMultiplier > 1.0 ? 'from-amber-500/10 to-yellow-500/10 border-amber-500/30' : 'from-accent/20 to-accent-secondary/20 border-accent/30'}`}>
         <div className="text-center">
           <p className="text-text-muted text-sm mb-1">
             Founder Equity Value
@@ -603,11 +603,16 @@ export function GameOverScreen({
                 -20% Restructuring
               </span>
             )}
+            {foMultiplier > 1.0 && (
+              <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-amber-900/30 border border-amber-500/50 text-amber-400" title={`Your FEV has been boosted by ${((foMultiplier - 1) * 100).toFixed(0)}% from Family Office performance.`}>
+                +{((foMultiplier - 1) * 100).toFixed(0)}% Family Office
+              </span>
+            )}
           </p>
-          {hasRestructured ? (
+          {hasRestructured || foMultiplier > 1.0 ? (
             <div className="mb-2">
               <p className="text-lg font-mono text-text-muted line-through">{formatMoney(founderEquityValue)}</p>
-              <p className="text-3xl sm:text-5xl font-bold font-mono text-red-400">
+              <p className={`text-3xl sm:text-5xl font-bold font-mono ${hasRestructured ? 'text-red-400' : 'text-amber-400'}`}>
                 {formatMoney(adjustedFEV)}
               </p>
             </div>

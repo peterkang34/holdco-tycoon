@@ -385,6 +385,7 @@ export function AllocatePhase({
   const isPublic = !!ipoState?.isPublic;
   const equityDiscount = isPublic ? 1 : Math.max(1 - EQUITY_DILUTION_STEP * equityRaisesUsed, EQUITY_DILUTION_FLOOR);
   const effectivePricePerShare = isPublic ? (ipoState?.stockPrice ?? 0) : intrinsicValuePerShare * equityDiscount;
+  const buybackPricePerShare = isPublic ? (ipoState?.stockPrice ?? 0) : intrinsicValuePerShare;
   const raiseCooldownBlocked = lastBuybackRound > 0 && round - lastBuybackRound < EQUITY_BUYBACK_COOLDOWN;
   const buybackCooldownBlocked = lastEquityRaiseRound > 0 && round - lastEquityRaiseRound < EQUITY_BUYBACK_COOLDOWN;
   const negativeEquity = intrinsicValuePerShare <= 0;
@@ -2592,7 +2593,7 @@ export function AllocatePhase({
             <div className={`card ${buybackCooldownBlocked || activeBusinesses.length === 0 ? 'opacity-50' : ''}`}>
               <h4 className="font-bold mb-3">Buyback Shares</h4>
               <p className="text-sm text-text-muted mb-2">
-                Repurchase outside investor shares at {formatMoney(intrinsicValuePerShare)}/share.
+                Repurchase outside investor shares at {formatMoney(buybackPricePerShare)}/share{isPublic ? ' (market price)' : ''}.
               </p>
               <p className="text-xs text-text-muted mb-4">
                 Outstanding: {sharesOutstanding.toFixed(0)} total | {(sharesOutstanding - founderShares).toFixed(0)} outside shares
@@ -2649,8 +2650,8 @@ export function AllocatePhase({
                       }
                     } else {
                       const shareCount = parseInt(buybackAmount) || 0;
-                      if (shareCount > 0 && intrinsicValuePerShare > 0) {
-                        const internalAmount = Math.floor(shareCount * intrinsicValuePerShare);
+                      if (shareCount > 0 && buybackPricePerShare > 0) {
+                        const internalAmount = Math.floor(shareCount * buybackPricePerShare);
                         if (internalAmount > 0) {
                           onBuyback(internalAmount);
                           setBuybackAmount('');
@@ -2666,8 +2667,8 @@ export function AllocatePhase({
                     } else {
                       const shareCount = parseInt(buybackAmount) || 0;
                       const outsideShares = sharesOutstanding - founderShares;
-                      const cost = Math.floor(shareCount * intrinsicValuePerShare);
-                      return shareCount < 1 || shareCount > Math.ceil(outsideShares) || cost > cash || intrinsicValuePerShare <= 0;
+                      const cost = Math.floor(shareCount * buybackPricePerShare);
+                      return shareCount < 1 || shareCount > Math.ceil(outsideShares) || cost > cash || buybackPricePerShare <= 0;
                     }
                   })()}
                   className="btn-primary text-sm min-h-[44px]"
@@ -2680,15 +2681,15 @@ export function AllocatePhase({
                 <p className="text-xs text-text-muted mt-1">= {formatMoney(Math.round(parseInt(buybackAmount) / 1000))}</p>
               )}
               {/* Preview for shares mode */}
-              {buybackMode === 'shares' && buybackAmount && parseInt(buybackAmount) >= 1 && intrinsicValuePerShare > 0 && (() => {
+              {buybackMode === 'shares' && buybackAmount && parseInt(buybackAmount) >= 1 && buybackPricePerShare > 0 && (() => {
                 const shareCount = parseInt(buybackAmount) || 0;
-                const cost = Math.floor(shareCount * intrinsicValuePerShare);
+                const cost = Math.floor(shareCount * buybackPricePerShare);
                 return (
-                  <p className="text-xs text-text-muted mt-1">= {formatMoney(cost)} ({shareCount} shares @ {formatMoney(intrinsicValuePerShare)}/share)</p>
+                  <p className="text-xs text-text-muted mt-1">= {formatMoney(cost)} ({shareCount} shares @ {formatMoney(buybackPricePerShare)}/share)</p>
                 );
               })()}
               {/* Detail preview */}
-              {buybackAmount && intrinsicValuePerShare > 0 && (() => {
+              {buybackAmount && buybackPricePerShare > 0 && (() => {
                 let internalAmt: number;
                 if (buybackMode === 'dollars') {
                   const dollars = parseInt(buybackAmount) || 0;
@@ -2697,9 +2698,9 @@ export function AllocatePhase({
                 } else {
                   const shareCount = parseInt(buybackAmount) || 0;
                   if (shareCount < 1) return null;
-                  internalAmt = Math.floor(shareCount * intrinsicValuePerShare);
+                  internalAmt = Math.floor(shareCount * buybackPricePerShare);
                 }
-                const sharesRepurchased = Math.round((internalAmt / intrinsicValuePerShare) * 1000) / 1000;
+                const sharesRepurchased = Math.round((internalAmt / buybackPricePerShare) * 1000) / 1000;
                 const outsideShares = sharesOutstanding - founderShares;
                 const newTotal = sharesOutstanding - Math.min(sharesRepurchased, outsideShares);
                 const newOwnership = founderShares / newTotal * 100;

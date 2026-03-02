@@ -54,8 +54,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       duration,
       founderEquityValue,
       founderPersonalWealth,
+      hasRestructured,
       familyOfficeCompleted,
       legacyGrade,
+      foMultiplier,
     } = body || {};
 
     // initials: 2-4 uppercase alpha chars
@@ -129,7 +131,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // --- Store Entry ---
     const id = randomUUID();
     const multiplier = DIFFICULTY_MULTIPLIER[validDifficulty] ?? 1.0;
-    const adjustedFEV = Math.round(validFEV * multiplier);
+    const restructuringPenalty = hasRestructured === true ? 0.80 : 1.0;
+    const validFoMultiplier = typeof foMultiplier === 'number' && foMultiplier >= 1.0 && foMultiplier <= 1.5 ? foMultiplier : 1.0;
+    const adjustedFEV = Math.round(validFEV * multiplier * restructuringPenalty * validFoMultiplier);
 
     const entry = {
       id,
@@ -141,6 +145,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       difficulty: validDifficulty,
       duration: validDuration,
       submittedMultiplier: multiplier,
+      hasRestructured: hasRestructured === true ? true : undefined,
+      foMultiplier: validFoMultiplier > 1.0 ? validFoMultiplier : undefined,
       score,
       grade,
       businessCount,
