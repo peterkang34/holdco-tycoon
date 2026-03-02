@@ -9,7 +9,7 @@ const NEW_KEY = LEADERBOARD_KEY;
 // Conservative FO multiplier from legacy grade (uses minimum MOIC for each tier)
 // Formula: Math.min(1.50, 1.0 + moic * 0.10)
 const FO_MULTIPLIER_BY_GRADE: Record<string, number> = {
-  'Enduring':    1.35,  // MOIC >= 3.5 → 1.0 + 3.5 * 0.1 = 1.35
+  'Enduring':    1.50,  // MOIC >= 5.0 → cap 1.50 (confirmed by player screenshots)
   'Influential': 1.20,  // MOIC >= 2.0 → 1.0 + 2.0 * 0.1 = 1.20
   'Established': 1.10,  // MOIC >= 1.0 → 1.0 + 1.0 * 0.1 = 1.10
   'Fragile':     1.0,   // MOIC < 1.0  → no bonus
@@ -105,8 +105,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Skip entries that aren't FO completions
           if (!entry.familyOfficeCompleted) { notFO++; continue; }
 
-          // Skip entries that already have foMultiplier set
-          if (typeof entry.foMultiplier === 'number' && entry.foMultiplier > 1.0) { alreadyHas++; continue; }
+          // Skip entries that already have the correct foMultiplier
+          const expectedMult = (typeof entry.legacyGrade === 'string' && FO_MULTIPLIER_BY_GRADE[entry.legacyGrade]) || 1.0;
+          if (typeof entry.foMultiplier === 'number' && entry.foMultiplier >= expectedMult) { alreadyHas++; continue; }
 
           // Derive foMultiplier from legacyGrade
           const grade = entry.legacyGrade;
