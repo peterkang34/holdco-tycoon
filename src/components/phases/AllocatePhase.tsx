@@ -1000,7 +1000,7 @@ export function AllocatePhase({
   };
 
   return (
-    <div ref={scrollContainerRef} className="px-4 sm:px-6 py-6 pb-20 md:pb-8" style={{ overscrollBehavior: 'none' }}>
+    <div ref={scrollContainerRef} className="px-4 sm:px-6 py-6 pb-20 md:pb-16" style={{ overscrollBehavior: 'none' }}>
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-2">
         <div>
@@ -2901,18 +2901,11 @@ export function AllocatePhase({
         </div>
       )}
 
-      {/* End Round Button (desktop) */}
-      <div className="hidden md:flex justify-end">
-        <button onClick={() => setShowEndTurnConfirm(true)} className="btn-primary text-lg px-8">
-          End Year →
-        </button>
-      </div>
-
-      {/* Sticky End Year bar (mobile) */}
+      {/* Sticky bottom bar (mobile) */}
       <div className="fixed bottom-0 left-0 right-0 md:hidden bg-bg-primary/95 backdrop-blur-sm border-t border-white/10 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex items-center justify-between" style={{ touchAction: 'none' }}>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => (scrollContainerRef.current ?? window).scrollTo({ top: 0, behavior: 'smooth' })}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary transition-colors rounded-lg bg-white/5"
             aria-label="Scroll to top"
           >
@@ -2921,6 +2914,32 @@ export function AllocatePhase({
           <span className="text-sm font-mono text-text-secondary">Cash: <span className="text-accent font-bold">{formatMoney(cash)}</span></span>
         </div>
         <button onClick={() => setShowEndTurnConfirm(true)} className="btn-primary text-sm px-4 py-2">
+          End Year {round} →
+        </button>
+      </div>
+
+      {/* Sticky bottom bar (desktop) */}
+      <div className="hidden md:flex fixed bottom-0 left-0 right-0 bg-bg-primary/95 backdrop-blur-sm border-t border-white/10 px-6 py-2.5 z-40 items-center justify-between">
+        <span className="text-sm font-mono text-text-secondary">Cash: <span className="text-accent font-bold">{formatMoney(cash)}</span></span>
+        <div className="flex gap-1.5">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              className={`px-3 py-1.5 rounded-md transition-colors text-xs font-medium ${
+                activeTab === tab.id
+                  ? 'bg-accent text-bg-primary'
+                  : 'text-text-muted hover:text-text-primary hover:bg-white/5'
+              }`}
+            >
+              {tab.label}
+              {tab.badge !== undefined && tab.badge > 0 && (
+                <span className="ml-1 text-[10px] bg-white/20 px-1 py-0.5 rounded-full">{tab.badge}</span>
+              )}
+            </button>
+          ))}
+        </div>
+        <button onClick={() => setShowEndTurnConfirm(true)} className="btn-primary text-sm px-5 py-1.5">
           End Year {round} →
         </button>
       </div>

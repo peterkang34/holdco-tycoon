@@ -23,10 +23,17 @@ export const CHANGELOG: ChangelogEntry[] = [
         ],
       },
       {
+        heading: 'UI Improvements',
+        items: [
+          'New desktop bottom action bar during Allocate phase — always-visible cash, tab shortcuts (with scroll-to-top), and End Year button so you never have to scroll back up.',
+        ],
+      },
+      {
         heading: 'Bug Fixes',
         items: [
           'Fixed equity raises being incorrectly blocked after sourcing deals — metrics now recalculate after every cash-changing action so intrinsic value per share stays accurate.',
           'Equity raise error messages now show the actual reason (negative equity vs. ownership floor vs. cooldown) instead of always blaming the 51% floor.',
+          'Fixed mobile back-to-top button not working — was scrolling a non-scrollable div instead of the window.',
         ],
       },
     ],
