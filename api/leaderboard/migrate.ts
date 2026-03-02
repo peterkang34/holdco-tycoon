@@ -6,12 +6,22 @@ import { verifyAdminToken } from '../_lib/adminAuth.js';
 const OLD_KEY = 'leaderboard:v1';
 const NEW_KEY = LEADERBOARD_KEY;
 
+// Conservative FO multiplier from legacy grade (uses minimum MOIC for each tier)
+// Formula: Math.min(1.50, 1.0 + moic * 0.10)
+const FO_MULTIPLIER_BY_GRADE: Record<string, number> = {
+  'Enduring':    1.35,  // MOIC >= 3.5 → 1.0 + 3.5 * 0.1 = 1.35
+  'Influential': 1.20,  // MOIC >= 2.0 → 1.0 + 2.0 * 0.1 = 1.20
+  'Established': 1.10,  // MOIC >= 1.0 → 1.0 + 1.0 * 0.1 = 1.10
+  'Fragile':     1.0,   // MOIC < 1.0  → no bonus
+};
+
 /**
  * Admin endpoint for leaderboard management.
  *
- * GET /api/leaderboard/migrate                    — show diagnostics (v1 + v2)
- * GET /api/leaderboard/migrate?action=migrate_v1  — migrate v1 entries to v2
- * GET /api/leaderboard/migrate?delete=ENTRY_ID    — delete a specific entry by ID
+ * GET /api/leaderboard/migrate                              — show diagnostics (v1 + v2)
+ * GET /api/leaderboard/migrate?action=migrate_v1            — migrate v1 entries to v2
+ * GET /api/leaderboard/migrate?action=apply_fo_multiplier   — backfill foMultiplier for FO entries
+ * GET /api/leaderboard/migrate?delete=ENTRY_ID              — delete a specific entry by ID
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -76,6 +86,76 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       return res.status(200).json({ migrated, skipped, v1Total: v1Entries.length });
+    }
+
+    // Backfill FO multiplier for entries with familyOfficeCompleted but no foMultiplier
+    if (action === 'apply_fo_multiplier') {
+      const allEntries = await kv.zrange(NEW_KEY, 0, -1);
+      let updated = 0;
+      let alreadyHas = 0;
+      let notFO = 0;
+      const details: { id: string; holdcoName: string; legacyGrade: string; foMultiplier: number; oldAdjFEV: number; newAdjFEV: number }[] = [];
+      const skipped: string[] = [];
+
+      for (const raw of allEntries) {
+        try {
+          const entry: any = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (!entry?.id) { skipped.push('missing id'); continue; }
+
+          // Skip entries that aren't FO completions
+          if (!entry.familyOfficeCompleted) { notFO++; continue; }
+
+          // Skip entries that already have foMultiplier set
+          if (typeof entry.foMultiplier === 'number' && entry.foMultiplier > 1.0) { alreadyHas++; continue; }
+
+          // Derive foMultiplier from legacyGrade
+          const grade = entry.legacyGrade;
+          const foMult = (typeof grade === 'string' && FO_MULTIPLIER_BY_GRADE[grade]) || 1.0;
+
+          // Skip if multiplier would be 1.0 (no change needed)
+          if (foMult <= 1.0) { notFO++; continue; }
+
+          // Recalculate adjusted FEV with the new foMultiplier
+          const fev = entry.founderEquityValue ?? entry.enterpriseValue;
+          const difficulty = entry.difficulty ?? 'easy';
+          const multiplier = entry.submittedMultiplier ?? (DIFFICULTY_MULTIPLIER[difficulty] ?? 1.0);
+          const restructuringPenalty = entry.hasRestructured ? 0.80 : 1.0;
+
+          const oldAdjFEV = Math.round(fev * multiplier * restructuringPenalty);
+          const newAdjFEV = Math.round(fev * multiplier * restructuringPenalty * foMult);
+
+          // Remove old entry, add updated one with new score
+          const rawStr = typeof raw === 'string' ? raw : JSON.stringify(raw);
+          await kv.zrem(NEW_KEY, rawStr);
+
+          const enriched = {
+            ...entry,
+            foMultiplier: foMult,
+          };
+          await kv.zadd(NEW_KEY, { score: newAdjFEV, member: JSON.stringify(enriched) });
+
+          details.push({
+            id: entry.id,
+            holdcoName: entry.holdcoName,
+            legacyGrade: grade ?? 'unknown',
+            foMultiplier: foMult,
+            oldAdjFEV,
+            newAdjFEV,
+          });
+          updated++;
+        } catch (e) {
+          skipped.push(String(e));
+        }
+      }
+
+      return res.status(200).json({
+        totalEntries: allEntries.length,
+        updated,
+        alreadyHas,
+        notFO,
+        skipped,
+        details,
+      });
     }
 
     // Audit mode — flag potentially invalid entries
