@@ -1,17 +1,12 @@
-import { useState, useMemo } from 'react';
+import { useState, Fragment } from 'react';
 import { MetricCard } from '../ui/MetricCard';
-import { AdminBarChart } from './AdminBarChart';
 import { ScoreRadar } from './ScoreRadar';
 import { formatMoney } from '../../engine/types';
 import type { LeaderboardStrategy } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
-import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
 import { SECTORS } from '../../data/sectors';
-import type { AnalyticsData, Totals, MiniTrendProps, SectionHeaderProps, ActivityEvent, LeaderboardEntryAdmin } from './adminTypes';
-
-// ── Shared tiny components (re-exported from AdminDashboard) ──
-
-export { MiniTrend, SectionHeader } from './adminShared';
+import { MiniTrend, computeAdjFev, MultiplierBadges } from './adminShared';
+import type { AnalyticsData, Totals, ActivityEvent } from './adminTypes';
 
 function getTimeAgo(date: Date): string {
   const now = Date.now();
@@ -199,64 +194,66 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor }: Overvi
                 <tr className="text-text-muted border-b border-border">
                   <th className="text-left py-2 pr-3">#</th>
                   <th className="text-left py-2 pr-3">Name</th>
-                  <th className="text-center py-2 pr-3">Initials</th>
+                  <th className="text-center py-2 pr-3">Init</th>
                   <th className="text-right py-2 pr-3">Adj FEV</th>
                   <th className="text-right py-2 pr-3">Raw FEV</th>
                   <th className="text-center py-2 pr-3">Score</th>
                   <th className="text-center py-2 pr-3">Grade</th>
                   <th className="text-center py-2 pr-3">Mode</th>
+                  <th className="text-left py-2 pr-3">Multipliers</th>
                   <th className="text-center py-2 pr-3">Biz</th>
                   <th className="text-right py-2">Date</th>
                 </tr>
               </thead>
               <tbody>
                 {data.leaderboardEntries.map((entry, i) => {
-                  const multiplier = entry.difficulty === 'normal'
-                    ? DIFFICULTY_CONFIG.normal.leaderboardMultiplier
-                    : DIFFICULTY_CONFIG.easy.leaderboardMultiplier;
-                  const adjFev = Math.round(entry.founderEquityValue * multiplier);
+                  const adjFev = computeAdjFev(entry);
                   const durationLabel = entry.duration === 'quick' ? '10' : '20';
                   const diffLabel = entry.difficulty === 'normal' ? 'H' : 'E';
                   const isExpanded = expandedRow === i;
-                  const hasStrategy = !!(entry as any).strategy;
+                  const hasStrategy = !!entry.strategy;
 
                   return (
-                    <tr key={i} className="border-b border-border/50">
-                      <td colSpan={10} className="p-0">
-                        <div>
-                          <div
-                            className={`flex items-center cursor-pointer hover:bg-white/5 transition-colors ${hasStrategy ? '' : 'cursor-default'}`}
-                            onClick={() => hasStrategy && setExpandedRow(isExpanded ? null : i)}
-                          >
-                            <td className="py-1.5 pr-3 text-text-muted font-mono w-8">{i + 1}</td>
-                            <td className="py-1.5 pr-3 text-text-primary truncate max-w-[150px]">
-                              {entry.holdcoName}
-                              {hasStrategy && <span className="ml-1 text-accent text-[10px]">{isExpanded ? '▼' : '▶'}</span>}
-                            </td>
-                            <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.initials || '—'}</td>
-                            <td className="py-1.5 pr-3 text-right font-mono text-accent">{formatMoney(adjFev)}</td>
-                            <td className="py-1.5 pr-3 text-right font-mono text-text-secondary">{formatMoney(entry.founderEquityValue)}</td>
-                            <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.score ?? '—'}</td>
-                            <td className={`py-1.5 pr-3 text-center font-bold ${getGradeColor(entry.grade)}`}>{entry.grade}</td>
-                            <td className="py-1.5 pr-3 text-center">
-                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
-                                {diffLabel}/{durationLabel}
-                              </span>
-                            </td>
-                            <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.businessCount ?? '—'}</td>
-                            <td className="py-1.5 text-right text-text-muted font-mono">{new Date(entry.date).toLocaleDateString()}</td>
-                          </div>
-                          {isExpanded && hasStrategy && (
-                            <StrategyDrillDown strategy={(entry as any).strategy} />
-                          )}
-                          {isExpanded && !hasStrategy && (
-                            <div className="px-4 pb-3 pt-2 text-xs text-text-muted italic bg-bg-secondary/30 border-t border-border/30">
-                              Strategy data not available for this entry
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
+                    <Fragment key={i}>
+                      <tr
+                        className={`border-b border-border/50 ${hasStrategy ? 'cursor-pointer hover:bg-white/5' : ''} transition-colors`}
+                        onClick={() => hasStrategy && setExpandedRow(isExpanded ? null : i)}
+                      >
+                        <td className="py-1.5 pr-3 text-text-muted font-mono">{i + 1}</td>
+                        <td className="py-1.5 pr-3 text-text-primary truncate max-w-[150px]">
+                          {entry.holdcoName}
+                          {hasStrategy && <span className="ml-1 text-accent text-[10px]">{isExpanded ? '▼' : '▶'}</span>}
+                        </td>
+                        <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.initials || '—'}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono text-accent">{formatMoney(adjFev)}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono text-text-secondary">{formatMoney(entry.founderEquityValue)}</td>
+                        <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.score ?? '—'}</td>
+                        <td className={`py-1.5 pr-3 text-center font-bold ${getGradeColor(entry.grade)}`}>{entry.grade}</td>
+                        <td className="py-1.5 pr-3 text-center">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
+                            {diffLabel}/{durationLabel}
+                          </span>
+                        </td>
+                        <td className="py-1.5 pr-3">
+                          <MultiplierBadges entry={entry} />
+                        </td>
+                        <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.businessCount ?? '—'}</td>
+                        <td className="py-1.5 text-right text-text-muted font-mono">{new Date(entry.date).toLocaleDateString()}</td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="border-b border-border/50">
+                          <td colSpan={11} className="p-0">
+                            {hasStrategy && entry.strategy ? (
+                              <StrategyDrillDown strategy={entry.strategy} />
+                            ) : (
+                              <div className="px-4 pb-3 pt-2 text-xs text-text-muted italic bg-bg-secondary/30 border-t border-border/30">
+                                Strategy data not available for this entry
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>
@@ -274,20 +271,18 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor }: Overvi
               <thead>
                 <tr className="text-text-muted border-b border-border">
                   <th className="text-left py-2 pr-3">Date</th>
-                  <th className="text-center py-2 pr-3">Initials</th>
+                  <th className="text-center py-2 pr-3">Init</th>
                   <th className="text-left py-2 pr-3">Name</th>
                   <th className="text-right py-2 pr-3">Adj FEV</th>
                   <th className="text-center py-2 pr-3">Score</th>
                   <th className="text-center py-2 pr-3">Grade</th>
                   <th className="text-center py-2 pr-3">Mode</th>
+                  <th className="text-left py-2">Multipliers</th>
                 </tr>
               </thead>
               <tbody>
                 {data.recentEntries.map((entry, i) => {
-                  const multiplier = entry.difficulty === 'normal'
-                    ? DIFFICULTY_CONFIG.normal.leaderboardMultiplier
-                    : DIFFICULTY_CONFIG.easy.leaderboardMultiplier;
-                  const adjFev = Math.round(entry.founderEquityValue * multiplier);
+                  const adjFev = computeAdjFev(entry);
                   const durationLabel = entry.duration === 'quick' ? '10' : '20';
                   const diffLabel = entry.difficulty === 'normal' ? 'H' : 'E';
                   const dateObj = new Date(entry.date);
@@ -306,6 +301,9 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor }: Overvi
                         <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
                           {diffLabel}/{durationLabel}
                         </span>
+                      </td>
+                      <td className="py-1.5">
+                        <MultiplierBadges entry={entry} />
                       </td>
                     </tr>
                   );

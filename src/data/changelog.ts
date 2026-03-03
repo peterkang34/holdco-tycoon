@@ -11,6 +11,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 2, 2026',
+    title: 'Admin Analytics Redesign',
+    sections: [
+      {
+        heading: 'Behind the Scenes',
+        items: [
+          'Redesigned admin Strategy & Balance tab with player strategy insights, score dimension analysis, and archetype effectiveness breakdowns.',
+          'Leaderboard entries now include full strategy data — score breakdown, deal activity, capital management, and more.',
+          'Fixed deal structure histogram to track all structures per game instead of just the most-used one.',
+          'Admin leaderboard tables now show all active multipliers (difficulty, Family Office, restructuring) and compute Adjusted FEV correctly.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 1, 2026',
     title: 'Family Office Overhaul',
     sections: [

@@ -1,5 +1,55 @@
 /** Shared presentational components used by OverviewTab, BalanceTab, and AdminDashboard */
 
+import type { LeaderboardEntryAdmin } from './adminTypes';
+import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
+
+// ── Multiplier Helpers ──
+
+const RESTRUCTURING_PENALTY = 0.80;
+
+/** Compute the true Adjusted FEV including all multipliers (difficulty, restructuring, FO) */
+export function computeAdjFev(entry: LeaderboardEntryAdmin): number {
+  const diffMult = entry.difficulty === 'normal'
+    ? DIFFICULTY_CONFIG.normal.leaderboardMultiplier
+    : DIFFICULTY_CONFIG.easy.leaderboardMultiplier;
+  const restructMult = entry.hasRestructured ? RESTRUCTURING_PENALTY : 1.0;
+  const foMult = (entry.foMultiplier && entry.foMultiplier > 1.0) ? entry.foMultiplier : 1.0;
+  return Math.round(entry.founderEquityValue * diffMult * restructMult * foMult);
+}
+
+/** Render small pill badges for active multipliers on a leaderboard entry */
+export function MultiplierBadges({ entry }: { entry: LeaderboardEntryAdmin }) {
+  const badges: { label: string; className: string; title: string }[] = [];
+
+  if (entry.difficulty === 'normal') {
+    badges.push({ label: `${DIFFICULTY_CONFIG.normal.leaderboardMultiplier}x`, className: 'bg-warning/20 text-warning', title: 'Hard mode multiplier' });
+  } else {
+    badges.push({ label: `${DIFFICULTY_CONFIG.easy.leaderboardMultiplier}x`, className: 'bg-blue-500/20 text-blue-400', title: 'Easy mode multiplier' });
+  }
+
+  if (entry.foMultiplier && entry.foMultiplier > 1.0) {
+    badges.push({ label: `FO ${entry.foMultiplier.toFixed(2)}x`, className: 'bg-purple-500/20 text-purple-400', title: 'Family Office performance multiplier' });
+  }
+
+  if (entry.hasRestructured) {
+    badges.push({ label: '-20%', className: 'bg-red-500/20 text-red-400', title: 'Restructuring penalty' });
+  }
+
+  if (entry.familyOfficeCompleted && !(entry.foMultiplier && entry.foMultiplier > 1.0)) {
+    badges.push({ label: 'FO', className: 'bg-purple-500/20 text-purple-400', title: 'Family Office completed (1.0x — no bonus)' });
+  }
+
+  return (
+    <span className="inline-flex gap-0.5 flex-wrap">
+      {badges.map(b => (
+        <span key={b.label} className={`text-[9px] px-1 py-0.5 rounded font-mono ${b.className}`} title={b.title}>
+          {b.label}
+        </span>
+      ))}
+    </span>
+  );
+}
+
 // ── MiniTrend ──
 
 export function MiniTrend({ label, data }: { label: string; data: { month: string; value: number }[] }) {

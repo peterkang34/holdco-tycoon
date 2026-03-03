@@ -65,10 +65,10 @@ export function ScoreRadar({ dimensions, size = 160 }: ScoreRadarProps) {
         const labelPos = point(i, 1.22);
         const angle = startAngle + i * angleStep;
         // Determine text-anchor based on position
-        let anchor = 'middle';
+        let anchor: 'start' | 'middle' | 'end' = 'middle';
         if (Math.cos(angle) > 0.3) anchor = 'start';
         else if (Math.cos(angle) < -0.3) anchor = 'end';
-        let baseline = 'middle';
+        let baseline: 'auto' | 'middle' | 'hanging' = 'middle';
         if (Math.sin(angle) > 0.3) baseline = 'hanging';
         else if (Math.sin(angle) < -0.3) baseline = 'auto';
         return (

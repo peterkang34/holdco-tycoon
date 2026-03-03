@@ -1,22 +1,18 @@
 import { useMemo } from 'react';
 import { AdminBarChart } from './AdminBarChart';
 import { ScoreRadar } from './ScoreRadar';
-import { SectionHeader, HorizontalBar, DonutChart } from './adminShared';
+import { SectionHeader, HorizontalBar, DonutChart, computeAdjFev, MultiplierBadges } from './adminShared';
 import { formatMoney } from '../../engine/types';
 import type { LeaderboardStrategy } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
 import { SECTORS } from '../../data/sectors';
-import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
 import type { AnalyticsData, Totals, LeaderboardEntryAdmin } from './adminTypes';
 
 // ── Section 1: How Top Players Win ──
 
 function TopPlayerCard({ entry }: { entry: LeaderboardEntryAdmin & { strategy: LeaderboardStrategy } }) {
   const s = entry.strategy;
-  const multiplier = entry.difficulty === 'normal'
-    ? DIFFICULTY_CONFIG.normal.leaderboardMultiplier
-    : DIFFICULTY_CONFIG.easy.leaderboardMultiplier;
-  const adjFev = Math.round(entry.founderEquityValue * multiplier);
+  const adjFev = computeAdjFev(entry);
 
   const dimensions = [
     { label: 'Val', value: s.scoreBreakdown.valueCreation, max: 20 },
@@ -38,11 +34,14 @@ function TopPlayerCard({ entry }: { entry: LeaderboardEntryAdmin & { strategy: L
           <p className="text-[10px] text-text-muted font-mono">{formatMoney(adjFev)} Adj FEV</p>
         </div>
       </div>
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-1">
         <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent">
           {s.archetype.replace(/_/g, ' ')}
         </span>
         <span className="text-xs">{sectorIcons}</span>
+      </div>
+      <div className="mb-2">
+        <MultiplierBadges entry={entry} />
       </div>
       <ScoreRadar dimensions={dimensions} size={100} />
     </div>

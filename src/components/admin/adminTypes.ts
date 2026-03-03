@@ -66,6 +66,9 @@ export interface LeaderboardEntryAdmin {
   score?: number;
   date: string;
   strategy?: LeaderboardStrategy;
+  hasRestructured?: boolean;
+  familyOfficeCompleted?: boolean;
+  foMultiplier?: number;
 }
 
 export interface ActivityEvent {

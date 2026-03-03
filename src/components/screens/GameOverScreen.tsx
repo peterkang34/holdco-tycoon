@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, LeaderboardStrategy, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration, IntegratedPlatform } from '../../engine/types';
+import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration, IntegratedPlatform } from '../../engine/types';
 import type { IPOState } from '../../engine/types';
 import { calculatePublicCompanyBonus } from '../../engine/ipo';
 import { useGameStore } from '../../hooks/useGame';

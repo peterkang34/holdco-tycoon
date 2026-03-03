@@ -7,8 +7,7 @@ import { BalanceTab } from './BalanceTab';
 import { MiniTrend, SectionHeader, HorizontalBar, DonutChart, FunnelStep } from './adminShared';
 import { MetricCard } from '../ui/MetricCard';
 import { SECTORS } from '../../data/sectors';
-import { formatMoney } from '../../engine/types';
-import type { AnalyticsData, MonthData, Totals } from './adminTypes';
+import type { AnalyticsData, Totals } from './adminTypes';
 
 // ── Tab Configuration ────────────────────────────────────────
 
