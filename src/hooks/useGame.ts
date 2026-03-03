@@ -4545,7 +4545,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v34', // v34: Multi-sponsor deal history, complexity cost, moat tiers, market cycle, competitive position premium
+      name: 'holdco-tycoon-save-v35', // v35: Real pro sports teams (200 teams, 8 leagues), women's leagues (WNBA/NWSL)
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

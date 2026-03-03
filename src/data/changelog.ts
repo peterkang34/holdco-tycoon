@@ -11,6 +11,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 3, 2026',
+    title: 'Real Pro Sports Teams',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Pro Sports Franchises now feature 200 real teams across 8 leagues — NFL, NBA, MLB, NHL, EPL, MLS, WNBA, and NWSL. Each team has unique valuations reflecting real-world franchise values.',
+          "Added women's leagues (WNBA and NWSL) with valuations in the hundreds of millions — more accessible entry points for Family Office play with flexible deal structures including seller notes and earn-outs.",
+          'League badges now appear on deal cards and business cards, showing which league each franchise belongs to.',
+          'One team per league — once you own a Cowboys, no more NFL teams appear in your pipeline.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 2, 2026',
     title: 'Admin Analytics Redesign',
     sections: [

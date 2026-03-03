@@ -8,6 +8,8 @@ import {
   ROLLOVER_EXCLUDED_ARCHETYPES,
 } from '../data/gameConfig';
 import { calculateShareFundedTerms } from './ipo';
+import { getLeagueTier } from '../data/proSportsTeams';
+import type { ProSportsLeague } from '../data/proSportsTeams';
 
 export function generateDealStructures(
   deal: Deal,
@@ -24,9 +26,12 @@ export function generateDealStructures(
   const askingPrice = deal.effectivePrice;
   const structures: DealStructure[] = [];
 
-  // Pro Sports Franchises: cash or bank debt only
-  // Real-world: leagues cap debt at 10-25% of franchise value, no seller financing/earn-outs
+  // Pro Sports Franchises: cash or bank debt only (mega/major/growth tiers)
+  // Women's leagues (WNBA, NWSL): more flexible deal structures allowed
   const isProSports = deal.business.sectorId === 'proSports';
+  const isWomensTier = isProSports && (['wnba', 'nwsl'] as string[]).includes(deal.business.subType)
+    && getLeagueTier(deal.business.subType as ProSportsLeague) === 'women';
+  const isProSportsRestricted = isProSports && !isWomensTier;
 
   // Scale debt terms by game duration
   // Quick games: stretch terms so debt isn't crushing in 10 rounds
@@ -49,8 +54,8 @@ export function generateDealStructures(
     });
   }
 
-  // Option B: Cash + Seller Note (usually available; not for pro sports)
-  if (!isProSports) {
+  // Option B: Cash + Seller Note (usually available; not for mega/major/growth pro sports)
+  if (!isProSportsRestricted) {
   const sellerNoteCashPercent = 0.40; // 40% equity
   const sellerNoteCash = Math.round(askingPrice * sellerNoteCashPercent);
   const sellerNoteAmount = askingPrice - sellerNoteCash;
@@ -74,7 +79,8 @@ export function generateDealStructures(
   // Option C: Cash + Bank Debt (not available during credit tightening or covenant breach)
   if (!creditTightening && !noNewDebt) {
     // Pro Sports: leagues cap acquisition debt at ~25% of franchise value (75% equity required)
-    const bankDebtCashPercent = isProSports ? 0.75 : 0.35;
+    // Women's tier: more accessible, 50% min cash
+    const bankDebtCashPercent = isProSportsRestricted ? 0.75 : isWomensTier ? 0.50 : 0.35;
     const bankDebtCash = Math.round(askingPrice * bankDebtCashPercent);
     const bankDebtAmount = askingPrice - bankDebtCash;
 
@@ -93,8 +99,8 @@ export function generateDealStructures(
     }
   }
 
-  // Option D: Earn-out (available for quality 3+ deals; not for pro sports)
-  if (!isProSports && deal.business.qualityRating >= 3 && (seed % 10) >= 4) {
+  // Option D: Earn-out (available for quality 3+ deals; not for mega/major/growth pro sports)
+  if (!isProSportsRestricted && deal.business.qualityRating >= 3 && (seed % 10) >= 4) {
     const earnoutUpfrontPercent = 0.55; // 55% upfront
     const earnoutCash = Math.round(askingPrice * earnoutUpfrontPercent);
     const earnoutAmount = askingPrice - earnoutCash;
@@ -113,8 +119,8 @@ export function generateDealStructures(
     }
   }
 
-  // Option E: LBO Combo — Cash + Seller Note + Bank Debt (not available during credit tightening, covenant breach, or pro sports)
-  if (!isProSports && !creditTightening && !noNewDebt) {
+  // Option E: LBO Combo — Cash + Seller Note + Bank Debt (not available during credit tightening, covenant breach, or mega/major/growth pro sports)
+  if (!isProSportsRestricted && !creditTightening && !noNewDebt) {
     const lboCashPercent = 0.25; // 25% equity
     const lboNotePercent = 0.35; // 35% seller note
     const lboCash = Math.round(askingPrice * lboCashPercent);
@@ -143,9 +149,9 @@ export function generateDealStructures(
     }
   }
 
-  // Option F: Rollover Equity — seller reinvests ~25% (standard) or ~20% (quick) as equity (not for pro sports)
+  // Option F: Rollover Equity — seller reinvests ~25% (standard) or ~20% (quick) as equity (not for mega/major/growth pro sports)
   if (
-    !isProSports &&
+    !isProSportsRestricted &&
     !noNewDebt &&
     maSourcingTier >= ROLLOVER_MIN_MA_TIER &&
     deal.business.qualityRating >= ROLLOVER_MIN_QUALITY &&
@@ -172,8 +178,8 @@ export function generateDealStructures(
     }
   }
 
-  // Option G: Share-Funded (public companies only, requires meaningful stock price; not for pro sports)
-  if (!isProSports && ipoState?.isPublic && ipoState.stockPrice >= 1.0) {
+  // Option G: Share-Funded (public companies only, requires meaningful stock price; not for mega/major/growth pro sports)
+  if (!isProSportsRestricted && ipoState?.isPublic && ipoState.stockPrice >= 1.0) {
     const terms = calculateShareFundedTerms(askingPrice, ipoState);
     structures.push({
       type: 'share_funded',

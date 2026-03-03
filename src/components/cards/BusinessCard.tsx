@@ -2,6 +2,8 @@ import { useState, useMemo } from 'react';
 import { Business, IntegratedPlatform, ActiveTurnaround, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
 import { getProgramById } from '../../data/turnaroundPrograms';
 import { SECTORS } from '../../data/sectors';
+import { LEAGUE_CONFIGS } from '../../data/proSportsTeams';
+import type { ProSportsLeague } from '../../data/proSportsTeams';
 import { calculateExitValuation } from '../../engine/simulation';
 import { calculateDeRiskingPremiumBreakdown, getMoatTier, type MoatTier } from '../../engine/buyers';
 import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
@@ -73,6 +75,11 @@ export function BusinessCard({
   const gainLoss = exitValuation.netProceeds - totalInvested;
   const moic = exitValuation.netProceeds / totalInvested;
 
+  // League badge for pro sports teams
+  const leagueConfig = business.sectorId === 'proSports'
+    ? LEAGUE_CONFIGS[business.subType as ProSportsLeague]
+    : null;
+
   const isGrowing = business.ebitda > business.acquisitionEbitda;
   const isDeclining = business.ebitda < business.peakEbitda * 0.7;
 
@@ -104,7 +111,14 @@ export function BusinessCard({
       >
         <span className="text-xl">{sector.emoji}</span>
         <div className="flex-1 min-w-0">
-          <div className="font-medium truncate">{business.name}</div>
+          <div className="font-medium truncate flex items-center gap-1.5">
+            {business.name}
+            {leagueConfig && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold shrink-0">
+                {leagueConfig.label}
+              </span>
+            )}
+          </div>
           <div className="text-xs text-text-muted">{sector.name}</div>
         </div>
         <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
@@ -132,7 +146,14 @@ export function BusinessCard({
       >
         <span className="text-xl">{sector.emoji}</span>
         <div className="flex-1 min-w-0">
-          <div className="font-medium truncate">{business.name}</div>
+          <div className="font-medium truncate flex items-center gap-1.5">
+            {business.name}
+            {leagueConfig && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold shrink-0">
+                {leagueConfig.label}
+              </span>
+            )}
+          </div>
           <div className="text-xs text-text-muted">{sector.name}</div>
         </div>
         <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
@@ -170,7 +191,14 @@ export function BusinessCard({
           <span className="text-2xl shrink-0">{sector.emoji}</span>
           <div className="min-w-0">
             <h3 className="font-bold truncate">{business.name}</h3>
-            <p className="text-xs text-text-muted truncate">{business.subType}</p>
+            <p className="text-xs text-text-muted truncate flex items-center gap-1">
+              {leagueConfig ? leagueConfig.fullName : business.subType}
+              {leagueConfig && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold shrink-0">
+                  {leagueConfig.label}
+                </span>
+              )}
+            </p>
           </div>
         </div>
         <div className="flex flex-col items-end gap-1">

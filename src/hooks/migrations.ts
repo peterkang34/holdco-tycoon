@@ -823,6 +823,74 @@ function migrateV33ToV34(): void {
 }
 
 /**
+ * v34→v35: Real pro sports teams — migrate old generic sub-types to league IDs.
+ * Old sub-types: 'Premier Football Franchise', 'Elite Basketball Franchise', etc.
+ * New sub-types: 'nfl', 'nba', 'mlb', 'nhl', 'epl', 'mls', 'wnba', 'nwsl'
+ */
+function migrateV34ToV35(): void {
+  const v34Key = 'holdco-tycoon-save-v34';
+  const v35Key = 'holdco-tycoon-save-v35';
+  if (localStorage.getItem(v35Key)) return;
+  try {
+    const raw = localStorage.getItem(v34Key);
+    if (!raw) return;
+    const v34Data = JSON.parse(raw);
+
+    // Map old generic sub-types to league IDs
+    const OLD_TO_LEAGUE: Record<string, string> = {
+      'Premier Football Franchise': 'nfl',
+      'Elite Basketball Franchise': 'nba',
+      'Championship Baseball Franchise': 'mlb',
+      'Elite Hockey Franchise': 'nhl',
+      'Hockey / Arena Sports': 'nhl',
+      'Global Football Club': 'epl',
+      'Premier Soccer Franchise': 'epl',
+      'Baseball Franchise': 'mlb',
+    };
+
+    // Simple team name pools per league for migration
+    const MIGRATION_TEAM_NAMES: Record<string, string[]> = {
+      nfl: ['Dallas Cowboys', 'New England Patriots', 'Green Bay Packers', 'San Francisco 49ers', 'Kansas City Chiefs'],
+      nba: ['Los Angeles Lakers', 'Golden State Warriors', 'Boston Celtics', 'Chicago Bulls', 'Brooklyn Nets'],
+      mlb: ['New York Yankees', 'Los Angeles Dodgers', 'Boston Red Sox', 'Chicago Cubs', 'Houston Astros'],
+      nhl: ['New York Rangers', 'Toronto Maple Leafs', 'Montreal Canadiens', 'Boston Bruins', 'Chicago Blackhawks'],
+      epl: ['Manchester United', 'Liverpool', 'Arsenal', 'Chelsea', 'Manchester City'],
+    };
+
+    const migrateProSportsBusiness = (b: any) => {
+      if (b.sectorId !== 'proSports') return b;
+      const newLeague = OLD_TO_LEAGUE[b.subType];
+      if (!newLeague) return b; // Already migrated or unknown
+      const teamNames = MIGRATION_TEAM_NAMES[newLeague] || ['Unknown Franchise'];
+      const randomTeamName = teamNames[Math.floor(Math.random() * teamNames.length)];
+      return {
+        ...b,
+        subType: newLeague,
+        name: randomTeamName,
+      };
+    };
+
+    if (Array.isArray(v34Data.state?.businesses)) {
+      v34Data.state.businesses = v34Data.state.businesses.map(migrateProSportsBusiness);
+    }
+    if (Array.isArray(v34Data.state?.exitedBusinesses)) {
+      v34Data.state.exitedBusinesses = v34Data.state.exitedBusinesses.map(migrateProSportsBusiness);
+    }
+    if (Array.isArray(v34Data.state?.dealPipeline)) {
+      v34Data.state.dealPipeline = v34Data.state.dealPipeline.map((d: any) => ({
+        ...d,
+        business: d.business ? migrateProSportsBusiness(d.business) : d.business,
+      }));
+    }
+
+    localStorage.setItem(v35Key, JSON.stringify(v34Data));
+    localStorage.removeItem(v34Key);
+  } catch (e) {
+    console.error('v34→v35 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -852,4 +920,5 @@ export function runAllMigrations(): void {
   migrateV31ToV32();
   migrateV32ToV33();
   migrateV33ToV34();
+  migrateV34ToV35();
 }

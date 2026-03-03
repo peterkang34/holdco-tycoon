@@ -39,6 +39,8 @@ import {
 import type { DealInflationState, GameDuration, IPOState } from './types';
 import { SECTORS, SECTOR_LIST, SECTOR_LIST_STANDARD } from '../data/sectors';
 import { getRandomBusinessName } from '../data/names';
+import { getTeamsByLeague } from '../data/proSportsTeams';
+import type { ProSportsLeague } from '../data/proSportsTeams';
 import { calculateSizeTierPremium } from './buyers';
 import {
   isAIEnabled,
@@ -929,16 +931,34 @@ export function generateDealWithSize(
 
   const business = generateBusiness(sectorId, round, quality, options.subType, rng);
 
+  // Pro Sports team override (populated inside trophy tier block, applied after adjustedBusiness declaration)
+  let proSportsTeamOverride: { name: string; multiple: number } | null = null;
+
   // Generate EBITDA within tier range
   let adjustedEbitda: number;
   if (resolvedTier === 'trophy') {
     adjustedEbitda = rng
       ? generateTrophyEbitda(affordability ?? 0, rng)
       : tierConfig.min + Math.round(Math.random() * tierConfig.min); // fallback without RNG
-    // Pro Sports franchises: cap EBITDA to realistic operating income range
-    // Real-world: NFL ~$100-300M, NBA ~$50-200M, MLB ~$30-100M, NHL ~$20-80M
+    // Pro Sports franchises: use per-team EBITDA/multiple from real team database
     if (sectorId === 'proSports') {
-      adjustedEbitda = Math.min(adjustedEbitda, 350000); // $350M cap
+      const league = business.subType as ProSportsLeague;
+      const leagueTeams = getTeamsByLeague(league);
+      if (leagueTeams.length > 0) {
+        const selectedTeam = pickRandom(leagueTeams, rng)!;
+        // Override EBITDA with team-specific range
+        adjustedEbitda = Math.round(
+          selectedTeam.ebitdaRange[0] + (rng ? rng.next() : Math.random()) * (selectedTeam.ebitdaRange[1] - selectedTeam.ebitdaRange[0])
+        );
+        // Store team override for later application (after adjustedBusiness is declared)
+        proSportsTeamOverride = {
+          name: selectedTeam.name,
+          multiple: Math.round(
+            (selectedTeam.multipleRange[0] + (rng ? rng.next() : Math.random()) * (selectedTeam.multipleRange[1] - selectedTeam.multipleRange[0])) * 10
+          ) / 10,
+        };
+      }
+      adjustedEbitda = Math.min(adjustedEbitda, 500000); // $500M cap
     }
   } else {
     const minEbitda = tierConfig.min;
@@ -952,7 +972,9 @@ export function generateDealWithSize(
   const adjustedRevenue = Math.round(adjustedEbitda / business.ebitdaMargin);
 
   // Apply deal inflation + entry multiple adder to the asking multiple
-  const inflatedMultiple = business.acquisitionMultiple
+  // Use team-specific multiple for proSports if available, otherwise sector default
+  const baseMultiple = proSportsTeamOverride?.multiple ?? business.acquisitionMultiple;
+  const inflatedMultiple = baseMultiple
     + (options.dealInflation ?? 0)
     + tierConfig.multipleAdder;
   const adjustedPrice = Math.round(adjustedEbitda * inflatedMultiple);
@@ -984,6 +1006,15 @@ export function generateDealWithSize(
         operatorQuality: archetypeOperator,
         operatorQualityText: pickRandom(operatorTexts[archetypeOperator], rng)!,
       },
+    };
+  }
+
+  // Apply pro sports team override (name + multiple)
+  if (proSportsTeamOverride) {
+    adjustedBusiness = {
+      ...adjustedBusiness,
+      name: proSportsTeamOverride.name,
+      acquisitionMultiple: proSportsTeamOverride.multiple,
     };
   }
 

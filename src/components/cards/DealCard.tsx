@@ -2,6 +2,8 @@ import { useState, useCallback } from 'react';
 import { Deal, DealHeat, SellerArchetype, formatMoney, Business } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { getSizeRatioTier } from '../../engine/businesses';
+import { LEAGUE_CONFIGS } from '../../data/proSportsTeams';
+import type { ProSportsLeague } from '../../data/proSportsTeams';
 import { Tooltip } from '../ui/Tooltip';
 import { useSwipe } from '../../hooks/useSwipe';
 import { useToastStore } from '../../hooks/useToast';
@@ -67,6 +69,11 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
     }
   };
   const archetypeBadge = getArchetypeBadge(deal.sellerArchetype);
+
+  // League badge for pro sports teams
+  const leagueConfig = deal.business.sectorId === 'proSports'
+    ? LEAGUE_CONFIGS[deal.business.subType as ProSportsLeague]
+    : null;
 
   const hasHeatPremium = deal.effectivePrice > deal.askingPrice;
   const premiumPct = hasHeatPremium ? Math.round(((deal.effectivePrice / deal.askingPrice) - 1) * 100) : 0;
@@ -150,6 +157,11 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
           <span className="text-xl shrink-0">{sector.emoji}</span>
           <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
             <span className="font-medium truncate">{deal.business.name}</span>
+            {leagueConfig && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0 bg-amber-500/20 text-amber-400 font-bold">
+                {leagueConfig.label}
+              </span>
+            )}
             <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${acquisitionBadge.color}`}>
               {acquisitionBadge.label}
             </span>
@@ -202,7 +214,14 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
           <span className="text-2xl">{sector.emoji}</span>
           <div className="min-w-0">
             <h3 className="font-bold truncate">{deal.business.name}</h3>
-            <p className="text-xs text-text-muted truncate">{deal.business.subType}</p>
+            <p className="text-xs text-text-muted truncate flex items-center gap-1">
+              {leagueConfig ? leagueConfig.fullName : deal.business.subType}
+              {leagueConfig && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-bold shrink-0">
+                  {leagueConfig.label}
+                </span>
+              )}
+            </p>
           </div>
         </div>
         <div className="flex flex-col items-end gap-0.5 sm:gap-1">
