@@ -48,6 +48,11 @@ interface MonthData {
   // Phase 4
   featureAdoption: Record<string, number>;
   eventChoices: Record<string, number>;
+  // Score dimensions & cross-dimensional
+  scoreDimSums: Record<string, number>;
+  scoreDimCounts: Record<string, number>;
+  antiPatternByGrade: Record<string, number>;
+  archetypeByGrade: Record<string, number>;
 }
 
 /**
@@ -134,6 +139,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       pipe.hgetall(`t:ending_subtypes:${mk}`);   // 31
       pipe.hgetall(`t:ending_ebitda:${mk}:sum`); // 32
       pipe.hgetall(`t:ending_construction:${mk}`); // 33
+      // Score dimensions & cross-dimensional (34-37)
+      pipe.hgetall(`t:score_dim:${mk}`);           // 34
+      pipe.hgetall(`t:score_dim_count:${mk}`);     // 35
+      pipe.hgetall(`t:antipattern_grade:${mk}`);   // 36
+      pipe.hgetall(`t:archetype_grade:${mk}`);     // 37
     }
 
     // All-time totals
@@ -142,7 +152,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     const results = await pipe.exec();
 
-    const FIELDS_PER_MONTH = 34;
+    const FIELDS_PER_MONTH = 38;
     const months: MonthData[] = monthKeys.map((mk, i) => {
       const offset = i * FIELDS_PER_MONTH;
       // Phase 5: raw sum/count for proper weighted averaging in dashboard
@@ -191,6 +201,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         endingEbitdaSum: ebitdaSumRecord['total'] || 0,
         endingEbitdaCount: ebitdaSumRecord['count'] || 0,
         endingConstruction: toNumberRecord(results[offset + 33]),
+        // Score dimensions & cross-dimensional
+        scoreDimSums: toNumberRecord(results[offset + 34]),
+        scoreDimCounts: toNumberRecord(results[offset + 35]),
+        antiPatternByGrade: toNumberRecord(results[offset + 36]),
+        archetypeByGrade: toNumberRecord(results[offset + 37]),
       };
     });
 

@@ -39,6 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     playerId, gameNumber, isChallenge, device, sessionDurationMs, referrer,
     isScoreboard,
     // Phase 2
+    score, scoreBreakdown,
     strategyArchetype, antiPatterns, sophisticationScore, platformsForged,
     dealStructureTypes,
     // Phase 5 ending business profile
@@ -160,13 +161,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         pipe.hincrby(`t:sophistication:${monthKey}`, getSophisticationBucket(sophisticationScore), 1);
       }
       if (dealStructureTypes) {
-        const topStructure = Object.entries(dealStructureTypes).sort((a, b) => b[1] - a[1])[0];
-        if (topStructure) {
-          pipe.hincrby(`t:structures:${monthKey}`, topStructure[0], 1);
+        for (const [structureType, count] of Object.entries(dealStructureTypes)) {
+          pipe.hincrby(`t:structures:${monthKey}`, structureType, count);
         }
       }
       if (platformsForged != null) {
         pipe.hincrby(`t:platforms_forged:${monthKey}`, String(platformsForged), 1);
+      }
+
+      // Score dimensions (sums + counts for averaging)
+      if (scoreBreakdown) {
+        for (const [dim, val] of Object.entries(scoreBreakdown)) {
+          pipe.hincrby(`t:score_dim:${monthKey}`, dim, Math.round(val * 10)); // store as 10x for precision
+        }
+        pipe.hincrby(`t:score_dim_count:${monthKey}`, 'total', 1);
+      }
+
+      // Anti-pattern by grade (for cross-dimensional analysis)
+      if (antiPatterns && antiPatterns.length > 0 && grade) {
+        for (const ap of antiPatterns) {
+          pipe.hincrby(`t:antipattern_grade:${monthKey}`, `${ap}:${grade}`, 1);
+        }
+      }
+
+      // Archetype by grade
+      if (strategyArchetype && grade) {
+        pipe.hincrby(`t:archetype_grade:${monthKey}`, `${strategyArchetype}:${grade}`, 1);
       }
 
       // Phase 5: ending business profile

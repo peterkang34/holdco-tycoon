@@ -58,6 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       familyOfficeCompleted,
       legacyGrade,
       foMultiplier,
+      strategy,
     } = body || {};
 
     // initials: 2-4 uppercase alpha chars
@@ -128,6 +129,40 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await kv.set(rateLimitKey, '1', { ex: RATE_LIMIT_SECONDS });
 
+    // Validate strategy (optional enrichment data)
+    let validStrategy = undefined;
+    if (strategy && typeof strategy === 'object' && !Array.isArray(strategy)) {
+      const s = strategy as any;
+      if (
+        s.scoreBreakdown && typeof s.scoreBreakdown === 'object' &&
+        typeof s.archetype === 'string' &&
+        typeof s.sophisticationScore === 'number' &&
+        Array.isArray(s.sectorIds)
+      ) {
+        validStrategy = {
+          scoreBreakdown: s.scoreBreakdown,
+          archetype: String(s.archetype).slice(0, 50),
+          sophisticationScore: Math.max(0, Math.min(100, Math.round(s.sophisticationScore))),
+          antiPatterns: Array.isArray(s.antiPatterns) ? s.antiPatterns.map((p: any) => String(p).slice(0, 50)).slice(0, 10) : undefined,
+          sectorIds: s.sectorIds.map((sid: any) => String(sid).slice(0, 30)).slice(0, 16),
+          dealStructureTypes: typeof s.dealStructureTypes === 'object' ? s.dealStructureTypes : {},
+          platformsForged: typeof s.platformsForged === 'number' ? s.platformsForged : 0,
+          totalAcquisitions: typeof s.totalAcquisitions === 'number' ? s.totalAcquisitions : 0,
+          totalSells: typeof s.totalSells === 'number' ? s.totalSells : 0,
+          totalDistributions: typeof s.totalDistributions === 'number' ? s.totalDistributions : 0,
+          totalBuybacks: typeof s.totalBuybacks === 'number' ? s.totalBuybacks : 0,
+          equityRaisesUsed: typeof s.equityRaisesUsed === 'number' ? s.equityRaisesUsed : 0,
+          peakLeverage: typeof s.peakLeverage === 'number' ? Math.round(s.peakLeverage * 10) / 10 : 0,
+          turnaroundsStarted: typeof s.turnaroundsStarted === 'number' ? s.turnaroundsStarted : 0,
+          turnaroundsSucceeded: typeof s.turnaroundsSucceeded === 'number' ? s.turnaroundsSucceeded : 0,
+          turnaroundsFailed: typeof s.turnaroundsFailed === 'number' ? s.turnaroundsFailed : 0,
+          maSourcingTier: typeof s.maSourcingTier === 'number' ? s.maSourcingTier : 0,
+          sharedServicesActive: typeof s.sharedServicesActive === 'number' ? s.sharedServicesActive : 0,
+          rolloverEquityCount: typeof s.rolloverEquityCount === 'number' ? s.rolloverEquityCount : 0,
+        };
+      }
+    }
+
     // --- Store Entry ---
     const id = randomUUID();
     const multiplier = DIFFICULTY_MULTIPLIER[validDifficulty] ?? 1.0;
@@ -155,6 +190,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       avgEbitdaMargin: typeof avgEbitdaMargin === 'number' ? Math.round(avgEbitdaMargin * 1000) / 1000 : undefined,
       familyOfficeCompleted: familyOfficeCompleted === true ? true : undefined,
       legacyGrade: typeof legacyGrade === 'string' && ['Enduring','Influential','Established','Fragile'].includes(legacyGrade) ? legacyGrade : undefined,
+      strategy: validStrategy,
     };
 
     // Add to sorted set with adjusted FEV as the ranking score

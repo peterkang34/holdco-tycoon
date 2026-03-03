@@ -2,95 +2,15 @@ import { useState, useEffect, useMemo } from 'react';
 import { AdminLogin } from './AdminLogin';
 import { AdminBarChart } from './AdminBarChart';
 import { FeedbackTab } from './FeedbackTab';
+import { OverviewTab } from './OverviewTab';
+import { BalanceTab } from './BalanceTab';
+import { MiniTrend, SectionHeader, HorizontalBar, DonutChart, FunnelStep } from './adminShared';
 import { MetricCard } from '../ui/MetricCard';
-import { getGradeColor } from '../../utils/gradeColors';
 import { SECTORS } from '../../data/sectors';
 import { formatMoney } from '../../engine/types';
-import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
+import type { AnalyticsData, MonthData, Totals } from './adminTypes';
 
-// ── Types ────────────────────────────────────────────────────────
-
-interface ChallengeMetrics {
-  created: number;
-  shared: number;
-  joined: number;
-  started: number;
-  completed: number;
-  scoreboardViews: number;
-}
-
-interface MonthData {
-  month: string;
-  started: number;
-  completed: number;
-  uniquePlayers: number;
-  configBreakdown: Record<string, number>;
-  sectorBreakdown: Record<string, number>;
-  roundDistribution: Record<string, number>;
-  gradeDistribution: Record<string, number>;
-  fevDistribution: Record<string, number>;
-  abandonByRound: Record<string, number>;
-  deviceBreakdown: Record<string, number>;
-  deviceComplete: Record<string, number>;
-  deviceAbandon: Record<string, number>;
-  returningBreakdown: Record<string, number>;
-  durationDistribution: Record<string, number>;
-  pageViews: number;
-  viewsByDevice: Record<string, number>;
-  startByNth: Record<string, number>;
-  completeByNth: Record<string, number>;
-  archetypeDistribution: Record<string, number>;
-  antiPatternDistribution: Record<string, number>;
-  sophisticationDistribution: Record<string, number>;
-  dealStructureDistribution: Record<string, number>;
-  platformsForgedDistribution: Record<string, number>;
-  endingSubTypes: Record<string, number>;
-  endingEbitdaSum: number;
-  endingEbitdaCount: number;
-  endingConstruction: Record<string, number>;
-  challengeMetrics: ChallengeMetrics;
-  featureAdoption: Record<string, number>;
-  eventChoices: Record<string, number>;
-}
-
-interface CohortRow {
-  cohortWeek: string;
-  weekData: Record<string, number>;
-}
-
-interface LeaderboardEntry {
-  holdcoName: string;
-  initials: string;
-  founderEquityValue: number;
-  grade: string;
-  difficulty: string;
-  duration?: string;
-  businessCount?: number;
-  score?: number;
-  date: string;
-}
-
-interface ActivityEvent {
-  type: 'start' | 'abandon';
-  ts: string;
-  difficulty?: string;
-  duration?: string;
-  sector?: string;
-  device?: string;
-  gameNumber?: number;
-  round?: number;
-  sessionDurationMs?: number;
-  fev?: number;
-}
-
-interface AnalyticsData {
-  allTime: { started: number; completed: number };
-  months: MonthData[];
-  leaderboardEntries: LeaderboardEntry[];
-  recentEntries: LeaderboardEntry[];
-  activityFeed: ActivityEvent[];
-  cohortRetention: CohortRow[];
-}
+// ── Tab Configuration ────────────────────────────────────────
 
 type TabId = 'overview' | 'funnel' | 'retention' | 'engagement' | 'balance' | 'challenge' | 'devices' | 'feedback';
 const TABS: { id: TabId; label: string }[] = [
@@ -98,135 +18,11 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'funnel', label: 'Funnel' },
   { id: 'retention', label: 'Retention' },
   { id: 'engagement', label: 'Engagement' },
-  { id: 'balance', label: 'Balance' },
+  { id: 'balance', label: 'Strategy & Balance' },
   { id: 'challenge', label: 'Challenge' },
   { id: 'devices', label: 'Devices' },
   { id: 'feedback', label: 'Feedback' },
 ];
-
-function getTimeAgo(date: Date): string {
-  const now = Date.now();
-  const diff = now - date.getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return date.toLocaleDateString();
-}
-
-// ── Shared Components ─────────────────────────────────────────
-
-function MiniTrend({ label, data }: { label: string; data: { month: string; value: number }[] }) {
-  const max = Math.max(...data.map(d => d.value), 1);
-  return (
-    <div className="card p-3">
-      <h4 className="text-xs font-semibold text-text-secondary mb-2">{label}</h4>
-      <div className="flex items-end gap-1 h-10">
-        {data.map(d => (
-          <div key={d.month} className="flex-1 flex flex-col items-center gap-0.5">
-            <div
-              className="w-full rounded-sm bg-accent/70 transition-all duration-300"
-              style={{ height: `${Math.max((d.value / max) * 100, 4)}%` }}
-              title={`${d.month}: ${d.value}`}
-            />
-            <span className="text-[8px] text-text-muted leading-none">{d.month.slice(5)}</span>
-          </div>
-        ))}
-      </div>
-      <div className="text-right text-[10px] text-text-muted mt-1">
-        Latest: {data[data.length - 1]?.value ?? 0}
-      </div>
-    </div>
-  );
-}
-
-function SectionHeader({ title }: { title: string }) {
-  return <h3 className="text-sm font-semibold text-text-secondary mb-3">{title}</h3>;
-}
-
-function HorizontalBar({ items, colorFn }: { items: { label: string; value: number }[]; colorFn?: (label: string) => string }) {
-  const max = Math.max(...items.map(i => i.value), 1);
-  return (
-    <div className="space-y-1.5">
-      {items.map(item => (
-        <div key={item.label} className="flex items-center gap-2">
-          <span className="text-[11px] text-text-secondary w-24 truncate text-right" title={item.label}>{item.label}</span>
-          <div className="flex-1 h-4 bg-bg-primary rounded overflow-hidden">
-            <div
-              className="h-full rounded transition-all duration-500"
-              style={{
-                width: `${Math.max((item.value / max) * 100, 2)}%`,
-                backgroundColor: colorFn ? colorFn(item.label) : 'var(--color-accent)',
-              }}
-            />
-          </div>
-          <span className="text-[11px] font-mono text-text-muted w-8 text-right">{item.value}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function DonutChart({ items, size = 80 }: { items: { label: string; value: number; color: string }[]; size?: number }) {
-  const total = items.reduce((s, i) => s + i.value, 0);
-  if (total === 0) return <div className="text-xs text-text-muted">No data</div>;
-  const radius = size / 2 - 8;
-  const circumference = 2 * Math.PI * radius;
-  let offset = 0;
-
-  return (
-    <div className="flex items-center gap-3">
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
-        {items.map((item) => {
-          const pct = item.value / total;
-          const dashLength = pct * circumference;
-          const segment = (
-            <circle
-              key={item.label}
-              cx={size / 2}
-              cy={size / 2}
-              r={radius}
-              fill="none"
-              stroke={item.color}
-              strokeWidth="10"
-              strokeDasharray={`${dashLength} ${circumference - dashLength}`}
-              strokeDashoffset={-offset}
-              transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            />
-          );
-          offset += dashLength;
-          return segment;
-        })}
-      </svg>
-      <div className="space-y-1">
-        {items.map(item => (
-          <div key={item.label} className="flex items-center gap-1.5">
-            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
-            <span className="text-[11px] text-text-secondary">{item.label}: {item.value} ({total > 0 ? Math.round(item.value / total * 100) : 0}%)</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function FunnelStep({ label, value, maxValue, color = 'var(--color-accent)' }: { label: string; value: number; maxValue: number; color?: string }) {
-  const pct = maxValue > 0 ? (value / maxValue) * 100 : 0;
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-[11px] text-text-secondary w-28 text-right truncate">{label}</span>
-      <div className="flex-1 h-6 bg-bg-primary rounded overflow-hidden relative">
-        <div className="h-full rounded transition-all duration-500" style={{ width: `${Math.max(pct, 2)}%`, backgroundColor: color }} />
-        <span className="absolute inset-0 flex items-center justify-center text-[10px] font-mono text-text-primary mix-blend-difference">
-          {value} ({pct.toFixed(0)}%)
-        </span>
-      </div>
-    </div>
-  );
-}
 
 // ── Health Alerts ─────────────────────────────────────────────
 
@@ -330,7 +126,7 @@ export function AdminDashboard() {
 
   // ── Aggregation hooks (must be before early returns) ──
 
-  const totals = useMemo(() => {
+  const totals: Totals = useMemo(() => {
     if (!data) return {
       allConfig: EMPTY_RECORD, allSectors: EMPTY_RECORD, allGrades: EMPTY_RECORD,
       allFev: EMPTY_RECORD, allAbandon: EMPTY_RECORD, allRounds: EMPTY_RECORD,
@@ -339,6 +135,8 @@ export function AdminDashboard() {
       allChoices: EMPTY_RECORD, allArchetypes: EMPTY_RECORD, allAntiPatterns: EMPTY_RECORD,
       allSophistication: EMPTY_RECORD, allStructures: EMPTY_RECORD,
       allEndingSubTypes: EMPTY_RECORD, allEndingConstruction: EMPTY_RECORD, avgEndingEbitda: 0,
+      allScoreDimSums: EMPTY_RECORD, allScoreDimCounts: EMPTY_RECORD,
+      allAntiPatternByGrade: EMPTY_RECORD, allArchetypeByGrade: EMPTY_RECORD,
       totalUnique: 0, totalViews: 0, completionRate: '0%', avgFev: 0, topFev: 0,
       normalPct: '0%', quickPct: '0%', mobileSharePct: '0%',
       totalChallenge: { created: 0, shared: 0, joined: 0, started: 0, completed: 0, scoreboardViews: 0 },
@@ -364,6 +162,11 @@ export function AdminDashboard() {
     const allStructures: Record<string, number> = {};
     const allEndingSubTypes: Record<string, number> = {};
     const allEndingConstruction: Record<string, number> = {};
+    // New Phase 1 aggregates
+    const allScoreDimSums: Record<string, number> = {};
+    const allScoreDimCounts: Record<string, number> = {};
+    const allAntiPatternByGrade: Record<string, number> = {};
+    const allArchetypeByGrade: Record<string, number> = {};
     let totalUnique = 0;
     let totalViews = 0;
     let ebitdaTotalSum = 0;
@@ -396,6 +199,11 @@ export function AdminDashboard() {
       merge(allStructures, m.dealStructureDistribution);
       merge(allEndingSubTypes, m.endingSubTypes);
       merge(allEndingConstruction, m.endingConstruction);
+      // New Phase 1 counters
+      if (m.scoreDimSums) merge(allScoreDimSums, m.scoreDimSums);
+      if (m.scoreDimCounts) merge(allScoreDimCounts, m.scoreDimCounts);
+      if (m.antiPatternByGrade) merge(allAntiPatternByGrade, m.antiPatternByGrade);
+      if (m.archetypeByGrade) merge(allArchetypeByGrade, m.archetypeByGrade);
       ebitdaTotalSum += m.endingEbitdaSum;
       ebitdaTotalCount += m.endingEbitdaCount;
       totalChallenge.created += m.challengeMetrics.created;
@@ -411,12 +219,10 @@ export function AdminDashboard() {
       : '0%';
 
     const bucketMidpoints: Record<string, number> = {
-      // Legacy buckets
       '0-5000': 2500, '5000-10000': 7500, '10000-20000': 15000,
       '20000-50000': 35000, '50000-100000': 75000,
       '100000+': 150000,
       '100000-200000': 150000, '200000-500000': 350000, '500000+': 750000,
-      // New wider buckets
       '0-10000': 5000, '10000-50000': 30000,
       '100000-250000': 175000, '250000-500000': 375000,
       '500000-1000000': 750000, '1000000-2500000': 1750000, '2500000+': 3750000,
@@ -439,13 +245,11 @@ export function AdminDashboard() {
     const quickCount = (allConfig['easy:quick'] || 0) + (allConfig['normal:quick'] || 0);
     const quickPct = data.allTime.started > 0 ? ((quickCount / data.allTime.started) * 100).toFixed(0) + '%' : '0%';
 
-    // Mobile share
     const totalDeviceStarts = Object.values(allDevice).reduce((s, v) => s + v, 0);
     const mobileSharePct = totalDeviceStarts > 0
       ? (((allDevice['mobile'] || 0) / totalDeviceStarts) * 100).toFixed(0) + '%'
       : '0%';
 
-    // Average session duration
     const durationMidpoints: Record<string, number> = { '<5m': 2.5, '5-15m': 10, '15-30m': 22.5, '30-60m': 45, '60m+': 75 };
     let durSum = 0, durCount = 0;
     for (const [bucket, count] of Object.entries(allDuration)) {
@@ -454,19 +258,16 @@ export function AdminDashboard() {
     }
     const avgSessionDuration = durCount > 0 ? `${Math.round(durSum / durCount)}m` : '—';
 
-    // New vs Returning
     const newPlayers = allReturning['new'] || 0;
     const returningPlayers = allReturning['returning'] || 0;
     const newVsReturning = (newPlayers + returningPlayers) > 0
       ? `${Math.round(newPlayers / (newPlayers + returningPlayers) * 100)}% new`
       : '—';
 
-    // Visit → Start rate
     const visitStartRate = totalViews > 0
       ? ((data.allTime.started / totalViews) * 100).toFixed(0) + '%'
       : '—';
 
-    // Second game rate
     const allStartByNth: Record<string, number> = {};
     for (const m of data.months) merge(allStartByNth, m.startByNth);
     const firstGameStarts = allStartByNth['1'] || 0;
@@ -482,6 +283,7 @@ export function AdminDashboard() {
       allDevice, allDeviceComplete, allDeviceAbandon, allReturning, allDuration,
       allFeatures, allChoices, allArchetypes, allAntiPatterns, allSophistication, allStructures,
       allEndingSubTypes, allEndingConstruction, avgEndingEbitda,
+      allScoreDimSums, allScoreDimCounts, allAntiPatternByGrade, allArchetypeByGrade,
       totalUnique, totalViews, completionRate, avgFev, topFev, normalPct, quickPct,
       mobileSharePct, totalChallenge, avgSessionDuration, newVsReturning, visitStartRate, secondGameRate,
     };
@@ -495,18 +297,18 @@ export function AdminDashboard() {
       emoji: SECTORS[id]?.emoji,
     })), [totals.allSectors]);
 
-  const roundItems = useMemo(() =>
-    Object.entries(totals.allRounds).map(([round, count]) => ({
-      label: `Year ${round}`,
-      value: count,
-    })).sort((a, b) => parseInt(a.label.split(' ')[1]) - parseInt(b.label.split(' ')[1])), [totals.allRounds]);
-
   const abandonItems = useMemo(() =>
     Object.entries(totals.allAbandon).map(([round, count]) => ({
       label: `Year ${round}`,
       value: count,
       color: '#ef4444',
     })).sort((a, b) => parseInt(a.label.split(' ')[1]) - parseInt(b.label.split(' ')[1])), [totals.allAbandon]);
+
+  const roundItems = useMemo(() =>
+    Object.entries(totals.allRounds).map(([round, count]) => ({
+      label: `Year ${round}`,
+      value: count,
+    })).sort((a, b) => parseInt(a.label.split(' ')[1]) - parseInt(b.label.split(' ')[1])), [totals.allRounds]);
 
   const configItems = useMemo(() =>
     Object.entries(totals.allConfig).map(([key, count]) => {
@@ -526,20 +328,16 @@ export function AdminDashboard() {
 
   const fevItems = useMemo(() => {
     const order = [
-      // Legacy buckets (shown only if data exists)
       '0-5000', '5000-10000', '10000-20000', '20000-50000',
       '100000+', '100000-200000', '200000-500000', '500000+',
-      // Current buckets
       '0-10000', '10000-50000', '50000-100000',
       '100000-250000', '250000-500000', '500000-1000000',
       '1000000-2500000', '2500000+',
     ];
     const labels: Record<string, string> = {
-      // Legacy
       '0-5000': '$0-5M (old)', '5000-10000': '$5-10M (old)', '10000-20000': '$10-20M (old)',
       '20000-50000': '$20-50M (old)', '100000+': '$100M+ (old)',
       '100000-200000': '$100-200M (old)', '200000-500000': '$200-500M (old)', '500000+': '$500M+ (old)',
-      // Current
       '0-10000': '$0-10M', '10000-50000': '$10-50M', '50000-100000': '$50-100M',
       '100000-250000': '$100-250M', '250000-500000': '$250-500M', '500000-1000000': '$500M-1B',
       '1000000-2500000': '$1-2.5B', '2500000+': '$2.5B+',
@@ -578,12 +376,11 @@ export function AdminDashboard() {
     );
   }
 
-  // ── k-factor calculation ──
+  // ── Derived values ──
   const kFactor = totals.totalChallenge.created > 0 && totals.totalChallenge.joined > 0
     ? ((totals.totalChallenge.joined / totals.totalChallenge.created) * (totals.totalChallenge.started / Math.max(totals.totalChallenge.joined, 1))).toFixed(2)
     : '—';
 
-  // ── Avg sophistication ──
   const sophMidpoints: Record<string, number> = { '0-19': 10, '20-39': 30, '40-59': 50, '60-79': 70, '80-100': 90 };
   let sophSum = 0, sophCount = 0;
   for (const [b, c] of Object.entries(totals.allSophistication)) { sophSum += (sophMidpoints[b] || 0) * c; sophCount += c; }
@@ -627,194 +424,7 @@ export function AdminDashboard() {
 
       {/* ═══════ OVERVIEW TAB ═══════ */}
       {activeTab === 'overview' && (
-        <>
-          {/* Hero metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-6">
-            <MetricCard label="Games Started" value={data.allTime.started} />
-            <MetricCard label="Completion Rate" value={totals.completionRate} status={parseFloat(totals.completionRate) > 50 ? 'positive' : 'warning'} />
-            <MetricCard label="2nd Game Rate" value={totals.secondGameRate} />
-            <MetricCard label="Avg Session" value={totals.avgSessionDuration} />
-            <MetricCard label="k-factor" value={kFactor} status={Number(kFactor) > 1 ? 'positive' : 'neutral'} />
-            <MetricCard label="Mobile Share" value={totals.mobileSharePct} />
-            <MetricCard label="Avg Sophistication" value={avgSophistication} />
-          </div>
-
-          {/* Trend sparklines */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-            <MiniTrend
-              label="Games Started / mo"
-              data={[...data.months].reverse().map(m => ({ month: m.month, value: m.started }))}
-            />
-            <MiniTrend
-              label="Completions / mo"
-              data={[...data.months].reverse().map(m => ({ month: m.month, value: m.completed }))}
-            />
-            <MiniTrend
-              label="Page Views / mo"
-              data={[...data.months].reverse().map(m => ({ month: m.month, value: m.pageViews }))}
-            />
-          </div>
-
-          {/* Secondary metrics */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-            <MetricCard label="Unique Players" value={totals.totalUnique} />
-            <MetricCard label="Avg FEV (est)" value={formatMoney(totals.avgFev)} />
-            <MetricCard label="Top FEV" value={formatMoney(totals.topFev)} status="positive" />
-            <MetricCard label="Normal Mode" value={totals.normalPct} />
-            <MetricCard label="Quick Play" value={totals.quickPct} />
-            <MetricCard label="Visit→Start" value={totals.visitStartRate} />
-          </div>
-
-          {/* Leaderboard */}
-          {data.leaderboardEntries.length > 0 && (
-            <div className="card p-4">
-              <SectionHeader title="Top Leaderboard Entries" />
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-text-muted border-b border-border">
-                      <th className="text-left py-2 pr-3">#</th>
-                      <th className="text-left py-2 pr-3">Name</th>
-                      <th className="text-center py-2 pr-3">Initials</th>
-                      <th className="text-right py-2 pr-3">Adj FEV</th>
-                      <th className="text-right py-2 pr-3">Raw FEV</th>
-                      <th className="text-center py-2 pr-3">Score</th>
-                      <th className="text-center py-2 pr-3">Grade</th>
-                      <th className="text-center py-2 pr-3">Mode</th>
-                      <th className="text-center py-2 pr-3">Biz</th>
-                      <th className="text-right py-2">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.leaderboardEntries.map((entry, i) => {
-                      const multiplier = entry.difficulty === 'normal'
-                        ? DIFFICULTY_CONFIG.normal.leaderboardMultiplier
-                        : DIFFICULTY_CONFIG.easy.leaderboardMultiplier;
-                      const adjFev = Math.round(entry.founderEquityValue * multiplier);
-                      const durationLabel = entry.duration === 'quick' ? '10' : '20';
-                      const diffLabel = entry.difficulty === 'normal' ? 'H' : 'E';
-                      return (
-                        <tr key={i} className="border-b border-border/50">
-                          <td className="py-1.5 pr-3 text-text-muted font-mono">{i + 1}</td>
-                          <td className="py-1.5 pr-3 text-text-primary truncate max-w-[150px]">{entry.holdcoName}</td>
-                          <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.initials || '—'}</td>
-                          <td className="py-1.5 pr-3 text-right font-mono text-accent">{formatMoney(adjFev)}</td>
-                          <td className="py-1.5 pr-3 text-right font-mono text-text-secondary">{formatMoney(entry.founderEquityValue)}</td>
-                          <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.score ?? '—'}</td>
-                          <td className={`py-1.5 pr-3 text-center font-bold ${getGradeColor(entry.grade)}`}>{entry.grade}</td>
-                          <td className="py-1.5 pr-3 text-center">
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
-                              {diffLabel}/{durationLabel}
-                            </span>
-                          </td>
-                          <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.businessCount ?? '—'}</td>
-                          <td className="py-1.5 text-right text-text-muted font-mono">{new Date(entry.date).toLocaleDateString()}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Recent Games Feed */}
-          {data.recentEntries && data.recentEntries.length > 0 && (
-            <div className="card p-4 mt-4">
-              <SectionHeader title="Recent Games (Last 25)" />
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="text-text-muted border-b border-border">
-                      <th className="text-left py-2 pr-3">Date</th>
-                      <th className="text-center py-2 pr-3">Initials</th>
-                      <th className="text-left py-2 pr-3">Name</th>
-                      <th className="text-right py-2 pr-3">Adj FEV</th>
-                      <th className="text-center py-2 pr-3">Score</th>
-                      <th className="text-center py-2 pr-3">Grade</th>
-                      <th className="text-center py-2 pr-3">Mode</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {data.recentEntries.map((entry, i) => {
-                      const multiplier = entry.difficulty === 'normal'
-                        ? DIFFICULTY_CONFIG.normal.leaderboardMultiplier
-                        : DIFFICULTY_CONFIG.easy.leaderboardMultiplier;
-                      const adjFev = Math.round(entry.founderEquityValue * multiplier);
-                      const durationLabel = entry.duration === 'quick' ? '10' : '20';
-                      const diffLabel = entry.difficulty === 'normal' ? 'H' : 'E';
-                      const dateObj = new Date(entry.date);
-                      const timeAgo = getTimeAgo(dateObj);
-                      return (
-                        <tr key={i} className="border-b border-border/50">
-                          <td className="py-1.5 pr-3 text-text-muted font-mono" title={dateObj.toLocaleString()}>
-                            {timeAgo}
-                          </td>
-                          <td className="py-1.5 pr-3 text-center font-mono text-text-primary font-bold">{entry.initials || '—'}</td>
-                          <td className="py-1.5 pr-3 text-text-secondary truncate max-w-[150px]">{entry.holdcoName}</td>
-                          <td className="py-1.5 pr-3 text-right font-mono text-accent">{formatMoney(adjFev)}</td>
-                          <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.score ?? '—'}</td>
-                          <td className={`py-1.5 pr-3 text-center font-bold ${getGradeColor(entry.grade)}`}>{entry.grade}</td>
-                          <td className="py-1.5 pr-3 text-center">
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
-                              {diffLabel}/{durationLabel}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {/* Activity Feed */}
-          {data.activityFeed && data.activityFeed.length > 0 && (
-            <div className="card p-4 mt-4">
-              <SectionHeader title="Live Activity Feed" />
-              <div className="space-y-1 max-h-[400px] overflow-y-auto">
-                {data.activityFeed.map((evt, i) => {
-                  const dateObj = new Date(evt.ts);
-                  const timeAgo = getTimeAgo(dateObj);
-                  const durationLabel = evt.duration === 'quick' ? '10yr' : '20yr';
-                  const diffLabel = evt.difficulty === 'normal' ? 'Hard' : 'Easy';
-
-                  if (evt.type === 'start') {
-                    return (
-                      <div key={i} className="flex items-center gap-2 py-1.5 border-b border-border/30 text-xs">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium w-16 text-center shrink-0">START</span>
-                        <span className="text-text-muted font-mono w-16 shrink-0" title={dateObj.toLocaleString()}>{timeAgo}</span>
-                        <span className="text-text-secondary">{diffLabel} {durationLabel}</span>
-                        {evt.sector && <span className="text-text-muted">· {evt.sector}</span>}
-                        {evt.device && <span className="text-text-muted ml-auto">{evt.device}</span>}
-                        {evt.gameNumber != null && (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${evt.gameNumber === 1 ? 'bg-accent/20 text-accent' : 'bg-white/5 text-text-muted'}`}>
-                            {evt.gameNumber === 1 ? 'New' : `#${evt.gameNumber}`}
-                          </span>
-                        )}
-                      </div>
-                    );
-                  } else {
-                    const mins = evt.sessionDurationMs ? Math.round(evt.sessionDurationMs / 60000) : null;
-                    return (
-                      <div key={i} className="flex items-center gap-2 py-1.5 border-b border-border/30 text-xs">
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-medium w-16 text-center shrink-0">ABANDON</span>
-                        <span className="text-text-muted font-mono w-16 shrink-0" title={dateObj.toLocaleString()}>{timeAgo}</span>
-                        {evt.round != null && <span className="text-text-secondary">Year {evt.round}</span>}
-                        {evt.difficulty && <span className="text-text-muted">· {diffLabel} {durationLabel}</span>}
-                        {evt.fev != null && <span className="font-mono text-accent">{formatMoney(evt.fev)}</span>}
-                        {mins != null && <span className="text-text-muted ml-auto">{mins}m played</span>}
-                        {evt.device && <span className="text-text-muted">{evt.device}</span>}
-                      </div>
-                    );
-                  }
-                })}
-              </div>
-              <p className="text-[10px] text-text-muted mt-2">Shows last 50 events. Feed populates from new sessions going forward.</p>
-            </div>
-          )}
-        </>
+        <OverviewTab data={data} totals={totals} avgSophistication={avgSophistication} kFactor={kFactor} />
       )}
 
       {/* ═══════ FUNNEL TAB ═══════ */}
@@ -911,7 +521,6 @@ export function AdminDashboard() {
       {activeTab === 'engagement' && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            {/* Session Duration */}
             <div className="card p-4">
               <SectionHeader title="Session Duration Distribution" />
               <HorizontalBar
@@ -922,7 +531,6 @@ export function AdminDashboard() {
               />
             </div>
 
-            {/* Feature Adoption */}
             <div className="card p-4">
               <SectionHeader title="Feature Adoption (sorted ascending)" />
               <HorizontalBar
@@ -935,7 +543,6 @@ export function AdminDashboard() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            {/* Sophistication */}
             <div className="card p-4">
               <SectionHeader title="Sophistication Score Distribution" />
               <HorizontalBar
@@ -947,17 +554,15 @@ export function AdminDashboard() {
               />
             </div>
 
-            {/* Sector Popularity */}
             <AdminBarChart title="Sector Popularity" items={sectorItems} />
           </div>
 
-          {/* Event Choices */}
           {Object.keys(totals.allChoices).length > 0 && (
             <div className="card p-4">
               <SectionHeader title="Event Choice Distribution" />
               <HorizontalBar
                 items={Object.entries(totals.allChoices)
-                  .map(([k, v]) => ({ label: k.replace(/_/g, ' ').replace(':', ' → '), value: v }))
+                  .map(([k, v]) => ({ label: k.replace(/_/g, ' ').replace(':', ' -> '), value: v }))
                   .sort((a, b) => b.value - a.value)
                   .slice(0, 20)}
               />
@@ -966,116 +571,9 @@ export function AdminDashboard() {
         </>
       )}
 
-      {/* ═══════ BALANCE TAB ═══════ */}
+      {/* ═══════ STRATEGY & BALANCE TAB ═══════ */}
       {activeTab === 'balance' && (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            {/* Archetype Distribution */}
-            <div className="card p-4">
-              <SectionHeader title="Strategy Archetype Distribution" />
-              <HorizontalBar
-                items={Object.entries(totals.allArchetypes)
-                  .map(([a, v]) => ({ label: a.replace(/_/g, ' '), value: v }))
-                  .sort((a, b) => b.value - a.value)}
-                colorFn={() => '#a78bfa'}
-              />
-            </div>
-
-            {/* Anti-Pattern Prevalence */}
-            <div className="card p-4">
-              <SectionHeader title="Anti-Pattern Prevalence" />
-              <HorizontalBar
-                items={Object.entries(totals.allAntiPatterns)
-                  .map(([a, v]) => ({ label: a.replace(/_/g, ' '), value: v }))
-                  .sort((a, b) => b.value - a.value)}
-                colorFn={() => '#ef4444'}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            {/* Deal Structure Histogram */}
-            <div className="card p-4">
-              <SectionHeader title="Deal Structure Histogram" />
-              <HorizontalBar
-                items={Object.entries(totals.allStructures)
-                  .map(([s, v]) => ({ label: s.replace(/_/g, ' '), value: v }))
-                  .sort((a, b) => b.value - a.value)}
-                colorFn={() => '#f59e0b'}
-              />
-            </div>
-
-            {/* Grade + FEV */}
-            <div className="space-y-4">
-              <div className="card p-4">
-                <SectionHeader title="Grade Distribution" />
-                <div className="space-y-2">
-                  {gradeItems.map(item => (
-                    <div key={item.label} className="flex items-center gap-2">
-                      <span className={`text-sm font-bold w-6 ${getGradeColor(item.label)}`}>{item.label}</span>
-                      <div className="flex-1 h-5 bg-bg-primary rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${Math.max((item.value / Math.max(...gradeItems.map(g => g.value), 1)) * 100, 2)}%`,
-                            backgroundColor: item.label === 'S' ? '#facc15' : item.label === 'A' ? 'var(--color-accent)' : item.label === 'B' ? '#60a5fa' : item.label === 'C' ? '#f59e0b' : item.label === 'D' ? '#f97316' : '#ef4444',
-                          }}
-                        />
-                      </div>
-                      <span className="text-xs font-mono text-text-secondary w-8 text-right">{item.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <AdminBarChart title="FEV Distribution" items={fevItems} />
-            </div>
-          </div>
-
-          {/* Completion Profile: Ending Businesses */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-            {/* Portfolio Construction */}
-            <div className="card p-4 min-w-0">
-              <SectionHeader title="Portfolio Construction" />
-              {Object.keys(totals.allEndingConstruction).length > 0 ? (
-                <>
-                  <DonutChart items={[
-                    { label: 'Standalone', value: totals.allEndingConstruction['standalone'] || 0, color: 'var(--color-accent)' },
-                    { label: 'Roll-Up', value: totals.allEndingConstruction['roll_up'] || 0, color: '#a78bfa' },
-                    { label: 'Integrated Platform', value: totals.allEndingConstruction['integrated_platform'] || 0, color: '#facc15' },
-                  ].filter(i => i.value > 0)} />
-                  <p className="text-[10px] text-text-muted mt-2">Distribution of ending business types across completions</p>
-                </>
-              ) : <p className="text-xs text-text-muted">No data yet</p>}
-            </div>
-
-            {/* Avg Ending Business Size */}
-            <div className="card p-4 min-w-0 flex flex-col justify-center">
-              <SectionHeader title="Avg Ending Business EBITDA" />
-              <div className="text-center py-4">
-                <p className="text-3xl font-bold text-accent">{totals.avgEndingEbitda > 0 ? formatMoney(totals.avgEndingEbitda) : '—'}</p>
-                <p className="text-xs text-text-muted mt-1">Average EBITDA of active businesses at game end</p>
-              </div>
-            </div>
-
-            {/* Top Ending Sub-Sectors */}
-            <div className="card p-4 min-w-0">
-              <SectionHeader title="Top Ending Sub-Sectors" />
-              {Object.keys(totals.allEndingSubTypes).length > 0 ? (
-                <HorizontalBar
-                  items={Object.entries(totals.allEndingSubTypes)
-                    .map(([k, v]) => {
-                      const parts = k.split(':');
-                      const sectorEmoji = SECTORS[parts[0]]?.emoji || '';
-                      return { label: `${sectorEmoji} ${(parts[1] || k).replace(/_/g, ' ')}`, value: v };
-                    })
-                    .sort((a, b) => b.value - a.value)
-                    .slice(0, 12)}
-                  colorFn={() => '#34d399'}
-                />
-              ) : <p className="text-xs text-text-muted">No data yet</p>}
-            </div>
-          </div>
-        </>
+        <BalanceTab data={data} totals={totals} sectorItems={sectorItems} gradeItems={gradeItems} fevItems={fevItems} />
       )}
 
       {/* ═══════ CHALLENGE TAB ═══════ */}
@@ -1090,7 +588,6 @@ export function AdminDashboard() {
             <MetricCard label="k-factor" value={kFactor} status={Number(kFactor) > 1 ? 'positive' : 'neutral'} />
           </div>
 
-          {/* Challenge Funnel */}
           <div className="card p-4 mb-4">
             <SectionHeader title="Challenge Viral Funnel" />
             <div className="space-y-2">
@@ -1103,7 +600,6 @@ export function AdminDashboard() {
             </div>
           </div>
 
-          {/* Monthly Challenge Trends */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <MiniTrend
               label="Challenges Created / mo"
@@ -1147,7 +643,6 @@ export function AdminDashboard() {
             </div>
           </div>
 
-          {/* Completion rate by device */}
           <div className="card p-4 mb-4">
             <SectionHeader title="Completion Rate by Device" />
             <div className="grid grid-cols-3 gap-4">
@@ -1166,7 +661,6 @@ export function AdminDashboard() {
             </div>
           </div>
 
-          {/* Page views by device */}
           <div className="card p-4">
             <SectionHeader title="Page Views by Device (Monthly)" />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">

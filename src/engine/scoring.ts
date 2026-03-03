@@ -4,6 +4,7 @@ import {
   ScoreBreakdown,
   PostGameInsight,
   LeaderboardEntry,
+  LeaderboardStrategy,
 } from './types';
 import { calculateMetrics, calculateSectorFocusBonus, calculateExitValuation } from './simulation';
 import { POST_GAME_INSIGHTS } from '../data/tips';
@@ -610,7 +611,7 @@ export async function loadLeaderboard(): Promise<LeaderboardEntry[]> {
  */
 export async function saveToLeaderboard(
   entry: Omit<LeaderboardEntry, 'id' | 'date'>,
-  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number; hasRestructured?: boolean; submittedMultiplier?: number; familyOfficeCompleted?: boolean; legacyGrade?: string; foMultiplier?: number }
+  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number; hasRestructured?: boolean; submittedMultiplier?: number; familyOfficeCompleted?: boolean; legacyGrade?: string; foMultiplier?: number; strategy?: LeaderboardStrategy }
 ): Promise<LeaderboardEntry> {
   const newEntry: LeaderboardEntry = {
     ...entry,
@@ -642,6 +643,7 @@ export async function saveToLeaderboard(
     ...(extra?.familyOfficeCompleted ? { familyOfficeCompleted: extra.familyOfficeCompleted } : {}),
     ...(extra?.legacyGrade ? { legacyGrade: extra.legacyGrade } : {}),
     ...(extra?.foMultiplier != null ? { foMultiplier: extra.foMultiplier } : {}),
+    ...(extra?.strategy ? { strategy: extra.strategy } : {}),
   };
   saveToLocalLeaderboard(localEntry);
   return newEntry;

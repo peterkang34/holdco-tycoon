@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration, IntegratedPlatform } from '../../engine/types';
+import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, LeaderboardStrategy, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration, IntegratedPlatform } from '../../engine/types';
 import type { IPOState } from '../../engine/types';
 import { calculatePublicCompanyBonus } from '../../engine/ipo';
 import { useGameStore } from '../../hooks/useGame';
@@ -178,40 +178,33 @@ export function GameOverScreen({
     }
   };
 
-  // Fire telemetry on game completion — full snapshot
-  useEffect(() => {
-    const sector = businesses[0]?.sectorId || exitedBusinesses[0]?.sectorId || 'agency';
+  // Strategy data — shared by telemetry + leaderboard save
+  const strategyData = useMemo(() => {
     const state = useGameStore.getState();
     const allActions = state.roundHistory.flatMap(r => r.actions);
 
-    // Count acquisitions, sells, turnarounds
     const acquireTypes = new Set(['acquire', 'acquire_tuck_in']);
     const sellTypes = new Set(['sell', 'sell_platform', 'accept_offer']);
     const totalAcquisitions = allActions.filter(a => acquireTypes.has(a.type)).length;
     const totalSells = allActions.filter(a => sellTypes.has(a.type)).length;
     const turnaroundsStarted = allActions.filter(a => a.type === 'start_turnaround').length;
 
-    // Turnaround outcomes
     const resolvedTurnarounds = allActions.filter(a => a.type === 'turnaround_resolved');
     const turnaroundsSucceeded = resolvedTurnarounds.filter(a => (a.details as any)?.outcome === 'success').length;
     const turnaroundsFailed = resolvedTurnarounds.filter(a => (a.details as any)?.outcome !== 'success').length;
 
-    // Peak leverage from metricsHistory
     const peakLeverage = metricsHistory.length > 0
       ? Math.max(...metricsHistory.map(m => m.metrics.netDebtToEbitda))
       : 0;
 
-    // Peak distress level (map string to number)
     const distressMap: Record<string, number> = { comfortable: 0, elevated: 1, stressed: 2, breach: 3 };
     const peakDistressLevel = metricsHistory.length > 0
       ? Math.max(...metricsHistory.map(m => distressMap[m.metrics.distressLevel] ?? 0))
       : 0;
 
-    // Unique sectors
     const allBiz = [...businesses, ...exitedBusinesses];
     const sectorIds = [...new Set(allBiz.map(b => b.sectorId))];
 
-    // Deal structure histogram
     const dealStructureTypes: Record<string, number> = {};
     for (const a of allActions) {
       if (acquireTypes.has(a.type) && (a.details as any)?.dealStructure) {
@@ -220,17 +213,14 @@ export function GameOverScreen({
       }
     }
 
-    // Rollover equity count
     const rolloverEquityCount = allActions.filter(a =>
       acquireTypes.has(a.type) && (a.details as any)?.dealStructure === 'rollover_equity'
     ).length;
 
-    // Strategy archetype heuristic
     const activeCount = businesses.filter(b => b.status === 'active').length;
     const platformCount = integratedPlatforms.length;
     const archetype = computeArchetype(activeCount, platformCount, totalAcquisitions, totalSells, turnaroundsStarted, totalDistributions, equityRaisesUsed);
 
-    // Anti-patterns
     const antiPatterns: string[] = [];
     if (peakLeverage > 6) antiPatterns.push('over_leveraged');
     if (hasRestructured) antiPatterns.push('serial_restructurer');
@@ -239,7 +229,6 @@ export function GameOverScreen({
     if (turnaroundsFailed >= 3) antiPatterns.push('turnaround_graveyard');
     if (totalAcquisitions >= 8 && sectorIds.length >= 5) antiPatterns.push('spray_and_pray');
 
-    // Sophistication score (0-100)
     let sophisticationScore = 0;
     if (platformCount > 0) sophisticationScore += 15;
     if (turnaroundsStarted > 0) sophisticationScore += 10;
@@ -249,11 +238,10 @@ export function GameOverScreen({
     if (totalSells >= 2) sophisticationScore += 10;
     if (totalDistributions > 0) sophisticationScore += 10;
     if (equityRaisesUsed > 0 && equityRaisesUsed <= 2) sophisticationScore += 5;
-    if (activeCount >= 3 && sectorIds.length <= 2) sophisticationScore += 10; // sector focus
+    if (activeCount >= 3 && sectorIds.length <= 2) sophisticationScore += 10;
     if (score.total >= 60) sophisticationScore += 10;
     sophisticationScore = Math.min(100, sophisticationScore);
 
-    // Ending business profile: sub-types, avg EBITDA, construction
     const activeBiz = businesses.filter(b => b.status === 'active');
     const endingSubTypes: Record<string, number> = {};
     for (const b of activeBiz) {
@@ -275,6 +263,19 @@ export function GameOverScreen({
       endingConstruction['integrated_platform'] = integratedPlatforms.length;
     }
 
+    return {
+      totalAcquisitions, totalSells, turnaroundsStarted, turnaroundsSucceeded, turnaroundsFailed,
+      peakLeverage, peakDistressLevel, sectorIds, dealStructureTypes, rolloverEquityCount,
+      activeCount, platformCount, archetype, antiPatterns, sophisticationScore,
+      endingSubTypes, avgEndingEbitda, endingConstruction,
+      maSourcingTier: state.maSourcing.tier,
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fire telemetry on game completion — full snapshot
+  useEffect(() => {
+    const sector = businesses[0]?.sectorId || exitedBusinesses[0]?.sectorId || 'agency';
+
     const snapshot: GameCompleteSnapshot = {
       round: maxRounds,
       maxRounds,
@@ -293,30 +294,30 @@ export function GameOverScreen({
         balanceSheetHealth: score.balanceSheetHealth,
         strategicDiscipline: score.strategicDiscipline,
       },
-      businessCount: activeCount,
-      totalAcquisitions,
-      totalSells,
+      businessCount: strategyData.activeCount,
+      totalAcquisitions: strategyData.totalAcquisitions,
+      totalSells: strategyData.totalSells,
       totalDistributions,
       totalBuybacks,
       equityRaisesUsed,
-      peakLeverage: Math.round(peakLeverage * 10) / 10,
+      peakLeverage: Math.round(strategyData.peakLeverage * 10) / 10,
       hasRestructured,
-      peakDistressLevel,
-      platformsForged: platformCount,
-      turnaroundsStarted,
-      turnaroundsSucceeded,
-      turnaroundsFailed,
+      peakDistressLevel: strategyData.peakDistressLevel,
+      platformsForged: strategyData.platformCount,
+      turnaroundsStarted: strategyData.turnaroundsStarted,
+      turnaroundsSucceeded: strategyData.turnaroundsSucceeded,
+      turnaroundsFailed: strategyData.turnaroundsFailed,
       sharedServicesActive,
-      maSourcingTier: state.maSourcing.tier,
-      sectorIds,
-      dealStructureTypes: Object.keys(dealStructureTypes).length > 0 ? dealStructureTypes : undefined,
-      rolloverEquityCount,
-      strategyArchetype: archetype,
-      antiPatterns: antiPatterns.length > 0 ? antiPatterns : undefined,
-      sophisticationScore,
-      endingSubTypes: Object.keys(endingSubTypes).length > 0 ? endingSubTypes : undefined,
-      avgEndingEbitda: avgEndingEbitda > 0 ? avgEndingEbitda : undefined,
-      endingConstruction: Object.keys(endingConstruction).length > 0 ? endingConstruction : undefined,
+      maSourcingTier: strategyData.maSourcingTier,
+      sectorIds: strategyData.sectorIds,
+      dealStructureTypes: Object.keys(strategyData.dealStructureTypes).length > 0 ? strategyData.dealStructureTypes : undefined,
+      rolloverEquityCount: strategyData.rolloverEquityCount,
+      strategyArchetype: strategyData.archetype,
+      antiPatterns: strategyData.antiPatterns.length > 0 ? strategyData.antiPatterns : undefined,
+      sophisticationScore: strategyData.sophisticationScore,
+      endingSubTypes: Object.keys(strategyData.endingSubTypes).length > 0 ? strategyData.endingSubTypes : undefined,
+      avgEndingEbitda: strategyData.avgEndingEbitda > 0 ? strategyData.avgEndingEbitda : undefined,
+      endingConstruction: Object.keys(strategyData.endingConstruction).length > 0 ? strategyData.endingConstruction : undefined,
     };
     trackGameComplete(snapshot);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -422,6 +423,34 @@ export function GameOverScreen({
           familyOfficeCompleted: !!familyOfficeState?.legacyScore,
           legacyGrade: familyOfficeState?.legacyScore?.grade,
           foMultiplier: foMultiplier > 1.0 ? foMultiplier : undefined,
+          strategy: {
+            scoreBreakdown: {
+              valueCreation: score.valueCreation,
+              fcfShareGrowth: score.fcfShareGrowth,
+              portfolioRoic: score.portfolioRoic,
+              capitalDeployment: score.capitalDeployment,
+              balanceSheetHealth: score.balanceSheetHealth,
+              strategicDiscipline: score.strategicDiscipline,
+            },
+            archetype: strategyData.archetype,
+            sophisticationScore: strategyData.sophisticationScore,
+            antiPatterns: strategyData.antiPatterns.length > 0 ? strategyData.antiPatterns : undefined,
+            sectorIds: strategyData.sectorIds,
+            dealStructureTypes: strategyData.dealStructureTypes,
+            platformsForged: strategyData.platformCount,
+            totalAcquisitions: strategyData.totalAcquisitions,
+            totalSells: strategyData.totalSells,
+            totalDistributions: Math.round(totalDistributions),
+            totalBuybacks: Math.round(totalBuybacks),
+            equityRaisesUsed,
+            peakLeverage: Math.round(strategyData.peakLeverage * 10) / 10,
+            turnaroundsStarted: strategyData.turnaroundsStarted,
+            turnaroundsSucceeded: strategyData.turnaroundsSucceeded,
+            turnaroundsFailed: strategyData.turnaroundsFailed,
+            maSourcingTier: strategyData.maSourcingTier,
+            sharedServicesActive,
+            rolloverEquityCount: strategyData.rolloverEquityCount,
+          },
         }
       );
 

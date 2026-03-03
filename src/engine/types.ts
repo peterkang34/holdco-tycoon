@@ -644,6 +644,35 @@ export interface PostGameInsight {
   bookReference?: string;
 }
 
+export interface LeaderboardStrategy {
+  scoreBreakdown: {
+    valueCreation: number;
+    fcfShareGrowth: number;
+    portfolioRoic: number;
+    capitalDeployment: number;
+    balanceSheetHealth: number;
+    strategicDiscipline: number;
+  };
+  archetype: string;
+  sophisticationScore: number;
+  antiPatterns?: string[];
+  sectorIds: string[];
+  dealStructureTypes: Record<string, number>;
+  platformsForged: number;
+  totalAcquisitions: number;
+  totalSells: number;
+  totalDistributions: number;
+  totalBuybacks: number;
+  equityRaisesUsed: number;
+  peakLeverage: number;
+  turnaroundsStarted: number;
+  turnaroundsSucceeded: number;
+  turnaroundsFailed: number;
+  maSourcingTier: number;
+  sharedServicesActive: number;
+  rolloverEquityCount: number;
+}
+
 export interface LeaderboardEntry {
   id: string;
   holdcoName: string;
@@ -666,6 +695,7 @@ export interface LeaderboardEntry {
   familyOfficeCompleted?: boolean;
   legacyGrade?: string; // 'Enduring' | 'Influential' | 'Established' | 'Fragile'
   foMultiplier?: number; // 1.0-1.5 (FO performance bonus on Adjusted FEV)
+  strategy?: LeaderboardStrategy;
 }
 
 // Utility types
