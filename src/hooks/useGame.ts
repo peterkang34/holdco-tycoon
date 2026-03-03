@@ -1216,7 +1216,10 @@ export const useGameStore = create<GameStore>()(
           const ownedSubTypes = state.businesses
             .filter(b => b.sectorId === 'proSports' && (b.status === 'active' || b.status === 'integrated'))
             .map(b => b.subType);
-          if (ownedSubTypes.includes(deal.business.subType)) return;
+          if (ownedSubTypes.includes(deal.business.subType)) {
+            set({ lastAcquisitionResult: 'blocked_same_league' });
+            return;
+          }
         }
 
         // Enforce distress restrictions — covenant breach blocks new acquisitions

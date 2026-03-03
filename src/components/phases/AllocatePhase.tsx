@@ -117,7 +117,7 @@ interface AllocatePhaseProps {
   covenantBreachRounds?: number; // kept for caller compat, not used internally
   acquisitionsThisRound: number;
   maxAcquisitionsPerRound: number;
-  lastAcquisitionResult: 'success' | 'snatched' | null;
+  lastAcquisitionResult: 'success' | 'snatched' | 'blocked_same_league' | null;
   turnaroundTier: TurnaroundTier;
   activeTurnarounds: ActiveTurnaround[];
   onUnlockTurnaroundTier: () => void;
@@ -253,6 +253,14 @@ export function AllocatePhase({
   const [expandedDealIds, setExpandedDealIds] = useState<Set<string>>(() => new Set());
 
   const activeBusinesses = businesses.filter(b => b.status === 'active');
+
+  // Owned pro sports league sub-types (for same-league blocking on deal cards)
+  const ownedProSportsSubTypes = useMemo(() =>
+    businesses
+      .filter(b => b.sectorId === 'proSports' && (b.status === 'active' || b.status === 'integrated'))
+      .map(b => b.subType),
+    [businesses]
+  );
 
   // Portfolio sort
   const sortedBusinesses = useMemo(() => {
@@ -1717,6 +1725,7 @@ export function AllocatePhase({
                   onSelect={() => setSelectedDeal(deal)}
                   disabled={!distressRestrictions.canAcquire || acquisitionsThisRound >= maxAcquisitionsPerRound}
                   unaffordable={cash < Math.round(deal.effectivePrice * 0.25)}
+                  leagueBlocked={deal.business.sectorId === 'proSports' && ownedProSportsSubTypes.includes(deal.business.subType)}
                   availablePlatforms={getPlatformsForSector(deal.business.sectorId)}
                   isPassed={passedDealIdSet.has(deal.id)}
                   onPass={() => onPassDeal(deal.id)}

@@ -266,19 +266,25 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   const handleAcquire = useCallback((deal: Deal, structure: DealStructure) => {
     acquireBusiness(deal, structure);
     const result = useGameStore.getState().lastAcquisitionResult;
-    if (result === 'snatched') {
+    if (result === 'blocked_same_league') {
+      addToast({
+        message: `Cannot acquire ${deal.business.name}`,
+        detail: 'You already own a team in this league — one per league allowed',
+        type: 'warning',
+      });
+    } else if (result === 'snatched') {
       addToast({
         message: `Outbid on ${deal.business.name}`,
         detail: 'Another buyer snatched the deal',
         type: 'danger',
       });
-    } else if (structure.type === 'share_funded') {
+    } else if (result === 'success' && structure.type === 'share_funded') {
       addToast({
         message: `Acquired ${deal.business.name} via stock`,
         detail: `${structure.shareTerms?.sharesToIssue?.toLocaleString() ?? 0} shares issued — ${((structure.shareTerms?.dilutionPct ?? 0) * 100).toFixed(1)}% dilution`,
         type: 'success',
       });
-    } else {
+    } else if (result === 'success') {
       addToast({
         message: `Acquired ${deal.business.name}`,
         detail: `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`,

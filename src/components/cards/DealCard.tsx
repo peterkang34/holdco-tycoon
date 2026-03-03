@@ -22,9 +22,10 @@ interface DealCardProps {
   onToggle?: () => void;
   showSwipeHint?: boolean;
   onSwipeUsed?: () => void;
+  leagueBlocked?: boolean;
 }
 
-export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlatforms = [], isPassed, onPass, collapsible, isExpanded, onToggle, showSwipeHint, onSwipeUsed }: DealCardProps) {
+export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlatforms = [], isPassed, onPass, collapsible, isExpanded, onToggle, showSwipeHint, onSwipeUsed, leagueBlocked }: DealCardProps) {
   const [showStory, setShowStory] = useState(false);
   const sector = SECTORS[deal.business.sectorId];
   const { dueDiligence, qualityRating } = deal.business;
@@ -127,7 +128,7 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
     onSwipeLeft: isPassed ? undefined : handleSwipePass,
     onSwipeRight: isPassed ? handleSwipeRestore : undefined,
     threshold: Math.min(80, window.innerWidth * 0.2),
-    disabled: !collapsible || isExpanded || !onPass,
+    disabled: !collapsible || isExpanded || !onPass || leagueBlocked,
   });
 
   // Collapsible: collapsed state — compact one-line summary
@@ -150,7 +151,7 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
         {/* Card — slides with finger */}
         <div
           ref={swipe.ref}
-          className={`card flex items-center gap-1.5 py-2 cursor-pointer hover:border-accent/50 transition-colors relative ${disabled ? 'opacity-50' : unaffordable ? 'opacity-65' : ''} ${showSwipeHint ? 'animate-swipe-hint' : ''}`}
+          className={`card flex items-center gap-1.5 py-2 ${disabled || leagueBlocked ? '' : 'cursor-pointer hover:border-accent/50'} transition-colors relative ${disabled ? 'opacity-50' : leagueBlocked ? 'opacity-65' : unaffordable ? 'opacity-65' : ''} ${showSwipeHint ? 'animate-swipe-hint' : ''}`}
           style={{ borderLeftColor: sector.color, borderLeftWidth: '3px' }}
           onClick={swipe.swiping || swipe.recentlySwiped ? undefined : onToggle}
         >
@@ -158,8 +159,8 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
           <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
             <span className="font-medium truncate">{deal.business.name}</span>
             {leagueConfig && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded shrink-0 bg-amber-500/20 text-amber-400 font-bold">
-                {leagueConfig.label}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 font-bold ${leagueBlocked ? 'bg-warning/20 text-warning' : 'bg-amber-500/20 text-amber-400'}`}>
+                {leagueConfig.label}{leagueBlocked ? ' Owned' : ''}
               </span>
             )}
             <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${acquisitionBadge.color}`}>
@@ -193,9 +194,9 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
 
   return (
     <div
-      className={`card transition-all ${disabled ? 'opacity-50' : unaffordable ? 'opacity-65 cursor-pointer hover:border-accent/50' : 'cursor-pointer hover:border-accent'}`}
+      className={`card transition-all ${disabled ? 'opacity-50' : leagueBlocked ? 'opacity-65' : unaffordable ? 'opacity-65 cursor-pointer hover:border-accent/50' : 'cursor-pointer hover:border-accent'}`}
       style={{ borderTopColor: sector.color, borderTopWidth: '3px' }}
-      onClick={!disabled ? onSelect : undefined}
+      onClick={!disabled && !leagueBlocked ? onSelect : undefined}
     >
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -450,7 +451,7 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
           )}
         </div>
         <div className="flex items-center gap-2">
-          {onPass && (
+          {onPass && !leagueBlocked && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -465,7 +466,11 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
               {isPassed ? 'Restore' : 'Pass'}
             </button>
           )}
-          {onSelect && !disabled && !isPassed && (
+          {onSelect && !disabled && leagueBlocked ? (
+            <span className="text-[10px] text-warning bg-warning/10 px-2 py-1 rounded whitespace-nowrap">
+              Already own a {leagueConfig?.label ?? deal.business.subType.toUpperCase()} team
+            </span>
+          ) : onSelect && !disabled && !isPassed && (
             unaffordable ? (
               <div className="flex items-center gap-2">
                 <span className="text-[10px] text-warning bg-warning/10 px-1.5 py-0.5 rounded whitespace-nowrap">
