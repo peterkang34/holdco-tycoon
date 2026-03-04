@@ -19,9 +19,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const parsed = entries.map((entry) => {
       try {
         const parsed = typeof entry === 'string' ? JSON.parse(entry) : entry;
-        // Strip claimToken — never expose ownership proof to clients
+        // Strip sensitive fields — never expose tokens or raw UUIDs to clients
         if (parsed && typeof parsed === 'object') {
           delete parsed.claimToken;
+          // Expose a boolean flag instead of the raw playerId UUID
+          if (parsed.playerId) {
+            parsed.isVerified = true;
+            delete parsed.playerId;
+          }
         }
         return parsed;
       } catch {

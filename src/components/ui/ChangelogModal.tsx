@@ -6,6 +6,8 @@ interface ChangelogModalProps {
 }
 
 export function ChangelogModal({ onClose }: ChangelogModalProps) {
+  const visibleEntries = CHANGELOG.filter((entry) => !entry.hidden);
+
   return (
     <Modal
       isOpen={true}
@@ -15,7 +17,7 @@ export function ChangelogModal({ onClose }: ChangelogModalProps) {
       size="lg"
     >
       <div className="space-y-8">
-        {CHANGELOG.map((entry, i) => (
+        {visibleEntries.map((entry, i) => (
           <div key={i}>
             {i > 0 && <div className="border-t border-white/10 mb-8" />}
 

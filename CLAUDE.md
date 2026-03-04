@@ -79,10 +79,11 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **Modes**: Easy ($20M fund, 80% ownership) / Normal ($5M self-funded, 100% ownership) × Quick Play (10yr) / Full Game (20yr)
 - **Scoring**: FEV (Founder Equity Value = EV × ownership%) is primary metric; leaderboard uses adjustedFEV with difficulty multiplier
 - **Leaderboard**: 6 tabs (Overall/Hard-20/Hard-10/Easy-20/Easy-10/Distributions); client-side filtering from single KV set; 500 stored, 50 displayed per tab
+- **Player Accounts**: Optional Supabase auth (Google OAuth + Magic Link); anonymous sessions auto-created on first visit; `linkIdentity`/`updateUser` preserves UUID on upgrade; GET API strips `playerId` → returns `isVerified` boolean; verified badge only for non-anonymous accounts; game history claimed via distributed lock (KV setnx)
 
 ## Key Files
 - `src/hooks/useGame.ts` — Zustand store (game actions, state transitions)
-- `src/hooks/migrations.ts` — Save migration logic (current: v33)
+- `src/hooks/migrations.ts` — Save migration logic (current: v35)
 - `src/engine/affordability.ts` — 7-tier affordability engine (calculateAffordability, getAffordabilityWeights, pickWeightedTier, generateTrophyEbitda)
 - `src/hooks/chronicleContext.ts` — AI chronicle context builder
 - `src/engine/helpers.ts` — Shared helpers (clampMargin, capGrowthRate, applyEbitdaFloor)
@@ -100,6 +101,12 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/data/platformRecipes.ts` — 38 integrated platform recipes (32 within-sector + 6 cross-sector)
 - `src/engine/platforms.ts` — Platform eligibility, forging, bonus application
 - `src/components/ui/LeaderboardModal.tsx` — Tabbed leaderboard (exports filtering utils for GameOverScreen)
+- `src/hooks/useAuth.ts` — Auth Zustand store (player state, modal toggles, nudge dismissals)
+- `src/lib/supabase.ts` — Supabase client, anonymous auth, auth state listener, token helpers
+- `src/components/ui/AccountModal.tsx` — Google OAuth + Magic Link auth modal
+- `src/components/ui/StatsModal.tsx` — Player stats dashboard (fetches /api/player/stats + history)
+- `src/components/ui/ClaimGamesModal.tsx` — Claim past leaderboard entries to account
+- `api/player/` — Player API routes (profile, stats, history, claim-history)
 - `src/engine/rng.ts` — Seeded deterministic RNG (Mulberry32, stream isolation, pre-rolled outcomes)
 - `src/utils/challenge.ts` — Challenge mode encoding/decoding (URL params, result sharing, comparison)
 - `src/components/ui/ChallengeComparison.tsx` — Side-by-side player result comparison modal

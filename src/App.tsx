@@ -11,7 +11,10 @@ import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, repla
 import { checkFamilyOfficeEligibility } from './engine/familyOffice';
 import { calculateFinalScore } from './engine/scoring';
 import { trackPageView } from './services/telemetry';
-import { initAnonymousAuth } from './lib/supabase';
+import { initAnonymousAuth, initAuthListener } from './lib/supabase';
+import { AccountModal } from './components/ui/AccountModal';
+import { StatsModal } from './components/ui/StatsModal';
+import { ClaimGamesModal } from './components/ui/ClaimGamesModal';
 
 type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard';
 
@@ -31,8 +34,8 @@ function App() {
   // Fire page view telemetry once on mount
   useEffect(() => { trackPageView(); }, []);
 
-  // Initialize anonymous Supabase auth (silent, no UI impact)
-  useEffect(() => { initAnonymousAuth(); }, []);
+  // Initialize anonymous Supabase auth + auth state listener (silent, no UI impact)
+  useEffect(() => { initAnonymousAuth(); const unsub = initAuthListener(); return () => unsub?.(); }, []);
 
   const [screen, setScreen] = useState<Screen>('intro');
   const [isNewGame, setIsNewGame] = useState(false);
@@ -375,6 +378,11 @@ function App() {
           }}
         />
       )}
+
+      {/* Global auth modals (controlled by useAuthStore) */}
+      <AccountModal />
+      <StatsModal />
+      <ClaimGamesModal />
     </div>
   );
 }

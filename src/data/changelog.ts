@@ -7,12 +7,31 @@ export interface ChangelogEntry {
   date: string;
   title: string;
   sections: ChangelogSection[];
+  /** Hidden entries are preserved for documentation but excluded from the public What's New modal */
+  hidden?: boolean;
 }
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'March 3, 2026',
+    title: 'Player Accounts & Stats',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Create an account with Google or Magic Link to track your stats across games. Your anonymous progress is preserved — no data lost.',
+          'My Stats dashboard — view your personal records, grade distribution, strategy profile, mode breakdown, and full game history.',
+          'Claim your past games — link pre-account leaderboard entries to your new profile.',
+          'Verified badge (✓) appears next to your initials on the leaderboard when you have an account.',
+          '"You" indicator highlights your entries on the global leaderboard.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 3, 2026',
     title: 'Real Pro Sports Teams',
+    hidden: true,
     sections: [
       {
         heading: 'New Features',
@@ -35,7 +54,7 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Redesigned admin Strategy & Balance tab with player strategy insights, score dimension analysis, and archetype effectiveness breakdowns.',
           'Leaderboard entries now include full strategy data — score breakdown, deal activity, capital management, and more.',
           'Fixed deal structure histogram to track all structures per game instead of just the most-used one.',
-          'Admin leaderboard tables now show all active multipliers (difficulty, Family Office, restructuring) and compute Adjusted FEV correctly.',
+          'Admin leaderboard tables now show all active multipliers (difficulty, restructuring) and compute Adjusted FEV correctly.',
         ],
       },
     ],
@@ -43,6 +62,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'March 1, 2026',
     title: 'Family Office Overhaul',
+    hidden: true,
     sections: [
       {
         heading: 'New Features',
@@ -144,6 +164,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 28, 2026',
     title: 'Family Office Polish',
+    hidden: true,
     sections: [
       {
         heading: 'New Features',
@@ -162,6 +183,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 28, 2026',
     title: 'Pro Sports Franchise Updates',
+    hidden: true,
     sections: [
       {
         heading: 'New Features',
@@ -220,6 +242,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 28, 2026',
     title: 'Family Office V2 — Real Holdco Mechanics',
+    hidden: true,
     sections: [
       {
         heading: 'New Features',
@@ -303,6 +326,7 @@ export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'February 24, 2026',
     title: 'Family Office Endgame',
+    hidden: true,
     sections: [
       {
         heading: 'New Features',
@@ -363,7 +387,6 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Deal Inflation: Starting year 11, asking multiples inflate +0.5x/yr (cap +3.0x). Financial crises reset by -2.0x for 2 rounds.',
           'Management Succession: Businesses held 8+ years may face operator retirement. Choose: invest in external hire (75% restore), promote from within (50%+ with HR/platform bonuses), or sell at 85% fair value.',
           'IPO Pathway: At round 16+ with $75M+ EBITDA, 6+ businesses, Q4+ avg quality, and 2+ platforms, take your holdco public. Manage earnings expectations, analyst sentiment, and share-funded acquisitions.',
-          'Family Office Endgame: Post-game 5-round mini-game for $1B+ distributions with B+ grade. Build your dynasty through philanthropy, investments, and generational succession.',
           'Stay Private Bonus: Declining the IPO when eligible earns a 5-10% FEV bonus — makes the private path a genuine strategic choice.',
         ],
       },

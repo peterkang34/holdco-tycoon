@@ -4,6 +4,7 @@ import { loadLeaderboard } from '../../engine/scoring';
 import { getGradeColor, getRankColor } from '../../utils/gradeColors';
 import { Modal } from './Modal';
 import { RESTRUCTURING_FEV_PENALTY } from '../../data/gameConfig';
+import { useAuthStore } from '../../hooks/useAuth';
 
 type LeaderboardTab = 'overall' | 'hard20' | 'hard10' | 'easy20' | 'easy10' | 'distributions';
 
@@ -272,12 +273,21 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
   const adjFEV = getAdjustedFEV(entry);
   const showRaw = !showWealth && rawFEV > 0 && adjFEV !== rawFEV;
 
+  const currentPlayerId = useAuthStore((s) => s.player?.id);
+  const isYou = !!(currentPlayerId && entry.playerId && currentPlayerId === entry.playerId);
+  const isVerified = entry.isVerified || !!entry.playerId;
+
   return (
-    <div className="flex items-center justify-between p-3 rounded-lg bg-white/5">
+    <div className={`flex items-center justify-between p-3 rounded-lg ${isYou ? 'bg-accent/15 border border-accent/30' : 'bg-white/5'}`}>
       <div className="flex items-center gap-4 min-w-0 flex-1">
         <RankBadge rank={rank} />
         <div className="min-w-0">
-          <p className="font-bold">{entry.initials}{entry.familyOfficeCompleted && <span className="ml-1" title="Family Office Legacy">🦅</span>}</p>
+          <p className="font-bold">
+            {entry.initials}
+            {isVerified && <span className="text-blue-300 ml-1 text-sm" role="img" aria-label="Verified account" title="Verified account">✓</span>}
+            {entry.familyOfficeCompleted && <span className="ml-1" title="Family Office Legacy">🦅</span>}
+            {isYou && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium">You</span>}
+          </p>
           <p className="text-xs text-text-muted truncate">{entry.holdcoName}</p>
         </div>
       </div>

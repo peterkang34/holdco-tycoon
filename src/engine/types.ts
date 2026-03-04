@@ -697,7 +697,8 @@ export interface LeaderboardEntry {
   foMultiplier?: number; // 1.0-1.5 (FO performance bonus on Adjusted FEV)
   strategy?: LeaderboardStrategy;
   // Player accounts (Phase 1)
-  playerId?: string; // Supabase user UUID (set on submission or claim)
+  playerId?: string; // Supabase user UUID (set on submission or claim; stripped from GET responses)
+  isVerified?: boolean; // Set by GET API when playerId exists (playerId itself is stripped for privacy)
   claimToken?: string; // Secret UUID for ownership proof (stored locally, never returned by GET API)
 }
 

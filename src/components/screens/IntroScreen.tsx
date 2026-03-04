@@ -5,11 +5,14 @@ import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { ChangelogModal } from '../ui/ChangelogModal';
 import { UserManualModal } from '../ui/UserManualModal';
 import { FeedbackModal } from '../ui/FeedbackModal';
+import { AccountBadge } from '../ui/AccountBadge';
 import { DIFFICULTY_CONFIG, DURATION_CONFIG, DURATION_SUBTITLE } from '../../data/gameConfig';
 import type { ChallengeParams } from '../../utils/challenge';
 import { generateRandomSeed } from '../../engine/rng';
 import { buildChallengeUrl, shareChallenge, encodeChallengeParams, generateToken, setHostToken } from '../../utils/challenge';
 import { trackChallengeCreate, trackChallengeShare } from '../../services/telemetry';
+import { useIsLoggedIn } from '../../hooks/useAuth';
+import { useAuthStore } from '../../hooks/useAuth';
 
 interface IntroScreenProps {
   onStart: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty, duration: GameDuration, seed?: number) => void;
@@ -18,6 +21,8 @@ interface IntroScreenProps {
 
 export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
   const isChallenge = !!challengeData;
+  const isLoggedIn = useIsLoggedIn();
+  const openStatsModal = useAuthStore((s) => s.openStatsModal);
   const [step, setStep] = useState<'mode' | 'setup'>(isChallenge ? 'setup' : 'mode');
   const [holdcoName, setHoldcoName] = useState('');
   const [selectedSector, setSelectedSector] = useState<SectorId | 'random'>('random');
@@ -98,6 +103,11 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 sm:px-8 py-8 relative overflow-hidden">
+      {/* Account Badge — top right */}
+      <div className="absolute top-4 right-4 z-20">
+        <AccountBadge />
+      </div>
+
       {/* Animated background */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 left-1/4 text-6xl opacity-10 animate-pulse">🏭</div>
@@ -400,14 +410,27 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
           </div>
         )}
 
-        {/* Global Leaderboard + Changelog + Manual */}
+        {/* Global Leaderboard + My Stats + Changelog + Manual */}
         <div className="mt-3 flex flex-col items-center gap-2">
-          <button
-            onClick={() => setShowLeaderboard(true)}
-            className="text-sm text-text-muted hover:text-accent transition-colors"
-          >
-            🌍 Global Leaderboard
-          </button>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowLeaderboard(true)}
+              className="text-sm text-text-muted hover:text-accent transition-colors"
+            >
+              🌍 Global Leaderboard
+            </button>
+            {isLoggedIn && (
+              <>
+                <span className="text-text-muted/40">·</span>
+                <button
+                  onClick={openStatsModal}
+                  className="text-sm text-text-muted hover:text-accent transition-colors"
+                >
+                  📊 My Stats
+                </button>
+              </>
+            )}
+          </div>
           <div className="flex items-center gap-3">
             <button
               onClick={() => setShowChangelog(true)}

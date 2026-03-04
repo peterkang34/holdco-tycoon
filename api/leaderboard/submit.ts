@@ -120,6 +120,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const validPersonalWealth = typeof founderPersonalWealth === 'number' && founderPersonalWealth >= 0 && founderPersonalWealth <= 500000000
       ? Math.round(founderPersonalWealth) : 0;
 
+    // --- Plausibility Checks ---
+    // S-grade (score >= 95) requires at least 3 active businesses
+    if (score >= 95 && businessCount < 3) {
+      return res.status(400).json({ error: 'Implausible: S-grade with fewer than 3 businesses' });
+    }
+
+    // FEV cannot exceed EV × 1.2 (buffer for rounding)
+    if (typeof founderEquityValue === 'number' && founderEquityValue > enterpriseValue * 1.2) {
+      return res.status(400).json({ error: 'Implausible: FEV exceeds EV × 1.2' });
+    }
+
+    // Score > 0 but all 6 breakdown dimensions are 0 → reject
+    if (score > 0 && strategy?.scoreBreakdown) {
+      const sb = strategy.scoreBreakdown;
+      if (sb.valueCreation === 0 && sb.fcfShareGrowth === 0 && sb.portfolioRoic === 0 &&
+          sb.capitalDeployment === 0 && sb.balanceSheetHealth === 0 && sb.strategicDiscipline === 0) {
+        return res.status(400).json({ error: 'Implausible: score > 0 but all dimensions are 0' });
+      }
+    }
+
+    // Zero acquisitions (totalAcquisitions === 0) with 5+ businesses → reject
+    if (strategy?.totalAcquisitions === 0 && businessCount >= 5) {
+      return res.status(400).json({ error: 'Implausible: no acquisitions with 5+ businesses' });
+    }
+
     // --- Rate Limiting (uses x-real-ip, not spoofable x-forwarded-for) ---
     const ip = getClientIp(req);
     const rateLimitKey = `ratelimit:leaderboard:${ip}`;
@@ -171,6 +196,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const claimToken = typeof body?.claimToken === 'string' && UUID_REGEX.test(body.claimToken)
       ? body.claimToken : undefined;
 
+    // Check if player is anonymous — anonymous users don't get verified badge
+    let isAnonymous = true;
+    if (playerId && supabaseAdmin) {
+      try {
+        const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(playerId);
+        isAnonymous = user?.is_anonymous ?? true;
+      } catch { /* treat as anonymous */ }
+    }
+    // Only real (non-anonymous) accounts get playerId on leaderboard entries
+    const verifiedPlayerId = playerId && !isAnonymous ? playerId : undefined;
+
     // --- Store Entry ---
     const id = randomUUID();
     const multiplier = DIFFICULTY_MULTIPLIER[validDifficulty] ?? 1.0;
@@ -200,8 +236,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       familyOfficeCompleted: familyOfficeCompleted === true ? true : undefined,
       legacyGrade: typeof legacyGrade === 'string' && ['Enduring','Influential','Established','Fragile'].includes(legacyGrade) ? legacyGrade : undefined,
       strategy: validStrategy,
-      // Player accounts fields (Phase 1)
-      ...(playerId ? { playerId } : {}),
+      // Player accounts fields — only verified (non-anonymous) accounts get playerId on leaderboard
+      ...(verifiedPlayerId ? { playerId: verifiedPlayerId } : {}),
       ...(claimToken ? { claimToken } : {}),
     };
 
@@ -257,7 +293,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             score_fcf_share_growth: validStrategy.scoreBreakdown.fcfShareGrowth,
             score_portfolio_roic: validStrategy.scoreBreakdown.portfolioRoic,
             score_capital_deployment: validStrategy.scoreBreakdown.capitalDeployment,
-            score_balance_sheet: validStrategy.scoreBreakdown.balanceSheet,
+            score_balance_sheet: validStrategy.scoreBreakdown.balanceSheetHealth,
             score_strategic_discipline: validStrategy.scoreBreakdown.strategicDiscipline,
           } : {}),
           leaderboard_entry_id: id,

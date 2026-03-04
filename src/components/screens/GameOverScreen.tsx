@@ -25,6 +25,7 @@ import {
 import { ChallengeComparison } from '../ui/ChallengeComparison';
 import { ChallengeScoreboard } from '../ui/ChallengeScoreboard';
 import { FeedbackModal } from '../ui/FeedbackModal';
+import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 
 /** Heuristic archetype classification based on game actions */
 function computeArchetype(
@@ -111,6 +112,9 @@ export function GameOverScreen({
   onPlayAgain,
 }: GameOverScreenProps) {
   const familyOfficeState = useGameStore(s => s.familyOfficeState);
+  const isLoggedIn = useIsLoggedIn();
+  const { signupNudgeDismissals, incrementNudgeDismissals, openAccountModal } = useAuthStore();
+  const [nudgeDismissedThisSession, setNudgeDismissedThisSession] = useState(false);
 
   const [initials, setInitials] = useState('');
   const [hasSaved, setHasSaved] = useState(false);
@@ -827,6 +831,41 @@ export function GameOverScreen({
         </div>
       )}
 
+      {/* Signup Nudge */}
+      {(() => {
+        const gameNumber = parseInt(localStorage.getItem('holdco-game-number') ?? '0', 10);
+        const showNudge = gameNumber >= 2 && !isLoggedIn && signupNudgeDismissals < 3 && !nudgeDismissedThisSession;
+        if (!showNudge) return null;
+
+        const nudgeCopy = score.grade === 'S' || score.grade === 'A'
+          ? 'Your stats deserve a home'
+          : canMakeLeaderboard
+            ? 'Claim your leaderboard spot'
+            : 'Track your progress across games';
+
+        return (
+          <div className="card mb-6 border-accent/20 bg-gradient-to-r from-accent/5 to-accent-secondary/5">
+            <div className="text-center">
+              <p className="font-bold mb-1">{nudgeCopy}</p>
+              <p className="text-text-muted text-sm mb-4">
+                Create a free account to track your stats, claim your games, and get a verified badge on the leaderboard.
+              </p>
+              <div className="flex flex-wrap gap-3 justify-center">
+                <button onClick={openAccountModal} className="btn-primary text-sm">
+                  Create Account
+                </button>
+                <button
+                  onClick={() => { incrementNudgeDismissals(); setNudgeDismissedThisSession(true); }}
+                  className="btn-secondary text-sm"
+                >
+                  Not now
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Global Leaderboard */}
       <GameOverLeaderboard
         allEntries={leaderboard}
@@ -1134,6 +1173,7 @@ function GameOverLeaderboard({
   showWealth: boolean;
 }) {
   const filtered = useMemo(() => filterAndSort(allEntries, activeTab), [allEntries, activeTab]);
+  const currentPlayerId = useAuthStore((s) => s.player?.id);
 
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -1192,12 +1232,14 @@ function GameOverLeaderboard({
           {filtered.map((entry, index) => {
             const displayValue = getDisplayValue(entry, activeTab);
             const displayLabel = showWealth ? 'Wealth' : (entry.founderEquityValue ? 'FEV' : 'EV');
+            const isYou = !!(currentPlayerId && entry.playerId && currentPlayerId === entry.playerId);
+            const isVerified = entry.isVerified || !!entry.playerId;
             return (
               <div
                 key={entry.id}
                 className={`flex items-center justify-between p-3 rounded-lg ${
-                  entry.id === savedEntryId
-                    ? 'bg-accent/20 border border-accent/40'
+                  isYou ? 'bg-accent/15 border border-accent/30'
+                    : entry.id === savedEntryId ? 'bg-accent/20 border border-accent/40'
                     : 'bg-white/5'
                 }`}
               >
@@ -1206,7 +1248,12 @@ function GameOverLeaderboard({
                     #{index + 1}
                   </span>
                   <div className="min-w-0">
-                    <p className="font-bold">{entry.initials}{entry.familyOfficeCompleted && <span className="ml-1" title="Family Office Legacy">🦅</span>}</p>
+                    <p className="font-bold">
+                      {entry.initials}
+                      {isVerified && <span className="text-blue-300 ml-1 text-sm" role="img" aria-label="Verified account" title="Verified account">✓</span>}
+                      {entry.familyOfficeCompleted && <span className="ml-1" title="Family Office Legacy">🦅</span>}
+                      {isYou && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium">You</span>}
+                    </p>
                     <p className="text-xs text-text-muted truncate">{entry.holdcoName}</p>
                   </div>
                 </div>

@@ -29,6 +29,7 @@ import { updateSessionRound, trackEventChoice } from '../../services/telemetry';
 import { hasSeenNudge, dismissNudge } from '../../hooks/useNudges';
 import { MIN_OPCOS_FOR_SHARED_SERVICES } from '../../data/sharedServices';
 import { buildChallengeUrl, copyToClipboard } from '../../utils/challenge';
+import { AccountBadge } from '../ui/AccountBadge';
 
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
 const FO_TUTORIAL_SEEN_KEY = 'holdco-tycoon-fo-tutorial-seen-v1';
@@ -993,6 +994,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             )}
           </div>
           <div className="flex items-center gap-2">
+            <AccountBadge />
             {roundHistory && roundHistory.length > 0 && (
               <button
                 onClick={() => setShowAnnualReports(true)}
