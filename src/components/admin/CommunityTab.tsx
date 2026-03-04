@@ -449,39 +449,154 @@ function PlayerDetailPanel({ detail, loading }: { detail: PlayerDetail | null; l
       {/* Recent games */}
       {detail.recentGames.length > 0 && (
         <div>
-          <h4 className="text-xs font-semibold text-text-secondary mb-2">Recent Games</h4>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[11px]">
-              <thead>
-                <tr className="border-b border-border/50">
-                  <th className="py-1 px-1.5 text-left text-text-muted font-medium">Holdco</th>
-                  <th className="py-1 px-1.5 text-center text-text-muted font-medium">Grade</th>
-                  <th className="py-1 px-1.5 text-right text-text-muted font-medium">Adj FEV</th>
-                  <th className="py-1 px-1.5 text-right text-text-muted font-medium">Score</th>
-                  <th className="py-1 px-1.5 text-center text-text-muted font-medium">Mode</th>
-                  <th className="py-1 px-1.5 text-right text-text-muted font-medium">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detail.recentGames.map((game: any, i: number) => (
-                  <tr key={i} className="border-b border-border/20">
-                    <td className="py-1 px-1.5 text-text-primary truncate max-w-[140px]">{game.holdco_name || '--'}</td>
-                    <td className="py-1 px-1.5 text-center font-bold" style={{ color: GRADE_COLORS[game.grade] || 'inherit' }}>
-                      {game.grade}
-                    </td>
-                    <td className="py-1 px-1.5 text-right font-mono text-text-secondary">{formatFev(game.adjusted_fev || 0)}</td>
-                    <td className="py-1 px-1.5 text-right font-mono text-text-secondary">{game.score}</td>
-                    <td className="py-1 px-1.5 text-center text-text-muted">
-                      {game.difficulty === 'normal' ? 'Hard' : 'Easy'}/{game.duration === 'quick' ? '10yr' : '20yr'}
-                    </td>
-                    <td className="py-1 px-1.5 text-right text-text-muted">
-                      {game.completed_at ? formatDate(game.completed_at) : '--'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <h4 className="text-xs font-semibold text-text-secondary mb-2">Recent Games ({detail.recentGames.length})</h4>
+          <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
+            {detail.recentGames.map((game: any, i: number) => (
+              <GameBreakdown key={i} game={game} />
+            ))}
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Game Breakdown Card ──────────────────────────────────────────
+
+const SCORE_DIMS = [
+  { key: 'score_value_creation', label: 'Value' },
+  { key: 'score_fcf_share_growth', label: 'FCF' },
+  { key: 'score_portfolio_roic', label: 'ROIC' },
+  { key: 'score_capital_deployment', label: 'Deploy' },
+  { key: 'score_balance_sheet', label: 'Balance' },
+  { key: 'score_strategic_discipline', label: 'Discip' },
+];
+
+function GameBreakdown({ game }: { game: any }) {
+  const [expanded, setExpanded] = useState(false);
+  const strategy = game.strategy as Record<string, unknown> | null;
+  const archetype = (strategy?.archetype as string) || null;
+  const antiPatterns = (strategy?.antiPatterns as string[]) || [];
+
+  return (
+    <div className="bg-bg-primary/50 rounded border border-border/20">
+      {/* Summary row */}
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-white/5 transition-colors"
+      >
+        <span className="font-bold text-[11px] w-4" style={{ color: GRADE_COLORS[game.grade] || 'inherit' }}>
+          {game.grade}
+        </span>
+        <span className="text-[11px] text-text-primary truncate flex-1">{game.holdco_name || '--'}</span>
+        <span className="text-[10px] font-mono text-accent">{formatFev(game.adjusted_fev || 0)}</span>
+        <span className="text-[10px] font-mono text-text-muted">{game.score}/100</span>
+        <span className="text-[10px] text-text-muted">
+          {game.difficulty === 'normal' ? 'H' : 'E'}/{game.duration === 'quick' ? '10' : '20'}
+        </span>
+        <span className="text-[10px] text-text-muted">{game.completed_at ? formatDate(game.completed_at) : '--'}</span>
+        <span className="text-[9px] text-text-muted">{expanded ? '\u25b2' : '\u25bc'}</span>
+      </button>
+
+      {/* Expanded detail */}
+      {expanded && (
+        <div className="px-2.5 pb-2.5 pt-1 border-t border-border/20 space-y-2">
+          {/* Score breakdown bar */}
+          {game.score_value_creation != null && (
+            <div>
+              <p className="text-[9px] text-text-muted mb-1 uppercase tracking-wider">Score Breakdown</p>
+              <div className="flex gap-1">
+                {SCORE_DIMS.map(dim => {
+                  const val = game[dim.key] as number | null;
+                  if (val == null) return null;
+                  const maxDim = 20;
+                  const pct = Math.min(100, (val / maxDim) * 100);
+                  return (
+                    <div key={dim.key} className="flex-1 text-center">
+                      <div className="h-6 bg-bg-secondary rounded overflow-hidden relative">
+                        <div
+                          className="h-full bg-accent/60 rounded transition-all"
+                          style={{ width: `${Math.max(pct, 8)}%` }}
+                        />
+                        <span className="absolute inset-0 flex items-center justify-center text-[9px] font-mono text-text-primary mix-blend-difference">
+                          {val.toFixed(1)}
+                        </span>
+                      </div>
+                      <span className="text-[8px] text-text-muted">{dim.label}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Financials + Strategy */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-[10px]">
+            <div className="flex justify-between">
+              <span className="text-text-muted">EV</span>
+              <span className="font-mono text-text-primary">{formatFev(game.enterprise_value || 0)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-muted">FEV (raw)</span>
+              <span className="font-mono text-text-primary">{formatFev(game.founder_equity_value || 0)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-muted">Businesses</span>
+              <span className="font-mono text-text-primary">{game.business_count ?? '--'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-text-muted">Multiplier</span>
+              <span className="font-mono text-text-primary">{(game.submitted_multiplier ?? 1).toFixed(2)}x</span>
+            </div>
+            {game.total_revenue != null && (
+              <div className="flex justify-between">
+                <span className="text-text-muted">Revenue</span>
+                <span className="font-mono text-text-primary">{formatFev(game.total_revenue)}</span>
+              </div>
+            )}
+            {game.avg_ebitda_margin != null && (
+              <div className="flex justify-between">
+                <span className="text-text-muted">Avg Margin</span>
+                <span className="font-mono text-text-primary">{(game.avg_ebitda_margin * 100).toFixed(1)}%</span>
+              </div>
+            )}
+            {game.has_restructured && (
+              <div className="flex justify-between">
+                <span className="text-text-muted">Restructured</span>
+                <span className="text-warning font-medium">Yes (-20%)</span>
+              </div>
+            )}
+            {game.family_office_completed && (
+              <div className="flex justify-between">
+                <span className="text-text-muted">Family Office</span>
+                <span className="text-purple-400 font-medium">
+                  {game.fo_multiplier > 1 ? `${game.fo_multiplier.toFixed(2)}x` : 'Completed'}
+                </span>
+              </div>
+            )}
+            {game.legacy_grade && (
+              <div className="flex justify-between">
+                <span className="text-text-muted">Legacy</span>
+                <span className="text-purple-400 font-medium">{game.legacy_grade}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Archetype + Anti-patterns */}
+          {(archetype || antiPatterns.length > 0) && (
+            <div className="flex flex-wrap gap-1.5">
+              {archetype && (
+                <span className="text-[9px] bg-accent/15 text-accent px-1.5 py-0.5 rounded">
+                  {archetype.replace(/_/g, ' ')}
+                </span>
+              )}
+              {antiPatterns.map(ap => (
+                <span key={ap} className="text-[9px] bg-danger/15 text-danger px-1.5 py-0.5 rounded">
+                  {ap.replace(/_/g, ' ')}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </div>
