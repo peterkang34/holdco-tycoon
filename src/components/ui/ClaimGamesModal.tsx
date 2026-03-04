@@ -108,6 +108,9 @@ export function ClaimGamesModal() {
       const claimedCount = (data.results as ClaimResult[]).filter((r) => r.status === 'claimed').length;
       if (claimedCount > 0) {
         addToast({ message: `${claimedCount} game${claimedCount > 1 ? 's' : ''} claimed!`, type: 'success' });
+        try { localStorage.removeItem('holdco-tycoon-leaderboard'); } catch {}
+      } else {
+        addToast({ message: 'No new games to claim — they may already be linked to your account', type: 'info' });
       }
     } catch {
       addToast({ message: 'Network error', type: 'danger' });

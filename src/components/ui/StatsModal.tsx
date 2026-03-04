@@ -87,7 +87,10 @@ export function StatsModal() {
         if (cancelled) return;
 
         if (!statsRes.ok) {
-          setErrorMsg(`Stats request failed (${statsRes.status})`);
+          const msg = statsRes.status === 401
+            ? 'Session expired — please sign out and sign back in'
+            : `Stats request failed (${statsRes.status})`;
+          setErrorMsg(msg);
           setLoading(false);
           return;
         }
@@ -114,7 +117,7 @@ export function StatsModal() {
 
     fetchData();
     return () => { cancelled = true; };
-  }, [showStatsModal, isLoggedIn]);
+  }, [showStatsModal, isLoggedIn, player?.id]);
 
   if (!isLoggedIn) return null;
 

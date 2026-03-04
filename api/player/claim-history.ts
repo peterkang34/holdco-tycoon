@@ -58,9 +58,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
   if (isBodyTooLarge(req.body)) return res.status(413).json({ error: 'Request too large' });
 
+  if (!supabaseAdmin) return res.status(503).json({ error: 'Service temporarily unavailable' });
   const playerId = await getPlayerIdFromToken(req);
   if (!playerId) return res.status(401).json({ error: 'Unauthorized' });
-  if (!supabaseAdmin) return res.status(503).json({ error: 'Database unavailable' });
 
   try {
     // Check that user is NOT anonymous

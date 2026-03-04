@@ -4,6 +4,7 @@ import { createMockReqRes, createKvLeaderboardEntry } from './helpers.js';
 import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { kv } from '@vercel/kv';
+import { setMockSupabaseAdmin } from './setup.js';
 
 /** Helper: set up authenticated non-anonymous user for delete tests */
 function setupAuthUser(playerId = 'test-player-id') {
@@ -15,6 +16,13 @@ function setupAuthUser(playerId = 'test-player-id') {
 }
 
 describe('POST /api/player/delete', () => {
+  it('returns 503 when supabaseAdmin is null', async () => {
+    setMockSupabaseAdmin(null);
+    const { req, res, getResponse } = createMockReqRes({ method: 'POST' });
+    await handler(req, res);
+    expect(getResponse().statusCode).toBe(503);
+  });
+
   it('returns 401 without auth', async () => {
     const { req, res, getResponse } = createMockReqRes({ method: 'POST' });
     await handler(req, res);

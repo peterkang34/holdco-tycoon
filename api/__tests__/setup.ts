@@ -1,6 +1,15 @@
 import { vi, beforeEach } from 'vitest';
 import { createChain } from './helpers.js';
 
+// --- Mutable supabaseAdmin ref (allows 503 tests to set it to null) ---
+
+const _supabaseAdminRef = vi.hoisted(() => ({ current: null as any }));
+
+/** Override supabaseAdmin mock for testing (e.g., set to null for 503 tests). Resets each beforeEach. */
+export function setMockSupabaseAdmin(value: any) {
+  _supabaseAdminRef.current = value;
+}
+
 // --- Mock external modules ---
 
 vi.mock('@vercel/kv', () => ({
@@ -13,20 +22,12 @@ vi.mock('@vercel/kv', () => ({
     zadd: vi.fn(),
     zrange: vi.fn(),
     zrem: vi.fn(),
+    ping: vi.fn(),
   },
 }));
 
 vi.mock('../_lib/supabaseAdmin.js', () => ({
-  supabaseAdmin: {
-    from: vi.fn(),
-    auth: {
-      admin: {
-        getUserById: vi.fn(),
-        deleteUser: vi.fn(),
-      },
-      getUser: vi.fn(),
-    },
-  },
+  get supabaseAdmin() { return _supabaseAdminRef.current; },
 }));
 
 vi.mock('../_lib/playerAuth.js', () => ({
@@ -54,6 +55,18 @@ import { updatePlayerStats, updateGlobalStats } from '../_lib/playerStats.js';
 beforeEach(() => {
   vi.resetAllMocks();
 
+  // Reset supabaseAdmin to full mock object
+  _supabaseAdminRef.current = {
+    from: vi.fn(),
+    auth: {
+      admin: {
+        getUserById: vi.fn(),
+        deleteUser: vi.fn(),
+      },
+      getUser: vi.fn(),
+    },
+  };
+
   // Auth — default: unauthenticated
   vi.mocked(getPlayerIdFromToken).mockResolvedValue(null);
 
@@ -74,6 +87,7 @@ beforeEach(() => {
   vi.mocked(kv.zadd).mockResolvedValue(0 as never);
   vi.mocked(kv.zrange).mockResolvedValue([] as never);
   vi.mocked(kv.zrem).mockResolvedValue(0 as never);
+  vi.mocked((kv as any).ping).mockResolvedValue('PONG');
 
   // Supabase auth — default: no user
   vi.mocked(supabaseAdmin!.auth.admin.getUserById).mockResolvedValue({

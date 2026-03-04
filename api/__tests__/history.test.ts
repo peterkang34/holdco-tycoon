@@ -3,8 +3,16 @@ import handler from '../player/history.js';
 import { createMockReqRes, createChain, createGameHistoryRow } from './helpers.js';
 import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
+import { setMockSupabaseAdmin } from './setup.js';
 
 describe('GET /api/player/history', () => {
+  it('returns 503 when supabaseAdmin is null', async () => {
+    setMockSupabaseAdmin(null);
+    const { req, res, getResponse } = createMockReqRes();
+    await handler(req, res);
+    expect(getResponse().statusCode).toBe(503);
+  });
+
   it('returns 401 without auth', async () => {
     const { req, res, getResponse } = createMockReqRes();
     await handler(req, res);
