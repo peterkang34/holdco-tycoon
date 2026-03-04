@@ -452,13 +452,6 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
             >
               💬 Feedback
             </button>
-            <span className="text-text-muted/40">·</span>
-            <button
-              onClick={() => useAuthStore.getState().openPrivacyModal()}
-              className="text-sm text-text-muted hover:text-accent transition-colors"
-            >
-              🔒 Privacy
-            </button>
           </div>
         </div>
 
@@ -466,6 +459,12 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
         <div className="mt-8 text-sm text-text-muted">
           <p className="mb-2">{DURATION_CONFIG[isChallenge ? selectedDuration : selectedDuration].label.match(/\d+/)?.[0] || '20'} years. Build a long-term compounder.</p>
           <p>Based on <a href="https://holdcoguide.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">The Holdco Guide</a> by Peter Kang</p>
+          <button
+            onClick={() => useAuthStore.getState().openPrivacyModal()}
+            className="text-xs text-text-muted/50 hover:text-text-muted transition-colors mt-4"
+          >
+            Privacy Policy
+          </button>
         </div>
       </div>
 
