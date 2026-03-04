@@ -56,6 +56,10 @@ export function CommunityTab({ token }: { token: string }) {
   const [playerDetail, setPlayerDetail] = useState<PlayerDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
 
+  // Repair state
+  const [repairing, setRepairing] = useState(false);
+  const [repairResult, setRepairResult] = useState<string | null>(null);
+
   // Fetch community data
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -166,7 +170,39 @@ export function CommunityTab({ token }: { token: string }) {
       {/* ── Player Browser ── */}
       <div className="card p-4">
         <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-          <SectionHeader title={`Players (${data.totalPlayers})`} />
+          <div className="flex items-center gap-3">
+            <SectionHeader title={`Players (${data.totalPlayers})`} />
+            <button
+              onClick={async () => {
+                setRepairing(true);
+                setRepairResult(null);
+                try {
+                  const res = await fetch('/api/admin/repair-initials', {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}` },
+                  });
+                  const json = await res.json();
+                  if (res.ok) {
+                    setRepairResult(`Repaired ${json.repaired}/${json.checked} profiles`);
+                    if (json.repaired > 0) fetchData();
+                  } else {
+                    setRepairResult(json.error || 'Repair failed');
+                  }
+                } catch {
+                  setRepairResult('Network error');
+                } finally {
+                  setRepairing(false);
+                }
+              }}
+              disabled={repairing}
+              className="text-[10px] bg-warning/20 text-warning px-2 py-0.5 rounded hover:bg-warning/30 transition-colors disabled:opacity-50"
+            >
+              {repairing ? 'Repairing...' : 'Repair Initials'}
+            </button>
+            {repairResult && (
+              <span className="text-[10px] text-text-muted">{repairResult}</span>
+            )}
+          </div>
           <div className="flex gap-2">
             <input
               type="text"
