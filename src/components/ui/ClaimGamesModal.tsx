@@ -66,7 +66,7 @@ export function ClaimGamesModal() {
 
     const token = await getAccessToken();
     if (!token) {
-      addToast({ message: 'Authentication failed', type: 'danger' });
+      addToast({ message: 'Session expired — please refresh the page and sign in again', type: 'danger' });
       setClaiming(false);
       return;
     }
@@ -100,7 +100,13 @@ export function ClaimGamesModal() {
       });
 
       if (!res.ok) {
-        const msg = res.status === 429 ? 'Too many attempts. Try again in a few minutes.' : 'Claim failed';
+        const body = await res.json().catch(() => ({}));
+        const serverMsg = body?.error;
+        const msg = res.status === 429
+          ? 'Too many attempts. Try again in a few minutes.'
+          : res.status === 401
+          ? 'Session expired — please refresh the page and sign in again'
+          : `Claim failed${serverMsg ? ': ' + serverMsg : ''} (${res.status})`;
         addToast({ message: msg, type: 'danger' });
         setClaiming(false);
         return;

@@ -68,18 +68,22 @@ export function StatsModal() {
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [history, setHistory] = useState<GameHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (!showStatsModal || !isLoggedIn) return;
 
     let cancelled = false;
     setLoading(true);
-    setError(false);
+    setErrorMsg(null);
 
     const fetchData = async () => {
       const token = await getAccessToken();
-      if (!token) { setError(true); setLoading(false); return; }
+      if (!token) {
+        setErrorMsg('Session expired — please refresh the page and sign in again');
+        setLoading(false);
+        return;
+      }
 
       const headers = { Authorization: `Bearer ${token}` };
       try {
@@ -90,8 +94,13 @@ export function StatsModal() {
 
         if (cancelled) return;
 
-        if (!statsRes.ok || !historyRes.ok) {
-          setError(true);
+        if (!statsRes.ok) {
+          setErrorMsg(`Stats request failed (${statsRes.status})`);
+          setLoading(false);
+          return;
+        }
+        if (!historyRes.ok) {
+          setErrorMsg(`History request failed (${historyRes.status})`);
           setLoading(false);
           return;
         }
@@ -105,7 +114,7 @@ export function StatsModal() {
         setLoading(false);
       } catch {
         if (!cancelled) {
-          setError(true);
+          setErrorMsg('Network error — check your connection');
           setLoading(false);
         }
       }
@@ -143,14 +152,14 @@ export function StatsModal() {
         </div>
       )}
 
-      {error && (
+      {errorMsg && (
         <div className="text-center py-12 min-h-[300px] flex flex-col items-center justify-center">
-          <p className="text-text-muted mb-2">Failed to load stats</p>
+          <p className="text-text-muted mb-2">{errorMsg}</p>
           <button onClick={closeStatsModal} className="btn-secondary text-sm">Close</button>
         </div>
       )}
 
-      {!loading && !error && stats && stats.total_games === 0 && (
+      {!loading && !errorMsg && stats && stats.total_games === 0 && (
         <div className="text-center py-12 min-h-[300px] flex flex-col items-center justify-center">
           <span className="text-4xl block mb-3">📊</span>
           <p className="text-text-secondary font-medium mb-1">No games tracked yet</p>
@@ -158,7 +167,7 @@ export function StatsModal() {
         </div>
       )}
 
-      {!loading && !error && stats && stats.total_games > 0 && (
+      {!loading && !errorMsg && stats && stats.total_games > 0 && (
         <div className="space-y-6">
           {/* Header */}
           <div className="flex items-center gap-4">
