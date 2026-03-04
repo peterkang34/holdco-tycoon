@@ -159,6 +159,11 @@ export function StatsModal() {
           <span className="text-4xl block mb-3">📊</span>
           <p className="text-text-secondary font-medium mb-1">No games tracked yet</p>
           <p className="text-text-muted text-sm">Complete a game to start building your stats!</p>
+          {player?.id && (
+            <p className="text-[10px] text-text-muted/50 mt-4 font-mono select-all" title="Player UUID — share with admin if stats are missing">
+              {player.id}
+            </p>
+          )}
         </div>
       )}
 

@@ -15,11 +15,24 @@ export const supabase = supabaseUrl && supabaseAnonKey
 /**
  * Initialize anonymous auth session. Call once on app load.
  * If a session already exists (from localStorage), this is a no-op.
+ * Skips anonymous session creation if an auth callback is in progress
+ * (magic link redirect, OAuth callback) to avoid race conditions.
  * Silent — no UI impact on failure.
  */
 export async function initAnonymousAuth(): Promise<void> {
   if (!supabase) return;
   try {
+    // Skip if auth callback params are present in the URL — Supabase is
+    // already processing the magic link / OAuth code exchange asynchronously.
+    // Creating an anonymous session here would race and potentially overwrite
+    // the verified session that the callback is about to establish.
+    const hash = window.location.hash;
+    const search = window.location.search;
+    if (hash.includes('access_token=') || hash.includes('type=magiclink') ||
+        hash.includes('type=recovery') || search.includes('code=')) {
+      return;
+    }
+
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) {
       await supabase.auth.signInAnonymously();
@@ -39,7 +52,7 @@ export function initAuthListener(): (() => void) | undefined {
   const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
     const store = useAuthStore.getState();
 
-    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
+    if (event === 'INITIAL_SESSION' || event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
       if (!session?.user) return;
 
       const user = session.user;
