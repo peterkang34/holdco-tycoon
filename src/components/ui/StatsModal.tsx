@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
-import { getAccessToken } from '../../lib/supabase';
+import { fetchWithAuth } from '../../lib/supabase';
 import { formatMoney } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
 import SparklineChart from './SparklineChart';
@@ -78,18 +78,10 @@ export function StatsModal() {
     setErrorMsg(null);
 
     const fetchData = async () => {
-      const token = await getAccessToken();
-      if (!token) {
-        setErrorMsg('Session expired — please refresh the page and sign in again');
-        setLoading(false);
-        return;
-      }
-
-      const headers = { Authorization: `Bearer ${token}` };
       try {
         const [statsRes, historyRes] = await Promise.all([
-          fetch('/api/player/stats', { headers }),
-          fetch('/api/player/history?limit=20', { headers }),
+          fetchWithAuth('/api/player/stats'),
+          fetchWithAuth('/api/player/history?limit=20'),
         ]);
 
         if (cancelled) return;
@@ -114,7 +106,7 @@ export function StatsModal() {
         setLoading(false);
       } catch {
         if (!cancelled) {
-          setErrorMsg('Network error — check your connection');
+          setErrorMsg('Session expired — please refresh the page and sign in again');
           setLoading(false);
         }
       }

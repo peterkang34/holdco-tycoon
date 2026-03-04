@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { useAuthStore } from '../../hooks/useAuth';
 import { useToastStore } from '../../hooks/useToast';
-import { supabase, initAnonymousAuth, getAccessToken } from '../../lib/supabase';
+import { supabase, initAnonymousAuth, fetchWithAuth } from '../../lib/supabase';
 
 export function DeleteAccountModal() {
   const isOpen = useAuthStore((s) => s.showDeleteModal);
@@ -27,19 +27,9 @@ export function DeleteAccountModal() {
     setDeleting(true);
 
     try {
-      const token = await getAccessToken();
-      if (!token) {
-        addToast({ message: 'Not authenticated', type: 'danger' });
-        setDeleting(false);
-        return;
-      }
-
-      const res = await fetch('/api/player/delete', {
+      const res = await fetchWithAuth('/api/player/delete', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
       });
 
       if (!res.ok) {

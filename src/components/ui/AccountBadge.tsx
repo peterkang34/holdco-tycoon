@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
-import { supabase, initAnonymousAuth, getAccessToken } from '../../lib/supabase';
+import { supabase, initAnonymousAuth, fetchWithAuth } from '../../lib/supabase';
 import { useToastStore } from '../../hooks/useToast';
 
 export function AccountBadge() {
@@ -47,14 +47,7 @@ export function AccountBadge() {
   const handleExportData = async () => {
     setShowDropdown(false);
     try {
-      const token = await getAccessToken();
-      if (!token) {
-        useToastStore.getState().addToast({ message: 'Not authenticated', type: 'danger' });
-        return;
-      }
-      const response = await fetch('/api/player/export', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetchWithAuth('/api/player/export');
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
         throw new Error(body.error || 'Export failed');

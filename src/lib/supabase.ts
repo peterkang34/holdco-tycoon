@@ -93,16 +93,57 @@ export function initAuthListener(): (() => void) | undefined {
 
 /**
  * Get the current user's access token for API calls.
+ * Checks JWT expiry and proactively refreshes if token is stale.
  * Returns null if not authenticated or Supabase not configured.
  */
 export async function getAccessToken(): Promise<string | null> {
   if (!supabase) return null;
   try {
     const { data: { session } } = await supabase.auth.getSession();
-    return session?.access_token ?? null;
+
+    if (session?.access_token) {
+      // Check if token is still fresh (not expired or expiring within 30s)
+      try {
+        const payload = JSON.parse(atob(session.access_token.split('.')[1]));
+        if (payload.exp * 1000 > Date.now() + 30_000) {
+          return session.access_token;
+        }
+      } catch { /* fall through to refresh */ }
+    }
+
+    // No valid session or token expired — try explicit refresh
+    const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+    return refreshed?.access_token ?? null;
   } catch {
     return null;
   }
+}
+
+/**
+ * Fetch with auth token + automatic 401 retry via session refresh.
+ * Throws if not authenticated (no token available).
+ */
+export async function fetchWithAuth(url: string, init?: RequestInit): Promise<Response> {
+  const token = await getAccessToken();
+  if (!token) throw new Error('Not authenticated');
+
+  const res = await fetch(url, {
+    ...init,
+    headers: { ...init?.headers, Authorization: `Bearer ${token}` },
+  });
+
+  // If server rejects token, try refreshing and retry once
+  if (res.status === 401 && supabase) {
+    const { data: { session } } = await supabase.auth.refreshSession();
+    if (session?.access_token) {
+      return fetch(url, {
+        ...init,
+        headers: { ...init?.headers, Authorization: `Bearer ${session.access_token}` },
+      });
+    }
+  }
+
+  return res;
 }
 
 /**

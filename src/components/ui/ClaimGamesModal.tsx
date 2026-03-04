@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Modal } from './Modal';
 import { useAuthStore } from '../../hooks/useAuth';
 import { useToastStore } from '../../hooks/useToast';
-import { getAccessToken } from '../../lib/supabase';
+import { fetchWithAuth } from '../../lib/supabase';
 import { formatMoney } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
 
@@ -64,13 +64,6 @@ export function ClaimGamesModal() {
     if (selected.size === 0) return;
     setClaiming(true);
 
-    const token = await getAccessToken();
-    if (!token) {
-      addToast({ message: 'Session expired — please refresh the page and sign in again', type: 'danger' });
-      setClaiming(false);
-      return;
-    }
-
     const claims = entries
       .filter((e) => selected.has(e.id))
       .slice(0, 10) // Max 10 per request
@@ -90,12 +83,9 @@ export function ClaimGamesModal() {
       }));
 
     try {
-      const res = await fetch('/api/player/claim-history', {
+      const res = await fetchWithAuth('/api/player/claim-history', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ claims }),
       });
 
