@@ -12,24 +12,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const limit = Math.min(Math.max(parseInt(String(req.query.limit)) || 20, 1), 50);
   const offset = Math.max(parseInt(String(req.query.offset)) || 0, 0);
 
-  // Get total count
-  const { count } = await supabaseAdmin
-    .from('game_history')
-    .select('id', { count: 'exact', head: true })
-    .eq('player_id', playerId);
+  try {
+    // Get total count
+    const { count } = await supabaseAdmin
+      .from('game_history')
+      .select('id', { count: 'exact', head: true })
+      .eq('player_id', playerId);
 
-  // Get paginated games
-  const { data: games, error } = await supabaseAdmin
-    .from('game_history')
-    .select('id, holdco_name, initials, difficulty, duration, enterprise_value, founder_equity_value, adjusted_fev, score, grade, business_count, has_restructured, family_office_completed, strategy, completed_at')
-    .eq('player_id', playerId)
-    .order('completed_at', { ascending: false })
-    .range(offset, offset + limit - 1);
+    // Get paginated games
+    const { data: games, error } = await supabaseAdmin
+      .from('game_history')
+      .select('id, holdco_name, initials, difficulty, duration, enterprise_value, founder_equity_value, adjusted_fev, score, grade, business_count, has_restructured, family_office_completed, strategy, completed_at')
+      .eq('player_id', playerId)
+      .order('completed_at', { ascending: false })
+      .range(offset, offset + limit - 1);
 
-  if (error) return res.status(500).json({ error: 'Query failed' });
+    if (error) {
+      console.error('game_history query failed:', error);
+      return res.status(200).json({ games: [], total: 0 });
+    }
 
-  return res.status(200).json({
-    games: games ?? [],
-    total: count ?? 0,
-  });
+    return res.status(200).json({
+      games: games ?? [],
+      total: count ?? 0,
+    });
+  } catch (err) {
+    console.error('History fetch failed:', err);
+    return res.status(200).json({ games: [], total: 0 });
+  }
 }

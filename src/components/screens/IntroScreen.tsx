@@ -419,7 +419,7 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
             >
               🌍 Global Leaderboard
             </button>
-            {isLoggedIn && (
+            {isLoggedIn ? (
               <>
                 <span className="text-text-muted/40">·</span>
                 <button
@@ -427,6 +427,16 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
                   className="text-sm text-text-muted hover:text-accent transition-colors"
                 >
                   📊 My Stats
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="text-text-muted/40">·</span>
+                <button
+                  onClick={() => useAuthStore.getState().openAccountModal()}
+                  className="text-sm text-text-muted hover:text-accent transition-colors"
+                >
+                  Sign In
                 </button>
               </>
             )}
