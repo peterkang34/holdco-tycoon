@@ -619,11 +619,26 @@ export async function saveToLeaderboard(
     date: new Date().toISOString(),
   };
 
+  // Generate claimToken for future ownership proof (Phase 1 — player accounts)
+  const claimToken = crypto.randomUUID();
+
+  // Get Supabase auth token if available (anonymous or authenticated)
+  let accessToken: string | null = null;
   try {
+    const { getAccessToken } = await import('../lib/supabase');
+    accessToken = await getAccessToken();
+  } catch { /* Supabase not configured — continue without auth */ }
+
+  try {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (accessToken) {
+      headers['Authorization'] = `Bearer ${accessToken}`;
+    }
+
     const res = await fetch('/api/leaderboard/submit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...entry, ...extra }),
+      headers,
+      body: JSON.stringify({ ...entry, ...extra, claimToken }),
     });
     if (res.ok) {
       const data = await res.json();
@@ -644,6 +659,7 @@ export async function saveToLeaderboard(
     ...(extra?.legacyGrade ? { legacyGrade: extra.legacyGrade } : {}),
     ...(extra?.foMultiplier != null ? { foMultiplier: extra.foMultiplier } : {}),
     ...(extra?.strategy ? { strategy: extra.strategy } : {}),
+    claimToken, // Store locally for future claiming (Phase 2)
   };
   saveToLocalLeaderboard(localEntry);
   return newEntry;

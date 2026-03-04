@@ -11,6 +11,7 @@ import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, repla
 import { checkFamilyOfficeEligibility } from './engine/familyOffice';
 import { calculateFinalScore } from './engine/scoring';
 import { trackPageView } from './services/telemetry';
+import { initAnonymousAuth } from './lib/supabase';
 
 type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard';
 
@@ -29,6 +30,9 @@ function App() {
 
   // Fire page view telemetry once on mount
   useEffect(() => { trackPageView(); }, []);
+
+  // Initialize anonymous Supabase auth (silent, no UI impact)
+  useEffect(() => { initAnonymousAuth(); }, []);
 
   const [screen, setScreen] = useState<Screen>('intro');
   const [isNewGame, setIsNewGame] = useState(false);

@@ -18,7 +18,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Wrap each parse in try/catch so one bad entry doesn't break the whole endpoint
     const parsed = entries.map((entry) => {
       try {
-        return typeof entry === 'string' ? JSON.parse(entry) : entry;
+        const parsed = typeof entry === 'string' ? JSON.parse(entry) : entry;
+        // Strip claimToken — never expose ownership proof to clients
+        if (parsed && typeof parsed === 'object') {
+          delete parsed.claimToken;
+        }
+        return parsed;
       } catch {
         return null;
       }

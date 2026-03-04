@@ -696,6 +696,9 @@ export interface LeaderboardEntry {
   legacyGrade?: string; // 'Enduring' | 'Influential' | 'Established' | 'Fragile'
   foMultiplier?: number; // 1.0-1.5 (FO performance bonus on Adjusted FEV)
   strategy?: LeaderboardStrategy;
+  // Player accounts (Phase 1)
+  playerId?: string; // Supabase user UUID (set on submission or claim)
+  claimToken?: string; // Secret UUID for ownership proof (stored locally, never returned by GET API)
 }
 
 // Utility types

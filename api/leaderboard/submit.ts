@@ -3,6 +3,8 @@ import { kv } from '@vercel/kv';
 import { randomUUID } from 'crypto';
 import { getClientIp, isBodyTooLarge } from '../_lib/rateLimit.js';
 import { LEADERBOARD_KEY, DIFFICULTY_MULTIPLIER } from '../_lib/leaderboard.js';
+import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
+import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 
 const MAX_ENTRIES = 500;
 const RATE_LIMIT_SECONDS = 60;
@@ -163,12 +165,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // --- Player Identity (optional — silent if unauthenticated) ---
+    const playerId = await getPlayerIdFromToken(req);
+    const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    const claimToken = typeof body?.claimToken === 'string' && UUID_REGEX.test(body.claimToken)
+      ? body.claimToken : undefined;
+
     // --- Store Entry ---
     const id = randomUUID();
     const multiplier = DIFFICULTY_MULTIPLIER[validDifficulty] ?? 1.0;
     const restructuringPenalty = hasRestructured === true ? 0.80 : 1.0;
     const validFoMultiplier = typeof foMultiplier === 'number' && foMultiplier >= 1.0 && foMultiplier <= 1.5 ? foMultiplier : 1.0;
     const adjustedFEV = Math.round(validFEV * multiplier * restructuringPenalty * validFoMultiplier);
+    const entryDate = new Date().toISOString();
 
     const entry = {
       id,
@@ -185,12 +194,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       score,
       grade,
       businessCount,
-      date: new Date().toISOString(),
+      date: entryDate,
       totalRevenue: typeof totalRevenue === 'number' ? Math.round(totalRevenue) : undefined,
       avgEbitdaMargin: typeof avgEbitdaMargin === 'number' ? Math.round(avgEbitdaMargin * 1000) / 1000 : undefined,
       familyOfficeCompleted: familyOfficeCompleted === true ? true : undefined,
       legacyGrade: typeof legacyGrade === 'string' && ['Enduring','Influential','Established','Fragile'].includes(legacyGrade) ? legacyGrade : undefined,
       strategy: validStrategy,
+      // Player accounts fields (Phase 1)
+      ...(playerId ? { playerId } : {}),
+      ...(claimToken ? { claimToken } : {}),
     };
 
     // Add to sorted set with adjusted FEV as the ranking score
@@ -206,6 +218,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const ascRank = await kv.zrank(LEADERBOARD_KEY, JSON.stringify(entry));
     const currentCount = await kv.zcard(LEADERBOARD_KEY);
     const rank = ascRank !== null ? currentCount - ascRank : 1;
+
+    // --- Dual-write to Postgres (non-blocking, best-effort) ---
+    if (playerId && supabaseAdmin) {
+      try {
+        // Upsert player_profile (create on first game, update last_played_at on subsequent)
+        await supabaseAdmin.from('player_profiles').upsert({
+          id: playerId,
+          initials,
+          updated_at: entryDate,
+          last_played_at: entryDate,
+        }, { onConflict: 'id' });
+
+        // Insert game_history row
+        await supabaseAdmin.from('game_history').insert({
+          player_id: playerId,
+          holdco_name: holdcoName.trim(),
+          initials,
+          difficulty: validDifficulty,
+          duration: validDuration,
+          enterprise_value: Math.round(enterpriseValue),
+          founder_equity_value: validFEV,
+          founder_personal_wealth: validPersonalWealth,
+          adjusted_fev: adjustedFEV,
+          score,
+          grade,
+          submitted_multiplier: multiplier,
+          business_count: businessCount,
+          total_revenue: typeof totalRevenue === 'number' ? Math.round(totalRevenue) : null,
+          avg_ebitda_margin: typeof avgEbitdaMargin === 'number' ? Math.round(avgEbitdaMargin * 1000) / 1000 : null,
+          has_restructured: hasRestructured === true,
+          family_office_completed: familyOfficeCompleted === true,
+          legacy_grade: typeof legacyGrade === 'string' && ['Enduring','Influential','Established','Fragile'].includes(legacyGrade) ? legacyGrade : null,
+          fo_multiplier: validFoMultiplier,
+          strategy: validStrategy || null,
+          ...(validStrategy?.scoreBreakdown ? {
+            score_value_creation: validStrategy.scoreBreakdown.valueCreation,
+            score_fcf_share_growth: validStrategy.scoreBreakdown.fcfShareGrowth,
+            score_portfolio_roic: validStrategy.scoreBreakdown.portfolioRoic,
+            score_capital_deployment: validStrategy.scoreBreakdown.capitalDeployment,
+            score_balance_sheet: validStrategy.scoreBreakdown.balanceSheet,
+            score_strategic_discipline: validStrategy.scoreBreakdown.strategicDiscipline,
+          } : {}),
+          leaderboard_entry_id: id,
+          completed_at: entryDate,
+        });
+      } catch (err) {
+        // Non-blocking — KV is the source of truth, Postgres is secondary
+        console.error('Postgres dual-write failed:', err);
+      }
+    }
 
     return res.status(200).json({ success: true, id, rank });
   } catch (error) {
