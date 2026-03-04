@@ -452,6 +452,13 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
             >
               💬 Feedback
             </button>
+            <span className="text-text-muted/40">·</span>
+            <button
+              onClick={() => useAuthStore.getState().openPrivacyModal()}
+              className="text-sm text-text-muted hover:text-accent transition-colors"
+            >
+              🔒 Privacy
+            </button>
           </div>
         </div>
 

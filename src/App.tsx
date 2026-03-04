@@ -15,6 +15,8 @@ import { initAnonymousAuth, initAuthListener } from './lib/supabase';
 import { AccountModal } from './components/ui/AccountModal';
 import { StatsModal } from './components/ui/StatsModal';
 import { ClaimGamesModal } from './components/ui/ClaimGamesModal';
+import { PrivacyPolicyModal } from './components/ui/PrivacyPolicyModal';
+import { DeleteAccountModal } from './components/ui/DeleteAccountModal';
 
 type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard';
 
@@ -383,6 +385,8 @@ function App() {
       <AccountModal />
       <StatsModal />
       <ClaimGamesModal />
+      <PrivacyPolicyModal />
+      <DeleteAccountModal />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { getClientIp, isBodyTooLarge } from '../_lib/rateLimit.js';
 import { LEADERBOARD_KEY } from '../_lib/leaderboard.js';
+import { updatePlayerStats, updateGlobalStats } from '../_lib/playerStats.js';
 
 const RATE_LIMIT_SECONDS = 300; // 5 minutes between claim requests
 const MAX_CLAIMS_PER_REQUEST = 10;
@@ -190,6 +191,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else {
       results.push({ status: 'not_found' });
     }
+  }
+
+  // Update pre-computed stats after successful claims (non-blocking)
+  if (results.some(r => r.status === 'claimed')) {
+    updatePlayerStats(playerId).catch(console.error);
+    updateGlobalStats().catch(console.error);
   }
 
   return res.status(200).json({ results });

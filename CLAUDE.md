@@ -79,7 +79,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **Modes**: Easy ($20M fund, 80% ownership) / Normal ($5M self-funded, 100% ownership) × Quick Play (10yr) / Full Game (20yr)
 - **Scoring**: FEV (Founder Equity Value = EV × ownership%) is primary metric; leaderboard uses adjustedFEV with difficulty multiplier
 - **Leaderboard**: 6 tabs (Overall/Hard-20/Hard-10/Easy-20/Easy-10/Distributions); client-side filtering from single KV set; 500 stored, 50 displayed per tab
-- **Player Accounts**: Optional Supabase auth (Google OAuth + Magic Link); anonymous sessions auto-created on first visit; `linkIdentity`/`updateUser` preserves UUID on upgrade; GET API strips `playerId` → returns `isVerified` boolean; verified badge only for non-anonymous accounts; game history claimed via distributed lock (KV setnx)
+- **Player Accounts**: Optional Supabase auth (Google OAuth + Magic Link); anonymous sessions auto-created on first visit; `linkIdentity`/`updateUser` preserves UUID on upgrade; GET API strips `playerId` → returns `isVerified` boolean; verified badge only for non-anonymous accounts; game history claimed via distributed lock (KV setnx); pre-computed player_stats/global_stats updated on submit/claim (non-blocking); account deletion anonymizes KV leaderboard entries then cascades via Supabase admin; data export bundles profile+games+stats as JSON; anonymous users with no games cleaned up monthly (90-day cutoff)
 
 ## Key Files
 - `src/hooks/useGame.ts` — Zustand store (game actions, state transitions)
@@ -106,7 +106,9 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/components/ui/AccountModal.tsx` — Google OAuth + Magic Link auth modal
 - `src/components/ui/StatsModal.tsx` — Player stats dashboard (fetches /api/player/stats + history)
 - `src/components/ui/ClaimGamesModal.tsx` — Claim past leaderboard entries to account
-- `api/player/` — Player API routes (profile, stats, history, claim-history)
+- `api/player/` — Player API routes (profile, stats, history, claim-history, delete, export)
+- `api/_lib/playerStats.ts` — Pre-computed stats helpers (updatePlayerStats, updateGlobalStats)
+- `api/cron/cleanup-anonymous.ts` — Monthly anonymous user cleanup (90-day cutoff, CRON_SECRET auth)
 - `src/engine/rng.ts` — Seeded deterministic RNG (Mulberry32, stream isolation, pre-rolled outcomes)
 - `src/utils/challenge.ts` — Challenge mode encoding/decoding (URL params, result sharing, comparison)
 - `src/components/ui/ChallengeComparison.tsx` — Side-by-side player result comparison modal

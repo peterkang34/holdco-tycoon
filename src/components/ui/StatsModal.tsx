@@ -4,6 +4,14 @@ import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { getAccessToken } from '../../lib/supabase';
 import { formatMoney } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
+import SparklineChart from './SparklineChart';
+
+interface GlobalStats {
+  total_games: number;
+  avg_score: number;
+  avg_adjusted_fev: number;
+  grade_distribution: Record<string, number>;
+}
 
 interface PlayerStats {
   total_games: number;
@@ -14,6 +22,7 @@ interface PlayerStats {
   archetype_stats: Record<string, { count: number; avgScore: number }>;
   anti_pattern_frequency: Record<string, number>;
   avg_score_by_mode: Record<string, number>;
+  global: GlobalStats | null;
 }
 
 interface GameHistoryEntry {
@@ -185,6 +194,29 @@ export function StatsModal() {
             </div>
           </div>
 
+          {/* vs Community */}
+          {stats.global && (
+            <div>
+              <h3 className="text-sm font-bold text-text-muted mb-2">vs Community</h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-white/5 rounded-lg p-3 text-center">
+                  <p className="text-xs text-text-muted mb-1">Your Avg Score</p>
+                  <p className={`font-mono font-bold ${stats.avg_score >= stats.global.avg_score ? 'text-green-400' : 'text-red-400'}`}>
+                    {stats.avg_score >= stats.global.avg_score ? '▲' : '▼'} {stats.avg_score.toFixed(1)}
+                  </p>
+                  <p className="text-[10px] text-text-muted mt-0.5">Community: {stats.global.avg_score.toFixed(1)}</p>
+                </div>
+                <div className="bg-white/5 rounded-lg p-3 text-center">
+                  <p className="text-xs text-text-muted mb-1">Your Best FEV</p>
+                  <p className={`font-mono font-bold ${stats.best_adjusted_fev >= stats.global.avg_adjusted_fev ? 'text-green-400' : 'text-red-400'}`}>
+                    {stats.best_adjusted_fev >= stats.global.avg_adjusted_fev ? '▲' : '▼'} {formatMoney(stats.best_adjusted_fev)}
+                  </p>
+                  <p className="text-[10px] text-text-muted mt-0.5">Community Avg: {formatMoney(stats.global.avg_adjusted_fev)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Strategy Profile */}
           {(bestArchetype || mostCommonArchetype || topAntiPattern) && (
             <div>
@@ -252,10 +284,19 @@ export function StatsModal() {
             </div>
           )}
 
-          {/* Performance Trend — placeholder */}
-          <div className="bg-white/5 rounded-lg p-4 text-center">
-            <p className="text-text-muted text-sm">Performance trend chart coming soon</p>
-          </div>
+          {/* Performance Trend */}
+          {history.length >= 3 ? (
+            <div>
+              <h3 className="text-sm font-bold text-text-muted mb-2">Performance Trend</h3>
+              <div className="bg-white/5 rounded-lg p-4">
+                <SparklineChart games={[...history].reverse()} />
+              </div>
+            </div>
+          ) : history.length > 0 ? (
+            <div className="bg-white/5 rounded-lg p-4 text-center">
+              <p className="text-text-muted text-sm">Play {3 - history.length} more game{3 - history.length > 1 ? 's' : ''} to see your trend</p>
+            </div>
+          ) : null}
 
           {/* Game History */}
           {history.length > 0 && (

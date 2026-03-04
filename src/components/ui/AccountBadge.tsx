@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
-import { supabase, initAnonymousAuth } from '../../lib/supabase';
+import { supabase, initAnonymousAuth, getAccessToken } from '../../lib/supabase';
+import { useToastStore } from '../../hooks/useToast';
 
 export function AccountBadge() {
   const isLoggedIn = useIsLoggedIn();
@@ -43,6 +44,41 @@ export function AccountBadge() {
 
   if (!isLoggedIn || !player) return null;
 
+  const handleExportData = async () => {
+    setShowDropdown(false);
+    try {
+      const token = await getAccessToken();
+      if (!token) {
+        useToastStore.getState().addToast({ message: 'Not authenticated', type: 'danger' });
+        return;
+      }
+      const response = await fetch('/api/player/export', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || 'Export failed');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const filename = response.headers.get('Content-Disposition')?.match(/filename="(.+)"/)?.[1] ?? 'holdco-tycoon-data.json';
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        // iOS Safari blocks programmatic anchor clicks for blob URLs
+        window.open(url, '_blank');
+      } else {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+      useToastStore.getState().addToast({ message: 'Data exported successfully', type: 'success' });
+    } catch (err) {
+      useToastStore.getState().addToast({ message: err instanceof Error ? err.message : 'Export failed', type: 'danger' });
+    }
+  };
+
   const handleSignOut = async () => {
     setShowDropdown(false);
     if (supabase) {
@@ -81,7 +117,21 @@ export function AccountBadge() {
           >
             My Stats
           </button>
+          <button
+            role="menuitem"
+            onClick={handleExportData}
+            className="w-full text-left px-3 min-h-[44px] flex items-center text-sm text-text-secondary hover:bg-white/5 transition-colors"
+          >
+            Export My Data
+          </button>
           <div className="border-t border-white/10" />
+          <button
+            role="menuitem"
+            onClick={() => { setShowDropdown(false); useAuthStore.getState().openDeleteModal(); }}
+            className="w-full text-left px-3 min-h-[44px] flex items-center text-sm text-text-muted hover:text-danger hover:bg-white/5 transition-colors"
+          >
+            Delete Account
+          </button>
           <button
             role="menuitem"
             onClick={handleSignOut}

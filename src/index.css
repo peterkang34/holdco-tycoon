@@ -199,7 +199,8 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .animate-swipe-hint {
+  .animate-swipe-hint,
+  .animate-slide-up {
     animation: none;
   }
 }

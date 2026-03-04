@@ -18,6 +18,8 @@ interface AuthState {
   showAccountModal: boolean;
   showStatsModal: boolean;
   showClaimModal: boolean;
+  showPrivacyModal: boolean;
+  showDeleteModal: boolean;
 
   // Actions
   setPlayer: (player: Player | null) => void;
@@ -28,6 +30,10 @@ interface AuthState {
   closeStatsModal: () => void;
   openClaimModal: () => void;
   closeClaimModal: () => void;
+  openPrivacyModal: () => void;
+  closePrivacyModal: () => void;
+  openDeleteModal: () => void;
+  closeDeleteModal: () => void;
   incrementNudgeDismissals: () => void;
 }
 
@@ -39,6 +45,8 @@ export const useAuthStore = create<AuthState>()(
       showAccountModal: false,
       showStatsModal: false,
       showClaimModal: false,
+      showPrivacyModal: false,
+      showDeleteModal: false,
 
       setPlayer: (player) => set({ player }),
       signOut: () => set({ player: null }),
@@ -48,6 +56,10 @@ export const useAuthStore = create<AuthState>()(
       closeStatsModal: () => set({ showStatsModal: false }),
       openClaimModal: () => set({ showClaimModal: true }),
       closeClaimModal: () => set({ showClaimModal: false }),
+      openPrivacyModal: () => set({ showPrivacyModal: true }),
+      closePrivacyModal: () => set({ showPrivacyModal: false }),
+      openDeleteModal: () => set({ showDeleteModal: true }),
+      closeDeleteModal: () => set({ showDeleteModal: false }),
       incrementNudgeDismissals: () =>
         set((state) => ({
           signupNudgeDismissals: Math.min(state.signupNudgeDismissals + 1, 3),

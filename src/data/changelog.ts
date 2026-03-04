@@ -13,6 +13,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 4, 2026',
+    title: 'Account Tools & Insights',
+    sections: [
+      {
+        heading: 'New Features',
+        items: [
+          'Performance Trend — sparkline chart in My Stats shows your score trajectory across recent games, with grade-colored dots and hover tooltips.',
+          'vs Community — see how your average score and best FEV stack up against all players.',
+          'Export My Data — download all your game history, stats, and profile as a JSON file from the account menu.',
+          'Delete Account — permanently remove your account from the account menu. Leaderboard entries remain but become anonymous.',
+          'Privacy Policy — accessible from the sign-up modal and the intro screen footer.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 3, 2026',
     title: 'Player Accounts & Stats',
     sections: [

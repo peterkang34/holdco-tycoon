@@ -141,7 +141,14 @@ export function AccountModal() {
           )}
 
           <p className="text-text-muted text-xs text-center">
-            By continuing, you agree to our Terms.
+            By continuing, you agree to our{' '}
+            <button
+              type="button"
+              onClick={() => { closeAccountModal(); useAuthStore.getState().openPrivacyModal(); }}
+              className="underline text-accent cursor-pointer"
+            >
+              Privacy Policy
+            </button>.
           </p>
         </div>
       )}

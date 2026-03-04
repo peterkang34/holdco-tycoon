@@ -5,6 +5,7 @@ import { getClientIp, isBodyTooLarge } from '../_lib/rateLimit.js';
 import { LEADERBOARD_KEY, DIFFICULTY_MULTIPLIER } from '../_lib/leaderboard.js';
 import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
+import { updatePlayerStats, updateGlobalStats } from '../_lib/playerStats.js';
 
 const MAX_ENTRIES = 500;
 const RATE_LIMIT_SECONDS = 60;
@@ -303,6 +304,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Non-blocking — KV is the source of truth, Postgres is secondary
         console.error('Postgres dual-write failed:', err);
       }
+
+      // Update pre-computed stats (non-blocking)
+      updatePlayerStats(playerId).catch(console.error);
+      updateGlobalStats().catch(console.error);
     }
 
     return res.status(200).json({ success: true, id, rank });
