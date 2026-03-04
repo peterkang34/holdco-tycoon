@@ -30,6 +30,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const dailyCounts: Record<string, number> = {};
     const weeklyCounts: Record<string, number> = {};
 
+    // Build a map of user_id → is_anonymous for player browser
+    const anonMap = new Map<string, boolean>();
+
     // Paginate through all users (Supabase caps at 1000 per page)
     let authPage = 1;
     let hasMore = true;
@@ -53,12 +56,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         totalAccounts++;
 
         const isAnon = user.is_anonymous === true;
+        anonMap.set(user.id, isAnon);
+
         if (isAnon) {
           anonymousAccounts++;
           providerBreakdown['anonymous'] = (providerBreakdown['anonymous'] || 0) + 1;
         } else {
           verifiedAccounts++;
-          // Determine provider from identities or app_metadata
           const provider = user.app_metadata?.provider || 'email';
           providerBreakdown[provider] = (providerBreakdown[provider] || 0) + 1;
         }
@@ -96,10 +100,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .sort((a, b) => a.week.localeCompare(b.week));
 
     // ── Player browser ──
-    // Valid sort columns (must match player_profiles/player_stats columns)
-    const validSorts = ['created_at', 'display_name', 'initials', 'total_games', 'best_adjusted_fev', 'best_grade'];
-    const sortCol = validSorts.includes(sort) ? sort : 'created_at';
-    const isStatSort = ['total_games', 'best_adjusted_fev', 'best_grade'].includes(sortCol);
+    // Sort only by player_profiles columns (no FK join needed)
+    const profileSorts = ['created_at', 'display_name', 'initials'];
+    const sortCol = profileSorts.includes(sort) ? sort : 'created_at';
 
     // Count total players (with search filter)
     let countQuery = supabaseAdmin.from('player_profiles').select('id', { count: 'exact', head: true });
@@ -108,45 +111,62 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     const { count: totalPlayers } = await countQuery;
 
-    // Fetch players with stats join
-    // We select from player_profiles and left-join player_stats
-    let query = supabaseAdmin
+    // Fetch player profiles (no embedded join — query stats separately)
+    let profileQuery = supabaseAdmin
       .from('player_profiles')
-      .select(`
-        id, display_name, initials, created_at, is_anonymous,
-        player_stats(total_games, best_adjusted_fev, best_grade)
-      `)
+      .select('id, display_name, initials, created_at')
+      .order(sortCol, { ascending: order === 'asc' })
       .range((page - 1) * pageSize, page * pageSize - 1);
 
     if (search) {
-      query = query.or(`display_name.ilike.%${search}%,initials.ilike.%${search}%`);
+      profileQuery = profileQuery.or(`display_name.ilike.%${search}%,initials.ilike.%${search}%`);
     }
 
-    // Sort — stats columns require sorting on the join
-    if (isStatSort) {
-      query = query.order(sortCol, { ascending: order === 'asc', referencedTable: 'player_stats' });
-    } else {
-      query = query.order(sortCol, { ascending: order === 'asc' });
-    }
+    const { data: profiles, error: profileError } = await profileQuery;
 
-    const { data: rawPlayers, error: playerError } = await query;
-
-    if (playerError) {
-      console.error('Player query error:', playerError);
+    if (profileError) {
+      console.error('Player profiles query error:', profileError);
       return res.status(500).json({ error: 'Failed to query players' });
     }
 
-    const players = (rawPlayers || []).map((p: any) => {
-      const stats = Array.isArray(p.player_stats) ? p.player_stats[0] : p.player_stats;
+    // Fetch stats for the players on this page
+    const playerIds = (profiles || []).map((p: any) => p.id);
+    let statsMap = new Map<string, any>();
+
+    if (playerIds.length > 0) {
+      const { data: statsRows } = await supabaseAdmin
+        .from('player_stats')
+        .select('player_id, total_games, best_adjusted_fev, grade_distribution')
+        .in('player_id', playerIds);
+
+      if (statsRows) {
+        for (const row of statsRows) {
+          statsMap.set(row.player_id, row);
+        }
+      }
+    }
+
+    // Derive best grade from grade_distribution JSON
+    const GRADE_ORDER = ['S', 'A', 'B', 'C', 'D', 'F'];
+    function deriveBestGrade(gradeDistribution: Record<string, number> | null): string | null {
+      if (!gradeDistribution) return null;
+      for (const g of GRADE_ORDER) {
+        if ((gradeDistribution[g] ?? 0) > 0) return g;
+      }
+      return null;
+    }
+
+    const players = (profiles || []).map((p: any) => {
+      const stats = statsMap.get(p.id);
       return {
         id: p.id,
         display_name: p.display_name,
         initials: p.initials || '??',
         total_games: stats?.total_games ?? 0,
-        best_grade: stats?.best_grade ?? null,
+        best_grade: deriveBestGrade(stats?.grade_distribution ?? null),
         best_adjusted_fev: stats?.best_adjusted_fev ?? 0,
         created_at: p.created_at,
-        is_anonymous: p.is_anonymous ?? false,
+        is_anonymous: anonMap.get(p.id) ?? false,
       };
     });
 
