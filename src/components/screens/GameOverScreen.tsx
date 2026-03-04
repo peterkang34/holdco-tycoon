@@ -851,7 +851,7 @@ export function GameOverScreen({
                 Create a free account to track your stats, claim your games, and get a verified badge on the leaderboard.
               </p>
               <div className="flex flex-wrap gap-3 justify-center">
-                <button onClick={openAccountModal} className="btn-primary text-sm">
+                <button onClick={() => openAccountModal()} className="btn-primary text-sm">
                   Create Account
                 </button>
                 <button

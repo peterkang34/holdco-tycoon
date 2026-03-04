@@ -16,6 +16,7 @@ interface AuthState {
 
   // Transient (modal toggles)
   showAccountModal: boolean;
+  accountModalMode: 'create' | 'signin';
   showStatsModal: boolean;
   showClaimModal: boolean;
   showPrivacyModal: boolean;
@@ -24,7 +25,7 @@ interface AuthState {
   // Actions
   setPlayer: (player: Player | null) => void;
   signOut: () => void;
-  openAccountModal: () => void;
+  openAccountModal: (mode?: 'create' | 'signin') => void;
   closeAccountModal: () => void;
   openStatsModal: () => void;
   closeStatsModal: () => void;
@@ -43,6 +44,7 @@ export const useAuthStore = create<AuthState>()(
       player: null,
       signupNudgeDismissals: 0,
       showAccountModal: false,
+      accountModalMode: 'create',
       showStatsModal: false,
       showClaimModal: false,
       showPrivacyModal: false,
@@ -50,7 +52,7 @@ export const useAuthStore = create<AuthState>()(
 
       setPlayer: (player) => set({ player }),
       signOut: () => set({ player: null }),
-      openAccountModal: () => set({ showAccountModal: true }),
+      openAccountModal: (mode = 'create') => set({ showAccountModal: true, accountModalMode: mode }),
       closeAccountModal: () => set({ showAccountModal: false }),
       openStatsModal: () => set({ showStatsModal: true }),
       closeStatsModal: () => set({ showStatsModal: false }),

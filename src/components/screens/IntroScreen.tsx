@@ -433,7 +433,7 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
               <>
                 <span className="text-text-muted/40">·</span>
                 <button
-                  onClick={() => useAuthStore.getState().openAccountModal()}
+                  onClick={() => useAuthStore.getState().openAccountModal('signin')}
                   className="text-sm text-text-muted hover:text-accent transition-colors"
                 >
                   Sign In

@@ -5,14 +5,20 @@ import { useAuthStore } from '../../hooks/useAuth';
 import { useToastStore } from '../../hooks/useToast';
 
 export function AccountModal() {
-  const { showAccountModal, closeAccountModal } = useAuthStore();
+  const { showAccountModal, accountModalMode, closeAccountModal } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
 
+  const [mode, setMode] = useState<'create' | 'signin'>('create');
   const [email, setEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAnonymous, setIsAnonymous] = useState<boolean | null>(null);
+
+  // Sync mode from store when modal opens
+  useEffect(() => {
+    if (showAccountModal) setMode(accountModalMode);
+  }, [showAccountModal, accountModalMode]);
 
   // Pre-fetch session state when modal opens so OAuth click stays synchronous
   useEffect(() => {
@@ -31,7 +37,8 @@ export function AccountModal() {
 
     // Use pre-fetched session state — keeps the OAuth call synchronous with user gesture
     // This prevents iOS Safari from blocking the popup/redirect
-    if (isAnonymous) {
+    if (mode === 'create' && isAnonymous) {
+      // linkIdentity preserves the anonymous UUID
       supabase.auth.linkIdentity({ provider: 'google', options: { redirectTo: window.location.origin } })
         .then(({ error: linkError }) => { if (linkError) throw linkError; })
         .catch((err: unknown) => {
@@ -39,6 +46,7 @@ export function AccountModal() {
           setLoading(false);
         });
     } else {
+      // Sign-in mode or non-anonymous: standard OAuth flow
       supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
         .then(({ error: oauthError }) => { if (oauthError) throw oauthError; })
         .catch((err: unknown) => {
@@ -54,17 +62,20 @@ export function AccountModal() {
     setLoading(true);
     setError(null);
     try {
-      if (isAnonymous) {
+      if (mode === 'create' && isAnonymous) {
         // updateUser preserves the anonymous UUID (important for game history linking)
         // but sends a "confirm email change" email — we set expectations in the UI copy
         const { error: updateError } = await supabase.auth.updateUser({ email: email.trim() });
         if (updateError) throw updateError;
+        setEmailSent(true);
+        addToast({ message: 'Check your email to verify your account', type: 'info' });
       } else {
+        // Sign-in mode (returning user) or non-anonymous: use signInWithOtp
         const { error: otpError } = await supabase.auth.signInWithOtp({ email: email.trim() });
         if (otpError) throw otpError;
+        setEmailSent(true);
+        addToast({ message: 'Check your email for a sign-in link', type: 'info' });
       }
-      setEmailSent(true);
-      addToast({ message: isAnonymous ? 'Check your email to verify your account' : 'Check your email for a sign-in link', type: 'info' });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to send magic link');
     } finally {
@@ -78,16 +89,17 @@ export function AccountModal() {
     setEmailSent(false);
     setError(null);
     setLoading(false);
+    setMode('create');
   };
 
   return (
-    <Modal isOpen={showAccountModal} onClose={handleClose} title="Create Account" size="sm">
+    <Modal isOpen={showAccountModal} onClose={handleClose} title={mode === 'signin' ? 'Sign In' : 'Create Account'} size="sm">
       {emailSent ? (
         <div className="text-center py-6">
           <span className="text-4xl block mb-3">📧</span>
           <p className="font-bold text-lg mb-2">Check your email</p>
           <p className="text-text-secondary text-sm mb-4">
-            {isAnonymous
+            {mode === 'create' && isAnonymous
               ? <>We sent a verification link to <span className="font-medium text-text-primary">{email}</span>. Click it to confirm your account.</>
               : <>We sent a sign-in link to <span className="font-medium text-text-primary">{email}</span></>
             }
@@ -137,13 +149,25 @@ export function AccountModal() {
               className="btn-secondary w-full disabled:opacity-50"
               aria-busy={loading}
             >
-              {loading ? 'Sending...' : 'Send Magic Link'}
+              {loading ? 'Sending...' : mode === 'signin' ? 'Send Sign-In Link' : 'Send Magic Link'}
             </button>
           </form>
 
           {error && (
             <p className="text-danger text-sm text-center">{error}</p>
           )}
+
+          <p className="text-text-muted text-xs text-center">
+            {mode === 'create' ? (
+              <>Already have an account?{' '}
+                <button type="button" onClick={() => { setMode('signin'); setError(null); }} className="text-accent hover:underline">Sign in</button>
+              </>
+            ) : (
+              <>New here?{' '}
+                <button type="button" onClick={() => { setMode('create'); setError(null); }} className="text-accent hover:underline">Create account</button>
+              </>
+            )}
+          </p>
 
           <p className="text-text-muted text-xs text-center">
             By continuing, you agree to our{' '}
