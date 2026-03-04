@@ -35,6 +35,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch { /* skip */ }
     }
 
+    // Ensure player_profiles row exists (game_history FK requires it)
+    await supabaseAdmin.from('player_profiles').upsert({
+      id: playerId,
+      initials: 'AA',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' });
+
     if (playerEntries.length === 0) {
       return res.status(200).json({
         message: 'No claimed entries found in leaderboard for this player',

@@ -69,6 +69,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(403).json({ error: 'Account required — anonymous users cannot claim games' });
     }
 
+    // Ensure player_profiles row exists (game_history FK requires it)
+    await supabaseAdmin.from('player_profiles').upsert({
+      id: playerId,
+      initials: 'AA',
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'id' });
+
     // Rate limit: dual-key (per IP + per user)
     const ip = getClientIp(req);
     const ipRateLimitKey = `ratelimit:claim:${ip}`;
