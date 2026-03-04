@@ -70,11 +70,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // Ensure player_profiles row exists (game_history FK requires it)
+    // ignoreDuplicates: don't overwrite existing profile (preserves real initials)
     await supabaseAdmin.from('player_profiles').upsert({
       id: playerId,
       initials: 'AA',
       updated_at: new Date().toISOString(),
-    }, { onConflict: 'id' });
+    }, { onConflict: 'id', ignoreDuplicates: true });
 
     // Rate limit: dual-key (per IP + per user)
     const ip = getClientIp(req);
