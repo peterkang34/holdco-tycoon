@@ -66,7 +66,9 @@ export function initAuthListener(): (() => void) | undefined {
       store.setPlayer(player);
 
       // User just upgraded from anonymous to real account
-      if (event === 'USER_UPDATED' && wasAnonymous && !isAnonymous) {
+      // USER_UPDATED fires for in-session upgrades (e.g. updateUser with email)
+      // SIGNED_IN fires after email verification redirect or OAuth link
+      if ((event === 'USER_UPDATED' || event === 'SIGNED_IN') && wasAnonymous && !isAnonymous) {
         // Check localStorage for claimable leaderboard entries
         try {
           const localEntries = localStorage.getItem('holdco-tycoon-leaderboard');

@@ -55,6 +55,8 @@ export function AccountModal() {
     setError(null);
     try {
       if (isAnonymous) {
+        // updateUser preserves the anonymous UUID (important for game history linking)
+        // but sends a "confirm email change" email — we set expectations in the UI copy
         const { error: updateError } = await supabase.auth.updateUser({ email: email.trim() });
         if (updateError) throw updateError;
       } else {
@@ -62,7 +64,7 @@ export function AccountModal() {
         if (otpError) throw otpError;
       }
       setEmailSent(true);
-      addToast({ message: 'Check your email for a sign-in link', type: 'info' });
+      addToast({ message: isAnonymous ? 'Check your email to verify your account' : 'Check your email for a sign-in link', type: 'info' });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to send magic link');
     } finally {
@@ -85,7 +87,10 @@ export function AccountModal() {
           <span className="text-4xl block mb-3">📧</span>
           <p className="font-bold text-lg mb-2">Check your email</p>
           <p className="text-text-secondary text-sm mb-4">
-            We sent a sign-in link to <span className="font-medium text-text-primary">{email}</span>
+            {isAnonymous
+              ? <>We sent a verification link to <span className="font-medium text-text-primary">{email}</span>. Click it to confirm your account.</>
+              : <>We sent a sign-in link to <span className="font-medium text-text-primary">{email}</span></>
+            }
           </p>
           <button onClick={handleClose} className="btn-secondary text-sm">
             Close

@@ -103,7 +103,7 @@ export function AccountBadge() {
       </button>
 
       {showDropdown && (
-        <div className="absolute right-0 top-11 w-48 bg-bg-card border border-white/10 rounded-lg shadow-lg py-1 z-50" role="menu">
+        <div className="absolute right-0 top-11 w-48 border border-white/15 rounded-lg shadow-xl py-1 z-50" style={{ backgroundColor: 'rgba(20, 25, 35, 0.95)', backdropFilter: 'blur(8px)' }} role="menu">
           {player.email && (
             <>
               <p className="px-3 py-2 text-xs text-text-muted truncate">{player.email}</p>
