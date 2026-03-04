@@ -325,6 +325,10 @@ function PlayerDetailPanel({ detail, loading }: { detail: PlayerDetail | null; l
         <div>
           <h4 className="text-xs font-semibold text-text-secondary mb-2">Auth Details</h4>
           <div className="space-y-1 text-[11px]">
+            <div className="flex justify-between gap-2">
+              <span className="text-text-muted">UUID</span>
+              <span className="text-text-primary font-mono text-[9px] select-all truncate max-w-[180px]" title={detail.profile.id as string}>{detail.profile.id as string}</span>
+            </div>
             <div className="flex justify-between">
               <span className="text-text-muted">Provider</span>
               <span className="text-text-primary capitalize">{detail.auth.provider}</span>
