@@ -31,6 +31,67 @@ import { MIN_OPCOS_FOR_SHARED_SERVICES } from '../../data/sharedServices';
 import { buildChallengeUrl, copyToClipboard } from '../../utils/challenge';
 import { AccountBadge } from '../ui/AccountBadge';
 
+// ── Mobile Nav Overflow Menu ──────────────────────────────────────
+function NavOverflowMenu({ hasReports, onReports, onManual, onFeedback, onTutorial, onReset }: {
+  hasReports: boolean;
+  onReports: () => void;
+  onManual: () => void;
+  onFeedback: () => void;
+  onTutorial: () => void;
+  onReset: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handle = (e: Event) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('pointerdown', handle);
+    return () => document.removeEventListener('pointerdown', handle);
+  }, [open]);
+
+  const item = (label: string, icon: string, onClick: () => void, danger = false) => (
+    <button
+      key={label}
+      role="menuitem"
+      onClick={() => { setOpen(false); onClick(); }}
+      className={`w-full text-left px-3 min-h-[44px] flex items-center gap-2.5 text-sm transition-colors hover:bg-white/5 ${danger ? 'text-text-muted hover:text-danger' : 'text-text-secondary'}`}
+    >
+      <span className="w-5 text-center">{icon}</span>{label}
+    </button>
+  );
+
+  return (
+    <div className="relative sm:hidden" ref={ref}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5"
+        title="More"
+        aria-haspopup="true"
+        aria-expanded={open}
+      >
+        ⋯
+      </button>
+      {open && (
+        <div
+          className="absolute right-0 top-11 w-48 border border-white/15 rounded-lg shadow-xl py-1 z-50"
+          style={{ backgroundColor: 'rgba(20, 25, 35, 0.95)', backdropFilter: 'blur(8px)' }}
+          role="menu"
+        >
+          {hasReports && item('Annual Reports', '📊', onReports)}
+          {item('How to Play', '📖', onManual)}
+          {item('Send Feedback', '💬', onFeedback)}
+          {item('Tutorial', '?', onTutorial)}
+          <div className="border-t border-white/10 my-0.5" />
+          {item('Start Over', '↺', onReset, true)}
+        </div>
+      )}
+    </div>
+  );
+}
+
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
 const FO_TUTORIAL_SEEN_KEY = 'holdco-tycoon-fo-tutorial-seen-v1';
 
@@ -995,6 +1056,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
           </div>
           <div className="flex items-center gap-2">
             <AccountBadge />
+            {/* Desktop: show all buttons inline */}
             {roundHistory && roundHistory.length > 0 && (
               <button
                 onClick={() => setShowAnnualReports(true)}
@@ -1006,7 +1068,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             )}
             <button
               onClick={() => setShowFeedback(true)}
-              className="text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5"
+              className="hidden sm:flex text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] items-center justify-center rounded hover:bg-white/5"
               title="Send Feedback"
             >
               💬
@@ -1020,34 +1082,34 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             </button>
             <button
               onClick={() => setShowManual(true)}
-              className="text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5"
+              className="hidden sm:flex text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] items-center justify-center rounded hover:bg-white/5"
               title="How to Play"
             >
               📖
             </button>
             <button
               onClick={() => setShowInstructions(true)}
-              className="text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5"
+              className="hidden sm:flex text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] items-center justify-center rounded hover:bg-white/5"
               title="View Tutorial"
             >
               ?
             </button>
-            {roundHistory && roundHistory.length > 0 && (
-              <button
-                onClick={() => setShowAnnualReports(true)}
-                className="sm:hidden text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5"
-                title="Annual Reports"
-              >
-                📊
-              </button>
-            )}
             <button
               onClick={() => setShowResetConfirm(true)}
-              className="text-text-muted hover:text-danger transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center rounded hover:bg-white/5"
+              className="hidden sm:flex text-text-muted hover:text-danger transition-colors min-h-[44px] min-w-[44px] items-center justify-center rounded hover:bg-white/5"
               title="Start Over"
             >
               ↺
             </button>
+            {/* Mobile: overflow menu for secondary actions */}
+            <NavOverflowMenu
+              hasReports={!!roundHistory && roundHistory.length > 0}
+              onReports={() => setShowAnnualReports(true)}
+              onManual={() => setShowManual(true)}
+              onFeedback={() => setShowFeedback(true)}
+              onTutorial={() => setShowInstructions(true)}
+              onReset={() => setShowResetConfirm(true)}
+            />
           </div>
         </div>
         {/* Phase indicator + Market Cycle — compact on mobile, full on desktop */}
