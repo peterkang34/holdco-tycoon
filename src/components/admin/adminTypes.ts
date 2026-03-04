@@ -134,6 +134,48 @@ export interface Totals {
   secondGameRate: string;
 }
 
+// ── Community Tab Types ────────────────────────────────────────
+
+export interface SignUpMetrics {
+  totalAccounts: number;
+  verifiedAccounts: number;
+  anonymousAccounts: number;
+  providerBreakdown: Record<string, number>;
+  signUpsByWeek: { week: string; count: number }[];
+  signUpsByDay: { date: string; count: number }[];
+}
+
+export interface CommunityPlayer {
+  id: string;
+  display_name: string | null;
+  initials: string;
+  total_games: number;
+  best_grade: string | null;
+  best_adjusted_fev: number;
+  created_at: string;
+  is_anonymous: boolean;
+}
+
+export interface CommunityData {
+  metrics: SignUpMetrics;
+  players: CommunityPlayer[];
+  totalPlayers: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface PlayerDetail {
+  profile: Record<string, unknown>;
+  stats: Record<string, unknown> | null;
+  recentGames: Record<string, unknown>[];
+  auth: {
+    provider: string;
+    created_at: string;
+    last_sign_in_at: string | null;
+    is_anonymous: boolean;
+  };
+}
+
 // Re-export for component props
 export interface MiniTrendProps {
   label: string;

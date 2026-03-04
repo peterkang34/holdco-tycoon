@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { AdminLogin } from './AdminLogin';
 import { AdminBarChart } from './AdminBarChart';
 import { FeedbackTab } from './FeedbackTab';
+import { CommunityTab } from './CommunityTab';
 import { OverviewTab } from './OverviewTab';
 import { BalanceTab } from './BalanceTab';
 import { MiniTrend, SectionHeader, HorizontalBar, DonutChart, FunnelStep } from './adminShared';
@@ -11,7 +12,7 @@ import type { AnalyticsData, Totals } from './adminTypes';
 
 // ── Tab Configuration ────────────────────────────────────────
 
-type TabId = 'overview' | 'funnel' | 'retention' | 'engagement' | 'balance' | 'challenge' | 'devices' | 'feedback';
+type TabId = 'overview' | 'funnel' | 'retention' | 'engagement' | 'balance' | 'challenge' | 'devices' | 'feedback' | 'community';
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'funnel', label: 'Funnel' },
@@ -21,6 +22,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'challenge', label: 'Challenge' },
   { id: 'devices', label: 'Devices' },
   { id: 'feedback', label: 'Feedback' },
+  { id: 'community', label: 'Community' },
 ];
 
 // ── Health Alerts ─────────────────────────────────────────────
@@ -677,6 +679,9 @@ export function AdminDashboard() {
 
       {/* ═══════ FEEDBACK TAB ═══════ */}
       {activeTab === 'feedback' && <FeedbackTab token={token!} />}
+
+      {/* ═══════ COMMUNITY TAB ═══════ */}
+      {activeTab === 'community' && <CommunityTab token={token!} />}
     </div>
   );
 }
