@@ -796,7 +796,7 @@ export function GameOverScreen({
             </div>
             <div>
               <p className="text-text-muted text-sm">Final Stock Price</p>
-              <p className="text-lg sm:text-xl font-bold font-mono text-accent">${ipoState.stockPrice.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-lg sm:text-xl font-bold font-mono text-accent">{formatMoney(Math.round(ipoState.stockPrice))}/sh</p>
             </div>
             <div>
               <p className="text-text-muted text-sm">Market Sentiment</p>
