@@ -144,6 +144,7 @@ interface OverviewTabProps {
 
 export function OverviewTab({ data, totals, avgSophistication, kFactor }: OverviewTabProps) {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
+  const [expandedRecentRow, setExpandedRecentRow] = useState<number | null>(null);
 
   return (
     <>
@@ -287,25 +288,48 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor }: Overvi
                   const diffLabel = entry.difficulty === 'normal' ? 'H' : 'E';
                   const dateObj = new Date(entry.date);
                   const timeAgo = getTimeAgo(dateObj);
+                  const hasStrategy = !!entry.strategy?.scoreBreakdown;
+                  const isExpanded = expandedRecentRow === i;
                   return (
-                    <tr key={i} className="border-b border-border/50">
-                      <td className="py-1.5 pr-3 text-text-muted font-mono" title={dateObj.toLocaleString()}>
-                        {timeAgo}
-                      </td>
-                      <td className="py-1.5 pr-3 text-center font-mono text-text-primary font-bold">{entry.initials || '—'}</td>
-                      <td className="py-1.5 pr-3 text-text-secondary truncate max-w-[150px]">{entry.holdcoName}</td>
-                      <td className="py-1.5 pr-3 text-right font-mono text-accent">{formatMoney(adjFev)}</td>
-                      <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.score ?? '—'}</td>
-                      <td className={`py-1.5 pr-3 text-center font-bold ${getGradeColor(entry.grade)}`}>{entry.grade}</td>
-                      <td className="py-1.5 pr-3 text-center">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
-                          {diffLabel}/{durationLabel}
-                        </span>
-                      </td>
-                      <td className="py-1.5">
-                        <MultiplierBadges entry={entry} />
-                      </td>
-                    </tr>
+                    <Fragment key={i}>
+                      <tr
+                        className={`border-b border-border/50 ${hasStrategy ? 'cursor-pointer hover:bg-white/5' : ''} ${isExpanded ? 'bg-accent/5' : ''}`}
+                        onClick={() => hasStrategy && setExpandedRecentRow(isExpanded ? null : i)}
+                      >
+                        <td className="py-1.5 pr-3 text-text-muted font-mono" title={dateObj.toLocaleString()}>
+                          {timeAgo}
+                        </td>
+                        <td className="py-1.5 pr-3 text-center font-mono text-text-primary font-bold">{entry.initials || '—'}</td>
+                        <td className="py-1.5 pr-3 text-text-secondary truncate max-w-[150px]">
+                          {entry.holdcoName}
+                          {hasStrategy && <span className="ml-1 text-accent text-[10px]">{isExpanded ? '▼' : '▶'}</span>}
+                        </td>
+                        <td className="py-1.5 pr-3 text-right font-mono text-accent">{formatMoney(adjFev)}</td>
+                        <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.score ?? '—'}</td>
+                        <td className={`py-1.5 pr-3 text-center font-bold ${getGradeColor(entry.grade)}`}>{entry.grade}</td>
+                        <td className="py-1.5 pr-3 text-center">
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
+                            {diffLabel}/{durationLabel}
+                          </span>
+                        </td>
+                        <td className="py-1.5">
+                          <MultiplierBadges entry={entry} />
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr className="border-b border-border/50">
+                          <td colSpan={8} className="p-0">
+                            {entry.strategy ? (
+                              <StrategyDrillDown strategy={entry.strategy} />
+                            ) : (
+                              <div className="px-4 pb-3 pt-2 text-xs text-text-muted italic bg-bg-secondary/30 border-t border-border/30">
+                                Strategy data not available for this entry
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
                   );
                 })}
               </tbody>
