@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, Fragment } from 'react';
 import { MetricCard } from '../ui/MetricCard';
 import { DonutChart, MiniTrend, SectionHeader } from './adminShared';
+import { formatMoney } from '../../engine/types';
 import type { CommunityData, PlayerDetail } from './adminTypes';
 
 // ── Constants ────────────────────────────────────────────────────
@@ -29,12 +30,6 @@ const GRADE_COLORS: Record<string, string> = {
 };
 
 // ── Helpers ──────────────────────────────────────────────────────
-
-function formatFev(val: number): string {
-  if (val >= 1_000_000) return `$${(val / 1_000).toFixed(1)}B`;
-  if (val >= 1_000) return `$${(val / 1_000).toFixed(0)}M`;
-  return `$${val}K`;
-}
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
@@ -273,7 +268,7 @@ export function CommunityTab({ token }: { token: string }) {
                       )}
                     </td>
                     <td className="py-2 px-2 text-right font-mono text-text-secondary">
-                      {player.best_adjusted_fev > 0 ? formatFev(player.best_adjusted_fev) : '--'}
+                      {player.best_adjusted_fev > 0 ? formatMoney(player.best_adjusted_fev) : '--'}
                     </td>
                     <td className="py-2 px-2 text-right text-text-muted">{formatDate(player.created_at)}</td>
                     <td className="py-2 px-2 text-center">
@@ -403,7 +398,7 @@ function PlayerDetailPanel({ detail, loading }: { detail: PlayerDetail | null; l
               </div>
               <div className="flex justify-between">
                 <span className="text-text-muted">Best FEV</span>
-                <span className="text-text-primary font-mono">{formatFev((stats.best_adjusted_fev as number) || 0)}</span>
+                <span className="text-text-primary font-mono">{formatMoney((stats.best_adjusted_fev as number) || 0)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-text-muted">Grades</span>
@@ -494,7 +489,7 @@ function GameBreakdown({ game }: { game: any }) {
           {game.grade}
         </span>
         <span className="text-[11px] text-text-primary truncate flex-1">{game.holdco_name || '--'}</span>
-        <span className="text-[10px] font-mono text-accent">{formatFev(game.adjusted_fev || 0)}</span>
+        <span className="text-[10px] font-mono text-accent">{formatMoney(game.adjusted_fev || 0)}</span>
         <span className="text-[10px] font-mono text-text-muted">{game.score}/100</span>
         <span className="text-[10px] text-text-muted">
           {game.difficulty === 'normal' ? 'H' : 'E'}/{game.duration === 'quick' ? '10' : '20'}
@@ -538,11 +533,11 @@ function GameBreakdown({ game }: { game: any }) {
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-[10px]">
             <div className="flex justify-between">
               <span className="text-text-muted">EV</span>
-              <span className="font-mono text-text-primary">{formatFev(game.enterprise_value || 0)}</span>
+              <span className="font-mono text-text-primary">{formatMoney(game.enterprise_value || 0)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-text-muted">FEV (raw)</span>
-              <span className="font-mono text-text-primary">{formatFev(game.founder_equity_value || 0)}</span>
+              <span className="font-mono text-text-primary">{formatMoney(game.founder_equity_value || 0)}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-text-muted">Businesses</span>
@@ -555,7 +550,7 @@ function GameBreakdown({ game }: { game: any }) {
             {game.total_revenue != null && (
               <div className="flex justify-between">
                 <span className="text-text-muted">Revenue</span>
-                <span className="font-mono text-text-primary">{formatFev(game.total_revenue)}</span>
+                <span className="font-mono text-text-primary">{formatMoney(game.total_revenue)}</span>
               </div>
             )}
             {game.avg_ebitda_margin != null && (
