@@ -447,16 +447,20 @@ function PlayerDetailPanel({ detail, loading }: { detail: PlayerDetail | null; l
       </div>
 
       {/* Recent games */}
-      {detail.recentGames.length > 0 && (
-        <div>
-          <h4 className="text-xs font-semibold text-text-secondary mb-2">Recent Games ({detail.recentGames.length})</h4>
+      <div>
+        <h4 className="text-xs font-semibold text-text-secondary mb-2">
+          Recent Games {detail.recentGames.length > 0 ? `(${detail.recentGames.length})` : ''}
+        </h4>
+        {detail.recentGames.length > 0 ? (
           <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
             {detail.recentGames.map((game: any, i: number) => (
               <GameBreakdown key={i} game={game} />
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <p className="text-[11px] text-text-muted">No game history recorded for this player</p>
+        )}
+      </div>
     </div>
   );
 }
@@ -479,13 +483,14 @@ function GameBreakdown({ game }: { game: any }) {
   const antiPatterns = (strategy?.antiPatterns as string[]) || [];
 
   return (
-    <div className="bg-bg-primary/50 rounded border border-border/20">
-      {/* Summary row */}
+    <div className={`rounded border transition-colors ${expanded ? 'bg-bg-secondary border-accent/30' : 'bg-bg-card border-border/40 hover:border-border'}`}>
+      {/* Summary row — clickable to expand */}
       <button
         onClick={() => setExpanded(e => !e)}
-        className="w-full flex items-center gap-2 px-2.5 py-1.5 text-left hover:bg-white/5 transition-colors"
+        className="w-full flex items-center gap-2 px-2.5 py-2 text-left hover:bg-white/5 transition-colors cursor-pointer"
       >
-        <span className="font-bold text-[11px] w-4" style={{ color: GRADE_COLORS[game.grade] || 'inherit' }}>
+        <span className="text-[10px] text-text-muted w-3 shrink-0">{expanded ? '▾' : '▸'}</span>
+        <span className="font-bold text-[11px] w-4 shrink-0" style={{ color: GRADE_COLORS[game.grade] || 'inherit' }}>
           {game.grade}
         </span>
         <span className="text-[11px] text-text-primary truncate flex-1">{game.holdco_name || '--'}</span>
@@ -495,12 +500,11 @@ function GameBreakdown({ game }: { game: any }) {
           {game.difficulty === 'normal' ? 'H' : 'E'}/{game.duration === 'quick' ? '10' : '20'}
         </span>
         <span className="text-[10px] text-text-muted">{game.completed_at ? formatDate(game.completed_at) : '--'}</span>
-        <span className="text-[9px] text-text-muted">{expanded ? '\u25b2' : '\u25bc'}</span>
       </button>
 
       {/* Expanded detail */}
       {expanded && (
-        <div className="px-2.5 pb-2.5 pt-1 border-t border-border/20 space-y-2">
+        <div className="px-2.5 pb-2.5 pt-1 border-t border-accent/20 space-y-2">
           {/* Score breakdown bar */}
           {game.score_value_creation != null && (
             <div>
