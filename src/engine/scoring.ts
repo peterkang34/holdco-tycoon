@@ -643,8 +643,14 @@ export async function saveToLeaderboard(
     if (res.ok) {
       const data = await res.json();
       newEntry.id = data.id;
+    } else {
+      console.error('Leaderboard submit failed:', res.status, await res.text().catch(() => ''));
+      newEntry._submitFailed = true;
     }
-  } catch { /* silent fallback */ }
+  } catch (err) {
+    console.error('Leaderboard submit error:', err);
+    newEntry._submitFailed = true;
+  }
 
   // Always save locally too (dual-write) — merge extra fields so local has FEV/difficulty
   const localEntry = {

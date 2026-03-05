@@ -13,6 +13,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 5, 2026',
+    title: 'Leaderboard Fix',
+    hidden: true,
+    sections: [
+      {
+        heading: 'Bug Fixes',
+        items: [
+          'Fixed leaderboard validation caps that silently rejected scores above $500B FEV — raised to $5T.',
+          'Score submission failures now show an error message with a Retry button instead of failing silently.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 4, 2026',
     title: 'Admin: Sourcing Analytics',
     hidden: true,

@@ -123,6 +123,7 @@ export function GameOverScreen({
   const [leaderboardLoading, setLeaderboardLoading] = useState(true);
   const [leaderboardError, setLeaderboardError] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
   const [leaderboardTab, setLeaderboardTab] = useState<LeaderboardTab>('overall');
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [scoreboardLinkCopied, setScoreboardLinkCopied] = useState(false);
@@ -411,6 +412,7 @@ export function GameOverScreen({
     if (initials.length < 2 || hasSaved || saving) return;
 
     setSaving(true);
+    setSaveError(false);
     try {
       const entry = await saveToLeaderboard(
         {
@@ -468,6 +470,12 @@ export function GameOverScreen({
           },
         }
       );
+
+      if (entry._submitFailed) {
+        setSaveError(true);
+        setHasSaved(false);
+        return;
+      }
 
       setSavedEntryId(entry.id);
       setHasSaved(true);
@@ -829,9 +837,14 @@ export function GameOverScreen({
                 disabled={initials.length < 2 || saving}
                 className="btn-primary text-sm sm:text-base disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? 'Saving...' : 'Save Score'}
+                {saving ? 'Saving...' : saveError ? 'Retry' : 'Save Score'}
               </button>
             </div>
+            {saveError && (
+              <p className="text-red-400 text-sm mt-2">
+                Failed to save to global leaderboard. Your score was saved locally — please try again.
+              </p>
+            )}
           </div>
         </div>
       )}

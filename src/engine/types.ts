@@ -703,6 +703,7 @@ export interface LeaderboardEntry {
   playerId?: string; // Supabase user UUID (set on submission or claim; stripped from GET responses)
   isVerified?: boolean; // Set by GET API when playerId exists (playerId itself is stripped for privacy)
   claimToken?: string; // Secret UUID for ownership proof (stored locally, never returned by GET API)
+  _submitFailed?: boolean; // Client-only: true if API submission failed (not persisted)
 }
 
 // Utility types
