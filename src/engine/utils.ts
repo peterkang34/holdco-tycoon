@@ -14,6 +14,9 @@ export function randomInt(min: number, max: number, rng?: SeededRng): number {
 // All internal values are stored in thousands (e.g., 1000 = $1M, 16000 = $16M)
 export function formatMoney(amountInThousands: number): string {
   const amount = amountInThousands * 1000; // Convert to actual dollars
+  if (Math.abs(amount) >= 1000000000000) {
+    return `$${(amount / 1000000000000).toFixed(1)}T`;
+  }
   if (Math.abs(amount) >= 1000000000) {
     return `$${(amount / 1000000000).toFixed(1)}B`;
   }

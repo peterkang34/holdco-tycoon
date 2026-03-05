@@ -77,9 +77,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'holdcoName contains invalid characters' });
     }
 
-    // enterpriseValue: number, 0 ≤ EV ≤ 5,000,000,000 ($5T)
-    if (typeof enterpriseValue !== 'number' || enterpriseValue < 0 || enterpriseValue > 5000000000) {
-      return res.status(400).json({ error: 'enterpriseValue must be between 0 and 5,000,000,000' });
+    // enterpriseValue: number, 0 ≤ EV ≤ 100,000,000,000 ($100T)
+    if (typeof enterpriseValue !== 'number' || enterpriseValue < 0 || enterpriseValue > 100000000000) {
+      return res.status(400).json({ error: 'enterpriseValue must be between 0 and 100,000,000,000' });
     }
 
     // score: integer, 0 ≤ score ≤ 100
@@ -113,12 +113,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // duration: valid duration
     const validDuration = typeof duration === 'string' && (VALID_DURATIONS as readonly string[]).includes(duration) ? duration : 'standard';
 
-    // founderEquityValue: number, 0 ≤ FEV ≤ 5,000,000,000 ($5T)
-    const validFEV = typeof founderEquityValue === 'number' && founderEquityValue >= 0 && founderEquityValue <= 5000000000
+    // founderEquityValue: number, 0 ≤ FEV ≤ 100,000,000,000 ($100T)
+    const validFEV = typeof founderEquityValue === 'number' && founderEquityValue >= 0 && founderEquityValue <= 100000000000
       ? Math.round(founderEquityValue) : Math.round(enterpriseValue);
 
-    // founderPersonalWealth: number, 0 ≤ PW ≤ 5,000,000,000 ($5T)
-    const validPersonalWealth = typeof founderPersonalWealth === 'number' && founderPersonalWealth >= 0 && founderPersonalWealth <= 5000000000
+    // founderPersonalWealth: number, 0 ≤ PW ≤ 100,000,000,000 ($100T)
+    const validPersonalWealth = typeof founderPersonalWealth === 'number' && founderPersonalWealth >= 0 && founderPersonalWealth <= 100000000000
       ? Math.round(founderPersonalWealth) : 0;
 
     // --- Plausibility Checks ---
