@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Modal } from './Modal';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { fetchWithAuth } from '../../lib/supabase';
+import { useToastStore } from '../../hooks/useToast';
 import { formatMoney } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
 import SparklineChart from './SparklineChart';
@@ -69,6 +70,38 @@ export function StatsModal() {
   const [history, setHistory] = useState<GameHistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [linking, setLinking] = useState(false);
+  const [refetchKey, setRefetchKey] = useState(0);
+
+  const handleLinkGames = useCallback(async () => {
+    setLinking(true);
+    try {
+      const res = await fetchWithAuth('/api/player/auto-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const msg = res.status === 429 ? 'Try again in a few minutes' : 'Link failed';
+        useToastStore.getState().addToast({ message: msg, type: 'warning' });
+        return;
+      }
+      const data = await res.json();
+      if (data.linked > 0) {
+        useToastStore.getState().addToast({
+          message: `${data.linked} game${data.linked > 1 ? 's' : ''} linked!`,
+          type: 'success',
+        });
+        setRefetchKey((k) => k + 1); // trigger stats re-fetch
+      } else {
+        useToastStore.getState().addToast({ message: 'No unlinked games found', type: 'info' });
+      }
+    } catch {
+      useToastStore.getState().addToast({ message: 'Link request failed', type: 'warning' });
+    } finally {
+      setLinking(false);
+    }
+  }, []);
 
   useEffect(() => {
     if (!showStatsModal || !isLoggedIn) return;
@@ -117,7 +150,7 @@ export function StatsModal() {
 
     fetchData();
     return () => { cancelled = true; };
-  }, [showStatsModal, isLoggedIn, player?.id]);
+  }, [showStatsModal, isLoggedIn, player?.id, refetchKey]);
 
   if (!isLoggedIn) return null;
 
@@ -158,7 +191,14 @@ export function StatsModal() {
         <div className="text-center py-12 min-h-[300px] flex flex-col items-center justify-center">
           <span className="text-4xl block mb-3">📊</span>
           <p className="text-text-secondary font-medium mb-1">No games tracked yet</p>
-          <p className="text-text-muted text-sm">Complete a game to start building your stats!</p>
+          <p className="text-text-muted text-sm mb-4">Complete a game to start building your stats!</p>
+          <button
+            onClick={handleLinkGames}
+            disabled={linking}
+            className="btn-secondary text-sm"
+          >
+            {linking ? 'Linking...' : 'Link Past Games'}
+          </button>
           {player?.id && (
             <p className="text-[10px] text-text-muted/50 mt-4 font-mono select-all" title="Player UUID — share with admin if stats are missing">
               {player.id}
@@ -335,6 +375,17 @@ export function StatsModal() {
               </div>
             </div>
           )}
+
+          {/* Link Past Games */}
+          <div className="text-center pt-2">
+            <button
+              onClick={handleLinkGames}
+              disabled={linking}
+              className="text-xs text-text-muted hover:text-text-secondary transition-colors"
+            >
+              {linking ? 'Linking...' : 'Link Past Games'}
+            </button>
+          </div>
         </div>
       )}
     </Modal>

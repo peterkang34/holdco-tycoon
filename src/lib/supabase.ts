@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { useAuthStore, type Player } from '../hooks/useAuth';
+import { useToastStore } from '../hooks/useToast';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -43,6 +44,33 @@ export async function initAnonymousAuth(): Promise<void> {
 }
 
 /**
+ * Fire-and-forget auto-link: calls the server to link KV entries
+ * where submittedBy matches the current user's UUID.
+ * Shows a toast if games were linked.
+ */
+async function fireAutoLink(): Promise<void> {
+  try {
+    const token = await getAccessToken();
+    if (!token) return;
+
+    const res = await fetch('/api/player/auto-link', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.linked > 0) {
+      useToastStore.getState().addToast({
+        message: `${data.linked} past game${data.linked > 1 ? 's' : ''} linked to your account`,
+        type: 'success',
+      });
+    }
+  } catch { /* silent — best effort */ }
+}
+
+/**
  * Initialize auth state listener. Syncs Supabase auth events to useAuthStore.
  * Call once on app load alongside initAnonymousAuth().
  */
@@ -82,6 +110,9 @@ export function initAuthListener(): (() => void) | undefined {
       // USER_UPDATED fires for in-session upgrades (e.g. updateUser with email)
       // SIGNED_IN fires after email verification redirect or OAuth link
       if ((event === 'USER_UPDATED' || event === 'SIGNED_IN') && wasAnonymous && !isAnonymous) {
+        // Fire auto-link (server-side submittedBy matching) — runs alongside claim modal
+        fireAutoLink();
+
         // Check localStorage for claimable leaderboard entries
         try {
           const localEntries = localStorage.getItem('holdco-tycoon-leaderboard');
@@ -93,6 +124,15 @@ export function initAuthListener(): (() => void) | undefined {
             }
           }
         } catch { /* ignore parse errors */ }
+      }
+
+      // On initial load for verified users, auto-link once (catches stale-token submissions)
+      if (event === 'INITIAL_SESSION' && !isAnonymous) {
+        const flag = `holdco-autolink-done:${user.id}`;
+        if (!localStorage.getItem(flag)) {
+          localStorage.setItem(flag, '1');
+          fireAutoLink();
+        }
       }
     }
 

@@ -22,6 +22,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // Strip sensitive fields — never expose tokens or raw UUIDs to clients
         if (parsed && typeof parsed === 'object') {
           delete parsed.claimToken;
+          delete parsed.submittedBy;
           // Expose a boolean flag instead of the raw playerId UUID
           if (parsed.playerId) {
             parsed.isVerified = true;

@@ -239,6 +239,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       strategy: validStrategy,
       // Player accounts fields — only verified (non-anonymous) accounts get playerId on leaderboard
       ...(verifiedPlayerId ? { playerId: verifiedPlayerId } : {}),
+      ...(playerId ? { submittedBy: playerId } : {}),  // Always store submitter UUID (anon + verified)
       ...(claimToken ? { claimToken } : {}),
     };
 
