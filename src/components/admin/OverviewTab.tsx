@@ -96,6 +96,26 @@ function StrategyDrillDown({ strategy }: { strategy: LeaderboardStrategy }) {
             <span className="text-text-muted">Rollover Equity</span>
             <span className="text-text-primary font-mono">{strategy.rolloverEquityCount}</span>
           </div>
+          {((strategy.sourceDealUses ?? 0) > 0 || (strategy.proactiveOutreachUses ?? 0) > 0 || (strategy.smbBrokerUses ?? 0) > 0) && (
+            <>
+              <div className="flex justify-between">
+                <span className="text-text-muted">Source Deals</span>
+                <span className="text-text-primary font-mono">{strategy.sourceDealUses ?? 0}</span>
+              </div>
+              {(strategy.proactiveOutreachUses ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-text-muted">Outreach</span>
+                  <span className="text-text-primary font-mono">{strategy.proactiveOutreachUses}</span>
+                </div>
+              )}
+              {(strategy.smbBrokerUses ?? 0) > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-text-muted">SMB Broker</span>
+                  <span className="text-text-primary font-mono">{strategy.smbBrokerUses}</span>
+                </div>
+              )}
+            </>
+          )}
         </div>
 
         {/* Capital Management */}

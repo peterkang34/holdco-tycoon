@@ -14,6 +14,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'March 4, 2026',
+    title: 'Admin: Sourcing Analytics',
+    hidden: true,
+    sections: [
+      {
+        heading: 'Admin',
+        items: [
+          'M&A sourcing usage counts (Source Deals, Proactive Outreach, SMB Broker) now tracked per game and visible in admin Community and Overview tabs.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 4, 2026',
     title: 'Account Tools & Insights',
     sections: [
       {

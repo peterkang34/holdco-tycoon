@@ -267,12 +267,17 @@ export function GameOverScreen({
       endingConstruction['integrated_platform'] = integratedPlatforms.length;
     }
 
+    const sourceDealUses = allActions.filter(a => a.type === 'source_deals').length;
+    const proactiveOutreachUses = allActions.filter(a => a.type === 'proactive_outreach').length;
+    const smbBrokerUses = allActions.filter(a => a.type === 'smb_broker').length;
+
     return {
       totalAcquisitions, totalSells, turnaroundsStarted, turnaroundsSucceeded, turnaroundsFailed,
       peakLeverage, peakDistressLevel, sectorIds, dealStructureTypes, rolloverEquityCount,
       activeCount, platformCount, archetype, antiPatterns, sophisticationScore,
       endingSubTypes, avgEndingEbitda, endingConstruction,
       maSourcingTier: state.maSourcing.tier,
+      sourceDealUses, proactiveOutreachUses, smbBrokerUses,
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -322,6 +327,9 @@ export function GameOverScreen({
       endingSubTypes: Object.keys(strategyData.endingSubTypes).length > 0 ? strategyData.endingSubTypes : undefined,
       avgEndingEbitda: strategyData.avgEndingEbitda > 0 ? strategyData.avgEndingEbitda : undefined,
       endingConstruction: Object.keys(strategyData.endingConstruction).length > 0 ? strategyData.endingConstruction : undefined,
+      sourceDealUses: strategyData.sourceDealUses || undefined,
+      proactiveOutreachUses: strategyData.proactiveOutreachUses || undefined,
+      smbBrokerUses: strategyData.smbBrokerUses || undefined,
     };
     trackGameComplete(snapshot);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -454,6 +462,9 @@ export function GameOverScreen({
             maSourcingTier: strategyData.maSourcingTier,
             sharedServicesActive,
             rolloverEquityCount: strategyData.rolloverEquityCount,
+            sourceDealUses: strategyData.sourceDealUses || undefined,
+            proactiveOutreachUses: strategyData.proactiveOutreachUses || undefined,
+            smbBrokerUses: strategyData.smbBrokerUses || undefined,
           },
         }
       );

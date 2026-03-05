@@ -596,6 +596,24 @@ function GameBreakdown({ game }: { game: any }) {
               ))}
             </div>
           )}
+
+          {/* Sourcing usage */}
+          {((strategy?.maSourcingTier as number) > 0 || (strategy?.sourceDealUses as number) > 0 || (strategy?.proactiveOutreachUses as number) > 0 || (strategy?.smbBrokerUses as number) > 0) && (
+            <div className="flex flex-wrap gap-2 text-[10px]">
+              <span className="bg-purple-500/15 text-purple-400 px-1.5 py-0.5 rounded">
+                MA Tier {(strategy?.maSourcingTier as number) ?? 0}
+              </span>
+              {((strategy?.sourceDealUses as number) ?? 0) > 0 && (
+                <span className="text-text-muted">Source Deals: <span className="font-mono text-text-primary">{strategy?.sourceDealUses as number}</span></span>
+              )}
+              {((strategy?.proactiveOutreachUses as number) ?? 0) > 0 && (
+                <span className="text-text-muted">Outreach: <span className="font-mono text-text-primary">{strategy?.proactiveOutreachUses as number}</span></span>
+              )}
+              {((strategy?.smbBrokerUses as number) ?? 0) > 0 && (
+                <span className="text-text-muted">SMB Broker: <span className="font-mono text-text-primary">{strategy?.smbBrokerUses as number}</span></span>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

@@ -671,6 +671,9 @@ export interface LeaderboardStrategy {
   maSourcingTier: number;
   sharedServicesActive: number;
   rolloverEquityCount: number;
+  sourceDealUses?: number;
+  proactiveOutreachUses?: number;
+  smbBrokerUses?: number;
 }
 
 export interface LeaderboardEntry {

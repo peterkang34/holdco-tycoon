@@ -163,6 +163,10 @@ export interface GameCompleteSnapshot {
   strategyArchetype?: string;
   antiPatterns?: string[];
   sophisticationScore?: number;
+  // Sourcing usage counts
+  sourceDealUses?: number;
+  proactiveOutreachUses?: number;
+  smbBrokerUses?: number;
   // Phase 5 ending business profile
   endingSubTypes?: Record<string, number>;
   avgEndingEbitda?: number;
