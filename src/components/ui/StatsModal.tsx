@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Modal } from './Modal';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { fetchWithAuth } from '../../lib/supabase';
@@ -6,6 +6,7 @@ import { useToastStore } from '../../hooks/useToast';
 import { formatMoney } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
 import SparklineChart from './SparklineChart';
+import { ScoreRadar } from '../admin/ScoreRadar';
 
 interface GlobalStats {
   total_games: number;
@@ -26,17 +27,49 @@ interface PlayerStats {
   global: GlobalStats | null;
 }
 
+interface ScoreBreakdown {
+  valueCreation: number;
+  fcfShareGrowth: number;
+  portfolioRoic: number;
+  capitalDeployment: number;
+  balanceSheetHealth: number;
+  strategicDiscipline: number;
+}
+
+interface GameStrategy {
+  scoreBreakdown?: ScoreBreakdown;
+  archetype?: string;
+  sophisticationScore?: number;
+  antiPatterns?: string[];
+  sectorIds?: string[];
+  dealStructureTypes?: Record<string, number>;
+  platformsForged?: number;
+  totalAcquisitions?: number;
+  totalSells?: number;
+  totalDistributions?: number;
+  totalBuybacks?: number;
+  equityRaisesUsed?: number;
+  peakLeverage?: number;
+  turnaroundsStarted?: number;
+  turnaroundsSucceeded?: number;
+  turnaroundsFailed?: number;
+}
+
 interface GameHistoryEntry {
   id: string;
   holdco_name: string;
   grade: string;
   score: number;
   adjusted_fev: number;
+  founder_equity_value?: number;
+  enterprise_value?: number;
   difficulty: string;
   duration: string;
   business_count: number;
+  has_restructured?: boolean;
+  family_office_completed?: boolean;
   completed_at: string;
-  strategy?: { archetype?: string };
+  strategy?: GameStrategy;
 }
 
 const ARCHETYPE_LABELS: Record<string, string> = {
@@ -58,8 +91,193 @@ const MODE_LABELS: Record<string, string> = {
   normal_quick: 'H/10',
 };
 
+const RADAR_LABELS: Record<string, string> = {
+  valueCreation: 'Value',
+  fcfShareGrowth: 'FCF/Share',
+  portfolioRoic: 'ROIC',
+  capitalDeployment: 'Deploy',
+  balanceSheetHealth: 'Balance',
+  strategicDiscipline: 'Discipline',
+};
+
+const RADAR_MAX: Record<string, number> = {
+  valueCreation: 20,
+  fcfShareGrowth: 20,
+  portfolioRoic: 15,
+  capitalDeployment: 15,
+  balanceSheetHealth: 15,
+  strategicDiscipline: 15,
+};
+
+const RADAR_DIMENSION_ORDER = ['valueCreation', 'fcfShareGrowth', 'portfolioRoic', 'capitalDeployment', 'balanceSheetHealth', 'strategicDiscipline'];
+
+const PAGE_SIZE = 50;
+
 function formatDate(dateStr: string) {
   return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function GameRow({ game }: { game: GameHistoryEntry }) {
+  const [expanded, setExpanded] = useState(false);
+  const breakdown = game.strategy?.scoreBreakdown;
+
+  const radarDimensions = breakdown
+    ? RADAR_DIMENSION_ORDER
+        .filter(key => key in breakdown)
+        .map(key => ({
+          label: RADAR_LABELS[key] ?? key,
+          value: breakdown[key as keyof ScoreBreakdown],
+          max: RADAR_MAX[key] ?? 20,
+        }))
+    : [];
+
+  const s = game.strategy;
+
+  return (
+    <div className="bg-white/5 rounded-lg overflow-hidden">
+      {(() => {
+        const rowContent = (
+          <>
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-sm truncate">{game.holdco_name}</p>
+              <p className="text-xs text-text-muted">
+                {formatDate(game.completed_at)}
+                {s?.archetype && <span className="ml-2">{ARCHETYPE_LABELS[s.archetype] ?? s.archetype}</span>}
+              </p>
+            </div>
+            <div className="flex items-center gap-3 shrink-0 text-right">
+              <div>
+                <p className="font-mono text-sm font-bold text-accent">{formatMoney(game.adjusted_fev)}</p>
+              </div>
+              <span className={`font-mono font-bold ${getGradeColor(game.grade as any)}`}>{game.grade}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded ${game.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
+                {game.difficulty === 'normal' ? 'H' : 'E'}{game.duration === 'quick' ? '/10' : ''}
+              </span>
+              {breakdown && (
+                <span className={`text-text-muted text-xs transition-transform ${expanded ? 'rotate-90' : ''}`}>&#9654;</span>
+              )}
+            </div>
+          </>
+        );
+        return breakdown ? (
+          <button type="button" onClick={() => setExpanded(!expanded)} className="flex items-center justify-between p-2.5 w-full text-left cursor-pointer hover:bg-white/[0.03]">
+            {rowContent}
+          </button>
+        ) : (
+          <div className="flex items-center justify-between p-2.5">
+            {rowContent}
+          </div>
+        );
+      })()}
+
+      {expanded && breakdown && s && (
+        <div className="px-3 pb-3 pt-1 border-t border-white/5">
+          <div className="flex flex-col sm:flex-row gap-4">
+            {/* Radar */}
+            <div className="flex justify-center sm:justify-start shrink-0">
+              <ScoreRadar dimensions={radarDimensions} size={140} />
+            </div>
+
+            {/* Details */}
+            <div className="flex-1 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+              {game.score > 0 && (
+                <div>
+                  <span className="text-text-muted">Score</span>
+                  <span className="ml-1 font-mono font-bold">{game.score}/100</span>
+                </div>
+              )}
+              {s.sophisticationScore != null && (
+                <div>
+                  <span className="text-text-muted">Sophistication</span>
+                  <span className="ml-1 font-mono">{s.sophisticationScore}</span>
+                </div>
+              )}
+              <div>
+                <span className="text-text-muted">Businesses</span>
+                <span className="ml-1 font-mono">{game.business_count}</span>
+              </div>
+
+              {/* Deal activity */}
+              {(s.totalAcquisitions != null || s.totalSells != null) && (
+                <>
+                  {s.totalAcquisitions != null && (
+                    <div>
+                      <span className="text-text-muted">Acquisitions</span>
+                      <span className="ml-1 font-mono">{s.totalAcquisitions}</span>
+                    </div>
+                  )}
+                  {s.totalSells != null && (
+                    <div>
+                      <span className="text-text-muted">Sells</span>
+                      <span className="ml-1 font-mono">{s.totalSells}</span>
+                    </div>
+                  )}
+                </>
+              )}
+              {s.platformsForged != null && s.platformsForged > 0 && (
+                <div>
+                  <span className="text-text-muted">Platforms</span>
+                  <span className="ml-1 font-mono">{s.platformsForged}</span>
+                </div>
+              )}
+              {s.peakLeverage != null && (
+                <div>
+                  <span className="text-text-muted">Peak Leverage</span>
+                  <span className="ml-1 font-mono">{s.peakLeverage.toFixed(1)}x</span>
+                </div>
+              )}
+
+              {/* Capital */}
+              {s.totalDistributions != null && s.totalDistributions > 0 && (
+                <div>
+                  <span className="text-text-muted">Distributions</span>
+                  <span className="ml-1 font-mono">{formatMoney(s.totalDistributions)}</span>
+                </div>
+              )}
+              {s.totalBuybacks != null && s.totalBuybacks > 0 && (
+                <div>
+                  <span className="text-text-muted">Buybacks</span>
+                  <span className="ml-1 font-mono">{formatMoney(s.totalBuybacks)}</span>
+                </div>
+              )}
+              {s.equityRaisesUsed != null && s.equityRaisesUsed > 0 && (
+                <div>
+                  <span className="text-text-muted">Equity Raises</span>
+                  <span className="ml-1 font-mono">{s.equityRaisesUsed}</span>
+                </div>
+              )}
+              {(s.turnaroundsStarted != null && s.turnaroundsStarted > 0) && (
+                <div>
+                  <span className="text-text-muted">Turnarounds</span>
+                  <span className="ml-1 font-mono">{s.turnaroundsSucceeded ?? 0}/{s.turnaroundsStarted}</span>
+                </div>
+              )}
+
+              {/* Flags */}
+              {game.family_office_completed && (
+                <div className="col-span-2">
+                  <span className="text-yellow-400/80">Family Office completed</span>
+                </div>
+              )}
+              {game.has_restructured && (
+                <div className="col-span-2">
+                  <span className="text-orange-400/80">Restructured</span>
+                </div>
+              )}
+
+              {/* Anti-patterns */}
+              {s.antiPatterns && s.antiPatterns.length > 0 && (
+                <div className="col-span-2 mt-1">
+                  <span className="text-text-muted">Anti-patterns: </span>
+                  <span className="text-red-400/80">{s.antiPatterns.map(ap => ap.replace(/_/g, ' ')).join(', ')}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function StatsModal() {
@@ -68,7 +286,9 @@ export function StatsModal() {
 
   const [stats, setStats] = useState<PlayerStats | null>(null);
   const [history, setHistory] = useState<GameHistoryEntry[]>([]);
+  const [historyTotal, setHistoryTotal] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [refetchKey, setRefetchKey] = useState(0);
@@ -103,6 +323,26 @@ export function StatsModal() {
     }
   }, []);
 
+  const loadingMoreRef = useRef(false);
+  const handleLoadMore = useCallback(async () => {
+    if (loadingMoreRef.current) return;
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const offset = history.length;
+      const res = await fetchWithAuth(`/api/player/history?limit=${PAGE_SIZE}&offset=${offset}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setHistory(prev => [...prev, ...(data.games ?? [])]);
+      setHistoryTotal(prev => data.total ?? prev);
+    } catch {
+      // silent — user can retry
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [history.length]);
+
   useEffect(() => {
     if (!showStatsModal || !isLoggedIn) return;
 
@@ -114,7 +354,7 @@ export function StatsModal() {
       try {
         const [statsRes, historyRes] = await Promise.all([
           fetchWithAuth('/api/player/stats'),
-          fetchWithAuth('/api/player/history?limit=20'),
+          fetchWithAuth(`/api/player/history?limit=${PAGE_SIZE}`),
         ]);
 
         if (cancelled) return;
@@ -124,11 +364,13 @@ export function StatsModal() {
             ? 'Session expired — please sign out and sign back in'
             : `Stats request failed (${statsRes.status})`;
           setErrorMsg(msg);
+          setHistoryTotal(0);
           setLoading(false);
           return;
         }
         if (!historyRes.ok) {
           setErrorMsg(`History request failed (${historyRes.status})`);
+          setHistoryTotal(0);
           setLoading(false);
           return;
         }
@@ -139,6 +381,7 @@ export function StatsModal() {
 
         setStats(statsData);
         setHistory(historyData.games ?? []);
+        setHistoryTotal(historyData.total ?? 0);
         setLoading(false);
       } catch {
         if (!cancelled) {
@@ -158,10 +401,11 @@ export function StatsModal() {
     ? new Date(player.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     : '';
 
-  // Find best/most-common archetype
+  // Find best/most-common archetype (only consider archetypes with actual scored games)
   const archetypeEntries = stats?.archetype_stats ? Object.entries(stats.archetype_stats) : [];
-  const bestArchetype = archetypeEntries.length > 0
-    ? archetypeEntries.reduce((best, [key, val]) => val.avgScore > best[1].avgScore ? [key, val] as [string, typeof val] : best)[0]
+  const scoredArchetypes = archetypeEntries.filter(([, val]) => val.avgScore > 0);
+  const bestArchetype = scoredArchetypes.length > 0
+    ? scoredArchetypes.reduce((best, [key, val]) => val.avgScore > best[1].avgScore ? [key, val] as [string, typeof val] : best)[0]
     : null;
   const mostCommonArchetype = archetypeEntries.length > 0
     ? archetypeEntries.reduce((best, [key, val]) => val.count > best[1].count ? [key, val] as [string, typeof val] : best)[0]
@@ -169,6 +413,10 @@ export function StatsModal() {
   const topAntiPattern = stats?.anti_pattern_frequency
     ? Object.entries(stats.anti_pattern_frequency).sort((a, b) => b[1] - a[1])[0]?.[0]
     : null;
+
+  const chronologicalHistory = useMemo(() => [...history].reverse(), [history]);
+
+  const hasMoreHistory = historyTotal > history.length;
 
   return (
     <Modal isOpen={showStatsModal} onClose={closeStatsModal} title="My Stats" size="lg">
@@ -338,7 +586,7 @@ export function StatsModal() {
             <div>
               <h3 className="text-sm font-bold text-text-muted mb-2">Performance Trend</h3>
               <div className="bg-white/5 rounded-lg p-4">
-                <SparklineChart games={[...history].reverse()} />
+                <SparklineChart games={chronologicalHistory} />
               </div>
             </div>
           ) : history.length > 0 ? (
@@ -350,29 +598,24 @@ export function StatsModal() {
           {/* Game History */}
           {history.length > 0 && (
             <div>
-              <h3 className="text-sm font-bold text-text-muted mb-2">Recent Games</h3>
-              <div className="space-y-1.5 max-h-[300px] overflow-y-auto">
+              <h3 className="text-sm font-bold text-text-muted mb-2">
+                Game History
+                <span className="font-normal ml-1">({history.length}{hasMoreHistory ? `/${historyTotal}` : ''})</span>
+              </h3>
+              <div className="space-y-1.5 max-h-[400px] overflow-y-auto">
                 {history.map((game) => (
-                  <div key={game.id} className="flex items-center justify-between p-2.5 bg-white/5 rounded-lg">
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium text-sm truncate">{game.holdco_name}</p>
-                      <p className="text-xs text-text-muted">
-                        {formatDate(game.completed_at)}
-                        {game.strategy?.archetype && <span className="ml-2">{ARCHETYPE_LABELS[game.strategy.archetype] ?? game.strategy.archetype}</span>}
-                      </p>
-                    </div>
-                    <div className="flex items-center gap-3 shrink-0 text-right">
-                      <div>
-                        <p className="font-mono text-sm font-bold text-accent">{formatMoney(game.adjusted_fev)}</p>
-                      </div>
-                      <span className={`font-mono font-bold ${getGradeColor(game.grade as any)}`}>{game.grade}</span>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${game.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
-                        {game.difficulty === 'normal' ? 'H' : 'E'}{game.duration === 'quick' ? '/10' : ''}
-                      </span>
-                    </div>
-                  </div>
+                  <GameRow key={game.id} game={game} />
                 ))}
               </div>
+              {hasMoreHistory && (
+                <button
+                  onClick={handleLoadMore}
+                  disabled={loadingMore}
+                  className="w-full mt-2 py-2 text-sm text-text-muted hover:text-text-secondary bg-white/5 hover:bg-white/[0.08] rounded-lg transition-colors"
+                >
+                  {loadingMore ? 'Loading...' : `Load More (${historyTotal - history.length} remaining)`}
+                </button>
+              )}
             </div>
           )}
 

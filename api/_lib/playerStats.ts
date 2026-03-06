@@ -61,29 +61,37 @@ export async function updatePlayerStats(playerId: string): Promise<void> {
     }
 
     let sumScore = 0;
+    let scoredGames = 0;
     let bestScore = 0;
     let bestAdjustedFev = 0;
     const gradeDistribution: Record<string, number> = {};
-    const archetypeAccum: Record<string, { count: number; totalScore: number }> = {};
+    const archetypeAccum: Record<string, { count: number; totalScore: number; scoredCount: number }> = {};
     const antiPatternFrequency: Record<string, number> = {};
-    const modeAccum: Record<string, { sum: number; count: number }> = {};
+    const modeAccum: Record<string, { sum: number; count: number; scoredCount: number }> = {};
 
     for (const game of games) {
-      sumScore += game.score;
-      if (game.score > bestScore) bestScore = game.score;
+      const hasScore = game.score > 0;
+      if (hasScore) {
+        sumScore += game.score;
+        scoredGames++;
+        if (game.score > bestScore) bestScore = game.score;
+      }
       if (game.adjusted_fev > bestAdjustedFev) bestAdjustedFev = game.adjusted_fev;
 
-      // Grade distribution
+      // Grade distribution (grade is valid even without score)
       if (game.grade) {
         gradeDistribution[game.grade] = (gradeDistribution[game.grade] ?? 0) + 1;
       }
 
-      // Archetype stats
+      // Archetype stats (only count scored games for avgScore)
       const archetype = (game.strategy as any)?.archetype;
       if (archetype) {
-        if (!archetypeAccum[archetype]) archetypeAccum[archetype] = { count: 0, totalScore: 0 };
+        if (!archetypeAccum[archetype]) archetypeAccum[archetype] = { count: 0, totalScore: 0, scoredCount: 0 };
         archetypeAccum[archetype].count++;
-        archetypeAccum[archetype].totalScore += game.score;
+        if (hasScore) {
+          archetypeAccum[archetype].totalScore += game.score;
+          archetypeAccum[archetype].scoredCount++;
+        }
       }
 
       // Anti-pattern frequency
@@ -94,56 +102,49 @@ export async function updatePlayerStats(playerId: string): Promise<void> {
         }
       }
 
-      // Mode breakdown
+      // Mode breakdown (only count scored games for avg)
       const modeKey = `${game.difficulty}_${game.duration}`;
-      if (!modeAccum[modeKey]) modeAccum[modeKey] = { sum: 0, count: 0 };
-      modeAccum[modeKey].sum += game.score;
+      if (!modeAccum[modeKey]) modeAccum[modeKey] = { sum: 0, count: 0, scoredCount: 0 };
       modeAccum[modeKey].count++;
+      if (hasScore) {
+        modeAccum[modeKey].sum += game.score;
+        modeAccum[modeKey].scoredCount++;
+      }
     }
 
-    // Build archetype stats with avgScore
+    // Build archetype stats with avgScore (only from scored games)
     const archetypeStats: Record<string, { count: number; avgScore: number }> = {};
     for (const [key, val] of Object.entries(archetypeAccum)) {
       archetypeStats[key] = {
         count: val.count,
-        avgScore: Math.round((val.totalScore / val.count) * 10) / 10,
+        avgScore: val.scoredCount > 0 ? Math.round((val.totalScore / val.scoredCount) * 10) / 10 : 0,
       };
     }
 
-    // Mode averages and totals
+    // Mode averages and totals (avg only from scored games)
     const avgScoreByMode: Record<string, number> = {};
     const totalGamesByMode: Record<string, number> = {};
     for (const [key, val] of Object.entries(modeAccum)) {
-      avgScoreByMode[key] = Math.round((val.sum / val.count) * 10) / 10;
+      avgScoreByMode[key] = val.scoredCount > 0 ? Math.round((val.sum / val.scoredCount) * 10) / 10 : 0;
       totalGamesByMode[key] = val.count;
     }
 
-    // Score trend: avg of last 5 minus avg of prior 5 (games ordered ASC)
+    // Score trend: avg of last 5 scored games minus avg of prior 5 scored games
     let scoreTrend: number | null = null;
-    if (totalGames >= 6) {
-      const recentStart = totalGames - 5;
-      const priorStart = totalGames - 10 < 0 ? 0 : totalGames - 10;
-      const priorEnd = recentStart;
-
-      let recentSum = 0;
-      for (let i = recentStart; i < totalGames; i++) {
-        recentSum += games[i].score;
-      }
-
-      let priorSum = 0;
-      const priorCount = priorEnd - priorStart;
-      for (let i = priorStart; i < priorEnd; i++) {
-        priorSum += games[i].score;
-      }
-
-      scoreTrend = Math.round(((recentSum / 5) - (priorSum / priorCount)) * 10) / 10;
+    const scoredOnly = games.filter(g => g.score > 0);
+    if (scoredOnly.length >= 6) {
+      const recentSlice = scoredOnly.slice(-5);
+      const priorSlice = scoredOnly.slice(-10, -5);
+      const recentSum = recentSlice.reduce((s, g) => s + g.score, 0);
+      const priorSum = priorSlice.reduce((s, g) => s + g.score, 0);
+      scoreTrend = Math.round(((recentSum / 5) - (priorSum / priorSlice.length)) * 10) / 10;
     }
 
     await supabaseAdmin.from('player_stats').upsert(
       {
         player_id: playerId,
         total_games: totalGames,
-        avg_score: Math.round((sumScore / totalGames) * 10) / 10,
+        avg_score: scoredGames > 0 ? Math.round((sumScore / scoredGames) * 10) / 10 : 0,
         best_score: bestScore,
         best_adjusted_fev: bestAdjustedFev,
         grade_distribution: gradeDistribution,
@@ -204,12 +205,17 @@ export async function updateGlobalStats(): Promise<void> {
     }
 
     let sumScore = 0;
+    let scoredGames = 0;
     let sumAdjustedFev = 0;
     const gradeDistribution: Record<string, number> = {};
-    const archetypeAccum: Record<string, { count: number; totalScore: number }> = {};
+    const archetypeAccum: Record<string, { count: number; totalScore: number; scoredCount: number }> = {};
 
     for (const game of allGames) {
-      sumScore += game.score;
+      const hasScore = game.score > 0;
+      if (hasScore) {
+        sumScore += game.score;
+        scoredGames++;
+      }
       sumAdjustedFev += game.adjusted_fev ?? 0;
 
       // Grade distribution
@@ -217,12 +223,15 @@ export async function updateGlobalStats(): Promise<void> {
         gradeDistribution[game.grade] = (gradeDistribution[game.grade] ?? 0) + 1;
       }
 
-      // Archetype distribution
+      // Archetype distribution (only scored games for avgScore)
       const archetype = (game.strategy as any)?.archetype;
       if (archetype) {
-        if (!archetypeAccum[archetype]) archetypeAccum[archetype] = { count: 0, totalScore: 0 };
+        if (!archetypeAccum[archetype]) archetypeAccum[archetype] = { count: 0, totalScore: 0, scoredCount: 0 };
         archetypeAccum[archetype].count++;
-        archetypeAccum[archetype].totalScore += game.score;
+        if (hasScore) {
+          archetypeAccum[archetype].totalScore += game.score;
+          archetypeAccum[archetype].scoredCount++;
+        }
       }
     }
 
@@ -231,7 +240,7 @@ export async function updateGlobalStats(): Promise<void> {
     for (const [key, val] of Object.entries(archetypeAccum)) {
       archetypeDistribution[key] = {
         count: val.count,
-        avgScore: Math.round((val.totalScore / val.count) * 10) / 10,
+        avgScore: val.scoredCount > 0 ? Math.round((val.totalScore / val.scoredCount) * 10) / 10 : 0,
       };
     }
 
@@ -239,7 +248,7 @@ export async function updateGlobalStats(): Promise<void> {
       {
         id: 1,
         total_games: totalGames,
-        avg_score: Math.round((sumScore / totalGames) * 10) / 10,
+        avg_score: scoredGames > 0 ? Math.round((sumScore / scoredGames) * 10) / 10 : 0,
         avg_adjusted_fev: Math.round((sumAdjustedFev / totalGames) * 10) / 10,
         grade_distribution: gradeDistribution,
         archetype_distribution: archetypeDistribution,

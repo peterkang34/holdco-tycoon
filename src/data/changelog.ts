@@ -13,6 +13,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 6, 2026',
+    title: 'Player Stats Upgrade',
+    sections: [
+      {
+        heading: 'Bug Fixes',
+        items: [
+          'Average score now correctly excludes legacy games that predate the scoring system — your avg should jump a few points if you had old claimed games.',
+        ],
+      },
+      {
+        heading: 'Improvements',
+        items: [
+          'Full game history — see ALL your past games with "Load More" pagination (was limited to 20).',
+          'Expandable game rows — click any game with score data to see a radar chart breakdown, deal activity, capital moves, and anti-patterns.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 5, 2026',
     title: 'Leaderboard Fix',
     hidden: true,

@@ -70,25 +70,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       let sumScore = 0;
+      let scoredGames = 0;
       let bestScore = 0;
       let bestAdjustedFev = 0;
       const gradeDistribution: Record<string, number> = {};
-      const archetypeAgg: Record<string, { count: number; totalScore: number }> = {};
+      const archetypeAgg: Record<string, { count: number; totalScore: number; scoredCount: number }> = {};
       const antiPatternFrequency: Record<string, number> = {};
-      const modeScores: Record<string, { sum: number; count: number }> = {};
+      const modeScores: Record<string, { sum: number; count: number; scoredCount: number }> = {};
 
       for (const game of games ?? []) {
-        sumScore += game.score;
-        if (game.score > bestScore) bestScore = game.score;
+        const hasScore = game.score > 0;
+        if (hasScore) {
+          sumScore += game.score;
+          scoredGames++;
+          if (game.score > bestScore) bestScore = game.score;
+        }
         if (game.adjusted_fev > bestAdjustedFev) bestAdjustedFev = game.adjusted_fev;
 
         gradeDistribution[game.grade] = (gradeDistribution[game.grade] ?? 0) + 1;
 
         const archetype = (game.strategy as any)?.archetype;
         if (archetype) {
-          if (!archetypeAgg[archetype]) archetypeAgg[archetype] = { count: 0, totalScore: 0 };
+          if (!archetypeAgg[archetype]) archetypeAgg[archetype] = { count: 0, totalScore: 0, scoredCount: 0 };
           archetypeAgg[archetype].count++;
-          archetypeAgg[archetype].totalScore += game.score;
+          if (hasScore) {
+            archetypeAgg[archetype].totalScore += game.score;
+            archetypeAgg[archetype].scoredCount++;
+          }
         }
 
         const antiPatterns = (game.strategy as any)?.antiPatterns;
@@ -99,24 +107,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
 
         const modeKey = `${game.difficulty}_${game.duration}`;
-        if (!modeScores[modeKey]) modeScores[modeKey] = { sum: 0, count: 0 };
-        modeScores[modeKey].sum += game.score;
+        if (!modeScores[modeKey]) modeScores[modeKey] = { sum: 0, count: 0, scoredCount: 0 };
         modeScores[modeKey].count++;
+        if (hasScore) {
+          modeScores[modeKey].sum += game.score;
+          modeScores[modeKey].scoredCount++;
+        }
       }
 
       const archetypeStats: Record<string, { count: number; avgScore: number }> = {};
       for (const [key, val] of Object.entries(archetypeAgg)) {
-        archetypeStats[key] = { count: val.count, avgScore: Math.round((val.totalScore / val.count) * 10) / 10 };
+        archetypeStats[key] = { count: val.count, avgScore: val.scoredCount > 0 ? Math.round((val.totalScore / val.scoredCount) * 10) / 10 : 0 };
       }
 
       const avgScoreByMode: Record<string, number> = {};
       for (const [key, val] of Object.entries(modeScores)) {
-        avgScoreByMode[key] = Math.round((val.sum / val.count) * 10) / 10;
+        avgScoreByMode[key] = val.scoredCount > 0 ? Math.round((val.sum / val.scoredCount) * 10) / 10 : 0;
       }
 
       playerStats = {
         total_games: totalGames,
-        avg_score: Math.round((sumScore / totalGames) * 10) / 10,
+        avg_score: scoredGames > 0 ? Math.round((sumScore / scoredGames) * 10) / 10 : 0,
         best_score: bestScore,
         best_adjusted_fev: bestAdjustedFev,
         grade_distribution: gradeDistribution,
