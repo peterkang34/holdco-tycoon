@@ -132,6 +132,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Fetch stats for the players on this page
     const playerIds = (profiles || []).map((p: any) => p.id);
     let statsMap = new Map<string, any>();
+    const gameCountMap = new Map<string, number>();
 
     if (playerIds.length > 0) {
       const { data: statsRows } = await supabaseAdmin
@@ -143,6 +144,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         for (const row of statsRows) {
           statsMap.set(row.player_id, row);
         }
+      }
+
+      // Live game counts from game_history (source of truth — player_stats can be stale)
+      const { data: gameRows } = await supabaseAdmin
+        .from('game_history')
+        .select('player_id')
+        .in('player_id', playerIds)
+        .range(0, 4999);
+
+      for (const row of gameRows || []) {
+        gameCountMap.set(row.player_id, (gameCountMap.get(row.player_id) || 0) + 1);
       }
     }
 
@@ -162,7 +174,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         id: p.id,
         display_name: p.display_name,
         initials: p.initials || '??',
-        total_games: stats?.total_games ?? 0,
+        total_games: gameCountMap.get(p.id) ?? stats?.total_games ?? 0,
         best_grade: deriveBestGrade(stats?.grade_distribution ?? null),
         best_adjusted_fev: stats?.best_adjusted_fev ?? 0,
         created_at: p.created_at,
