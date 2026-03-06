@@ -5,8 +5,9 @@ import { formatMoney } from '../../engine/types';
 import type { LeaderboardStrategy } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
 import { SECTORS } from '../../data/sectors';
-import { MiniTrend, computeAdjFev, MultiplierBadges } from './adminShared';
-import type { AnalyticsData, Totals, ActivityEvent } from './adminTypes';
+import { computeAdjFev, MultiplierBadges } from './adminShared';
+import { AnalyticsChart } from './AnalyticsChart';
+import type { AnalyticsData, Totals, ActivityEvent, DayData } from './adminTypes';
 
 function getTimeAgo(date: Date): string {
   const now = Date.now();
@@ -160,9 +161,10 @@ interface OverviewTabProps {
   totals: Totals;
   avgSophistication: number;
   kFactor: string;
+  dailyData: DayData[];
 }
 
-export function OverviewTab({ data, totals, avgSophistication, kFactor }: OverviewTabProps) {
+export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyData }: OverviewTabProps) {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [expandedRecentRow, setExpandedRecentRow] = useState<number | null>(null);
 
@@ -179,21 +181,8 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor }: Overvi
         <MetricCard label="Avg Sophistication" value={avgSophistication} />
       </div>
 
-      {/* Trend sparklines */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
-        <MiniTrend
-          label="Games Started / mo"
-          data={[...data.months].reverse().map(m => ({ month: m.month, value: m.started }))}
-        />
-        <MiniTrend
-          label="Completions / mo"
-          data={[...data.months].reverse().map(m => ({ month: m.month, value: m.completed }))}
-        />
-        <MiniTrend
-          label="Page Views / mo"
-          data={[...data.months].reverse().map(m => ({ month: m.month, value: m.pageViews }))}
-        />
-      </div>
+      {/* Trends chart */}
+      <AnalyticsChart dailyData={dailyData} monthlyData={data.months} />
 
       {/* Secondary metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">

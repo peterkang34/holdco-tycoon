@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import { getClientIp } from '../_lib/rateLimit.js';
-import { getMonthKey, getWeekKey, getDurationBucket, getSophisticationBucket, validateTelemetryPayload, getFevBucket } from '../_lib/telemetry.js';
+import { getMonthKey, getDayKey, getWeekKey, getDurationBucket, getSophisticationBucket, validateTelemetryPayload, getFevBucket } from '../_lib/telemetry.js';
 
 const RATE_LIMIT_WINDOW = 60; // seconds
 const RATE_LIMIT_MAX = 30;
@@ -50,6 +50,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     feature, eventType, choiceAction,
   } = payload;
   const monthKey = getMonthKey();
+  const dayKey = getDayKey();
 
   try {
     if (event === 'game_start') {
@@ -69,9 +70,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       pipe.set(seenKey, 1, { ex: 86400 });
       pipe.incr('t:started');
       pipe.incr(`t:started:${monthKey}`);
+      pipe.incr(`t:started:d:${dayKey}`);
       pipe.hincrby(`t:cfg:${monthKey}`, `${difficulty}:${duration}`, 1);
       pipe.hincrby(`t:sector:${monthKey}`, sector!, 1);
       pipe.sadd(`t:uv:${monthKey}`, ip);
+      pipe.sadd(`t:uv:d:${dayKey}`, ip);
 
       // Phase 1: device, returning, nth-game
       if (device) {
@@ -128,6 +131,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const pipe = kv.pipeline();
       pipe.incr('t:completed');
       pipe.incr(`t:completed:${monthKey}`);
+      pipe.incr(`t:completed:d:${dayKey}`);
       pipe.hincrby(`t:rounds:${monthKey}`, String(round), 1);
       pipe.hincrby(`t:grades:${monthKey}`, grade!, 1);
       pipe.hincrby(`t:fev:${monthKey}`, getFevBucket(fev!), 1);
@@ -235,6 +239,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     } else if (event === 'page_view') {
       const pipe = kv.pipeline();
       pipe.incr(`t:views:${monthKey}`);
+      pipe.incr(`t:views:d:${dayKey}`);
       if (device) {
         pipe.hincrby(`t:views:device:${monthKey}`, device, 1);
       }

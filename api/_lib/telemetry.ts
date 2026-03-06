@@ -36,6 +36,13 @@ export const VALID_ANTIPATTERNS = [
 ] as const;
 
 /**
+ * Returns YYYY-MM-DD string for the current day.
+ */
+export function getDayKey(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
  * Returns YYYY-MM string for the current month.
  */
 export function getMonthKey(): string {

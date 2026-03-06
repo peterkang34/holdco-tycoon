@@ -8,7 +8,7 @@ import { BalanceTab } from './BalanceTab';
 import { MiniTrend, SectionHeader, HorizontalBar, DonutChart, FunnelStep } from './adminShared';
 import { MetricCard } from '../ui/MetricCard';
 import { SECTORS } from '../../data/sectors';
-import type { AnalyticsData, Totals } from './adminTypes';
+import type { AnalyticsData, Totals, DayData } from './adminTypes';
 
 // ── Tab Configuration ────────────────────────────────────────
 
@@ -97,6 +97,7 @@ const EMPTY_RECORD: Record<string, number> = {};
 export function AdminDashboard() {
   const [token, setToken] = useState<string | null>(() => sessionStorage.getItem('admin_token'));
   const [data, setData] = useState<AnalyticsData | null>(null);
+  const [dailyData, setDailyData] = useState<DayData[]>([]);
   const [loading, setLoading] = useState(() => !!sessionStorage.getItem('admin_token'));
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<TabId>('overview');
@@ -104,19 +105,24 @@ export function AdminDashboard() {
     if (!token) return;
     setLoading(true);
     setError('');
-    fetch('/api/admin/analytics', {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then(res => {
-        if (res.status === 401) {
-          sessionStorage.removeItem('admin_token');
-          setToken(null);
-          throw new Error('Unauthorized');
-        }
+    const headers = { Authorization: `Bearer ${token}` };
+    const handleUnauth = () => { sessionStorage.removeItem('admin_token'); setToken(null); };
+
+    Promise.all([
+      fetch('/api/admin/analytics', { headers }).then(res => {
+        if (res.status === 401) { handleUnauth(); throw new Error('Unauthorized'); }
         if (!res.ok) throw new Error(`API error: ${res.status}`);
         return res.json();
+      }),
+      fetch('/api/admin/analytics-daily', { headers }).then(res => {
+        if (!res.ok) return { days: [] };
+        return res.json();
+      }),
+    ])
+      .then(([analytics, daily]) => {
+        setData(analytics);
+        setDailyData(daily.days || []);
       })
-      .then((d) => { setData(d); })
       .catch((err) => {
         if (err.message !== 'Unauthorized') {
           setError(err.message || 'Failed to load analytics');
@@ -425,7 +431,7 @@ export function AdminDashboard() {
 
       {/* ═══════ OVERVIEW TAB ═══════ */}
       {activeTab === 'overview' && (
-        <OverviewTab data={data} totals={totals} avgSophistication={avgSophistication} kFactor={kFactor} />
+        <OverviewTab data={data} totals={totals} avgSophistication={avgSophistication} kFactor={kFactor} dailyData={dailyData} />
       )}
 
       {/* ═══════ FUNNEL TAB ═══════ */}

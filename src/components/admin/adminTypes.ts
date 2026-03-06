@@ -176,6 +176,14 @@ export interface PlayerDetail {
   };
 }
 
+export interface DayData {
+  date: string;      // YYYY-MM-DD
+  started: number;
+  completed: number;
+  pageViews: number;
+  uniquePlayers: number;
+}
+
 // Re-export for component props
 export interface MiniTrendProps {
   label: string;
