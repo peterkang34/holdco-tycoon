@@ -14,7 +14,6 @@ interface SeriesConfig {
 const SERIES: SeriesConfig[] = [
   { key: 'started', label: 'Games Started', color: '#3b82f6', fillColor: 'rgba(59,130,246,0.15)' },
   { key: 'completed', label: 'Completions', color: '#22c55e', fillColor: 'rgba(34,197,94,0.15)' },
-  { key: 'pageViews', label: 'Page Views', color: '#f59e0b', fillColor: 'rgba(245,158,11,0.15)' },
   { key: 'uniquePlayers', label: 'Unique Players', color: '#a855f7', fillColor: 'rgba(168,85,247,0.15)' },
 ];
 
