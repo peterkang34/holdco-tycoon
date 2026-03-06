@@ -3704,9 +3704,15 @@ export const useGameStore = create<GameStore>()(
         try {
           const restored = JSON.parse(snapshot);
 
+          // Merge FO-mode round history into main game history so strategy
+          // analytics (source_deals, acquisitions, etc.) include FO actions
+          const foRoundHistory = state.roundHistory ?? [];
+          const mergedRoundHistory = [...(restored.roundHistory ?? []), ...foRoundHistory];
+
           // 3. Merge restored state with FO results
           set({
             ...restored,
+            roundHistory: mergedRoundHistory,
             // Override FO state with results
             familyOfficeState: {
               isActive: false,
