@@ -2757,14 +2757,17 @@ export const useGameStore = create<GameStore>()(
         const newDpi = newLpDistributions / (state.fundSize || PE_FUND_CONFIG.fundSize);
         const dpiMilestones = { ...(state.dpiMilestones || { half: false, full: false }) };
 
-        // Check DPI milestones
-        if (!dpiMilestones.half && newDpi >= 0.5) {
-          dpiMilestones.half = true;
-          addToast({ message: 'DPI Milestone: 0.5x — halfway to returning LP capital', type: 'success' });
-        }
+        // Check DPI milestones — DPI = distributions / fund size (capital return metric)
+        // Check full (1.0x) first so a large distribution doesn't show "halfway" then "full" back-to-back
         if (!dpiMilestones.full && newDpi >= 1.0) {
           dpiMilestones.full = true;
-          addToast({ message: 'LPs have been made whole. Every dollar from here improves your carry.', type: 'success' });
+          dpiMilestones.half = true;
+          addToast({ message: `DPI ${newDpi.toFixed(2)}x — LPs have been made whole! Every dollar from here builds carry.`, type: 'success' });
+        } else if (!dpiMilestones.half && newDpi >= 0.5) {
+          dpiMilestones.half = true;
+          addToast({ message: `DPI ${newDpi.toFixed(2)}x — halfway to returning LP capital (1.0x)`, type: 'success' });
+        } else {
+          addToast({ message: `Distributed ${formatMoney(amount)} to LPs (DPI: ${newDpi.toFixed(2)}x)`, type: 'info' });
         }
 
         trackFeatureUsed('lp_distribution', state.round);
