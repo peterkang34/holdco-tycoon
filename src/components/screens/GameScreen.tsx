@@ -1102,6 +1102,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
               <span className="text-xs px-1.5 sm:px-2 py-0.5 rounded whitespace-nowrap bg-amber-500/20 text-amber-400">
                 FO {round}/{maxRounds}
               </span>
+            ) : isFundManagerMode ? (
+              <span className="text-xs px-1.5 sm:px-2 py-0.5 rounded whitespace-nowrap bg-purple-500/20 text-purple-400">
+                PE/{maxRounds}
+              </span>
             ) : difficulty && (
               <span className={`text-xs px-1.5 sm:px-2 py-0.5 rounded whitespace-nowrap ${difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
                 {difficulty === 'normal' ? 'H' : 'E'}{maxRounds && maxRounds < 20 ? `/${maxRounds}` : ''}

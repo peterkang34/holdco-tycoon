@@ -17,6 +17,7 @@ import {
   pickRandom,
   formatMoney,
   GameDuration,
+  DistressLevel,
 } from './types';
 import type { SeededRng } from './rng';
 import { SECTORS } from '../data/sectors';
@@ -2091,8 +2092,21 @@ export function calculateMetrics(state: GameState): Metrics {
   // Leverage
   const netDebtToEbitda = totalEbitda > 0 ? (totalDebt - state.cash) / totalEbitda : 0;
 
-  // Distress level
-  const distressLevel = calculateDistressLevel(netDebtToEbitda, totalDebt, totalEbitda, state.cash);
+  // Distress level — PE fund mode: 1-year grace period on newly acquired debt
+  // Businesses acquired this round have their debt excluded from the covenant test,
+  // mirroring real PE where covenant tests have a holiday period post-close.
+  let distressLevel: DistressLevel;
+  if (state.isFundManagerMode && state.round > 0) {
+    const graceBusinesses = allDebtBusinesses.filter(b => b.acquisitionRound === state.round);
+    const graceDebt = graceBusinesses.reduce((sum, b) =>
+      sum + b.bankDebtBalance + b.sellerNoteBalance, 0);
+    const adjustedDebt = totalDebt - graceDebt;
+    const adjustedEbitda = totalEbitda - graceBusinesses.reduce((sum, b) => sum + Math.max(0, b.ebitda), 0);
+    const adjustedRatio = adjustedEbitda > 0 ? (adjustedDebt - state.cash) / adjustedEbitda : 0;
+    distressLevel = calculateDistressLevel(adjustedRatio, adjustedDebt, adjustedEbitda, state.cash);
+  } else {
+    distressLevel = calculateDistressLevel(netDebtToEbitda, totalDebt, totalEbitda, state.cash);
+  }
 
   // Cash conversion
   const cashConversion = totalEbitda > 0 ? totalFcf / totalEbitda : 0;
