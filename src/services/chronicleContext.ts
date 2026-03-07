@@ -8,7 +8,8 @@
 import type { GameState, Business, Metrics } from '../engine/types';
 import { formatMoney } from '../engine/types';
 import { calculateMetrics, calculatePortfolioTax } from '../engine/simulation';
-import { calculateFounderEquityValue } from '../engine/scoring';
+import { calculateFounderEquityValue, calculateEnterpriseValue } from '../engine/scoring';
+import { PE_FUND_CONFIG } from '../data/gameConfig';
 import { SECTORS } from '../data/sectors';
 import { getMASourcingAnnualCost } from '../data/sharedServices';
 import { getNarrativePhase } from '../data/gameConfig';
@@ -66,6 +67,16 @@ export interface ChronicleContext {
   foPhilanthropyAmount?: string;
   foCurrentMOIC?: string;
   foRound?: string;
+  // PE Fund Manager mode
+  isFundManagerMode?: boolean;
+  fundName?: string;
+  grossMoic?: string;
+  dpi?: string;
+  deploymentPct?: string;
+  dryPowder?: string;
+  hurdleProgress?: string;
+  estimatedCarry?: string;
+  lpSatisfactionTone?: string;
 }
 
 /**
@@ -352,6 +363,34 @@ export function buildChronicleContext(state: GameState): ChronicleContext {
     context.foCurrentMOIC = `${currentMOIC.toFixed(2)}x`;
     context.foRound = `Year ${state.round} of ${state.maxRounds}`;
     context.narrativeToneGuidance = 'Contemplative and institutional. This is a family office — emphasize stewardship, generational permanence, and legacy building. Avoid startup energy or scrappy holdco vibes.';
+  }
+
+  // PE Fund Manager mode — override tone and add fund-specific fields
+  if (state.isFundManagerMode) {
+    const nav = calculateEnterpriseValue(state);
+    const fs = state.fundSize || PE_FUND_CONFIG.fundSize;
+    const lpDist = state.lpDistributions || 0;
+    const totalValue = nav + lpDist;
+    const grossMoic = fs > 0 ? totalValue / fs : 0;
+    const dpi = fs > 0 ? lpDist / fs : 0;
+    const deployPct = fs > 0 ? ((state.totalCapitalDeployed || 0) / fs) * 100 : 0;
+    const estCarry = totalValue > PE_FUND_CONFIG.hurdleReturn
+      ? (totalValue - PE_FUND_CONFIG.hurdleReturn) * PE_FUND_CONFIG.carryRate : 0;
+    const lpSat = state.lpSatisfactionScore ?? 75;
+    const lpTone = lpSat >= 60 ? 'confident' : lpSat >= 40 ? 'cautious' : 'frustrated';
+
+    context.isFundManagerMode = true;
+    context.fundName = state.fundName || state.holdcoName;
+    context.grossMoic = `${grossMoic.toFixed(2)}x`;
+    context.dpi = `${dpi.toFixed(2)}x`;
+    context.deploymentPct = `${deployPct.toFixed(0)}%`;
+    context.dryPowder = formatMoney(state.cash);
+    context.hurdleProgress = `${formatMoney(Math.round(totalValue))} of ${formatMoney(Math.round(PE_FUND_CONFIG.hurdleReturn))}`;
+    context.estimatedCarry = estCarry > 0 ? `~${formatMoney(Math.round(estCarry))}` : '$0 (below hurdle)';
+    context.lpSatisfactionTone = lpTone;
+    // Override narrative phase for PE
+    const pePhase = state.round <= 4 ? 'deploying_capital' : state.round <= 7 ? 'creating_value' : 'harvesting_returns';
+    context.narrativePhase = pePhase as NarrativePhaseId;
   }
 
   return context;

@@ -39,7 +39,7 @@ import { checkPlatformEligibility, checkNearEligiblePlatforms, calculateIntegrat
 import { getPlatformSaleBonus } from '../../data/gameConfig';
 import { getEligiblePrograms, canUnlockTier } from '../../engine/turnarounds';
 import { TURNAROUND_TIER_CONFIG, getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
-import { TURNAROUND_FATIGUE_THRESHOLD, IPO_MIN_ROUND } from '../../data/gameConfig';
+import { TURNAROUND_FATIGUE_THRESHOLD, IPO_MIN_ROUND, PE_FUND_CONFIG } from '../../data/gameConfig';
 import { checkIPOEligibility } from '../../engine/ipo';
 import type { IPOState } from '../../engine/types';
 import { DEBT_LABELS, DEBT_EXPLAINER } from '../../data/mechanicsCopy';
@@ -126,6 +126,12 @@ interface AllocatePhaseProps {
   onExecuteIPO?: () => void;
   onDeclineIPO?: () => void;
   isFamilyOfficeMode?: boolean;
+  isFundManagerMode?: boolean;
+  fundSize?: number;
+  totalCapitalDeployed?: number;
+  lpDistributions?: number;
+  managementFeesCollected?: number;
+  onDistributeToLPs?: (amount: number) => void;
 }
 
 type AllocateTab = 'portfolio' | 'deals' | 'shared_services' | 'capital';
@@ -202,6 +208,12 @@ export function AllocatePhase({
   onExecuteIPO,
   onDeclineIPO,
   isFamilyOfficeMode = false,
+  isFundManagerMode = false,
+  fundSize = 0,
+  totalCapitalDeployed = 0,
+  lpDistributions = 0,
+  managementFeesCollected = 0,
+  onDistributeToLPs,
 }: AllocatePhaseProps) {
   const isMobile = useIsMobile();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -242,6 +254,9 @@ export function AllocatePhase({
   const [sellPlatformConfirm, setSellPlatformConfirm] = useState<IntegratedPlatform | null>(null);
   const [turnaroundBusiness, setTurnaroundBusiness] = useState<Business | null>(null);
   const [showTurnaroundSummary, setShowTurnaroundSummary] = useState(false);
+  // Fund manager mode: DPI distribution
+  const [dpiAmount, setDpiAmount] = useState('');
+  const [dpiConfirm, setDpiConfirm] = useState(false);
 
   // Portfolio sort + expand/collapse
   const [portfolioSort, setPortfolioSort] = useState('ebitda');
@@ -252,6 +267,7 @@ export function AllocatePhase({
   const [dealFilters, setDealFilters] = useState<string[]>([]);
   const [expandedDealIds, setExpandedDealIds] = useState<Set<string>>(() => new Set());
 
+  const maxRounds = maxRoundsFromStore ?? 20;
   const activeBusinesses = businesses.filter(b => b.status === 'active');
 
   // Owned pro sports league sub-types (for same-league blocking on deal cards)
@@ -309,6 +325,36 @@ export function AllocatePhase({
       prev.size >= standalone.length ? new Set() : new Set(standalone.map(b => b.id))
     );
   }, [activeBusinesses]);
+
+  // Fund mode: compute NAV + MOIC + hurdle progress
+  const fundMetrics = useMemo(() => {
+    if (!isFundManagerMode) return null;
+    // Portfolio value: sum of exit valuations
+    let portfolioValue = 0;
+    let rolloverClaims = 0;
+    for (const biz of activeBusinesses) {
+      const val = calculateExitValuation(biz, maxRounds, lastEventType, undefined, integratedPlatforms);
+      portfolioValue += val.exitPrice;
+      if (biz.rolloverEquityPct && biz.rolloverEquityPct > 0) {
+        const bizDebt = biz.sellerNoteBalance + biz.bankDebtBalance;
+        const bizNet = Math.max(0, val.exitPrice - bizDebt);
+        rolloverClaims += bizNet * biz.rolloverEquityPct;
+      }
+    }
+    const opcoSellerNotes = businesses.reduce((s, b) => s + b.sellerNoteBalance, 0);
+    const allDebt = totalDebt + opcoSellerNotes;
+    const nav = Math.max(0, portfolioValue + cash - allDebt - rolloverClaims);
+    const grossMoic = fundSize > 0 ? (nav + lpDistributions) / fundSize : 0;
+    const dpi = fundSize > 0 ? lpDistributions / fundSize : 0;
+    const deployPct = fundSize > 0 ? (totalCapitalDeployed / fundSize) * 100 : 0;
+    const dryPowder = cash;
+    const totalValue = nav + lpDistributions;
+    const hurdlePct = PE_FUND_CONFIG.hurdleReturn > 0 ? (totalValue / PE_FUND_CONFIG.hurdleReturn) * 100 : 0;
+    const estCarry = totalValue > PE_FUND_CONFIG.hurdleReturn
+      ? (totalValue - PE_FUND_CONFIG.hurdleReturn) * PE_FUND_CONFIG.carryRate
+      : 0;
+    return { nav, grossMoic, dpi, deployPct, dryPowder, totalValue, hurdlePct, estCarry };
+  }, [isFundManagerMode, activeBusinesses, businesses, cash, totalDebt, fundSize, lpDistributions, totalCapitalDeployed, maxRounds, lastEventType, integratedPlatforms]);
 
   // Deal sort + filter
   const dealFilterOptions = useMemo(() => {
@@ -1471,6 +1517,19 @@ export function AllocatePhase({
 
         {activeTab === 'deals' && (
           <div>
+            {/* Fund Mode: Year 9 warning + Year 10 block */}
+            {isFundManagerMode && round === maxRounds && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4">
+                <p className="font-bold text-red-300 mb-1">Fund Closes This Year</p>
+                <p className="text-sm text-text-muted">No new standalone acquisitions. Tuck-ins are still permitted. Consider distributing cash to lock in your DPI.</p>
+              </div>
+            )}
+            {isFundManagerMode && round === maxRounds - 1 && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4">
+                <p className="font-bold text-amber-300 mb-1">Final Year Next Round</p>
+                <p className="text-sm text-text-muted">All remaining businesses will be liquidated at market value. Consider making distributions now to lock in your DPI.</p>
+              </div>
+            )}
             {/* M&A Focus Settings */}
             <div className="card mb-6">
               <div className="flex items-start justify-between mb-3 sm:mb-4 gap-2">
@@ -2070,6 +2129,13 @@ export function AllocatePhase({
 
         {activeTab === 'capital' && (
           <div className="space-y-6">
+            {/* Fund Mode: Year 10 standalone block reminder */}
+            {isFundManagerMode && round === maxRounds && (
+              <div className="bg-purple-500/10 border border-purple-500/30 rounded-lg p-4">
+                <p className="font-bold text-purple-300 mb-1">Final Year</p>
+                <p className="text-sm text-text-muted">Your fund closes this year. Distribute cash now to lock in DPI timing, or leave it for the terminal liquidation.</p>
+              </div>
+            )}
             {/* Debt Summary */}
             {(() => {
               const opcoSellerNotes = businesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
@@ -2106,8 +2172,8 @@ export function AllocatePhase({
               );
             })()}
 
-            {/* Cap Table / Equity Summary (hidden in FO mode) */}
-            {!isFamilyOfficeMode && (() => {
+            {/* Cap Table / Equity Summary (hidden in FO + Fund Manager mode) */}
+            {!isFamilyOfficeMode && !isFundManagerMode && (() => {
               const founderOwnership = founderShares / sharesOutstanding;
               const outsideShares = sharesOutstanding - founderShares;
               const isEasyMode = difficulty === 'easy';
@@ -2181,8 +2247,8 @@ export function AllocatePhase({
               );
             })()}
 
-            {/* IPO Pathway — 20-year mode only (hidden in FO mode) */}
-            {!isFamilyOfficeMode && (() => {
+            {/* IPO Pathway — 20-year mode only (hidden in FO + Fund Manager mode) */}
+            {!isFamilyOfficeMode && !isFundManagerMode && (() => {
               if (duration !== 'standard') return null;
               if (ipoState?.isPublic) {
                 // Post-IPO: Public Company Dashboard
@@ -2325,8 +2391,8 @@ export function AllocatePhase({
             })()}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Pay Down Holdco Debt */}
-            <div className="card">
+            {/* Pay Down Holdco Debt (hidden in fund mode — no holdco loans) */}
+            {!isFundManagerMode && <div className="card">
               <h4 className="font-bold mb-3">Pay Down Holdco Debt</h4>
               <p className="text-sm text-text-muted mb-4">
                 Holdco debt: {formatMoney(holdcoLoanBalance)} @ {formatPercent(interestRate)}
@@ -2365,7 +2431,7 @@ export function AllocatePhase({
                 <p className="text-xs text-text-muted mt-1">= {formatMoney(Math.round(parseInt(payDebtAmount) / 1000))}</p>
               )}
               <p className="text-xs text-text-muted mt-2">Interest charged annually on remaining balance</p>
-            </div>
+            </div>}
 
             {/* Pay Down Bank Debt (per-business) */}
             {(() => {
@@ -2429,8 +2495,216 @@ export function AllocatePhase({
               );
             })()}
 
-            {/* Equity / Buyback / Distribute — hidden in FO mode */}
-            {!isFamilyOfficeMode && <>
+            {/* Fund Overview Card — Fund Manager mode only */}
+            {isFundManagerMode && fundMetrics && (() => {
+              const hasBusinesses = activeBusinesses.length > 0;
+              const hurdleColor = fundMetrics.hurdlePct < 50 ? 'bg-red-400' : fundMetrics.hurdlePct < 90 ? 'bg-yellow-400' : fundMetrics.hurdlePct < 100 ? 'bg-amber-400' : 'bg-green-400';
+              return (
+                <div className="card bg-white/5 border border-purple-500/20">
+                  <h4 className="font-bold mb-4 text-purple-300">Fund Overview</h4>
+
+                  {!hasBusinesses ? (
+                    // Year 1 progressive disclosure
+                    <div className="space-y-3">
+                      <div className="flex justify-between text-sm">
+                        <span className="text-text-muted">Committed</span>
+                        <span className="font-mono font-bold">{formatMoney(fundSize)}</span>
+                      </div>
+                      <div className="flex justify-between text-sm">
+                        <span className="text-text-muted">Cash</span>
+                        <span className="font-mono font-bold">{formatMoney(cash)}</span>
+                      </div>
+                      <p className="text-sm text-text-muted italic mt-2">
+                        Your fund metrics will populate as you deploy capital.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {/* Hero: NAV */}
+                      <div className="text-center pb-3 border-b border-white/10">
+                        <p className="text-xs text-text-muted uppercase tracking-wide">Net Asset Value</p>
+                        <p className="text-3xl font-mono font-bold text-purple-300">{formatMoney(fundMetrics.nav)}</p>
+                        <p className="text-sm text-text-muted">Gross MOIC: <span className="font-mono font-bold text-text-primary">{fundMetrics.grossMoic.toFixed(2)}x</span></p>
+                      </div>
+
+                      {/* Fund details */}
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div>
+                          <p className="text-text-muted">Committed</p>
+                          <p className="font-mono font-bold">{formatMoney(fundSize)}</p>
+                        </div>
+                        <div>
+                          <p className="text-text-muted">Deployed</p>
+                          <p className="font-mono font-bold">{formatMoney(totalCapitalDeployed)} <span className="text-xs text-text-muted">({fundMetrics.deployPct.toFixed(0)}%)</span></p>
+                        </div>
+                        <div>
+                          <p className="text-text-muted">Dry Powder</p>
+                          <p className="font-mono font-bold">{formatMoney(fundMetrics.dryPowder)}</p>
+                        </div>
+                        <div>
+                          <p className="text-text-muted">LP Distributions</p>
+                          <p className="font-mono font-bold">{formatMoney(lpDistributions)} <span className="text-xs text-text-muted">(DPI: {fundMetrics.dpi.toFixed(2)}x)</span></p>
+                        </div>
+                        <div>
+                          <p className="text-text-muted">Mgmt Fees Paid</p>
+                          <p className="font-mono font-bold">{formatMoney(managementFeesCollected)}</p>
+                        </div>
+                        <div>
+                          <p className="text-text-muted">Est. Carry</p>
+                          <p className="font-mono font-bold text-purple-300">
+                            {fundMetrics.estCarry > 0 ? `~${formatMoney(Math.round(fundMetrics.estCarry))}` : 'Below hurdle'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Hurdle progress bar */}
+                      <div className="pt-2 border-t border-white/10">
+                        <div className="flex justify-between text-xs text-text-muted mb-1">
+                          <span>Hurdle Progress</span>
+                          <span>{formatMoney(Math.round(fundMetrics.totalValue))} of {formatMoney(Math.round(PE_FUND_CONFIG.hurdleReturn))}</span>
+                        </div>
+                        <div className="w-full h-3 bg-white/10 rounded-full overflow-hidden">
+                          <div
+                            className={`h-full ${hurdleColor} rounded-full transition-all`}
+                            style={{ width: `${Math.min(100, fundMetrics.hurdlePct)}%` }}
+                          />
+                        </div>
+                        <p className="text-xs text-text-muted mt-1">
+                          {fundMetrics.hurdlePct >= 100
+                            ? 'Hurdle cleared — you\'re earning carry!'
+                            : `${formatMoney(Math.round(PE_FUND_CONFIG.hurdleReturn - fundMetrics.totalValue))} more needed to earn carry`
+                          }
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Distribute to LPs — Fund Manager mode only */}
+            {isFundManagerMode && activeBusinesses.length > 0 && (() => {
+              const dpi = fundSize > 0 ? lpDistributions / fundSize : 0;
+              const canDistribute = totalCapitalDeployed >= PE_FUND_CONFIG.minDeploymentForDistribution;
+              const parsedDpiDollars = parseInt(dpiAmount) || 0;
+              const parsedDpiInternal = Math.round(parsedDpiDollars / 1000);
+              const validAmount = parsedDpiInternal >= PE_FUND_CONFIG.minDistribution && parsedDpiInternal <= cash;
+              // Upcoming obligations estimate
+              const mgmtFee = PE_FUND_CONFIG.annualManagementFee;
+              const turnaroundCost = activeTurnarounds.reduce((sum, t) => {
+                const prog = getProgramById(t.programId);
+                return sum + (prog ? getTurnaroundTierAnnualCost(prog.tier) : 0);
+              }, 0);
+              const estDebtService = allBusinesses
+                .filter(b => b.status === 'active')
+                .reduce((s, b) => {
+                  let ds = 0;
+                  if (b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0) {
+                    ds += b.sellerNoteBalance / b.sellerNoteRoundsRemaining + b.sellerNoteBalance * (b.sellerNoteRate || 0.05);
+                  }
+                  if (b.bankDebtBalance > 0 && b.bankDebtRoundsRemaining > 0) {
+                    ds += b.bankDebtBalance / b.bankDebtRoundsRemaining + b.bankDebtBalance * (b.bankDebtRate || interestRate);
+                  }
+                  return s + ds;
+                }, 0);
+              return (
+                <div className="card bg-white/5 border border-purple-500/20">
+                  <h4 className="font-bold mb-1 text-purple-300">Distribute to LPs</h4>
+                  <p className="text-sm text-text-muted mb-4">Return capital to your investors (permanent)</p>
+
+                  {/* DPI progress */}
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="text-text-muted">Cumulative DPI: <span className="font-mono font-bold text-text-primary">{dpi.toFixed(2)}x</span></span>
+                      <span className="text-text-muted text-xs">{formatMoney(lpDistributions)} of {formatMoney(fundSize)}</span>
+                    </div>
+                    <div className="relative w-full h-3 bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${dpi >= 1.0 ? 'bg-green-400' : dpi >= 0.5 ? 'bg-yellow-400' : 'bg-purple-400'}`}
+                        style={{ width: `${Math.min(100, dpi * 100)}%` }}
+                      />
+                      {/* 0.5x marker */}
+                      <div className="absolute top-0 bottom-0 w-px bg-yellow-400/50" style={{ left: '50%' }} />
+                      {/* 1.0x marker */}
+                      <div className="absolute top-0 bottom-0 w-px bg-green-400/50" style={{ left: '100%' }} />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-text-muted mt-0.5">
+                      <span>0x</span>
+                      <span>0.5x</span>
+                      <span>1.0x</span>
+                    </div>
+                  </div>
+
+                  {!canDistribute ? (
+                    <p className="text-sm text-warning">Deploy at least 20% of committed capital ({formatMoney(PE_FUND_CONFIG.minDeploymentForDistribution)}) before making distributions.</p>
+                  ) : dpiConfirm ? (
+                    // Confirmation step
+                    <div className="bg-purple-500/10 rounded-lg p-4 border border-purple-500/20">
+                      <p className="text-sm font-medium mb-1">Distribute {formatMoney(parsedDpiInternal)} to LPs?</p>
+                      <p className="text-xs text-text-muted mb-3">This is permanent. Cash cannot be recalled.</p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => { setDpiConfirm(false); setDpiAmount(''); }}
+                          className="btn-secondary flex-1 text-sm"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            onDistributeToLPs?.(parsedDpiInternal);
+                            setDpiConfirm(false);
+                            setDpiAmount('');
+                          }}
+                          className="flex-1 px-4 py-2 rounded-lg font-medium bg-purple-600 text-white hover:bg-purple-500 transition-colors text-sm"
+                        >
+                          Confirm Distribution
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex gap-2 mb-3">
+                        <div className="flex-1 relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted text-sm">$</span>
+                          <input
+                            type="text"
+                            inputMode="numeric"
+                            value={dpiAmount}
+                            onChange={(e) => {
+                              const raw = e.target.value.replace(/[^0-9]/g, '');
+                              setDpiAmount(raw);
+                            }}
+                            placeholder="1,000,000"
+                            className="w-full bg-white/5 border border-white/10 rounded pl-7 pr-3 py-2.5 text-sm"
+                          />
+                        </div>
+                        <button
+                          onClick={() => setDpiConfirm(true)}
+                          disabled={!validAmount}
+                          className="px-4 py-2 rounded-lg font-medium bg-purple-600 text-white hover:bg-purple-500 transition-colors text-sm disabled:opacity-40 disabled:cursor-not-allowed min-h-[44px]"
+                        >
+                          Distribute
+                        </button>
+                      </div>
+                      {dpiAmount && parsedDpiDollars >= 1000 && (
+                        <p className="text-xs text-text-muted mb-3">= {formatMoney(parsedDpiInternal)}</p>
+                      )}
+                      <div className="text-xs text-text-muted space-y-1">
+                        <p className="font-medium">Upcoming obligations:</p>
+                        <div className="flex flex-wrap gap-x-3">
+                          <span>Mgmt fee: {formatMoney(mgmtFee)}</span>
+                          {turnaroundCost > 0 && <span>Turnarounds: {formatMoney(turnaroundCost)}</span>}
+                          {estDebtService > 0 && <span>Debt service: ~{formatMoney(Math.round(estDebtService))}</span>}
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              );
+            })()}
+
+            {/* Equity / Buyback / Distribute — hidden in FO + Fund Manager mode */}
+            {!isFamilyOfficeMode && !isFundManagerMode && <>
             {/* Issue Equity */}
             <div className={`card ${raiseBlocked ? 'opacity-50' : ''}`}>
               <h4 className="font-bold mb-3">Issue Equity</h4>

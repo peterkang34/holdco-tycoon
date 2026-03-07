@@ -23,7 +23,10 @@ function buildEventPrompt(context: Record<string, unknown>): string {
     portfolioContext += `\nPORTFOLIO: ${allBizNames.join(', ')}`;
   }
 
-  return `You are a financial journalist writing a brief, dramatic narrative for a holding company simulation game. The player runs a holdco (not a PE fund) — never call it a "private equity firm". Write 2-3 sentences that bring this economic event to life with specific details and human impact.
+  const modeInstruction = context.isFundManagerMode
+    ? 'The player runs a PE fund managing third-party capital. Use PE vocabulary naturally.'
+    : 'The player runs a holdco (not a PE fund) — never call it a "private equity firm".';
+  return `You are a financial journalist writing a brief, dramatic narrative for a ${context.isFundManagerMode ? 'private equity fund' : 'holding company'} simulation game. ${modeInstruction} Write 2-3 sentences that bring this economic event to life with specific details and human impact.
 
 EVENT: ${context.eventType}
 EFFECT: ${context.effect}
@@ -50,7 +53,7 @@ RECENT EVENTS: ${context.recentEvents || 'None'}
 IMPROVEMENTS MADE: ${context.improvements || 'None'}
 IS PLATFORM: ${context.isPlatform ? 'Yes, with ' + context.boltOnCount + ' bolt-ons' : 'No'}
 
-Write 2-3 sentences about what happened at this business this year. Include a specific detail (a person, customer, project, challenge). If margins changed significantly, weave that into the narrative (e.g., cost pressures, efficiency gains). Make it feel like a real company story. Keep it under 60 words. Respond with just the narrative text.`;
+Write 2-3 sentences about what happened at this ${context.isFundManagerMode ? 'portfolio company' : 'business'} this year. Include a specific detail (a person, customer, project, challenge). If margins changed significantly, weave that into the narrative (e.g., cost pressures, efficiency gains). Make it feel like a real company story. Keep it under 60 words.${context.isFundManagerMode ? ' Use PE vocabulary: "value creation", "exit readiness", "multiple expansion", "add-on potential".' : ''} Respond with just the narrative text.`;
 }
 
 function buildYearChroniclePrompt(context: Record<string, unknown>): string {
@@ -148,6 +151,58 @@ ${context.narrativeToneGuidance ? `- VOICE/TONE: ${context.narrativeToneGuidance
 Write 3-4 sentences in a shareholder letter style befitting a family office annual review. Keep it under 80 words. Respond with just the narrative text.`;
 }
 
+function buildPEFundChroniclePrompt(context: Record<string, unknown>): string {
+  const strategicLines: string[] = [];
+  if (context.platformCount && (context.platformCount as number) > 0) {
+    strategicLines.push(`- Platforms: ${context.platformCount} (with ${context.totalBoltOns || 0} add-on acquisitions)`);
+  }
+  if (context.sectors) strategicLines.push(`- Sectors: ${context.sectors}`);
+  const strategicSection = strategicLines.length > 0 ? `\nSTRATEGIC POSITION:\n${strategicLines.join('\n')}` : '';
+
+  const year = context.year as number || 1;
+  const isInvestmentPeriod = year <= 5;
+
+  return `You are writing the annual chronicle for a private equity fund — a professional investment vehicle managing third-party capital with a fixed 10-year life. The tone should be measured, professional, and return-focused — think quarterly LP letter, not startup blog post.
+
+FUND: ${context.fundName || context.holdcoName}
+YEAR: ${context.year} of 10 (${isInvestmentPeriod ? 'Investment Period' : 'Harvest Period'})
+
+FUND METRICS:
+- Gross MOIC: ${context.grossMoic || 'N/A'}
+- DPI: ${context.dpi || '0.0x'}
+- Deployed: ${context.deploymentPct || '0%'}
+- Dry Powder: ${context.dryPowder || 'N/A'}
+- Hurdle Progress: ${context.hurdleProgress || 'N/A'} of 8% annual ($216M)
+- Est. Carry: ${context.estimatedCarry || '$0'}
+- LP Sentiment: ${context.lpSatisfactionTone || 'confident'}
+
+KEY FINANCIALS:
+${context.totalRevenue ? `- Revenue: ${context.totalRevenue}${context.revenueGrowth ? ` [${context.revenueGrowth} YoY]` : ''}\n` : ''}- EBITDA: ${context.totalEbitda}${context.prevTotalEbitda ? ` (prior: ${context.prevTotalEbitda})` : ''}${context.ebitdaGrowth ? ` [${context.ebitdaGrowth} YoY]` : ''}
+${context.avgMargin ? `- Avg EBITDA Margin: ${context.avgMargin}${context.marginChange ? ` [${context.marginChange} vs prior year]` : ''}\n` : ''}- Net Debt/EBITDA: ${context.leverage}
+- Portfolio: ${context.portfolioCount} companies
+${strategicSection}
+
+THIS YEAR'S ACTIVITY:
+${context.actions || 'Capital deployed into pipeline opportunities'}
+
+MARKET: ${context.marketConditions || 'Normal'}
+${context.concerns ? `\nCONCERNS: ${context.concerns}` : ''}
+${context.positives ? `\nSTRENGTHS: ${context.positives}` : ''}
+${context.narrativeToneGuidance ? `\nNARRATIVE PHASE GUIDANCE: ${context.narrativeToneGuidance}` : ''}
+
+WRITING GUIDELINES:
+- 3-4 sentences, under 80 words
+- Use PE vocabulary naturally: "portfolio companies" not "businesses", "platform" not "group", "deployment" not "spending", "dry powder" not "cash on hand", "value creation" not "improvements", "exit" not "sale"
+- Reference the fund lifecycle: deployment velocity in Years 1-5, value creation in Years 3-7, harvesting and DPI in Years 6-10
+${context.lpSatisfactionTone === 'cautious' ? '- Subtly reference LP expectations or quarterly call pressure\n' : ''}${context.lpSatisfactionTone === 'frustrated' ? '- Reference governance concerns or LP scrutiny more directly\n' : ''}- Never mention specific dollar amounts for carry (it changes constantly)
+- Never use exclamation marks or casual language
+- Do NOT include LP reactions or investor sentiment — that is handled separately by LP character dialogues
+- Use ONLY the exact financial figures provided above — do NOT invent, calculate, or round your own numbers
+- Do NOT mention portfolio quality ratings or scores
+${(context.portfolioCount as number) === 0 ? '- The fund has just opened. Capital is committed but undeployed. Reference the deployment mandate, deal pipeline, and the management fee clock ticking on uninvested capital.\n' : ''}
+Write 3-4 sentences in an LP letter style. Keep it under 80 words. Respond with just the narrative text.`;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (await validateAIRequest(req, res)) return;
 
@@ -181,9 +236,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         prompt = buildBusinessUpdatePrompt(context);
         break;
       case 'year_chronicle':
-        prompt = context.isFamilyOfficeMode
-          ? buildFamilyOfficeChroniclePrompt(context)
-          : buildYearChroniclePrompt(context);
+        prompt = context.isFundManagerMode
+          ? buildPEFundChroniclePrompt(context)
+          : context.isFamilyOfficeMode
+            ? buildFamilyOfficeChroniclePrompt(context)
+            : buildYearChroniclePrompt(context);
         break;
       default:
         return res.status(400).json({ error: 'Invalid narrative type' });

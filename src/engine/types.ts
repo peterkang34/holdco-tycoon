@@ -479,6 +479,47 @@ export interface FamilyOfficeState {
   legacyScore?: LegacyScore;      // kept for display (grade, MOIC, etc.)
 }
 
+// ── PE Fund Manager Mode ──
+
+export interface FundCashFlow {
+  round: number;
+  amount: number;  // positive = distribution to LPs
+}
+
+export interface LPComment {
+  round: number;
+  speaker: 'edna' | 'chip';
+  text: string;
+}
+
+export interface CarryWaterfall {
+  grossTotalReturns: number;
+  returnOfCapital: number;
+  hurdleAmount: number;
+  hurdleCleared: boolean;
+  aboveHurdle: number;
+  carry: number;
+  managementFees: number;
+  totalGpEconomics: number;
+  grossMoic: number;
+  netIrr: number;
+  dpi: number;
+  lpDistributions: number;
+  liquidationProceeds: number;
+}
+
+export interface PEScoreBreakdown {
+  returnGeneration: number;       // max 25
+  capitalEfficiency: number;      // max 20
+  valueCreation: number;          // max 15
+  deploymentDiscipline: number;   // max 15
+  riskManagement: number;         // max 15
+  lpSatisfaction: number;         // max 10
+  total: number;                  // max 100
+  grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
+  gradeTitle: string;
+}
+
 export interface GameState {
   // Meta
   holdcoName: string;
@@ -591,6 +632,18 @@ export interface GameState {
   dealInflationState: DealInflationState;
   ipoState: IPOState | null;
   familyOfficeState: FamilyOfficeState | null;
+
+  // PE Fund Manager Mode
+  isFundManagerMode?: boolean;
+  fundName?: string;
+  fundSize?: number;                    // committed capital ($K)
+  managementFeesCollected?: number;     // cumulative fees deducted
+  lpSatisfactionScore?: number;         // hidden 0-100
+  lpCommentary?: LPComment[];           // historical LP comments
+  fundCashFlows?: FundCashFlow[];       // LP-perspective cash flows for IRR
+  totalCapitalDeployed?: number;        // cumulative acquisition deal value (asking price, incl. debt)
+  lpDistributions?: number;             // cumulative cash distributed to LPs
+  dpiMilestones?: { half: boolean; full: boolean };  // one-time DPI milestone flags
 }
 
 export type GameActionType =
@@ -620,7 +673,8 @@ export type GameActionType =
   | 'start_turnaround'
   | 'turnaround_resolved'
   | 'ipo'
-  | 'smb_broker';
+  | 'smb_broker'
+  | 'distribute_to_lps';
 
 export interface GameAction {
   type: GameActionType;
@@ -701,6 +755,12 @@ export interface LeaderboardEntry {
   legacyGrade?: string; // 'Enduring' | 'Influential' | 'Established' | 'Fragile'
   foMultiplier?: number; // 1.0-1.5 (FO performance bonus on Adjusted FEV)
   strategy?: LeaderboardStrategy;
+  // PE Fund Manager Mode
+  isFundManager?: boolean;
+  fundName?: string;
+  netIrr?: number;
+  grossMoic?: number;
+  carryEarned?: number;
   // Player accounts (Phase 1)
   playerId?: string; // Supabase user UUID (set on submission or claim; stripped from GET responses)
   isVerified?: boolean; // Set by GET API when playerId exists (playerId itself is stripped for privacy)

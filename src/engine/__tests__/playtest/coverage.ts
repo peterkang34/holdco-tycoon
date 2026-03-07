@@ -100,6 +100,17 @@ export const FEATURE_REGISTRY = {
   quiet_year_capped: 'quiet_year_capped',
   filler_event_choice: 'filler_event_choice',
   early_game_safety_net: 'early_game_safety_net',
+
+  // PE Fund Mode (9)
+  fund_mode_started: 'fund_mode_started',
+  lp_distribution: 'lp_distribution',
+  lpac_triggered: 'lpac_triggered',
+  lpac_approved: 'lpac_approved',
+  lpac_denied: 'lpac_denied',
+  management_fee_deducted: 'management_fee_deducted',
+  forced_liquidation: 'forced_liquidation',
+  carry_earned: 'carry_earned',
+  pe_scoring_completed: 'pe_scoring_completed',
 } as const;
 
 export type FeatureKey = keyof typeof FEATURE_REGISTRY;

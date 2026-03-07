@@ -104,6 +104,8 @@ import {
   FILLER_REPUTATION_COST_MIN,
   FILLER_REPUTATION_COST_MAX,
   FILLER_REPUTATION_HEAT_REDUCTION,
+  PE_FUND_CONFIG,
+  FUND_MANAGER_CONFIG,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
 import {
@@ -2025,6 +2027,149 @@ describe('Display Proofreader', () => {
     it('types.ts has priorOwnershipCount field (Strategy B)', () => {
       const types = readComponent('engine/types.ts');
       expect(types).toContain('priorOwnershipCount');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // PE FUND MODE
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('PE Fund Mode', () => {
+    it('PE_FUND_CONFIG constants match UI references (Strategy A)', () => {
+      expect(PE_FUND_CONFIG.fundSize).toBe(100_000);
+      expect(PE_FUND_CONFIG.managementFeeRate).toBe(0.02);
+      expect(PE_FUND_CONFIG.annualManagementFee).toBe(2_000);
+      expect(PE_FUND_CONFIG.carryRate).toBe(0.20);
+      expect(PE_FUND_CONFIG.hurdleRate).toBe(0.08);
+      expect(PE_FUND_CONFIG.investmentPeriodEnd).toBe(5);
+      expect(PE_FUND_CONFIG.minDistribution).toBe(1_000);
+      expect(PE_FUND_CONFIG.minDeploymentForDistribution).toBe(20_000);
+    });
+
+    it('GameState has all fund mode fields (Strategy B)', () => {
+      const types = readComponent('engine/types.ts');
+      expect(types).toContain('isFundManagerMode');
+      expect(types).toContain('fundName');
+      expect(types).toContain('fundSize');
+      expect(types).toContain('managementFeesCollected');
+      expect(types).toContain('lpSatisfactionScore');
+      expect(types).toContain('lpCommentary');
+      expect(types).toContain('fundCashFlows');
+      expect(types).toContain('totalCapitalDeployed');
+      expect(types).toContain('lpDistributions');
+      expect(types).toContain('dpiMilestones');
+    });
+
+    it('PE scoring has 6 dimensions (Strategy B)', () => {
+      const scoring = readComponent('engine/scoring.ts');
+      expect(scoring).toContain('PEScoreBreakdown');
+      expect(scoring).toContain('returnGeneration');
+      expect(scoring).toContain('capitalEfficiency');
+      expect(scoring).toContain('valueCreation');
+      expect(scoring).toContain('deploymentDiscipline');
+      expect(scoring).toContain('riskManagement');
+      expect(scoring).toContain('lpSatisfaction');
+    });
+
+    it('carry waterfall calculator exists (Strategy B)', () => {
+      const scoring = readComponent('engine/scoring.ts');
+      expect(scoring).toContain('calculateCarryWaterfall');
+      expect(scoring).toContain('CarryWaterfall');
+      expect(scoring).toContain('calculateIRR');
+    });
+
+    it('IntroScreen has Fund Manager mode selection (Strategy B)', () => {
+      const intro = readComponent('components/screens/IntroScreen.tsx');
+      expect(intro).toContain('Fund Manager');
+      expect(intro).toContain('onStartFund');
+    });
+
+    it('AllocatePhase gates holdco-only sections in fund mode (Strategy B)', () => {
+      const alloc = readComponent('components/phases/AllocatePhase.tsx');
+      expect(alloc).toContain('isFundManagerMode');
+      // Fund mode should show Fund Overview and DPI distribution
+      expect(alloc).toContain('Fund Overview');
+      expect(alloc).toContain('DPI');
+    });
+
+    it('Dashboard shows fund metrics in fund mode (Strategy B)', () => {
+      const dash = readComponent('components/dashboard/Dashboard.tsx');
+      expect(dash).toContain('isFundManagerMode');
+      expect(dash).toContain('fundNav');
+      expect(dash).toContain('fundGrossMoic');
+      expect(dash).toContain('fundDpi');
+    });
+
+    it('GameOverScreen shows carry waterfall in fund mode (Strategy B)', () => {
+      const gos = readComponent('components/screens/GameOverScreen.tsx');
+      expect(gos).toContain('isFundManagerMode');
+      expect(gos).toContain('carryWaterfall');
+      expect(gos).toContain('waterfallStep');
+    });
+
+    it('PE chronicle prompt exists in generate-narrative.ts (Strategy B)', () => {
+      const narr = readFileSync(resolve(SRC_ROOT, '../api/ai/generate-narrative.ts'), 'utf-8');
+      expect(narr).toContain('buildPEFundChroniclePrompt');
+      expect(narr).toContain('isFundManagerMode');
+    });
+
+    it('LP commentary data file exists (Strategy B)', () => {
+      const lp = readComponent('data/lpCommentary.ts');
+      expect(lp).toContain('selectLPQuote');
+      expect(lp).toContain('edna');
+      expect(lp).toContain('chip');
+    });
+
+    it('PE post-game insights exist in tips.ts (Strategy B)', () => {
+      const tips = readComponent('data/tips.ts');
+      expect(tips).toContain('pe_never_distributed');
+      expect(tips).toContain('pe_over_concentrated');
+      expect(tips).toContain('pe_strong_dpi_timing');
+      expect(tips).toContain('pe_missed_hurdle_narrowly');
+      expect(tips).toContain('pe_zero_leverage');
+      expect(tips).toContain('pe_late_deployment');
+    });
+
+    it('FUND_MANAGER_CONFIG blocks holdco mechanics (Strategy A)', () => {
+      expect(FUND_MANAGER_CONFIG.blockEquityRaises).toBe(true);
+      expect(FUND_MANAGER_CONFIG.blockDistributions).toBe(true);
+      expect(FUND_MANAGER_CONFIG.blockBuybacks).toBe(true);
+      expect(FUND_MANAGER_CONFIG.blockIPO).toBe(true);
+      expect(FUND_MANAGER_CONFIG.blockFamilyOffice).toBe(true);
+      expect(FUND_MANAGER_CONFIG.blockHoldcoLoan).toBe(true);
+      expect(FUND_MANAGER_CONFIG.founderShares).toBe(0);
+    });
+
+    it('migration handles PE fund mode fields (Strategy B)', () => {
+      const migrations = readComponent('hooks/migrations.ts');
+      expect(migrations).toContain('isFundManagerMode');
+      expect(migrations).toContain('lpSatisfactionScore');
+    });
+
+    it('chronicle context includes PE fund fields (Strategy B)', () => {
+      const ctx = readComponent('services/chronicleContext.ts');
+      expect(ctx).toContain('isFundManagerMode');
+      expect(ctx).toContain('grossMoic');
+      expect(ctx).toContain('deploymentPct');
+    });
+
+    it('telemetry supports game mode (Strategy B)', () => {
+      const tel = readComponent('services/telemetry.ts');
+      expect(tel).toContain('gameMode');
+      expect(tel).toContain('isFundManager');
+      expect(tel).toContain('netIrr');
+      expect(tel).toContain('grossMoic');
+    });
+
+    it('playtest coverage includes PE feature keys (Strategy B)', () => {
+      const cov = readFileSync(resolve(__dirname, 'playtest/coverage.ts'), 'utf-8');
+      expect(cov).toContain('fund_mode_started');
+      expect(cov).toContain('lp_distribution');
+      expect(cov).toContain('lpac_triggered');
+      expect(cov).toContain('management_fee_deducted');
+      expect(cov).toContain('forced_liquidation');
+      expect(cov).toContain('carry_earned');
+      expect(cov).toContain('pe_scoring_completed');
     });
   });
 });

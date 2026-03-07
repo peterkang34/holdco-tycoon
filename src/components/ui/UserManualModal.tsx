@@ -15,6 +15,7 @@ type ManualSection =
   | 'selling'
   | 'events'
   | 'twenty-year'
+  | 'fund-manager'
   | 'scoring'
   | 'sectors'
   | 'strategy'
@@ -39,6 +40,7 @@ const SECTIONS: SectionDef[] = [
   { id: 'selling', label: 'Selling & Exit', shortLabel: 'Exit' },
   { id: 'events', label: 'Events', shortLabel: 'Events' },
   { id: 'twenty-year', label: '20-Year Mode', shortLabel: '20-Year' },
+  { id: 'fund-manager', label: 'Fund Manager Mode', shortLabel: 'PE Fund' },
   { id: 'scoring', label: 'Scoring & Leaderboard', shortLabel: 'Scoring' },
   { id: 'sectors', label: 'The 15 Sectors', shortLabel: 'Sectors' },
   { id: 'strategy', label: 'Tips & Strategy', shortLabel: 'Tips' },
@@ -1437,6 +1439,36 @@ function GlossaryContent() {
           Revenue Growth % + EBITDA Margin % should sum to at least 40. Businesses exceeding
           this threshold earn a valuation premium.
         </div>
+        <div>
+          <strong className="text-white">DPI (Distributions to Paid-In)</strong> &mdash;
+          Cumulative cash distributions divided by total committed capital. A 1.0x DPI means LPs
+          have received their money back. Fund Manager mode metric.
+        </div>
+        <div>
+          <strong className="text-white">Carry (Carried Interest)</strong> &mdash;
+          The GP&apos;s share of profits above the hurdle rate. Typically 20% of returns exceeding
+          the 8% preferred return threshold. Fund Manager mode metric.
+        </div>
+        <div>
+          <strong className="text-white">Hurdle Rate</strong> &mdash;
+          The minimum return LPs must receive before carry kicks in. In Fund Manager mode, 8% annual
+          compounded over 10 years (~$216M on a $100M fund).
+        </div>
+        <div>
+          <strong className="text-white">NAV (Net Asset Value)</strong> &mdash;
+          The fund&apos;s total value: portfolio company valuations + cash - all debt - rollover claims.
+          Fund Manager mode metric.
+        </div>
+        <div>
+          <strong className="text-white">LPAC (LP Advisory Committee)</strong> &mdash;
+          A governance body of Limited Partners that approves or denies large acquisitions exceeding
+          concentration thresholds. Approval probability depends on LP satisfaction.
+        </div>
+        <div>
+          <strong className="text-white">Dry Powder</strong> &mdash;
+          Uninvested cash available for deployment. In PE, idle dry powder drags down IRR because
+          committed capital is not generating returns.
+        </div>
       </div>
     </>
   );
@@ -1605,6 +1637,80 @@ function TwentyYearContent() {
   );
 }
 
+function FundManagerContent() {
+  return (
+    <>
+      <Heading>Fund Manager Mode</Heading>
+      <P>
+        A separate game mode where you manage a $100M PE fund with a 10-year life,
+        investing LP capital, earning management fees, and aiming for carried interest above an 8% hurdle.
+      </P>
+
+      <SubHeading>Fund Economics</SubHeading>
+      <DataTable
+        headers={['Term', 'Value']}
+        rows={[
+          ['Fund Size', '$100M committed capital'],
+          ['Management Fee', '2% ($2M/year, deducted from cash)'],
+          ['Hurdle Rate', '8% annual (~$216M total return threshold)'],
+          ['Carried Interest', '20% of profits above the hurdle'],
+          ['Fund Life', '10 years (Investment Period: Y1-5, Harvest: Y6-10)'],
+        ]}
+      />
+
+      <SubHeading>LP Distributions (DPI)</SubHeading>
+      <P>
+        You can distribute cash to LPs during the Allocate Phase. DPI (Distributions to Paid-In) tracks
+        how much capital you have returned. LPs expect 0.5x DPI by mid-fund and 1.0x by fund end.
+        Minimum distribution: $1M. Must deploy at least 20% before distributing.
+      </P>
+
+      <SubHeading>LPAC Governance</SubHeading>
+      <P>
+        Large acquisitions (cumulative platform deal value exceeding $25M) require LP Advisory Committee
+        approval. Approval probability depends on LP satisfaction: 70+ auto-approves, 50-69 = 85% chance,
+        30-49 = 50%, below 30 = 25%.
+      </P>
+
+      <SubHeading>LP Satisfaction</SubHeading>
+      <P>
+        A hidden 0-100 score reflecting LP confidence. Affected by DPI pace, deployment discipline,
+        MOIC progress, and leverage management. Below 20, your grade is capped at C.
+        LP characters (Edna Blackwell and Chip Saunders) provide commentary reflecting sentiment.
+      </P>
+
+      <SubHeading>Blocked Mechanics</SubHeading>
+      <P>
+        Fund mode disables: holdco loans, equity raises, buybacks, founder distributions, IPO,
+        and Family Office. You manage LP capital, not your own equity.
+      </P>
+
+      <SubHeading>Forced Liquidation</SubHeading>
+      <P>
+        At Year 10, all remaining portfolio companies are sold automatically. Distressed businesses
+        receive a discount (0.70x for covenant breach, 0.85x for stressed). The carry waterfall
+        determines your final compensation.
+      </P>
+
+      <SubHeading>PE Scoring</SubHeading>
+      <P>
+        Fund mode uses a separate 6-dimension scoring system:
+      </P>
+      <DataTable
+        headers={['Dimension', 'Weight', 'Measures']}
+        rows={[
+          ['Return Generation', '25', 'Net IRR and Gross MOIC'],
+          ['Capital Efficiency', '20', 'ROIC and cash conversion'],
+          ['Value Creation', '15', 'EBITDA growth and margin expansion'],
+          ['Deployment Discipline', '15', 'Pace, concentration, dry powder'],
+          ['Risk Management', '15', 'Leverage, diversification, distress'],
+          ['LP Satisfaction', '10', 'LP score and DPI delivery'],
+        ]}
+      />
+    </>
+  );
+}
+
 // --- Section renderer map ---
 
 const SECTION_CONTENT: Record<ManualSection, () => React.ReactElement> = {
@@ -1620,6 +1726,7 @@ const SECTION_CONTENT: Record<ManualSection, () => React.ReactElement> = {
   'selling': SellingContent,
   'events': EventsContent,
   'twenty-year': TwentyYearContent,
+  'fund-manager': FundManagerContent,
   'scoring': ScoringContent,
   'sectors': SectorsContent,
   'strategy': StrategyContent,

@@ -424,8 +424,8 @@ describe('runAllMigrations', () => {
 
     // v9 should be consumed
     expect(localStorageMock.getItem('holdco-tycoon-save-v9')).toBeNull();
-    // Final v36 should exist (chain goes through all migrations including v35→v36)
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v36')!);
+    // Final v37 should exist (chain goes through all migrations including v36→v37)
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v37')!);
     expect(result.state.difficulty).toBe('easy');
     expect(result.state.maxRounds).toBe(20);
     expect(result.state.founderDistributionsReceived).toBeDefined();
@@ -475,6 +475,17 @@ describe('runAllMigrations', () => {
     expect(result.state.businesses[0].priorOwnershipCount).toBe(0);
     // v35→v36 fields (Cash equity invested)
     expect(result.state.businesses[0].cashEquityInvested).toBeDefined();
+    // v36→v37 fields (PE Fund Manager Mode)
+    expect(result.state.isFundManagerMode).toBe(false);
+    expect(result.state.fundName).toBe('');
+    expect(result.state.fundSize).toBe(0);
+    expect(result.state.managementFeesCollected).toBe(0);
+    expect(result.state.lpSatisfactionScore).toBe(75);
+    expect(result.state.lpCommentary).toEqual([]);
+    expect(result.state.fundCashFlows).toEqual([]);
+    expect(result.state.totalCapitalDeployed).toBe(0);
+    expect(result.state.lpDistributions).toBe(0);
+    expect(result.state.dpiMilestones).toEqual({ half: false, full: false });
   });
 
   it('should be safe to call multiple times (idempotent)', () => {

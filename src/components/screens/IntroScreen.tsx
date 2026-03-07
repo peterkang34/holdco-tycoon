@@ -6,7 +6,7 @@ import { ChangelogModal } from '../ui/ChangelogModal';
 import { UserManualModal } from '../ui/UserManualModal';
 import { FeedbackModal } from '../ui/FeedbackModal';
 import { AccountBadge } from '../ui/AccountBadge';
-import { DIFFICULTY_CONFIG, DURATION_CONFIG, DURATION_SUBTITLE } from '../../data/gameConfig';
+import { DIFFICULTY_CONFIG, DURATION_CONFIG, DURATION_SUBTITLE, PE_FUND_CONFIG } from '../../data/gameConfig';
 import type { ChallengeParams } from '../../utils/challenge';
 import { generateRandomSeed } from '../../engine/rng';
 import { buildChallengeUrl, shareChallenge, encodeChallengeParams, generateToken, setHostToken } from '../../utils/challenge';
@@ -14,17 +14,49 @@ import { trackChallengeCreate, trackChallengeShare } from '../../services/teleme
 import { useIsLoggedIn } from '../../hooks/useAuth';
 import { useAuthStore } from '../../hooks/useAuth';
 
+const BEST_GRADE_KEY = 'holdco-tycoon-best-grade';
+const GRADE_ORDER = ['F', 'D', 'C', 'B', 'A', 'S'] as const;
+
+export function getBestGrade(): string | null {
+  try { return localStorage.getItem(BEST_GRADE_KEY); } catch { return null; }
+}
+
+export function writeBestGrade(grade: string): void {
+  try {
+    const current = getBestGrade();
+    const currentIdx = current ? GRADE_ORDER.indexOf(current as typeof GRADE_ORDER[number]) : -1;
+    const newIdx = GRADE_ORDER.indexOf(grade as typeof GRADE_ORDER[number]);
+    if (newIdx > currentIdx) {
+      localStorage.setItem(BEST_GRADE_KEY, grade);
+    }
+  } catch {}
+}
+
+// Fund name randomizer
+const FUND_PREFIXES = ['Granite', 'Summit', 'Cedar', 'Harbor', 'Ridge', 'Iron', 'Stone', 'Pine', 'Aspen', 'Falcon', 'Eagle', 'Meridian', 'Anchor', 'Beacon', 'Sterling'];
+const FUND_GEO = ['Peak', 'Valley', 'River', 'Coast', 'Canyon', 'Mesa', 'Bay', 'Crest', 'Point', 'Bridge'];
+const FUND_SUFFIX = ['Capital', 'Partners', 'Advisors', 'Equity'];
+
+function randomFundName(): string {
+  const prefix = FUND_PREFIXES[Math.floor(Math.random() * FUND_PREFIXES.length)];
+  const geo = FUND_GEO[Math.floor(Math.random() * FUND_GEO.length)];
+  const suffix = FUND_SUFFIX[Math.floor(Math.random() * FUND_SUFFIX.length)];
+  return `${prefix} ${geo} ${suffix} Fund I`;
+}
+
 interface IntroScreenProps {
   onStart: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty, duration: GameDuration, seed?: number) => void;
+  onStartFund: (fundName: string) => void;
   challengeData?: ChallengeParams | null;
 }
 
-export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
+export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreenProps) {
   const isChallenge = !!challengeData;
   const isLoggedIn = useIsLoggedIn();
   const openStatsModal = useAuthStore((s) => s.openStatsModal);
-  const [step, setStep] = useState<'mode' | 'setup'>(isChallenge ? 'setup' : 'mode');
+  const [step, setStep] = useState<'mode' | 'setup' | 'fund_setup'>(isChallenge ? 'setup' : 'mode');
   const [holdcoName, setHoldcoName] = useState('');
+  const [fundName, setFundName] = useState('');
   const [selectedSector, setSelectedSector] = useState<SectorId | 'random'>('random');
   const [selectedDifficulty, setSelectedDifficulty] = useState<GameDifficulty>(challengeData?.difficulty ?? 'easy');
   const [selectedDuration, setSelectedDuration] = useState<GameDuration>(challengeData?.duration ?? 'quick');
@@ -37,11 +69,12 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [challengeDifficulty, setChallengeDifficulty] = useState<GameDifficulty>('easy');
   const [challengeDuration, setChallengeDuration] = useState<GameDuration>('quick');
-  // After creating a challenge, store the seed so the creator can play it too
   const [createdChallengeSeed, setCreatedChallengeSeed] = useState<number | null>(null);
+  const [showHurdleTooltip, setShowHurdleTooltip] = useState(false);
+  const [showCarryTooltip, setShowCarryTooltip] = useState(false);
 
-  // Sync challenge settings when challengeData arrives (it's null on first render,
-  // populated asynchronously via useEffect in App.tsx)
+
+  // Sync challenge settings when challengeData arrives
   useEffect(() => {
     if (challengeData) {
       setSelectedDifficulty(challengeData.difficulty);
@@ -63,6 +96,15 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
     onStart(holdcoName.trim(), sector, selectedDifficulty, selectedDuration, challengeData?.seed);
   };
 
+  const handleFundSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (fundName.trim().length < 2) {
+      setShowNameError(true);
+      return;
+    }
+    onStartFund(fundName.trim());
+  };
+
   const handleChallengeStart = (e: React.FormEvent) => {
     e.preventDefault();
     if (holdcoName.trim().length < 2) {
@@ -72,12 +114,18 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
     const sector = selectedSector === 'random'
       ? SECTOR_LIST_STANDARD[Math.abs(createdChallengeSeed!) % SECTOR_LIST_STANDARD.length].id
       : selectedSector;
-    // Start with the created challenge seed
     onStart(holdcoName.trim(), sector, challengeDifficulty, challengeDuration, createdChallengeSeed!);
   };
 
   const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setHoldcoName(e.target.value);
+    if (showNameError && e.target.value.trim().length >= 2) {
+      setShowNameError(false);
+    }
+  };
+
+  const handleFundNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setFundName(e.target.value);
     if (showNameError && e.target.value.trim().length >= 2) {
       setShowNameError(false);
     }
@@ -89,7 +137,6 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
     const params = { seed, difficulty: challengeDifficulty, duration: challengeDuration };
     const code = encodeChallengeParams(params);
     const url = buildChallengeUrl(params);
-    // Save host token so this browser can reveal scores later
     const hostToken = generateToken();
     setHostToken(code, hostToken);
     trackChallengeCreate(code);
@@ -100,6 +147,9 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
       setTimeout(() => setChallengeCopied(false), 2500);
     }
   };
+
+  const hurdleAmount = Math.round(PE_FUND_CONFIG.hurdleReturn);
+  const fundSize = PE_FUND_CONFIG.fundSize;
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center px-4 sm:px-8 py-8 relative overflow-hidden">
@@ -232,7 +282,175 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
               >
                 Continue →
               </button>
+
+              {/* ═══ Fund Manager — separate mode ═══ */}
+              <div className="relative my-5">
+                <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
+                <div className="relative flex justify-center"><span className="bg-bg-secondary px-3 text-xs text-text-muted">or try a different mode</span></div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNameError(false);
+                  if (!fundName) setFundName(randomFundName());
+                  setStep('fund_setup');
+                }}
+                className="w-full p-4 rounded-lg border border-purple-500/30 bg-gradient-to-r from-purple-500/5 to-transparent hover:border-purple-500/50 transition-all text-left"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-lg">🏦</span>
+                      <span className="font-bold text-purple-400">PE Fund Manager</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">10yr Fixed</span>
+                    </div>
+                    <p className="text-xs text-text-muted">$100M from LPs. 10 years. Earn your carry.</p>
+                  </div>
+                  <span className="text-text-muted text-lg">→</span>
+                </div>
+              </button>
             </div>
+          </>
+        ) : step === 'fund_setup' ? (
+          <>
+            {/* ═══ FUND SETUP ═══ */}
+            <form onSubmit={handleFundSubmit} className="card p-6 border-purple-500/20">
+              <div className="flex items-center justify-between mb-5">
+                <button
+                  type="button"
+                  onClick={() => setStep('mode')}
+                  className="text-sm text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center"
+                >
+                  ← Back
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">🏦</span>
+                  <span className="text-sm font-medium text-purple-400">Fund Manager</span>
+                </div>
+              </div>
+
+              {/* Fund Name */}
+              <label className="block text-left mb-2 text-sm text-text-muted">
+                Name your fund <span className="text-danger">*</span>
+              </label>
+              <div className="flex gap-2 mb-1">
+                <input
+                  type="text"
+                  value={fundName}
+                  onChange={handleFundNameChange}
+                  placeholder="e.g. Granite Peak Capital Fund I"
+                  className={`flex-1 bg-white/5 border rounded-lg px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none transition-colors ${
+                    showNameError ? 'border-danger focus:border-danger' : 'border-white/10 focus:border-accent'
+                  }`}
+                  maxLength={40}
+                  autoFocus
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setFundName(randomFundName())}
+                  className="min-h-[44px] min-w-[44px] px-3 rounded-lg border border-white/10 bg-white/5 hover:border-white/30 text-text-muted hover:text-text-secondary transition-colors text-sm"
+                  title="Randomize"
+                >
+                  🎲
+                </button>
+              </div>
+              {showNameError && (
+                <p className="text-danger text-sm mt-1 mb-3">Please enter a name for your fund</p>
+              )}
+              {!showNameError && <div className="mb-4" />}
+
+              {/* LP Roster */}
+              <label className="block text-left mb-2 text-sm text-text-muted font-medium">
+                Your Limited Partners
+              </label>
+              <div className="grid grid-cols-2 gap-3 mb-5">
+                <div className="p-3 rounded-lg border border-blue-500/20 bg-blue-500/5 text-left">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-7 h-7 rounded-full bg-blue-500/30 text-blue-300 text-[10px] font-bold flex items-center justify-center">EM</span>
+                    <div>
+                      <div className="text-xs font-medium text-blue-300">"Steady Edna" Morrison</div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-text-muted ml-9">State Pension Fund</div>
+                  <div className="text-[11px] text-blue-300/80 ml-9 font-medium">$60M committed</div>
+                  <div className="text-[10px] text-text-muted ml-9 mt-1 italic">Wants: stability, distributions</div>
+                </div>
+                <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 text-left">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="w-7 h-7 rounded-full bg-amber-500/30 text-amber-300 text-[10px] font-bold flex items-center justify-center">CH</span>
+                    <div>
+                      <div className="text-xs font-medium text-amber-300">"Chip" Henderson</div>
+                    </div>
+                  </div>
+                  <div className="text-[11px] text-text-muted ml-9">Family Office</div>
+                  <div className="text-[11px] text-amber-300/80 ml-9 font-medium">$40M committed</div>
+                  <div className="text-[10px] text-text-muted ml-9 mt-1 italic">Wants: action, big returns</div>
+                </div>
+              </div>
+
+              {/* Fund Terms */}
+              <label className="block text-left mb-2 text-sm text-text-muted font-medium">
+                Fund Terms
+              </label>
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3 mb-5 text-left">
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-text-muted">Committed Capital</span>
+                    <span className="text-text-primary font-medium">${fundSize / 1000}M</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-muted">Management Fee</span>
+                    <span className="text-text-primary">2%/year ($2M)</span>
+                  </div>
+                  <div className="flex justify-between items-center relative">
+                    <button
+                      type="button"
+                      className="text-text-muted hover:text-text-secondary transition-colors flex items-center gap-1"
+                      onClick={() => { setShowHurdleTooltip(!showHurdleTooltip); setShowCarryTooltip(false); }}
+                    >
+                      Hurdle Rate <span className="text-[10px] text-accent/60">[?]</span>
+                    </button>
+                    <span className="text-text-primary">8% annual</span>
+                    {showHurdleTooltip && (
+                      <div className="absolute left-0 top-full mt-1 z-10 p-2 rounded-lg bg-bg-secondary border border-white/20 text-xs text-text-secondary max-w-xs shadow-lg">
+                        Your LPs earn 8% per year before you see any carry. Over 10 years, you need to turn $100M into ~${Math.round(hurdleAmount / 1000)}M to earn carry.
+                        <button type="button" onClick={() => setShowHurdleTooltip(false)} className="ml-2 text-accent">OK</button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between items-center relative">
+                    <button
+                      type="button"
+                      className="text-text-muted hover:text-text-secondary transition-colors flex items-center gap-1"
+                      onClick={() => { setShowCarryTooltip(!showCarryTooltip); setShowHurdleTooltip(false); }}
+                    >
+                      Carried Interest <span className="text-[10px] text-accent/60">[?]</span>
+                    </button>
+                    <span className="text-text-primary">20% above hurdle</span>
+                    {showCarryTooltip && (
+                      <div className="absolute left-0 top-full mt-1 z-10 p-2 rounded-lg bg-bg-secondary border border-white/20 text-xs text-text-secondary max-w-xs shadow-lg">
+                        Your share of profits above the hurdle. If your fund returns $300M, that's $84M above the ~$216M hurdle. Your carry: 20% of $84M = $16.8M.
+                        <button type="button" onClick={() => setShowCarryTooltip(false)} className="ml-2 text-accent">OK</button>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-muted">Duration</span>
+                    <span className="text-text-primary">10 years</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={!fundName.trim()}
+                className="btn-primary w-full text-lg bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400"
+              >
+                Launch Your Fund →
+              </button>
+            </form>
           </>
         ) : (
           <>
@@ -325,8 +543,8 @@ export function IntroScreen({ onStart, challengeData }: IntroScreenProps) {
           </>
         )}
 
-        {/* Challenge a Friend (only in normal flow) */}
-        {!isChallenge && (
+        {/* Challenge a Friend (only in normal flow, not fund setup) */}
+        {!isChallenge && step !== 'fund_setup' && (
           <div className="mt-4">
             <button
               onClick={() => setShowChallengeCreator(!showChallengeCreator)}

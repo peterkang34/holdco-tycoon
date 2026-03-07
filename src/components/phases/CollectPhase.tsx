@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Business, formatMoney, formatPercent } from '../../engine/types';
+import { Business, LPComment, formatMoney, formatPercent } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { calculatePortfolioTax, TAX_RATE, ComplexityCostBreakdown } from '../../engine/simulation';
-import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
+import { EARNOUT_EXPIRATION_YEARS, PE_FUND_CONFIG } from '../../data/gameConfig';
 import { debtCountdownLabel } from '../../data/mechanicsCopy';
 
 interface CollectPhaseProps {
@@ -24,6 +24,9 @@ interface CollectPhaseProps {
   interestPenalty?: number;
   capexReduction?: number;
   complexityCost?: number | ComplexityCostBreakdown;
+  isFundManagerMode?: boolean;
+  managementFee?: number;
+  lpCommentary?: LPComment[];
   onContinue: () => void;
 }
 
@@ -124,6 +127,9 @@ export function CollectPhase({
   interestPenalty,
   capexReduction = 0,
   complexityCost: complexityCostProp = 0,
+  isFundManagerMode = false,
+  managementFee = 0,
+  lpCommentary,
   onContinue
 }: CollectPhaseProps) {
   // Support both legacy number and full breakdown object
@@ -509,6 +515,20 @@ export function CollectPhase({
         <div className="mt-6 pt-4 border-t border-white/10 space-y-2">
           <p className="text-xs text-text-muted font-medium uppercase tracking-wide mb-3">Holdco-Level Deductions</p>
 
+          {/* Management Fee (Fund Mode — first deduction) */}
+          {isFundManagerMode && managementFee > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-lg">🏦</span>
+                <span className="text-text-secondary">Management Fee</span>
+                <span className="text-xs text-text-muted">
+                  ({Math.round(PE_FUND_CONFIG.managementFeeRate * 100)}% of committed capital)
+                </span>
+              </div>
+              <span className="font-mono text-warning">-{formatMoney(managementFee)}</span>
+            </div>
+          )}
+
           {/* Portfolio Tax */}
           <div className="flex items-center justify-between text-sm">
             <div className="flex items-center gap-2">
@@ -523,7 +543,8 @@ export function CollectPhase({
             <span className="font-mono text-warning">-{formatMoney(taxBreakdown.taxAmount)}</span>
           </div>
 
-          {holdcoInterest > 0 && (
+          {/* Holdco Loan P&I (hidden in fund mode — no holdco debt) */}
+          {!isFundManagerMode && holdcoInterest > 0 && (
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center gap-2">
                 <span className="text-lg">🏦</span>
@@ -599,6 +620,40 @@ export function CollectPhase({
           </span>
         </div>
       </div>
+
+      {/* Fund Mode: Year 1 Orientation Card (0 businesses) */}
+      {isFundManagerMode && round === 1 && activeBusinesses.length === 0 && (
+        <div className="card mb-6 bg-gradient-to-r from-purple-500/10 to-transparent border-l-4 border-purple-500/50">
+          <p className="text-sm text-text-secondary leading-relaxed mb-2">
+            <strong className="text-purple-300">Your fund is open for business.</strong> $100M committed, no businesses yet.
+          </p>
+          <p className="text-xs text-text-muted leading-relaxed">
+            The $2M management fee covers your team and fund operations — it deducts whether you've deployed capital or not.
+            Next: Head to the Deals tab and start building your portfolio.
+          </p>
+        </div>
+      )}
+
+      {/* LP Commentary (Fund Mode) */}
+      {isFundManagerMode && lpCommentary && lpCommentary.filter(c => c.round === round).length > 0 && (
+        <div className="space-y-3 mb-6">
+          {lpCommentary.filter(c => c.round === round).map((comment, i) => (
+            <div key={i} className="card flex items-start gap-3 bg-white/3">
+              <span className={`w-8 h-8 rounded-full flex-shrink-0 text-[10px] font-bold flex items-center justify-center ${
+                comment.speaker === 'edna' ? 'bg-blue-500/30 text-blue-300' : 'bg-amber-500/30 text-amber-300'
+              }`}>
+                {comment.speaker === 'edna' ? 'EM' : 'CH'}
+              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm italic text-text-primary leading-relaxed">"{comment.text}"</p>
+                <p className="text-xs text-text-muted mt-1">
+                  — {comment.speaker === 'edna' ? 'Edna Morrison, State Pension Fund' : 'Chip Henderson, Family Office'}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Holdco Cash */}
       <div className="card text-center mb-6">

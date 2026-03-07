@@ -84,6 +84,36 @@ export const COMPLEXITY_COST_LABELS = {
   tip: 'As your portfolio grows past the complexity threshold, coordination costs mount. Each active shared service offsets ~33% of the cost. Maximum compression: 4ppt of total revenue.',
 } as const;
 
+// ── PE Fund Manager Mode ──
+
+export const PE_FUND_LABELS = {
+  managementFee: {
+    name: 'Management Fee',
+    behavior: '2% of committed capital ($2M/year) — deducted annually from fund cash. Tax-deductible.',
+    summaryShort: 'Annual fee',
+  },
+  lpDistribution: {
+    name: 'LP Distribution',
+    behavior: 'Permanently return cash to LPs. Improves DPI and Net IRR but reduces dry powder.',
+    summaryShort: 'Return capital',
+  },
+  carryWaterfall: {
+    name: 'Carried Interest',
+    behavior: '20% of profits above the 8% annual hurdle ($216M over 10 years). European waterfall — calculated at fund close.',
+    summaryShort: 'GP carry',
+  },
+  lpacGate: {
+    name: 'LPAC Approval',
+    behavior: 'Required when cumulative deal value in a single platform exceeds 25% of committed capital ($25M). Approval probability scales with LP satisfaction.',
+    summaryShort: 'LP approval',
+  },
+  hurdleRate: {
+    name: 'Hurdle Rate',
+    behavior: 'LPs earn 8% per year before carry. Over 10 years: $100M × 1.08^10 ≈ $216M.',
+    summaryShort: '8% annual',
+  },
+} as const;
+
 export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   pattern: RegExp;
   reason: string;

@@ -939,6 +939,40 @@ function migrateV35ToV36(): void {
 }
 
 /**
+ * v36 → v37: PE Fund Manager Mode fields
+ * Backfill all new fund mode fields with defaults for existing saves.
+ */
+function migrateV36ToV37(): void {
+  const v36Key = 'holdco-tycoon-save-v36';
+  const v37Key = 'holdco-tycoon-save-v37';
+  if (localStorage.getItem(v37Key)) return;
+  try {
+    const raw = localStorage.getItem(v36Key);
+    if (!raw) return;
+    const v36Data = JSON.parse(raw);
+
+    if (v36Data.state) {
+      const s = v36Data.state;
+      s.isFundManagerMode = s.isFundManagerMode ?? false;
+      s.fundName = s.fundName ?? '';
+      s.fundSize = s.fundSize ?? 0;
+      s.managementFeesCollected = s.managementFeesCollected ?? 0;
+      s.lpSatisfactionScore = s.lpSatisfactionScore ?? 75;
+      s.lpCommentary = s.lpCommentary ?? [];
+      s.fundCashFlows = s.fundCashFlows ?? [];
+      s.totalCapitalDeployed = s.totalCapitalDeployed ?? 0;
+      s.lpDistributions = s.lpDistributions ?? 0;
+      s.dpiMilestones = s.dpiMilestones ?? { half: false, full: false };
+    }
+
+    localStorage.setItem(v37Key, JSON.stringify(v36Data));
+    localStorage.removeItem(v36Key);
+  } catch (e) {
+    console.error('v36→v37 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -970,4 +1004,5 @@ export function runAllMigrations(): void {
   migrateV33ToV34();
   migrateV34ToV35();
   migrateV35ToV36();
+  migrateV36ToV37();
 }

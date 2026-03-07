@@ -96,6 +96,16 @@ describe.each(MODES)('$label Playtest', ({ difficulty, duration }) => {
       'early_game_safety_net',
       // Complexity cost requires 5+ active businesses without full shared services
       'complexity_cost_triggered',
+      // PE Fund Mode features require fund mode game (separate playtest strategy)
+      'fund_mode_started',
+      'lp_distribution',
+      'lpac_triggered',
+      'lpac_approved',
+      'lpac_denied',
+      'management_fee_deducted',
+      'forced_liquidation',
+      'carry_earned',
+      'pe_scoring_completed',
     ];
 
     for (const strategy of strategies) {

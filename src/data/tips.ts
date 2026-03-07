@@ -353,4 +353,29 @@ export const POST_GAME_INSIGHTS: Record<string, { pattern: string; insight: stri
     insight: 'Your SaaS or education businesses achieved Rule of 40 status (growth% + margin% >= 40). This is the gold standard for software businesses and commands premium valuations from buyers.',
     bookReference: 'Ch. III',
   },
+  // PE Fund Mode insights
+  pe_never_distributed: {
+    pattern: 'Never returned capital to LPs',
+    insight: "You never returned capital to LPs. Even strong MOIC can't paper over 0.0x DPI — LPs need liquidity.",
+  },
+  pe_over_concentrated: {
+    pattern: 'Over-concentrated in one platform',
+    insight: 'More than 40% of deal value in one platform. One bad outcome could have sunk your fund.',
+  },
+  pe_strong_dpi_timing: {
+    pattern: 'Early and frequent LP distributions',
+    insight: 'You distributed early and often. Your Net IRR benefited from cash flow timing — that\'s real PE skill.',
+  },
+  pe_missed_hurdle_narrowly: {
+    pattern: 'Narrowly missed the hurdle',
+    insight: 'You missed the hurdle by a slim margin. One more distribution or one better exit would have earned carry.',
+  },
+  pe_zero_leverage: {
+    pattern: 'Never used LBO debt',
+    insight: 'You never used LBO debt. PE is the business of leveraged returns — cash-only deals leave IRR on the table.',
+  },
+  pe_late_deployment: {
+    pattern: 'Slow capital deployment',
+    insight: 'You deployed less than 60% by Year 5. Slow deployment means your capital sat idle, dragging down IRR.',
+  },
 };

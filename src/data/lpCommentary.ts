@@ -1,0 +1,283 @@
+import type { SeededRng } from '../engine/rng';
+
+export type LPSpeaker = 'edna' | 'chip';
+
+export type LPTriggerId =
+  | 'year_1_start'
+  | 'no_distributions_y3'
+  | 'no_distributions_y5'
+  | 'no_distributions_y7'
+  | 'no_distributions_y9'
+  | 'distribution_made'
+  | 'large_distribution'
+  | 'dpi_half'
+  | 'dpi_full'
+  | 'large_cash_reserve'
+  | 'over_deployed'
+  | 'business_distress'
+  | 'strong_exit'
+  | 'weak_exit'
+  | 'harvest_period'
+  | 'late_acquisition'
+  | 'recession'
+  | 'exceptional_growth'
+  | 'mgmt_fee_shortfall'
+  | 'earnout_skipped'
+  | 'final_year'
+  | 'termination_threat'
+  | 'lpac_approved'
+  | 'lpac_denied'
+  | 'zero_businesses_extended';
+
+/** LP quotes: 3 variants per trigger/speaker for seeded RNG variety */
+const lpQuotes: Record<string, Partial<Record<LPSpeaker, string[]>>> = {
+  year_1_start: {
+    chip: [
+      '$100M to deploy, let\'s get to work.',
+      'Fresh capital, clean slate. Time to find some deals.',
+      'The fund is open. Show me what you can do with $100M.',
+    ],
+  },
+  no_distributions_y3: {
+    edna: [
+      'My board has started asking about distributions.',
+      'Three years in. My board would like to see some capital returned.',
+      'I\'ll need something to report on distributions at our next meeting.',
+    ],
+  },
+  no_distributions_y5: {
+    edna: [
+      'Five years. No distributions. I need something to show my board.',
+      'We\'re halfway through. Zero DPI is becoming difficult to defend.',
+      'My board is asking pointed questions about when they\'ll see returns.',
+    ],
+  },
+  no_distributions_y7: {
+    edna: [
+      'At this point, I\'m defending your fee arrangement in every meeting.',
+      'Seven years of management fees and zero distributions. This is untenable.',
+      'My board has formally questioned the fee structure given zero DPI.',
+    ],
+  },
+  no_distributions_y9: {
+    edna: [
+      'I cannot in good conscience recommend re-upping with this fund.',
+      'Nine years. I have nothing positive to report to my beneficiaries.',
+      'Fund II is off the table. My board has made that clear.',
+    ],
+  },
+  distribution_made: {
+    edna: [
+      'Noted. This will be well received by my board.',
+      'Good. Distributions demonstrate discipline.',
+      'I\'ll report this at our next meeting. Appreciated.',
+    ],
+    chip: [
+      'Cash back already? I was hoping you\'d reinvest that.',
+      'Fair enough — LPs like to see some return of capital.',
+      'I get it, but don\'t leave returns on the table.',
+    ],
+  },
+  large_distribution: {
+    edna: [
+      'This is exactly what we invested for. Well done.',
+      'Substantial. My board will be very pleased with this return.',
+      'This kind of capital return builds trust for the next fund.',
+    ],
+    chip: [
+      'Big distribution. Are you sure you don\'t need that dry powder?',
+      'Impressive return of capital. I hope you\'ve kept enough for follow-ons.',
+      'That\'s real money back. Mixed feelings — but my accountant\'s happy.',
+    ],
+  },
+  dpi_half: {
+    edna: [
+      'Half our capital returned. This is meaningful progress.',
+      '0.5x DPI. We\'re on the right track.',
+      'Halfway back. My board acknowledges the progress.',
+    ],
+  },
+  dpi_full: {
+    edna: [
+      'Capital returned in full. Everything from here is profit.',
+      '1.0x DPI. My board is satisfied. Now let\'s see what carry looks like.',
+      'We\'ve been made whole. This is what institutional investing should look like.',
+    ],
+  },
+  large_cash_reserve: {
+    chip: [
+      'That\'s a lot of cash sitting idle. Put it to work.',
+      'You\'re paying management fees on uninvested capital. Find deals.',
+      'I didn\'t commit to a money market fund. Deploy that capital.',
+    ],
+  },
+  over_deployed: {
+    edna: [
+      'Over 90% deployed already? Where are our reserves?',
+      'You\'ve deployed too aggressively. What happens if a deal goes sideways?',
+      'I\'m concerned about the pace. We need reserves for follow-on support.',
+    ],
+  },
+  business_distress: {
+    edna: [
+      'This covenant breach is deeply concerning. What\'s the recovery plan?',
+      'A distressed portfolio company this early is not reassuring.',
+      'My board will want a detailed write-up on this situation.',
+    ],
+    chip: [
+      'Distressed asset? Could be an opportunity to buy in cheap.',
+      'Rough patch. These things happen. Fix it or sell it.',
+      'Every portfolio has a problem child. How you handle it matters.',
+    ],
+  },
+  strong_exit: {
+    edna: [
+      'A strong exit. This is the kind of result we expect.',
+      'Excellent realization. I hope the proceeds are distributed promptly.',
+      'Well-timed exit. My board will be pleased.',
+    ],
+    chip: [
+      'Great exit! That\'s why we\'re in this game.',
+      'Love to see a big win. This is what PE is about.',
+      'Beautiful multiple on that one. More of this, please.',
+    ],
+  },
+  weak_exit: {
+    edna: [
+      'Selling at a loss is difficult to explain to my beneficiaries.',
+      'This realization falls well below our expectations.',
+      'A loss-making exit. I trust you\'ve learned from this.',
+    ],
+    chip: [
+      'Sometimes you have to cut your losses. On to the next one.',
+      'Not every deal works out. The portfolio matters, not one position.',
+      'Tough break. I hope the rest of the portfolio offsets this.',
+    ],
+  },
+  harvest_period: {
+    edna: [
+      'Year 6. The investment period is closed. I expect harvest discipline.',
+      'We\'re now in the harvest period. Exits and distributions should be the focus.',
+      'Time to start realizing value. My board expects meaningful DPI from here.',
+    ],
+    chip: [
+      'Harvest time. Let\'s see what this portfolio is really worth.',
+      'Investment period\'s done. Now the fun part — exits and carry.',
+      'Year 6 already. I\'m expecting some fireworks from here.',
+    ],
+  },
+  late_acquisition: {
+    edna: [
+      'New platform investment in the harvest period? My board expected exits by now.',
+      'A new standalone this late? This is highly unusual.',
+      'Deploying new capital this late concerns me. Focus on existing positions.',
+    ],
+    chip: [
+      'If the deal is right, the deal is right. Timing be damned.',
+      'Late-stage acquisition? Bold move. I respect the conviction.',
+      'Breaking convention, but I\'ve seen it work. Make it count.',
+    ],
+  },
+  recession: {
+    edna: [
+      'Recession conditions require conservative portfolio management.',
+      'This downturn is concerning. Protect cash flow above all else.',
+      'My board is watching closely. No heroics during a recession.',
+    ],
+    chip: [
+      'Recession means bargains. This is when the best deals get done.',
+      'Downturns create opportunity. I hope you have dry powder.',
+      'Blood in the streets. Time to get greedy.',
+    ],
+  },
+  exceptional_growth: {
+    chip: [
+      'Portfolio is humming. This is top-quartile performance.',
+      'That EBITDA growth is exceptional. Keep the operational pressure on.',
+      '20%+ growth across the portfolio? Outstanding execution.',
+    ],
+  },
+  mgmt_fee_shortfall: {
+    edna: [
+      'You cannot cover the management fee. This is an operational failure.',
+      'A GP who can\'t fund basic operations raises serious governance questions.',
+      'Fee shortfall noted. I\'ve flagged this with outside counsel.',
+    ],
+  },
+  earnout_skipped: {
+    edna: [
+      'Not a position a reputable GP should be in.',
+      'Failing to honor earn-out obligations damages our reputation.',
+      'Skipping earn-outs is a red flag in any LP due diligence.',
+    ],
+  },
+  final_year: {
+    edna: [
+      'Year 10. Let\'s see where we land.',
+      'The fund is closing. I expect a full accounting.',
+      'Final year. My board is awaiting the carry waterfall.',
+    ],
+    chip: [
+      'End of the road. Let\'s hope the carry check is worth it.',
+      'Year 10. Time to tally up and see what we built.',
+      'Last year. Whatever we\'ve got, we\'ve got. Let\'s close this out.',
+    ],
+  },
+  termination_threat: {
+    edna: [
+      'I\'ve consulted outside counsel about our termination provisions.',
+      'My board is reviewing the no-fault termination clause.',
+      'We\'re evaluating all options, including early fund termination.',
+    ],
+  },
+  lpac_approved: {
+    edna: [
+      'Noted. Proceed.',
+      'We\'ll allow it, but I want quarterly updates on this position.',
+      'Approved. Don\'t make me regret this.',
+    ],
+    chip: [
+      'Go for it. Big bets, big returns.',
+      'Approved. I like the conviction.',
+      'Green light. Make it count.',
+    ],
+  },
+  lpac_denied: {
+    edna: [
+      'The concentration risk is unacceptable given current portfolio performance.',
+      'I have serious reservations about this concentration level.',
+      'We cannot support further concentrated risk in this fund.',
+    ],
+  },
+  zero_businesses_extended: {
+    edna: [
+      'There\'s nothing left to manage. We\'re counting the days until this fund expires.',
+      'An empty portfolio with fees still accruing. My board is furious.',
+      'No portfolio companies for over a year. What are we paying management fees for?',
+    ],
+  },
+};
+
+/**
+ * Select an LP quote for a given trigger, using seeded RNG for deterministic variety.
+ * Returns null if no quote exists for the trigger/speaker combination.
+ */
+export function selectLPQuote(
+  triggerId: LPTriggerId,
+  speaker: LPSpeaker,
+  rng: SeededRng,
+): string | null {
+  const variants = lpQuotes[triggerId]?.[speaker];
+  if (!variants || variants.length === 0) return null;
+  const idx = Math.floor(rng.next() * variants.length);
+  return variants[idx];
+}
+
+/**
+ * Get all available speakers for a trigger.
+ */
+export function getTriggerSpeakers(triggerId: LPTriggerId): LPSpeaker[] {
+  const entry = lpQuotes[triggerId];
+  if (!entry) return [];
+  return Object.keys(entry) as LPSpeaker[];
+}

@@ -20,6 +20,13 @@ interface DashboardProps {
   covenantBreachRounds?: number; // Consecutive rounds in breach
   isPublic?: boolean; // Whether the company is public (post-IPO)
   isFamilyOfficeMode?: boolean;
+  isFundManagerMode?: boolean;
+  fundNav?: number;
+  fundGrossMoic?: number;
+  fundDpi?: number;
+  fundDeployPct?: number;
+  fundEstCarry?: number;
+  totalCapitalDeployed?: number;
   onMetricClick?: (key: string) => void;
 }
 
@@ -39,6 +46,13 @@ export function Dashboard({
   covenantBreachRounds,
   isPublic,
   isFamilyOfficeMode,
+  isFundManagerMode,
+  fundNav = 0,
+  fundGrossMoic = 0,
+  fundDpi = 0,
+  fundDeployPct = 0,
+  fundEstCarry = 0,
+  totalCapitalDeployed = 0,
   onMetricClick,
 }: DashboardProps) {
   const getCashStatus = () => {
@@ -83,12 +97,30 @@ export function Dashboard({
     return 'negative';
   };
 
+  // Fund mode helpers
+  const getFundMoicStatus = (): 'positive' | 'warning' | 'negative' | 'neutral' => {
+    if (fundGrossMoic >= 2.0) return 'positive';
+    if (fundGrossMoic >= 1.2) return 'neutral';
+    return 'negative';
+  };
+
+  const getFundDpiStatus = (): 'positive' | 'warning' | 'negative' | 'neutral' => {
+    if (fundDpi >= 1.0) return 'positive';
+    if (fundDpi >= 0.5) return 'warning';
+    return 'neutral';
+  };
+
+  const investmentPeriod = round <= 5;
+  const periodLabel = isFundManagerMode
+    ? `Year ${round} of ${totalRounds} — ${investmentPeriod ? 'Investment Period' : 'Harvest Period'}`
+    : isFamilyOfficeMode ? `FO Round ${round} of ${totalRounds}` : `Year ${round} of ${totalRounds}`;
+
   return (
     <div className="bg-bg-card border-b border-white/10 p-4">
       {/* Progress Bar */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-1">
-          <span className="text-sm text-text-muted">{isFamilyOfficeMode ? `FO Round ${round} of ${totalRounds}` : `Year ${round} of ${totalRounds}`}</span>
+          <span className="text-sm text-text-muted">{periodLabel}</span>
           <div className="flex items-center gap-2">
             {round >= FINAL_COUNTDOWN_START_ROUND && totalRounds === 20 && (
               <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 animate-pulse">
@@ -108,6 +140,45 @@ export function Dashboard({
         </div>
       </div>
 
+      {/* Fund Manager Mode Metrics */}
+      {isFundManagerMode ? (
+        <>
+          {/* Mobile: 4 primary + expandable 4 more */}
+          <div className="md:hidden">
+            <div className="grid grid-cols-2 gap-1">
+              <MetricCard label="Cash" value={formatMoney(liveCash)} status={getCashStatus()} onClick={() => onMetricClick?.('cash')} />
+              <MetricCard label="NAV" value={formatMoney(fundNav)} status={fundNav > 100_000 ? 'positive' : 'neutral'} onClick={() => onMetricClick?.('nav')} />
+              <MetricCard label="Gross MOIC" value={`${fundGrossMoic.toFixed(2)}x`} status={getFundMoicStatus()} onClick={() => onMetricClick?.('moic')} />
+              <MetricCard label="DPI" value={`${fundDpi.toFixed(2)}x`} status={getFundDpiStatus()} onClick={() => onMetricClick?.('dpi')} />
+            </div>
+            {showAllMetrics && (
+              <div className="grid grid-cols-2 gap-1 mt-1">
+                <MetricCard label="Deployed" value={formatMoney(totalCapitalDeployed)} subValue={`${fundDeployPct.toFixed(0)}% of committed`} onClick={() => onMetricClick?.('deployed')} />
+                <MetricCard label="EBITDA" value={formatMoney(metrics.totalEbitda)} onClick={() => onMetricClick?.('ebitda')} />
+                <MetricCard label="~Est. Carry" value={fundEstCarry > 0 ? `~${formatMoney(Math.round(fundEstCarry))}` : 'Below hurdle'} status={fundEstCarry > 0 ? 'positive' : 'neutral'} onClick={() => onMetricClick?.('carry')} />
+                <MetricCard label="Leverage" value={isNetCash ? 'Net Cash' : formatMultiple(metrics.netDebtToEbitda)} status={getLeverageStatus()} onClick={() => onMetricClick?.('leverage')} />
+              </div>
+            )}
+            <button
+              onClick={() => setShowAllMetrics(!showAllMetrics)}
+              className="w-full mt-1.5 py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
+            >
+              {showAllMetrics ? 'Show less \u25B2' : 'Show 4 more \u25BC'}
+            </button>
+          </div>
+          {/* Desktop: all 8 visible */}
+          <div className="hidden md:grid md:grid-cols-4 lg:grid-cols-8 gap-1 md:gap-1.5 lg:gap-3">
+            <MetricCard label="Cash" value={formatMoney(liveCash)} status={getCashStatus()} onClick={() => onMetricClick?.('cash')} />
+            <MetricCard label="NAV" value={formatMoney(fundNav)} status={fundNav > 100_000 ? 'positive' : 'neutral'} onClick={() => onMetricClick?.('nav')} />
+            <MetricCard label="Gross MOIC" value={`${fundGrossMoic.toFixed(2)}x`} status={getFundMoicStatus()} onClick={() => onMetricClick?.('moic')} />
+            <MetricCard label="DPI" value={`${fundDpi.toFixed(2)}x`} status={getFundDpiStatus()} onClick={() => onMetricClick?.('dpi')} />
+            <MetricCard label="Deployed" value={formatMoney(totalCapitalDeployed)} subValue={`${fundDeployPct.toFixed(0)}%`} onClick={() => onMetricClick?.('deployed')} />
+            <MetricCard label="EBITDA" value={formatMoney(metrics.totalEbitda)} onClick={() => onMetricClick?.('ebitda')} />
+            <MetricCard label="~Est. Carry" value={fundEstCarry > 0 ? `~${formatMoney(Math.round(fundEstCarry))}` : 'Below hurdle'} status={fundEstCarry > 0 ? 'positive' : 'neutral'} onClick={() => onMetricClick?.('carry')} />
+            <MetricCard label="Leverage" value={isNetCash ? 'Net Cash' : formatMultiple(metrics.netDebtToEbitda)} status={getLeverageStatus()} onClick={() => onMetricClick?.('leverage')} />
+          </div>
+        </>
+      ) : <>
       {/* Metrics Grid — Mobile: priority 4 + expandable 5 */}
       <div className="md:hidden">
         <div className="grid grid-cols-2 gap-1">
@@ -245,16 +316,26 @@ export function Dashboard({
           onClick={() => onMetricClick?.('cashconv')}
         />
       </div>
+      </>}
 
       {/* Status Badges */}
       <div className="flex flex-wrap gap-1 sm:gap-2 mt-3 sm:mt-4">
-        <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
+        {/* Fund mode: deployment pace badge (Years 1-5) */}
+        {isFundManagerMode && round <= 5 && (
+          <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
+            fundDeployPct >= (round / 5) * 80 ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'
+          }`}>
+            {fundDeployPct.toFixed(0)}% deployed (target: 80% by Y5)
+          </span>
+        )}
+        {/* Ownership badge — hidden in fund mode */}
+        {!isFundManagerMode && <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${
           founderOwnership >= 0.70 ? 'bg-accent/20 text-accent' :
           founderOwnership >= (isPublic ? MIN_PUBLIC_FOUNDER_OWNERSHIP : MIN_FOUNDER_OWNERSHIP) ? 'bg-warning/20 text-warning' :
           'bg-danger/20 text-danger'
         }`}>
           Your Ownership: {formatPercent(founderOwnership)}
-        </span>
+        </span>}
         {sharedServicesCount > 0 && (
           <span className="text-[10px] sm:text-xs bg-accent/20 text-accent px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full">
             {sharedServicesCount} Shared Service{sharedServicesCount > 1 ? 's' : ''} Active

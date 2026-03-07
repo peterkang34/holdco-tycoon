@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration, IntegratedPlatform } from '../../engine/types';
+import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration, IntegratedPlatform, PEScoreBreakdown, CarryWaterfall, LPComment } from '../../engine/types';
 import type { IPOState } from '../../engine/types';
 import { calculatePublicCompanyBonus } from '../../engine/ipo';
 import { useGameStore } from '../../hooks/useGame';
@@ -75,6 +75,11 @@ interface GameOverScreenProps {
   ipoState?: IPOState | null;
   challengeData?: ChallengeParams | null;
   incomingResult?: PlayerResult | null;
+  isFundManagerMode?: boolean;
+  fundName?: string;
+  peScore?: PEScoreBreakdown | null;
+  carryWaterfall?: CarryWaterfall | null;
+  lpCommentary?: LPComment[];
   onPlayAgain: () => void;
 }
 
@@ -109,6 +114,11 @@ export function GameOverScreen({
   ipoState,
   challengeData,
   incomingResult,
+  isFundManagerMode = false,
+  fundName,
+  peScore,
+  carryWaterfall: carryWaterfallData,
+  lpCommentary,
   onPlayAgain,
 }: GameOverScreenProps) {
   const familyOfficeState = useGameStore(s => s.familyOfficeState);
@@ -130,6 +140,9 @@ export function GameOverScreen({
   const [showComparison, setShowComparison] = useState(!!incomingResult);
   const [scoreboardFailed, setScoreboardFailed] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
+  // Carry waterfall step progression (fund mode)
+  const [waterfallStep, setWaterfallStep] = useState(0);
+  const maxWaterfallSteps = carryWaterfallData?.hurdleCleared ? 6 : 4; // Skip carry + what-if if below hurdle
 
   // Build challenge params from current game (works for both challenge and solo games)
   const currentChallengeParams: ChallengeParams = useMemo(() => (
@@ -542,8 +555,184 @@ export function GameOverScreen({
 
   return (
     <div className="min-h-screen px-4 sm:px-8 py-8 pb-16 max-w-4xl mx-auto">
+      {/* Fund Manager Mode: Bankruptcy */}
+      {isFundManagerMode && bankruptRound ? (
+        <div className="text-center mb-8">
+          <span className="text-6xl mb-4 block">💀</span>
+          <h1 className="text-3xl font-bold mb-2">{fundName || 'PE Fund'}</h1>
+          <div className="text-7xl font-bold mb-2 text-red-500">FUND COLLAPSE</div>
+          <p className="text-xl text-red-400">Your fund failed in Year {bankruptRound}</p>
+          <div className="card mt-6 bg-red-900/20 border-red-500/30">
+            <p className="text-text-secondary mb-4">Your fund couldn't meet its obligations. All LP capital is at risk.</p>
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div>
+                <p className="text-text-muted text-sm">LP Capital Lost</p>
+                <p className="text-2xl font-bold font-mono text-red-400">{formatMoney(100_000 - (cash > 0 ? cash : 0))}</p>
+              </div>
+              <div>
+                <p className="text-text-muted text-sm">Gross MOIC</p>
+                <p className="text-2xl font-bold font-mono text-red-400">{((cash > 0 ? cash : 0) / 100_000).toFixed(2)}x</p>
+              </div>
+            </div>
+          </div>
+          <button onClick={onPlayAgain} className="btn-primary text-lg py-3 mt-6 w-full">Play Again</button>
+        </div>
+
+      ) : isFundManagerMode && peScore && carryWaterfallData ? (
+        /* Fund Manager Mode: Normal completion */
+        <div className="mb-8">
+          {/* Grade header */}
+          <div className="text-center mb-6">
+            <span className="text-6xl mb-4 block">{getGradeEmoji()}</span>
+            <h1 className="text-3xl font-bold mb-2">{fundName || 'PE Fund'}</h1>
+            <div className={`text-7xl font-bold mb-2 ${getGradeColor(peScore.grade)}`}>{peScore.grade}</div>
+            <p className="text-xl text-text-secondary">{peScore.gradeTitle}</p>
+            <div className="flex justify-center gap-2 mt-3">
+              <span className="text-xs px-2 py-0.5 rounded bg-purple-500/20 text-purple-300">Fund Manager</span>
+              <span className="text-xs px-2 py-0.5 rounded bg-white/10 text-text-secondary">10yr</span>
+            </div>
+          </div>
+
+          {/* Carry Hero Number */}
+          <div className="card mb-6 bg-gradient-to-r from-purple-500/10 to-purple-500/5 border-purple-500/30">
+            <div className="text-center">
+              <p className="text-text-muted text-sm mb-1">Carried Interest Earned</p>
+              <p className="text-5xl font-bold font-mono text-purple-300">
+                {carryWaterfallData.carry > 0 ? formatMoney(Math.round(carryWaterfallData.carry)) : '$0'}
+              </p>
+              {carryWaterfallData.carry > 0 && (
+                <p className="text-sm text-text-muted mt-2">
+                  Total GP Economics: {formatMoney(Math.round(carryWaterfallData.totalGpEconomics))} (carry + mgmt fees)
+                </p>
+              )}
+              <div className="grid grid-cols-3 gap-4 mt-4 text-center">
+                <div>
+                  <p className="text-xs text-text-muted">Net IRR</p>
+                  <p className="font-mono font-bold text-lg">{(carryWaterfallData.netIrr * 100).toFixed(1)}%</p>
+                </div>
+                <div>
+                  <p className="text-xs text-text-muted">Gross MOIC</p>
+                  <p className="font-mono font-bold text-lg">{carryWaterfallData.grossMoic.toFixed(2)}x</p>
+                </div>
+                <div>
+                  <p className="text-xs text-text-muted">DPI</p>
+                  <p className="font-mono font-bold text-lg">{carryWaterfallData.dpi.toFixed(2)}x</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Carry Waterfall Click-Through */}
+          <div className="card mb-6 border-purple-500/20">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-bold text-purple-300">Carry Waterfall</h2>
+              {waterfallStep < maxWaterfallSteps && (
+                <button
+                  onClick={() => setWaterfallStep(maxWaterfallSteps)}
+                  className="text-xs text-text-muted hover:text-text-secondary"
+                >
+                  Show All
+                </button>
+              )}
+            </div>
+            <div className="space-y-3">
+              {/* Step 1: Total Fund Value */}
+              {waterfallStep >= 1 && (
+                <div className="bg-white/5 rounded-lg p-3 border-l-2 border-purple-400">
+                  <p className="text-sm font-medium mb-1">Step 1: Total Fund Value</p>
+                  <p className="text-xs text-text-muted">Your fund generated {formatMoney(Math.round(carryWaterfallData.grossTotalReturns))} in total value over 10 years.</p>
+                  <p className="text-xs text-text-muted">Distributed to LPs: {formatMoney(Math.round(carryWaterfallData.lpDistributions))} | At liquidation: {formatMoney(Math.round(carryWaterfallData.liquidationProceeds))}</p>
+                </div>
+              )}
+              {/* Step 2: Return of Capital */}
+              {waterfallStep >= 2 && (
+                <div className="bg-white/5 rounded-lg p-3 border-l-2 border-purple-400">
+                  <p className="text-sm font-medium mb-1">Step 2: Return of Capital</p>
+                  <p className="text-xs text-text-muted">LPs get their {formatMoney(carryWaterfallData.returnOfCapital)} back first.</p>
+                  <p className="text-xs text-text-muted">Profits: {formatMoney(Math.round(Math.max(0, carryWaterfallData.grossTotalReturns - carryWaterfallData.returnOfCapital)))}</p>
+                </div>
+              )}
+              {/* Step 3: Preferred Return */}
+              {waterfallStep >= 3 && (
+                <div className={`bg-white/5 rounded-lg p-3 border-l-2 ${carryWaterfallData.hurdleCleared ? 'border-green-400' : 'border-red-400'}`}>
+                  <p className="text-sm font-medium mb-1">Step 3: Preferred Return (The Hurdle)</p>
+                  <p className="text-xs text-text-muted">LPs are entitled to 8% annually for 10 years = {formatMoney(Math.round(carryWaterfallData.hurdleAmount))}.</p>
+                  {carryWaterfallData.hurdleCleared ? (
+                    <p className="text-xs font-bold text-green-400">You CLEARED the hurdle by {formatMoney(Math.round(carryWaterfallData.aboveHurdle))}!</p>
+                  ) : (
+                    <p className="text-xs font-bold text-red-400">You did not clear the hurdle. Carried interest: $0.</p>
+                  )}
+                </div>
+              )}
+              {/* Step 4: Your Carry (only if hurdle cleared) */}
+              {waterfallStep >= 4 && carryWaterfallData.hurdleCleared && (
+                <div className="bg-purple-500/10 rounded-lg p-3 border-l-2 border-purple-400">
+                  <p className="text-sm font-medium mb-1 text-purple-300">Step 4: Your Carry</p>
+                  <p className="text-xs text-text-muted">20% of above-hurdle profits: {formatMoney(Math.round(carryWaterfallData.aboveHurdle))} x 20% = <span className="font-bold text-purple-300">{formatMoney(Math.round(carryWaterfallData.carry))}</span></p>
+                  <p className="text-xs text-text-muted">Management fees earned: {formatMoney(Math.round(carryWaterfallData.managementFees))}</p>
+                  <p className="text-xs font-bold text-purple-300">Total GP Economics: {formatMoney(Math.round(carryWaterfallData.totalGpEconomics))}</p>
+                </div>
+              )}
+              {/* Step 5: What If? (only if hurdle cleared) */}
+              {waterfallStep >= 5 && carryWaterfallData.hurdleCleared && (
+                <div className="bg-white/5 rounded-lg p-3 border-l-2 border-white/20">
+                  <p className="text-sm font-medium mb-1">Step 5: What If?</p>
+                  <p className="text-xs text-text-muted">At 3.5x MOIC: Carry = {formatMoney(Math.round(Math.max(0, (350_000 - carryWaterfallData.hurdleAmount) * 0.20)))}</p>
+                  <p className="text-xs text-text-muted">At 2.0x MOIC: Carry = {200_000 > carryWaterfallData.hurdleAmount ? formatMoney(Math.round((200_000 - carryWaterfallData.hurdleAmount) * 0.20)) : '$0 (below hurdle)'}</p>
+                  <p className="text-xs text-text-muted">Net MOIC to LPs: {((carryWaterfallData.grossTotalReturns - carryWaterfallData.carry) / carryWaterfallData.returnOfCapital).toFixed(2)}x</p>
+                </div>
+              )}
+              {/* Step 6: LP Reactions */}
+              {waterfallStep >= (carryWaterfallData.hurdleCleared ? 6 : 4) && lpCommentary && lpCommentary.length > 0 && (
+                <div className="bg-white/5 rounded-lg p-3 border-l-2 border-blue-400">
+                  <p className="text-sm font-medium mb-2">LP Reactions</p>
+                  {lpCommentary.slice(-2).map((lp, i) => (
+                    <div key={i} className="flex items-start gap-2 mb-2">
+                      <span className={`w-6 h-6 rounded-full text-[9px] font-bold flex items-center justify-center shrink-0 ${lp.speaker === 'edna' ? 'bg-blue-500/30 text-blue-300' : 'bg-amber-500/30 text-amber-300'}`}>
+                        {lp.speaker === 'edna' ? 'EM' : 'CH'}
+                      </span>
+                      <p className="text-xs text-text-muted italic">"{lp.text}"</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {/* Step progression button */}
+            {waterfallStep < maxWaterfallSteps && (
+              <button
+                onClick={() => setWaterfallStep(s => s + 1)}
+                className="w-full mt-4 px-4 py-2 rounded-lg font-medium bg-purple-600 text-white hover:bg-purple-500 transition-colors text-sm"
+              >
+                {waterfallStep === 0 ? 'Reveal Waterfall' : 'Next Step'} ({waterfallStep + 1}/{maxWaterfallSteps})
+              </button>
+            )}
+          </div>
+
+          {/* PE Score Breakdown */}
+          <div className="card mb-6">
+            <h2 className="text-lg font-bold mb-4">Score Breakdown</h2>
+            <ScoreBar label="Return Generation (Net IRR)" value={peScore.returnGeneration} max={25} />
+            <ScoreBar label="Capital Efficiency (Gross MOIC)" value={peScore.capitalEfficiency} max={20} />
+            <ScoreBar label="Value Creation (EBITDA Growth)" value={peScore.valueCreation} max={15} />
+            <ScoreBar label="Deployment Discipline" value={peScore.deploymentDiscipline} max={15} />
+            <ScoreBar label="Risk Management" value={peScore.riskManagement} max={15} />
+            <ScoreBar label="LP Satisfaction" value={peScore.lpSatisfaction} max={10} />
+            <div className="mt-4 pt-4 border-t border-white/10 text-center">
+              <span className="text-2xl font-bold font-mono">{peScore.total} / 100</span>
+            </div>
+          </div>
+
+          {/* Play Again at bottom */}
+          <button onClick={onPlayAgain} className="btn-primary text-lg py-3 w-full mb-6">
+            Play Again
+          </button>
+        </div>
+
+      ) :
+
+      /* Holdco Modes */
       {/* Bankruptcy Header (replaces normal header) */}
-      {bankruptRound ? (
+      bankruptRound ? (
         <div className="text-center mb-8">
           <span className="text-6xl mb-4 block">💀</span>
           <h1 className="text-3xl font-bold mb-2">{holdcoName}</h1>
@@ -621,8 +810,8 @@ export function GameOverScreen({
       </div>
       )}
 
-      {/* Family Office — Completed */}
-      {familyOfficeState?.legacyScore && (
+      {/* Family Office — Completed (hidden in fund mode) */}
+      {!isFundManagerMode && familyOfficeState?.legacyScore && (
         <div className="card mb-6 border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-yellow-500/5">
           <div className="text-center">
             <span className="text-3xl block mb-1">🦅</span>
@@ -645,8 +834,8 @@ export function GameOverScreen({
         </div>
       )}
 
-      {/* Founder Equity Value - Hero Display */}
-      <div className={`card mb-6 bg-gradient-to-r ${hasRestructured ? 'from-red-900/20 to-orange-900/20 border-red-500/30' : foMultiplier > 1.0 ? 'from-amber-500/10 to-yellow-500/10 border-amber-500/30' : 'from-accent/20 to-accent-secondary/20 border-accent/30'}`}>
+      {/* Founder Equity Value - Hero Display (hidden in fund mode) */}
+      {!isFundManagerMode && <div className={`card mb-6 bg-gradient-to-r ${hasRestructured ? 'from-red-900/20 to-orange-900/20 border-red-500/30' : foMultiplier > 1.0 ? 'from-amber-500/10 to-yellow-500/10 border-amber-500/30' : 'from-accent/20 to-accent-secondary/20 border-accent/30'}`}>
         <div className="text-center">
           <p className="text-text-muted text-sm mb-1">
             Founder Equity Value
@@ -686,10 +875,10 @@ export function GameOverScreen({
             )}
           </div>
         </div>
-      </div>
+      </div>}
 
-      {/* FEV / EV Breakdown */}
-      {!bankruptRound && (() => {
+      {/* FEV / EV Breakdown (hidden in fund mode) */}
+      {!isFundManagerMode && !bankruptRound && (() => {
         const { currentOwnership, opcoDebt, portfolioValue, blendedMultiple, hypotheticalFEV } = fevBreakdown;
 
         return (
@@ -785,8 +974,8 @@ export function GameOverScreen({
         );
       })()}
 
-      {/* IPO Summary */}
-      {ipoState?.isPublic && (
+      {/* IPO Summary (hidden in fund mode) */}
+      {!isFundManagerMode && ipoState?.isPublic && (
         <div className="card mb-6">
           <h2 className="text-lg font-bold mb-4">IPO Summary</h2>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
@@ -813,8 +1002,8 @@ export function GameOverScreen({
         </div>
       )}
 
-      {/* Save to Leaderboard */}
-      {!hasSaved && !leaderboardLoading && canMakeLeaderboard && (
+      {/* Save to Leaderboard (hidden in fund mode) */}
+      {!isFundManagerMode && !hasSaved && !leaderboardLoading && canMakeLeaderboard && (
         <div className="card mb-6 border-yellow-400/30">
           <div className="text-center">
             <p className="text-yellow-400 font-bold mb-2">
@@ -855,8 +1044,8 @@ export function GameOverScreen({
         </div>
       )}
 
-      {/* Signup Nudge */}
-      {(() => {
+      {/* Signup Nudge (hidden in fund mode) */}
+      {!isFundManagerMode && (() => {
         const gameNumber = parseInt(localStorage.getItem('holdco-game-number') ?? '0', 10);
         const showNudge = gameNumber >= 2 && !isLoggedIn && signupNudgeDismissals < 3 && !nudgeDismissedThisSession;
         if (!showNudge) return null;
@@ -890,8 +1079,8 @@ export function GameOverScreen({
         );
       })()}
 
-      {/* Global Leaderboard */}
-      <GameOverLeaderboard
+      {/* Global Leaderboard (hidden in fund mode) */}
+      {!isFundManagerMode && <GameOverLeaderboard
         allEntries={leaderboard}
         loading={leaderboardLoading}
         error={leaderboardError}
@@ -900,10 +1089,10 @@ export function GameOverScreen({
         activeTab={leaderboardTab}
         onTabChange={setLeaderboardTab}
         showWealth={leaderboardTab === 'distributions'}
-      />
+      />}
 
-      {/* Challenge Scoreboard (auto-submit + live scoreboard for challenge games) */}
-      {challengeData && !scoreboardFailed && (
+      {/* Challenge Scoreboard (hidden in fund mode) */}
+      {!isFundManagerMode && challengeData && !scoreboardFailed && (
         <>
           <ChallengeScoreboard
             challengeParams={currentChallengeParams}
@@ -936,8 +1125,8 @@ export function GameOverScreen({
         </>
       )}
 
-      {/* Challenge Friends (manual flow — shown for solo games, or as fallback when scoreboard fails) */}
-      {(!challengeData || scoreboardFailed) && (
+      {/* Challenge Friends (hidden in fund mode) */}
+      {!isFundManagerMode && (!challengeData || scoreboardFailed) && (
       <div className="card mb-6 border-yellow-500/20 bg-gradient-to-r from-yellow-500/5 to-orange-500/5">
         <h2 className="text-lg font-bold mb-2 flex items-center gap-2">
           <span>🏆</span> Challenge Friends
@@ -982,8 +1171,8 @@ export function GameOverScreen({
       </div>
       )}
 
-      {/* Score Breakdown */}
-      <div className="card mb-6">
+      {/* Score Breakdown (holdco only — PE score rendered in fund mode header) */}
+      {!isFundManagerMode && <div className="card mb-6">
         <h2 className="text-lg font-bold mb-4">Score Breakdown</h2>
         <ScoreBar label="Value Creation (FEV / Capital)" value={score.valueCreation} max={20} />
         <ScoreBar label="FCF/Share Growth" value={score.fcfShareGrowth} max={20} />
@@ -994,7 +1183,7 @@ export function GameOverScreen({
         <div className="mt-4 pt-4 border-t border-white/10 text-center">
           <span className="text-2xl font-bold font-mono">{score.total} / 100</span>
         </div>
-      </div>
+      </div>}
 
       {/* Final Metrics */}
       <div className="card mb-6">

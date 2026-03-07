@@ -8,12 +8,13 @@ interface SessionMeta {
   sessionId: string;
   difficulty: string;
   duration: string;
-  sector: string;
+  sector: string | undefined;
   round: number;
   maxRounds: number;
   startedAt: number;
   isChallenge: boolean;
   fev?: number;
+  gameMode?: string;
 }
 
 function saveSessionMeta(meta: SessionMeta): void {
@@ -55,7 +56,7 @@ let _pageViewSent = false;
 // Dedup set for feature_used events (per session)
 const _featuresTracked = new Set<string>();
 
-export function trackGameStart(difficulty: string, duration: string, sector: string, maxRounds: number, isChallenge: boolean): void {
+export function trackGameStart(difficulty: string, duration: string, sector: string | undefined, maxRounds: number, isChallenge: boolean, gameMode?: string): void {
   // Check if there's an uncompleted previous session
   const prevMeta = getSessionMeta();
   if (prevMeta) {
@@ -82,7 +83,7 @@ export function trackGameStart(difficulty: string, duration: string, sector: str
 
   const gameNumber = getGameNumber();
   const startedAt = Date.now();
-  const meta: SessionMeta = { sessionId, difficulty, duration, sector, round: 1, maxRounds, startedAt, isChallenge };
+  const meta: SessionMeta = { sessionId, difficulty, duration, sector, round: 1, maxRounds, startedAt, isChallenge, gameMode };
   saveSessionMeta(meta);
 
   // Reset per-session dedup
@@ -99,6 +100,7 @@ export function trackGameStart(difficulty: string, duration: string, sector: str
     playerId: getPlayerId(),
     gameNumber,
     isChallenge,
+    gameMode,
     device: getDeviceType(),
     referrer: document.referrer || undefined,
   });
@@ -171,6 +173,14 @@ export interface GameCompleteSnapshot {
   endingSubTypes?: Record<string, number>;
   avgEndingEbitda?: number;
   endingConstruction?: Record<string, number>;
+  // PE Fund Mode fields
+  gameMode?: string;
+  isFundManager?: boolean;
+  netIrr?: number;
+  grossMoic?: number;
+  carryEarned?: number;
+  dpi?: number;
+  lpSatisfaction?: number;
 }
 
 export function trackGameComplete(snapshot: GameCompleteSnapshot): void {

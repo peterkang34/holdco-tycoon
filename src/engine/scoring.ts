@@ -5,11 +5,14 @@ import {
   PostGameInsight,
   LeaderboardEntry,
   LeaderboardStrategy,
+  CarryWaterfall,
+  PEScoreBreakdown,
+  FundCashFlow,
 } from './types';
 import { calculateMetrics, calculateSectorFocusBonus, calculateExitValuation } from './simulation';
 import { POST_GAME_INSIGHTS } from '../data/tips';
 import { getAllDedupedBusinesses } from './helpers';
-import { RESTRUCTURING_FEV_PENALTY } from '../data/gameConfig';
+import { RESTRUCTURING_FEV_PENALTY, PE_FUND_CONFIG, PE_GRADE_THRESHOLDS, PE_GRADE_TITLES } from '../data/gameConfig';
 import { calculatePublicCompanyBonus } from './ipo';
 
 const LEADERBOARD_KEY = 'holdco-tycoon-leaderboard';
@@ -108,6 +111,8 @@ export function calculateFounderPersonalWealth(state: GameState): number {
 }
 
 export function calculateFinalScore(state: GameState): ScoreBreakdown {
+  if (state.isFundManagerMode) throw new Error('Use calculatePEFundScore for fund mode');
+
   // Bankruptcy = immediate F grade, score 0
   if (state.bankruptRound) {
     return {
@@ -382,7 +387,47 @@ export function generatePostGameInsights(state: GameState): PostGameInsight[] {
   // Deduplicate: exitedBusinesses wins; filter out integrated bolt-ons and child bolt-ons
   const allBusinesses = getAllDedupedBusinesses(state.businesses, state.exitedBusinesses);
 
-  // Check for patterns
+  // PE Fund Mode: separate insight path
+  if (state.isFundManagerMode) {
+    const fundSize = state.fundSize || 100000;
+    const dpi = fundSize > 0 ? (state.lpDistributions || 0) / fundSize : 0;
+    const totalDeployed = state.totalCapitalDeployed || 0;
+    const deployPct = fundSize > 0 ? totalDeployed / fundSize : 0;
+    const usedDebt = allBusinesses.some(b => b.bankDebtBalance > 0);
+    // Check concentration: any single platform > 40% of total deployed
+    const overConcentrated = allBusinesses.some(b => {
+      const dealValue = b.acquisitionPrice + (b.bankDebtBalance || 0);
+      return totalDeployed > 0 && dealValue / totalDeployed > 0.40;
+    });
+    // Hurdle: $100M * 1.08^10 ≈ $216M → need ~$116M above cost basis
+    const nav = calculateEnterpriseValue(state);
+    const totalValue = nav + (state.lpDistributions || 0);
+    const hurdleTarget = fundSize * Math.pow(1.08, 10);
+    const missedHurdleNarrowly = totalValue < hurdleTarget && totalValue >= hurdleTarget - 10000;
+
+    if (dpi === 0 && allBusinesses.length > 0) insights.push(POST_GAME_INSIGHTS.pe_never_distributed);
+    if (overConcentrated) insights.push(POST_GAME_INSIGHTS.pe_over_concentrated);
+    if (dpi >= 0.5 && (state.round || 0) <= 7) insights.push(POST_GAME_INSIGHTS.pe_strong_dpi_timing);
+    if (missedHurdleNarrowly) insights.push(POST_GAME_INSIGHTS.pe_missed_hurdle_narrowly);
+    if (!usedDebt && allBusinesses.length > 1) insights.push(POST_GAME_INSIGHTS.pe_zero_leverage);
+    if (deployPct < 0.60 && (state.round || 0) >= 5) insights.push(POST_GAME_INSIGHTS.pe_late_deployment);
+
+    // Also include some universal insights that apply to PE
+    if (allBusinesses.length > 1) {
+      const marginExpanders = activeBusinesses.filter(b => b.ebitdaMargin - b.acquisitionMargin >= 0.03);
+      if (marginExpanders.length >= 2) insights.push(POST_GAME_INSIGHTS.margin_improver);
+    }
+    const smartExits = state.exitedBusinesses.filter(b => {
+      if (!b.exitPrice) return false;
+      const moic = b.acquisitionPrice > 0 ? b.exitPrice / b.acquisitionPrice : 0;
+      return moic > 2.0;
+    });
+    if (smartExits.length >= 2) insights.push(POST_GAME_INSIGHTS.smart_exits);
+
+    return insights.slice(0, 3);
+  }
+
+  // Check for patterns (holdco mode)
   const neverAcquired = allBusinesses.length <= 1;
   const overLeveraged = metrics.netDebtToEbitda > 3;
   const singleSector = new Set(activeBusinesses.map(b => b.sectorId)).size === 1 && activeBusinesses.length >= 3;
@@ -666,4 +711,334 @@ export async function saveToLeaderboard(
   };
   saveToLocalLeaderboard(localEntry);
   return newEntry;
+}
+
+// ── PE Fund Scoring ──
+
+/**
+ * Linear interpolation helper for score calculations.
+ * Maps `value` from [minVal, maxVal] to [minPoints, maxPoints], clamped.
+ */
+export function linearInterpolate(
+  value: number,
+  minVal: number,
+  maxVal: number,
+  minPoints: number,
+  maxPoints: number,
+): number {
+  if (value <= minVal) return minPoints;
+  if (value >= maxVal) return maxPoints;
+  return minPoints + ((value - minVal) / (maxVal - minVal)) * (maxPoints - minPoints);
+}
+
+/**
+ * Newton's method IRR calculation.
+ * Cash flows are { round, amount } where negative = outflow, positive = inflow.
+ */
+export function calculateIRR(cashFlows: { round: number; amount: number }[]): number {
+  // Guard: if total positive cash flows <= 0, return -1.0
+  const totalPositive = cashFlows.reduce((sum, cf) => sum + (cf.amount > 0 ? cf.amount : 0), 0);
+  if (totalPositive <= 0) return -1.0;
+
+  let irr = 0.10;
+
+  for (let i = 0; i < 100; i++) {
+    let npv = 0;
+    let dnpv = 0;
+
+    for (const cf of cashFlows) {
+      npv += cf.amount / Math.pow(1 + irr, cf.round);
+      dnpv += -cf.round * cf.amount / Math.pow(1 + irr, cf.round + 1);
+    }
+
+    if (Math.abs(npv) < 0.001) break;
+    if (dnpv === 0) break;
+
+    // Clamp Newton step to ±0.5 to prevent oscillation
+    const step = npv / dnpv;
+    const clampedStep = Math.max(-0.5, Math.min(0.5, step));
+    irr = irr - clampedStep;
+  }
+
+  return irr;
+}
+
+/**
+ * Calculate the carry waterfall for PE fund mode at game end.
+ * Assumes all businesses have been liquidated — portfolio = 0, debt = 0.
+ */
+export function calculateCarryWaterfall(state: GameState): CarryWaterfall {
+  const fundSize = state.fundSize || PE_FUND_CONFIG.fundSize;
+  const lpDistributed = state.lpDistributions || 0;
+
+  // At game end, all businesses liquidated, portfolio = 0, debt = 0
+  const grossTotalReturns = lpDistributed + state.cash;
+
+  // Carry calculation
+  const carry = grossTotalReturns > PE_FUND_CONFIG.hurdleReturn
+    ? (grossTotalReturns - PE_FUND_CONFIG.hurdleReturn) * PE_FUND_CONFIG.carryRate
+    : 0;
+
+  const lpReturn = grossTotalReturns - carry;
+  const grossMoic = fundSize > 0 ? grossTotalReturns / fundSize : 0;
+  const dpi = fundSize > 0 ? lpDistributed / fundSize : 0;
+
+  // Net IRR: build cash flows from LP perspective
+  const netTerminalValue = state.cash - carry;
+  const irrCashFlows: { round: number; amount: number }[] = [
+    { round: 0, amount: -fundSize },
+    ...(state.fundCashFlows || []),
+    { round: 10, amount: netTerminalValue },
+  ];
+  const netIrr = calculateIRR(irrCashFlows);
+
+  // Management fees: annual fee × 10 rounds
+  const managementFees = PE_FUND_CONFIG.annualManagementFee * 10;
+  const totalGpEconomics = carry + managementFees;
+
+  return {
+    grossTotalReturns,
+    returnOfCapital: fundSize,
+    hurdleAmount: PE_FUND_CONFIG.hurdleReturn,
+    hurdleCleared: grossTotalReturns > PE_FUND_CONFIG.hurdleReturn,
+    aboveHurdle: Math.max(0, grossTotalReturns - PE_FUND_CONFIG.hurdleReturn),
+    carry,
+    managementFees,
+    totalGpEconomics,
+    grossMoic,
+    netIrr,
+    dpi,
+    lpDistributions: lpDistributed,
+    liquidationProceeds: state.cash,
+  };
+}
+
+/**
+ * Calculate PE Fund score breakdown (100-point scale).
+ * 6 dimensions: Return Generation (25), Capital Efficiency (20),
+ * Value Creation (15), Deployment Discipline (15), Risk Management (15),
+ * LP Satisfaction (10).
+ */
+export function calculatePEFundScore(state: GameState): PEScoreBreakdown {
+  const waterfall = calculateCarryWaterfall(state);
+  const allBusinesses = getAllDedupedBusinesses(state.businesses, state.exitedBusinesses);
+
+  // ── 1. Return Generation (25 pts) — based on net IRR ──
+  let returnGeneration = 0;
+  const irr = waterfall.netIrr;
+  if (irr >= 0.20) {
+    returnGeneration = 25;
+  } else if (irr >= 0.15) {
+    returnGeneration = linearInterpolate(irr, 0.15, 0.20, 18, 25);
+  } else if (irr >= 0.08) {
+    returnGeneration = linearInterpolate(irr, 0.08, 0.15, 8, 18);
+  } else if (irr >= 0.04) {
+    returnGeneration = linearInterpolate(irr, 0.04, 0.08, 3, 8);
+  } else if (irr >= 0) {
+    returnGeneration = linearInterpolate(irr, 0, 0.04, 0, 3);
+  } else {
+    returnGeneration = 0;
+  }
+
+  // ── 2. Capital Efficiency (20 pts) — based on gross MOIC ──
+  let capitalEfficiency = 0;
+  const moic = waterfall.grossMoic;
+  if (moic >= 3.5) {
+    capitalEfficiency = 20;
+  } else if (moic >= 3.0) {
+    capitalEfficiency = linearInterpolate(moic, 3.0, 3.5, 16, 20);
+  } else if (moic >= 2.5) {
+    capitalEfficiency = linearInterpolate(moic, 2.5, 3.0, 12, 16);
+  } else if (moic >= 2.0) {
+    capitalEfficiency = linearInterpolate(moic, 2.0, 2.5, 8, 12);
+  } else if (moic >= 1.5) {
+    capitalEfficiency = linearInterpolate(moic, 1.5, 2.0, 4, 8);
+  } else if (moic >= 1.0) {
+    capitalEfficiency = linearInterpolate(moic, 1.0, 1.5, 0, 4);
+  } else {
+    capitalEfficiency = 0;
+  }
+
+  // ── 3. Value Creation (15 pts) — weighted avg EBITDA growth across portfolio ──
+  let valueCreation = 0;
+  if (allBusinesses.length > 0) {
+    let totalWeight = 0;
+    let weightedGrowth = 0;
+    for (const biz of allBusinesses) {
+      if (biz.acquisitionEbitda > 0) {
+        const growth = (biz.ebitda - biz.acquisitionEbitda) / biz.acquisitionEbitda;
+        totalWeight += biz.acquisitionEbitda;
+        weightedGrowth += growth * biz.acquisitionEbitda;
+      }
+    }
+    const avgEbitdaGrowth = totalWeight > 0 ? weightedGrowth / totalWeight : 0;
+
+    if (avgEbitdaGrowth >= 1.0) {
+      valueCreation = 15;
+    } else if (avgEbitdaGrowth >= 0.5) {
+      valueCreation = linearInterpolate(avgEbitdaGrowth, 0.5, 1.0, 8, 15);
+    } else if (avgEbitdaGrowth >= 0.2) {
+      valueCreation = linearInterpolate(avgEbitdaGrowth, 0.2, 0.5, 3, 8);
+    } else if (avgEbitdaGrowth >= 0) {
+      valueCreation = linearInterpolate(avgEbitdaGrowth, 0, 0.2, 0, 3);
+    } else {
+      valueCreation = 0;
+    }
+  }
+
+  // ── 4. Deployment Discipline (15 pts) — Pacing (10) + Harvest (5) ──
+  let deploymentDiscipline = 0;
+  const totalCapitalDeployed = state.totalCapitalDeployed || 0;
+  const fundSize = state.fundSize || PE_FUND_CONFIG.fundSize;
+
+  if (totalCapitalDeployed > 0) {
+    // Pacing sub-component (10 pts): % deployed by Year 5
+    let pacingScore = 0;
+    // Calculate capital deployed by Year 5 from round history
+    let capitalByYear5 = 0;
+    for (const rh of state.roundHistory) {
+      if (rh.round <= 5) {
+        for (const action of rh.actions) {
+          if (action.type === 'acquire' || action.type === 'acquire_tuck_in') {
+            capitalByYear5 += (action.details.price as number) || 0;
+          }
+        }
+      }
+    }
+    const deployedPct = fundSize > 0 ? capitalByYear5 / fundSize : 0;
+    if (deployedPct >= 0.80) {
+      pacingScore = 10;
+    } else if (deployedPct >= 0.60) {
+      pacingScore = 7;
+    } else if (deployedPct >= 0.40) {
+      pacingScore = 3;
+    } else {
+      pacingScore = 0;
+    }
+
+    // Harvest sub-component (5 pts): standalone acquisitions after Year 5
+    let lateAcquisitions = 0;
+    for (const rh of state.roundHistory) {
+      if (rh.round > 5) {
+        for (const action of rh.actions) {
+          if (action.type === 'acquire') {
+            lateAcquisitions++;
+          }
+        }
+      }
+    }
+    let harvestScore = 0;
+    if (lateAcquisitions === 0) {
+      harvestScore = 5;
+    } else if (lateAcquisitions === 1) {
+      harvestScore = 3;
+    } else {
+      harvestScore = 0;
+    }
+
+    deploymentDiscipline = pacingScore + harvestScore;
+  }
+
+  // ── 5. Risk Management (15 pts) — leverage curve + bonuses ──
+  let riskManagement = 0;
+
+  // Portfolio-level net debt / EBITDA
+  const activeBusinesses = state.businesses.filter(b => b.status === 'active');
+  const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
+  const totalDebt = state.totalDebt + activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance, 0);
+  const netDebt = totalDebt - state.cash;
+  const netDebtToEbitda = totalEbitda > 0
+    ? netDebt / totalEbitda
+    : (netDebt <= 0 ? 0 : 4.1); // 0 EBITDA 0 debt → 0; 0 EBITDA positive debt → treat as 4x+
+
+  let leverageScore = 0;
+  if (netDebtToEbitda < 0) {
+    // Net cash position
+    leverageScore = 3;
+  } else if (netDebtToEbitda <= 1.0) {
+    leverageScore = linearInterpolate(netDebtToEbitda, 0, 1.0, 4, 6);
+  } else if (netDebtToEbitda <= 1.5) {
+    leverageScore = linearInterpolate(netDebtToEbitda, 1.0, 1.5, 6, 8);
+  } else if (netDebtToEbitda <= 3.0) {
+    leverageScore = linearInterpolate(netDebtToEbitda, 1.5, 3.0, 8, 10);
+  } else if (netDebtToEbitda <= 4.0) {
+    leverageScore = linearInterpolate(netDebtToEbitda, 3.0, 4.0, 4, 8);
+  } else {
+    leverageScore = linearInterpolate(netDebtToEbitda, 4.0, 6.0, 0, 4);
+  }
+  // Cap leverage component at 10 before bonuses
+  leverageScore = Math.min(10, leverageScore);
+
+  // Bonus: no covenant breaches (+3)
+  const everBreached = state.metricsHistory.some(h => h.metrics.distressLevel === 'breach');
+  if (!everBreached) {
+    riskManagement += 3;
+  }
+
+  // Bonus: no restructurings (+2)
+  if (!state.hasRestructured) {
+    riskManagement += 2;
+  }
+
+  riskManagement += leverageScore;
+
+  // ── 6. LP Satisfaction (10 pts) ──
+  let lpSatisfaction = 0;
+  const lpScore = state.lpSatisfactionScore ?? PE_FUND_CONFIG.lpSatisfactionStart;
+  if (lpScore >= 80) {
+    lpSatisfaction = 10;
+  } else if (lpScore >= 60) {
+    lpSatisfaction = linearInterpolate(lpScore, 60, 79, 6, 9);
+  } else if (lpScore >= 40) {
+    lpSatisfaction = linearInterpolate(lpScore, 40, 59, 2, 5);
+  } else if (lpScore >= 20) {
+    lpSatisfaction = linearInterpolate(lpScore, 20, 39, 0, 1);
+  } else {
+    lpSatisfaction = 0;
+  }
+
+  // ── Total & Grade ──
+  let total = Math.round(
+    returnGeneration + capitalEfficiency + valueCreation +
+    deploymentDiscipline + riskManagement + lpSatisfaction
+  );
+
+  // Determine grade from thresholds
+  let grade: 'S' | 'A' | 'B' | 'C' | 'D' | 'F';
+  if (total >= PE_GRADE_THRESHOLDS.S) {
+    grade = 'S';
+  } else if (total >= PE_GRADE_THRESHOLDS.A) {
+    grade = 'A';
+  } else if (total >= PE_GRADE_THRESHOLDS.B) {
+    grade = 'B';
+  } else if (total >= PE_GRADE_THRESHOLDS.C) {
+    grade = 'C';
+  } else if (total >= PE_GRADE_THRESHOLDS.D) {
+    grade = 'D';
+  } else {
+    grade = 'F';
+  }
+
+  // LP satisfaction grade cap: if lpSatisfactionScore < 20, cap grade at C
+  if (lpScore < PE_FUND_CONFIG.lpSatisfactionGradeCap && (grade === 'S' || grade === 'A' || grade === 'B')) {
+    grade = 'C';
+  }
+
+  // Bankruptcy override
+  if (state.bankruptRound) {
+    total = 0;
+    grade = 'F';
+  }
+
+  return {
+    returnGeneration: Math.round(returnGeneration * 10) / 10,
+    capitalEfficiency: Math.round(capitalEfficiency * 10) / 10,
+    valueCreation: Math.round(valueCreation * 10) / 10,
+    deploymentDiscipline: Math.round(deploymentDiscipline * 10) / 10,
+    riskManagement: Math.round(riskManagement * 10) / 10,
+    lpSatisfaction: Math.round(lpSatisfaction * 10) / 10,
+    total,
+    grade,
+    gradeTitle: PE_GRADE_TITLES[grade] || '',
+  };
 }

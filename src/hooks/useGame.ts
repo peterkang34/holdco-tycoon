@@ -72,7 +72,9 @@ import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue
 import { getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
 
-import type { GameDifficulty, GameDuration, GameActionType, DealHeat } from '../engine/types';
+import type { GameDifficulty, GameDuration, GameActionType, DealHeat, FundCashFlow } from '../engine/types';
+import { selectLPQuote } from '../data/lpCommentary';
+import type { LPTriggerId, LPSpeaker } from '../data/lpCommentary';
 import { generateRandomSeed, createRngStreams } from '../engine/rng';
 import { checkIPOEligibility, executeIPO as executeIPOEngine, processEarningsResult } from '../engine/ipo';
 import {
@@ -104,7 +106,62 @@ import {
   FILLER_REPUTATION_COST_MIN,
   FILLER_REPUTATION_COST_MAX,
   FILLER_REPUTATION_HEAT_REDUCTION,
+  PE_FUND_CONFIG,
+  FUND_MANAGER_CONFIG,
 } from '../data/gameConfig';
+
+/**
+ * Check if a deal requires LPAC approval (cumulative deal value in platform exceeds 25% of committed capital).
+ * Returns { required: boolean, platformName: string, cumulativeValue: number }
+ */
+export function checkLPACRequired(
+  deal: Deal,
+  state: GameState,
+  targetPlatformId?: string,
+): { required: boolean; platformName: string; cumulativeValue: number } {
+  if (!state.isFundManagerMode) return { required: false, platformName: '', cumulativeValue: 0 };
+  const fundSize = state.fundSize || PE_FUND_CONFIG.fundSize;
+  const threshold = fundSize * PE_FUND_CONFIG.maxConcentration; // $25M
+
+  // For tuck-ins: check if target platform already exceeds threshold
+  if (targetPlatformId) {
+    const platform = state.integratedPlatforms.find(p => p.id === targetPlatformId);
+    if (!platform) return { required: false, platformName: '', cumulativeValue: 0 };
+    // Sum acquisition prices of all businesses in this platform
+    const allBiz = [...state.businesses, ...state.exitedBusinesses];
+    const platformBizIds = [platform.coreBusinessId, ...platform.memberBusinessIds];
+    const cumulative = platformBizIds.reduce((sum, id) => {
+      const biz = allBiz.find(b => b.id === id);
+      return sum + (biz ? biz.acquisitionPrice : 0);
+    }, 0);
+    // Only trigger if platform already over threshold (tuck-ins to sub-threshold platforms exempt)
+    if (cumulative < threshold) return { required: false, platformName: platform.name, cumulativeValue: cumulative };
+    return { required: true, platformName: platform.name, cumulativeValue: cumulative + deal.askingPrice };
+  }
+
+  // For standalone deals: check if deal + existing businesses in same sector would create concentration
+  // Standalone deals themselves can trigger LPAC if their asking price alone exceeds threshold
+  if (deal.askingPrice >= threshold) {
+    return { required: true, platformName: deal.name, cumulativeValue: deal.askingPrice };
+  }
+
+  return { required: false, platformName: '', cumulativeValue: 0 };
+}
+
+/**
+ * Roll LPAC approval based on LP satisfaction tier. Uses seeded RNG.
+ */
+export function rollLPACApproval(
+  state: GameState,
+  rng: { next(): number },
+): boolean {
+  const satisfaction = state.lpSatisfactionScore ?? 75;
+  if (satisfaction >= PE_FUND_CONFIG.lpacAutoApproveThreshold) return true; // Auto-approved at 70+
+  const prob = satisfaction >= 50 ? PE_FUND_CONFIG.lpacHighApproval  // 85%
+    : satisfaction >= 30 ? PE_FUND_CONFIG.lpacMidApproval             // 50%
+    : PE_FUND_CONFIG.lpacLowApproval;                                  // 25%
+  return rng.next() < prob;
+}
 
 /** Recompute totalDebt from holdco loan + per-business bank debt */
 function computeTotalDebt(businesses: Business[], holdcoLoanBalance: number): number {
@@ -218,7 +275,7 @@ interface GameStore extends GameState {
   focusBonus: ReturnType<typeof calculateSectorFocusBonus>;
 
   // Actions
-  startGame: (holdcoName: string, startingSector: SectorId, difficulty?: GameDifficulty, duration?: GameDuration, seed?: number) => void;
+  startGame: (holdcoName: string, startingSector: SectorId | undefined, difficulty?: GameDifficulty, duration?: GameDuration, seed?: number, isFundManagerMode?: boolean, fundName?: string) => void;
   resetGame: () => void;
 
   // Phase transitions
@@ -240,6 +297,7 @@ interface GameStore extends GameState {
   issueEquity: (amount: number) => void;
   buybackShares: (amount: number) => void;
   distributeToOwners: (amount: number) => void;
+  distributeToLPs: (amount: number) => void;
   sellBusiness: (businessId: string) => void;
 
   acceptOffer: () => void;
@@ -409,6 +467,17 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   familyOfficeState: null,
   isFamilyOfficeMode: false,
   nextAcquisitionHeatReduction: 0,
+  // PE Fund Manager Mode defaults
+  isFundManagerMode: false,
+  fundName: '',
+  fundSize: 0,
+  managementFeesCollected: 0,
+  lpSatisfactionScore: 75,
+  lpCommentary: [],
+  fundCashFlows: [],
+  totalCapitalDeployed: 0,
+  lpDistributions: 0,
+  dpiMilestones: { half: false, full: false },
 };
 
 export const useGameStore = create<GameStore>()(
@@ -418,7 +487,7 @@ export const useGameStore = create<GameStore>()(
       metrics: calculateMetrics(initialState as GameState),
       focusBonus: null,
 
-      startGame: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty = 'easy', duration: GameDuration = 'standard', seed?: number) => {
+      startGame: (holdcoName: string, startingSector: SectorId | undefined, difficulty: GameDifficulty = 'easy', duration: GameDuration = 'standard', seed?: number, isFundManagerMode?: boolean, fundName?: string) => {
         resetBusinessIdCounter();
         resetUsedNames();
 
@@ -428,7 +497,68 @@ export const useGameStore = create<GameStore>()(
         const maxRounds = durConfig.rounds;
 
         const round1Streams = createRngStreams(gameSeed, 1);
-        const startingBusiness = createStartingBusiness(startingSector, diffConfig.startingEbitda, diffConfig.startingMultipleCap, round1Streams.cosmetic);
+
+        // Fund mode: empty portfolio, $100M cash, pre-unlocked M&A
+        if (isFundManagerMode) {
+          const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds, false, round1Streams.deals, 0, PE_FUND_CONFIG.fundSize, null, false, false, 'easy');
+
+          const newState: GameState = {
+            ...initialState,
+            holdcoName: fundName || holdcoName,
+            seed: gameSeed,
+            difficulty: 'easy',
+            duration: 'quick',
+            maxRounds: 10,
+            round: 1,
+            phase: 'collect',
+            businesses: [],
+            cash: PE_FUND_CONFIG.fundSize,
+            totalDebt: 0,
+            totalInvestedCapital: 0,
+            founderShares: FUND_MANAGER_CONFIG.founderShares,
+            sharesOutstanding: FUND_MANAGER_CONFIG.totalShares,
+            initialRaiseAmount: PE_FUND_CONFIG.fundSize,
+            initialOwnershipPct: 0,
+            holdcoDebtStartRound: 0,
+            holdcoLoanBalance: 0,
+            holdcoLoanRate: 0,
+            holdcoLoanRoundsRemaining: 0,
+            sharedServices: initializeSharedServices(),
+            dealPipeline: initialDealPipeline,
+            maSourcing: { tier: PE_FUND_CONFIG.startingMaSourcingTier as MASourcingTier, active: true, unlockedRound: 1, lastUpgradeRound: 0 },
+            maxAcquisitionsPerRound: 3,
+            turnaroundTier: 0 as any,
+            activeTurnarounds: [],
+            founderDistributionsReceived: 0,
+            isChallenge: false, // Force off for fund mode
+            dealInflationState: { crisisResetRoundsRemaining: 0 },
+            ipoState: null,
+            familyOfficeState: null,
+            // PE Fund Mode fields
+            isFundManagerMode: true,
+            fundName: fundName || holdcoName,
+            fundSize: PE_FUND_CONFIG.fundSize,
+            managementFeesCollected: 0,
+            lpSatisfactionScore: PE_FUND_CONFIG.lpSatisfactionStart,
+            lpCommentary: [],
+            fundCashFlows: [],
+            totalCapitalDeployed: 0,
+            lpDistributions: 0,
+            dpiMilestones: { half: false, full: false },
+          };
+
+          set({
+            ...newState,
+            metrics: calculateMetrics(newState),
+            focusBonus: null,
+            yearChronicle: null,
+          });
+
+          trackGameStart('easy', 'quick', undefined, 10, false, 'fund_manager');
+          return;
+        }
+
+        const startingBusiness = createStartingBusiness(startingSector!, diffConfig.startingEbitda, diffConfig.startingMultipleCap, round1Streams.cosmetic);
         const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds, false, round1Streams.deals, 0, diffConfig.initialCash, null, false, false, difficulty);
 
         // Holdco loan setup: Normal mode gets a structured loan, Easy mode has none
@@ -533,8 +663,11 @@ export const useGameStore = create<GameStore>()(
 
         // Collect FCF when transitioning from collect to event phase (annual)
         // Portfolio tax (with interest/SS+MA deductions for tax shield) is computed inside
+        // PE Fund Manager: management fee deducted from cash, tax-deductible
+        const managementFee = state.isFundManagerMode ? Math.min(PE_FUND_CONFIG.annualManagementFee, state.cash) : 0;
+
         // Use holdcoLoanRate + penalty for tax deduction (matches actual interest paid)
-        const totalDeductibleCosts = sharedServicesCost + maSourcingCost;
+        const totalDeductibleCosts = sharedServicesCost + maSourcingCost + managementFee;
         const annualFcf = calculatePortfolioFcf(
           state.businesses.filter(b => b.status === 'active'),
           sharedBenefits.capexReduction,
@@ -568,7 +701,7 @@ export const useGameStore = create<GameStore>()(
           state.integratedPlatforms,
         );
 
-        let newCash = state.cash + annualFcf - holdcoLoanPayment - sharedServicesCost - maSourcingCost - turnaroundTierCost - turnaroundProgramCosts - complexityCost.netCost;
+        let newCash = state.cash + annualFcf - holdcoLoanPayment - sharedServicesCost - maSourcingCost - turnaroundTierCost - turnaroundProgramCosts - complexityCost.netCost - managementFee;
 
         // Pay opco-level debt (seller notes, earnouts, bank debt interest)
         // This aligns with the waterfall display — all deductions happen at collection time
@@ -767,6 +900,8 @@ export const useGameStore = create<GameStore>()(
           pendingProSportsEvent: primaryIsProSports ? null : (proSportsEvent ?? null),
           requiresRestructuring,
           phase: requiresRestructuring ? 'restructure' as GamePhase : 'event' as GamePhase,
+          // PE Fund Manager: track cumulative management fees
+          ...(state.isFundManagerMode ? { managementFeesCollected: (state.managementFeesCollected || 0) + managementFee } : {}),
         };
 
         // Events with choices that have NO immediate effects — skip applyEventEffects entirely
@@ -1129,6 +1264,157 @@ export const useGameStore = create<GameStore>()(
         };
         const newRoundHistory = [...(state.roundHistory ?? []), roundHistoryEntry];
 
+        // ── PE Fund Manager: LP Satisfaction Annual Update ──
+        let updatedLPSatisfaction = state.lpSatisfactionScore ?? 75;
+        let updatedLPCommentary = [...(state.lpCommentary || [])];
+        if (state.isFundManagerMode) {
+          const round = state.round;
+          const fundSize = state.fundSize || PE_FUND_CONFIG.fundSize;
+          const dpi = (state.lpDistributions || 0) / fundSize;
+          const activeCount = updatedBusinesses.filter(b => b.status === 'active').length;
+          const totalEbitda = updatedBusinesses.filter(b => b.status === 'active').reduce((s, b) => s + b.ebitda, 0);
+          const prevTotalEbitda = state.businesses.filter(b => b.status === 'active').reduce((s, b) => s + b.ebitda, 0);
+          const ebitdaGrowthPct = prevTotalEbitda > 0 ? (totalEbitda - prevTotalEbitda) / prevTotalEbitda : 0;
+          const ev = calculateEnterpriseValue({ ...state, businesses: updatedBusinesses } as GameState);
+          const grossMoic = ev / fundSize;
+
+          // Year's DPI change (sum of distributions made this round)
+          const yearDistributions = (state.fundCashFlows || []).filter(cf => cf.round === round).reduce((s, cf) => s + cf.amount, 0);
+          const yearDpiChange = yearDistributions / fundSize;
+
+          // Distress check
+          const anyBreach = updatedBusinesses.some(b => b.status === 'active' && endMetrics.distressLevel === 'breach');
+          const hasRestructured = state.hasRestructured;
+
+          // Count exits this round
+          const exitActions = state.actionsThisRound.filter(a => a.type === 'sell' || a.type === 'sell_platform');
+          const strongExits = exitActions.filter(a => {
+            const moic = a.details?.exitMoic ?? 0;
+            return moic >= 3.0;
+          }).length;
+          const weakExits = exitActions.filter(a => {
+            const moic = a.details?.exitMoic ?? 0;
+            return moic < 1.0;
+          }).length;
+          const platformSales = exitActions.filter(a => a.type === 'sell_platform').length;
+
+          // Late acquisitions (standalone after Y5)
+          const lateStandaloneAcquisitions = round > PE_FUND_CONFIG.investmentPeriodEnd
+            ? state.actionsThisRound.filter(a => a.type === 'acquire').length : 0;
+
+          // Sum adjustments
+          let adjustment = 0;
+
+          // MOIC-conditional bonus
+          if (grossMoic >= 2.0) {
+            if (round <= 3) adjustment += 5;
+            else if (round <= 6) adjustment += 3;
+            else if (dpi > 0) adjustment += 0; // No bonus without distributions in harvest
+          }
+
+          // DPI adjustments
+          if (yearDpiChange > 0.1) adjustment += 8;
+          else if (yearDpiChange > 0.02) adjustment += 5;
+          else if (yearDpiChange > 0) adjustment += 2;
+
+          // One-time DPI milestones
+          const prevDpi = ((state.lpDistributions || 0) - yearDistributions) / fundSize;
+          if (prevDpi < 0.5 && dpi >= 0.5) adjustment += 3;
+
+          // No distress bonus
+          if (!anyBreach && !hasRestructured) adjustment += 3;
+
+          // Strong exits
+          adjustment += strongExits * 3;
+
+          // Platform sales
+          adjustment += platformSales * 5;
+
+          // Exceptional growth
+          if (ebitdaGrowthPct > 0.20) adjustment += 3;
+
+          // ── Negative adjustments ──
+          if (anyBreach) adjustment -= 10;
+          if (hasRestructured) adjustment -= 15;
+          adjustment -= weakExits * 5;
+
+          // No deployment for 2+ consecutive years AND <70% deployed
+          const deployed = (state.totalCapitalDeployed || 0) / fundSize;
+          const hadAcquisitions = state.actionsThisRound.some(a => a.type === 'acquire' || a.type === 'acquire_tuck_in');
+          const prevRoundHadAcquisitions = (state.roundHistory ?? []).length > 0
+            && (state.roundHistory[state.roundHistory.length - 1]?.actions ?? []).some(a => a.type === 'acquire' || a.type === 'acquire_tuck_in');
+          if (!hadAcquisitions && !prevRoundHadAcquisitions && deployed < 0.70 && round >= 3) adjustment -= 10;
+
+          // MOIC below 1.0x
+          if (grossMoic < 1.0) adjustment -= 5;
+
+          // DPI = 0 escalation
+          if (dpi === 0) {
+            if (round >= 8) adjustment -= 12;
+            else if (round >= 6) adjustment -= 8;
+            else if (round >= 4) adjustment -= 5;
+          }
+
+          // 0 businesses for 2+ years, Year 3+, DPI < 0.5x
+          if (activeCount === 0 && round >= 3 && dpi < 0.5) {
+            const prevActiveCount = state.businesses.filter(b => b.status === 'active').length;
+            if (prevActiveCount === 0) adjustment -= 10;
+          }
+
+          // Management fee shortfall
+          if (state.cash < PE_FUND_CONFIG.annualManagementFee) adjustment -= 8;
+
+          // Earn-out skipped (if any earnout payments were skipped this round due to cash)
+          const skippedEarnouts = updatedBusinesses.some(b =>
+            b.earnoutRemaining > 0 && b.earnoutTarget > 0 && state.cash <= 0
+          );
+          if (skippedEarnouts) adjustment -= 3;
+
+          // Over-deployed
+          if (deployed > 0.90 && round < PE_FUND_CONFIG.investmentPeriodEnd) adjustment -= 3;
+
+          // Late acquisitions
+          adjustment -= lateStandaloneAcquisitions * 3;
+
+          // Clamp
+          updatedLPSatisfaction = Math.max(
+            PE_FUND_CONFIG.lpSatisfactionFloor,
+            Math.min(PE_FUND_CONFIG.lpSatisfactionCeiling, updatedLPSatisfaction + adjustment),
+          );
+
+          // ── Generate LP Commentary (max 2/year, highest priority) ──
+          const cosmeticRng = roundStreams.cosmetic.fork('lpCommentary');
+          let commentsThisYear = 0;
+
+          const addComment = (triggerId: LPTriggerId, speaker: LPSpeaker): boolean => {
+            if (commentsThisYear >= 2) return false;
+            const text = selectLPQuote(triggerId, speaker, cosmeticRng);
+            if (!text) return false;
+            updatedLPCommentary.push({ round, speaker, text });
+            commentsThisYear++;
+            return true;
+          };
+
+          // Priority order (most important first)
+          if (updatedLPSatisfaction < PE_FUND_CONFIG.lpTerminationThreatThreshold) {
+            addComment('termination_threat', 'edna');
+          }
+          if (anyBreach) { addComment('business_distress', 'edna'); addComment('business_distress', 'chip'); }
+          if (dpi === 0 && round === 9) addComment('no_distributions_y9', 'edna');
+          else if (dpi === 0 && round === 7) addComment('no_distributions_y7', 'edna');
+          else if (dpi === 0 && round === 5) addComment('no_distributions_y5', 'edna');
+          else if (dpi === 0 && round === 3) addComment('no_distributions_y3', 'edna');
+          if (round === 10) { addComment('final_year', 'edna'); addComment('final_year', 'chip'); }
+          if (round === 6) { addComment('harvest_period', 'edna'); addComment('harvest_period', 'chip'); }
+          if (round === 1) addComment('year_1_start', 'chip');
+          if (lateStandaloneAcquisitions > 0) { addComment('late_acquisition', 'edna'); addComment('late_acquisition', 'chip'); }
+          if (yearDpiChange > 0.2) { addComment('large_distribution', 'edna'); addComment('large_distribution', 'chip'); }
+          else if (yearDpiChange > 0) { addComment('distribution_made', 'edna'); addComment('distribution_made', 'chip'); }
+          if (strongExits > 0) { addComment('strong_exit', 'edna'); addComment('strong_exit', 'chip'); }
+          if (weakExits > 0) { addComment('weak_exit', 'edna'); addComment('weak_exit', 'chip'); }
+          if (ebitdaGrowthPct > 0.20) addComment('exceptional_growth', 'chip');
+        }
+
         // Process IPO earnings result (if public) — skip in FO mode
         let updatedIPOState = state.ipoState;
         if (!state.isFamilyOfficeMode && state.ipoState?.isPublic) {
@@ -1170,10 +1456,66 @@ export const useGameStore = create<GameStore>()(
             lastAcquisitionResult: null,
             lastIntegrationOutcome: null,
             ipoState: updatedIPOState,
+            // PE Fund Manager LP state
+            ...(state.isFundManagerMode ? {
+              lpSatisfactionScore: updatedLPSatisfaction,
+              lpCommentary: updatedLPCommentary,
+            } : {}),
           });
         } else {
+          // ── PE Fund Manager: Forced Liquidation ──
+          let liquidationCash = state.cash;
+          let liquidationBusinesses = updatedBusinesses;
+          if (state.isFundManagerMode && !gameOverFromBankruptcy) {
+            // Force-sell all remaining active businesses
+            const lastEvent = state.eventHistory[state.eventHistory.length - 1];
+            for (const biz of updatedBusinesses.filter(b => b.status === 'active')) {
+              const valuation = calculateExitValuation(biz, state.round, lastEvent?.type, undefined, state.integratedPlatforms);
+              let grossEV = biz.ebitda * valuation.totalMultiple;
+
+              // Distress discount for forced sellers
+              const bizMetrics = endMetrics; // Use portfolio-level distress
+              if (bizMetrics.distressLevel === 'breach') grossEV *= 0.70;
+              else if (bizMetrics.distressLevel === 'stressed') grossEV *= 0.85;
+
+              // Pay off per-business debt
+              const debtPayoff = biz.bankDebtBalance + biz.sellerNoteBalance;
+
+              // Earn-out verification (shared logic)
+              let earnoutDue = 0;
+              if (biz.earnoutRemaining > 0 && biz.earnoutTarget > 0) {
+                let growth = 0;
+                if (biz.status === 'integrated' && biz.parentPlatformId) {
+                  const parent = updatedBusinesses.find(b => b.id === biz.parentPlatformId);
+                  growth = parent && parent.acquisitionEbitda > 0
+                    ? (parent.ebitda - parent.acquisitionEbitda) / parent.acquisitionEbitda : 0;
+                } else if (biz.acquisitionEbitda > 0) {
+                  growth = (biz.ebitda - biz.acquisitionEbitda) / biz.acquisitionEbitda;
+                }
+                if (growth >= biz.earnoutTarget) earnoutDue = biz.earnoutRemaining;
+              }
+
+              let netProceeds = Math.max(0, grossEV - debtPayoff - earnoutDue);
+
+              // Rollover equity split
+              if (biz.rolloverEquityPct && biz.rolloverEquityPct > 0) {
+                netProceeds = netProceeds * (1 - biz.rolloverEquityPct);
+              }
+
+              liquidationCash += Math.round(netProceeds);
+            }
+
+            // Mark all businesses as sold
+            liquidationBusinesses = updatedBusinesses.map(b =>
+              b.status === 'active' ? { ...b, status: 'sold' as const, bankDebtBalance: 0, sellerNoteBalance: 0, earnoutRemaining: 0 } : b
+            );
+          }
+
           // Game over — run final collection to settle all remaining debt before scoring
-          const finalState = runFinalCollection({ ...state, businesses: updatedBusinesses } as GameState);
+          const preCollectionState = state.isFundManagerMode && !gameOverFromBankruptcy
+            ? { ...state, businesses: liquidationBusinesses, cash: liquidationCash, holdcoLoanBalance: 0 } as GameState
+            : { ...state, businesses: updatedBusinesses } as GameState;
+          const finalState = runFinalCollection(preCollectionState);
           const gameOverDebt = computeTotalDebt(finalState.businesses, finalState.holdcoLoanBalance);
           const gameOverMetrics = calculateMetrics({ ...state, businesses: finalState.businesses, cash: finalState.cash, totalDebt: gameOverDebt, holdcoLoanBalance: finalState.holdcoLoanBalance });
 
@@ -1195,6 +1537,11 @@ export const useGameStore = create<GameStore>()(
             metrics: gameOverMetrics,
             focusBonus: calculateSectorFocusBonus(finalState.businesses),
             ipoState: updatedIPOState,
+            // PE Fund Manager LP state
+            ...(state.isFundManagerMode ? {
+              lpSatisfactionScore: updatedLPSatisfaction,
+              lpCommentary: updatedLPCommentary,
+            } : {}),
           });
         }
       },
@@ -1276,6 +1623,8 @@ export const useGameStore = create<GameStore>()(
             businesses: newBusinesses,
             totalDebt: computeTotalDebt(newBusinesses, state.holdcoLoanBalance),
             totalInvestedCapital: state.totalInvestedCapital + deal.effectivePrice,
+            // PE Fund: track total deal value deployed
+            ...(state.isFundManagerMode ? { totalCapitalDeployed: (state.totalCapitalDeployed || 0) + deal.effectivePrice } : {}),
             dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
             acquisitionsThisRound: state.acquisitionsThisRound + 1,
             lastAcquisitionResult: 'success',
@@ -1319,6 +1668,8 @@ export const useGameStore = create<GameStore>()(
           acquisitionsThisRound: state.acquisitionsThisRound + 1,
           lastAcquisitionResult: 'success',
           nextAcquisitionHeatReduction: consumeHeatReduction ? 0 : state.nextAcquisitionHeatReduction,
+          // PE Fund: track total deal value deployed (asking price, not equity check)
+          ...(state.isFundManagerMode ? { totalCapitalDeployed: (state.totalCapitalDeployed || 0) + deal.effectivePrice } : {}),
           actionsThisRound: [
             ...state.actionsThisRound,
             {
@@ -1452,6 +1803,8 @@ export const useGameStore = create<GameStore>()(
             sharesOutstanding: updatedIPO.sharesOutstanding,
             totalDebt: newTotalDebtSF,
             totalInvestedCapital: state.totalInvestedCapital + deal.effectivePrice + restructuringCostSF,
+            // PE Fund: track total deal value deployed
+            ...(state.isFundManagerMode ? { totalCapitalDeployed: (state.totalCapitalDeployed || 0) + deal.effectivePrice } : {}),
             businesses: tuckInBusinessesSF,
             dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
             acquisitionsThisRound: state.acquisitionsThisRound + 1,
@@ -1594,6 +1947,8 @@ export const useGameStore = create<GameStore>()(
           cash: tuckInCash,
           totalDebt: newTotalDebt,
           totalInvestedCapital: state.totalInvestedCapital + deal.effectivePrice + restructuringCost,
+          // PE Fund: track total deal value deployed
+          ...(state.isFundManagerMode ? { totalCapitalDeployed: (state.totalCapitalDeployed || 0) + deal.effectivePrice } : {}),
           businesses: [...updatedBusinesses, boltOnBusiness],
           dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
           acquisitionsThisRound: state.acquisitionsThisRound + 1,
@@ -2208,6 +2563,7 @@ export const useGameStore = create<GameStore>()(
       issueEquity: (amount: number) => {
         const state = get();
         if (state.isFamilyOfficeMode) return; // No equity raises in FO mode
+        if (state.isFundManagerMode) return; // Fund size fixed; GP can't demand more capital
         if (amount <= 0) return;
 
         // Guard: no normal equity raises during restructuring (use emergencyEquityRaise instead)
@@ -2282,6 +2638,7 @@ export const useGameStore = create<GameStore>()(
       buybackShares: (amount: number) => {
         const state = get();
         if (state.isFamilyOfficeMode) return; // No buybacks in FO mode
+        if (state.isFundManagerMode) return; // No public shares in fund mode
         if (state.cash < amount) return;
 
         // Block buybacks when no active businesses — prevents sell-all-then-buyback FEV exploit
@@ -2358,6 +2715,7 @@ export const useGameStore = create<GameStore>()(
       distributeToOwners: (amount: number) => {
         const state = get();
         if (state.isFamilyOfficeMode) return; // No distributions in FO mode
+        if (state.isFundManagerMode) return; // Replaced by LP distributions (DPI)
         if (state.cash < amount) return;
 
         // Enforce distress restrictions — covenant breach blocks distributions
@@ -2382,6 +2740,49 @@ export const useGameStore = create<GameStore>()(
             { type: 'distribute', round: state.round, details: { amount, founderPortion } },
           ],
           metrics: calculateMetrics(distributeState),
+        });
+      },
+
+      distributeToLPs: (amount: number) => {
+        const state = get();
+        if (!state.isFundManagerMode) return;
+        if (state.phase !== 'allocate') return;
+        if (amount < PE_FUND_CONFIG.minDistribution) return; // $1M minimum
+        if (amount > state.cash) return;
+        // Must have deployed at least 20% before distributing
+        if ((state.totalCapitalDeployed || 0) < PE_FUND_CONFIG.minDeploymentForDistribution) return;
+
+        const addToast = useToastStore.getState().addToast;
+        const newLpDistributions = (state.lpDistributions || 0) + amount;
+        const newDpi = newLpDistributions / (state.fundSize || PE_FUND_CONFIG.fundSize);
+        const dpiMilestones = { ...(state.dpiMilestones || { half: false, full: false }) };
+
+        // Check DPI milestones
+        if (!dpiMilestones.half && newDpi >= 0.5) {
+          dpiMilestones.half = true;
+          addToast({ message: 'DPI Milestone: 0.5x — halfway to returning LP capital', type: 'success' });
+        }
+        if (!dpiMilestones.full && newDpi >= 1.0) {
+          dpiMilestones.full = true;
+          addToast({ message: 'LPs have been made whole. Every dollar from here improves your carry.', type: 'success' });
+        }
+
+        trackFeatureUsed('lp_distribution', state.round);
+
+        const newState = {
+          ...state,
+          cash: state.cash - amount,
+          lpDistributions: newLpDistributions,
+          dpiMilestones,
+          fundCashFlows: [...(state.fundCashFlows || []), { round: state.round, amount }],
+        };
+        set({
+          ...newState,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'distribute_to_lps' as GameActionType, round: state.round, details: { amount, dpi: newDpi } },
+          ],
+          metrics: calculateMetrics(newState),
         });
       },
 
@@ -3382,6 +3783,7 @@ export const useGameStore = create<GameStore>()(
       emergencyEquityRaise: (amount: number) => {
         const state = get();
         if (state.isFamilyOfficeMode) return; // No emergency equity in FO mode
+        if (state.isFundManagerMode) return; // GP can't call capital beyond commitments
         const metrics = calculateMetrics(state);
         if (metrics.intrinsicValuePerShare <= 0) return;
 
@@ -4362,9 +4764,17 @@ export const useGameStore = create<GameStore>()(
         const upfrontCost = calculateTurnaroundCost(program, business);
         if (state.cash < upfrontCost) return;
 
-        trackFeatureUsed('turnaround', state.round);
-
+        // PE Fund: block turnaround if it would complete after fund closes
         const duration = getTurnaroundDuration(program, state.duration);
+        if (state.isFundManagerMode && duration > (state.maxRounds - state.round)) {
+          useToastStore.getState().addToast({
+            message: `Not enough time remaining — this turnaround would complete in Year ${state.round + duration}, but the fund closes in Year ${state.maxRounds}.`,
+            type: 'warning',
+          });
+          return;
+        }
+
+        trackFeatureUsed('turnaround', state.round);
         const turnaround: ActiveTurnaround = {
           id: `ta_${businessId}_${state.round}`,
           businessId,
@@ -4570,7 +4980,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v36', // v36: cashEquityInvested tracking, MOIC scoring fix, platform forge totalInvestedCapital
+      name: 'holdco-tycoon-save-v37', // v37: PE Fund Manager Mode
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -4637,6 +5047,17 @@ export const useGameStore = create<GameStore>()(
         familyOfficeState: state.familyOfficeState,
         isFamilyOfficeMode: state.isFamilyOfficeMode,
         nextAcquisitionHeatReduction: state.nextAcquisitionHeatReduction,
+        // PE Fund Manager Mode
+        isFundManagerMode: state.isFundManagerMode,
+        fundName: state.fundName,
+        fundSize: state.fundSize,
+        managementFeesCollected: state.managementFeesCollected,
+        lpSatisfactionScore: state.lpSatisfactionScore,
+        lpCommentary: state.lpCommentary,
+        fundCashFlows: state.fundCashFlows,
+        totalCapitalDeployed: state.totalCapitalDeployed,
+        lpDistributions: state.lpDistributions,
+        dpiMilestones: state.dpiMilestones,
       }),
       // Debounced storage to coalesce rapid mutations (game is turn-based, 500ms delay is safe)
       storage: {

@@ -1,7 +1,7 @@
 import { Suspense, lazy, useState, useEffect, useMemo } from 'react';
 const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 import { useGameStore, getFinalScore, getPostGameInsights, getEnterpriseValue, getFounderEquityValue, getFounderPersonalWealth } from './hooks/useGame';
-import { IntroScreen } from './components/screens/IntroScreen';
+import { IntroScreen, writeBestGrade } from './components/screens/IntroScreen';
 import { GameScreen } from './components/screens/GameScreen';
 import { GameOverScreen } from './components/screens/GameOverScreen';
 import { FamilyOfficeScreen } from './components/screens/FamilyOfficeScreen';
@@ -9,7 +9,7 @@ import { ScoreboardScreen } from './components/screens/ScoreboardScreen';
 import { SectorId, GameDifficulty, GameDuration, formatMoney } from './engine/types';
 import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, replaceUrlWithChallenge, type ChallengeParams, type PlayerResult } from './utils/challenge';
 import { checkFamilyOfficeEligibility } from './engine/familyOffice';
-import { calculateFinalScore } from './engine/scoring';
+import { calculateFinalScore, calculatePEFundScore, calculateCarryWaterfall } from './engine/scoring';
 import { trackPageView } from './services/telemetry';
 import { initAnonymousAuth, initAuthListener } from './lib/supabase';
 import { AccountModal } from './components/ui/AccountModal';
@@ -77,6 +77,9 @@ function App() {
     familyOfficeState: _familyOfficeState,
     founderDistributionsReceived,
     isFamilyOfficeMode,
+    isFundManagerMode,
+    fundName,
+    lpCommentary,
     startFamilyOffice,
     completeFamilyOffice,
     startGame,
@@ -153,14 +156,34 @@ function App() {
     setScreen('game');
   };
 
+  const handleStartFund = (fundName: string) => {
+    startGame(fundName, undefined, 'easy', 'quick', undefined, true, fundName);
+    setIsNewGame(true);
+    setScreen('game');
+  };
+
   const handleGameOver = () => {
     window.scrollTo(0, 0);
     const state = useGameStore.getState();
+
+    // Write best grade for unlock gate
+    if (!state.isFundManagerMode && !state.isFamilyOfficeMode) {
+      try {
+        const score = state.isFundManagerMode ? calculatePEFundScore(state) : calculateFinalScore(state);
+        writeBestGrade(score.grade);
+      } catch {}
+    }
 
     // FO mode game over — calculate FO results and show results screen
     if (state.isFamilyOfficeMode) {
       completeFamilyOffice();
       setScreen('familyOfficeResults');
+      return;
+    }
+
+    // Fund mode — skip FO eligibility check, go straight to gameOver
+    if (state.isFundManagerMode) {
+      setScreen('gameOver');
       return;
     }
 
@@ -191,11 +214,20 @@ function App() {
 
   // Compute game-over values only when needed (non-reactive to avoid infinite re-renders)
   const needsScoring = screen === 'gameOver' || screen === 'familyOfficeBridge' || screen === 'familyOfficeResults';
-  const score = useMemo(() => needsScoring ? getFinalScore() : undefined, [needsScoring]);
+  const score = useMemo(() => {
+    if (!needsScoring) return undefined;
+    // Fund mode uses PE scorer; holdco mode uses standard scorer
+    if (isFundManagerMode) return calculatePEFundScore(useGameStore.getState());
+    return getFinalScore();
+  }, [needsScoring, isFundManagerMode]);
   const insights = useMemo(() => screen === 'gameOver' ? getPostGameInsights() : undefined, [screen]);
   const enterpriseValue = useMemo(() => needsScoring ? getEnterpriseValue() : undefined, [needsScoring]);
   const founderEquityValue = useMemo(() => needsScoring ? getFounderEquityValue() : undefined, [needsScoring]);
   const founderPersonalWealth = useMemo(() => needsScoring ? getFounderPersonalWealth() : undefined, [needsScoring]);
+  const carryWaterfall = useMemo(() => {
+    if (!needsScoring || !isFundManagerMode) return undefined;
+    return calculateCarryWaterfall(useGameStore.getState());
+  }, [needsScoring, isFundManagerMode]);
 
   if (isAdmin) {
     return (
@@ -291,6 +323,7 @@ function App() {
       {screen === 'intro' && (
         <IntroScreen
           onStart={handleStart}
+          onStartFund={handleStartFund}
           challengeData={challengeData}
         />
       )}
@@ -331,7 +364,7 @@ function App() {
       {screen === 'gameOver' && (
         <ErrorBoundary><GameOverScreen
           holdcoName={holdcoName}
-          score={score!}
+          score={score as any}
           insights={insights!}
           businesses={businesses}
           exitedBusinesses={exitedBusinesses}
@@ -360,6 +393,11 @@ function App() {
           ipoState={ipoState}
           challengeData={challengeData}
           incomingResult={incomingResult}
+          isFundManagerMode={isFundManagerMode}
+          fundName={fundName}
+          peScore={isFundManagerMode ? (score as any) : null}
+          carryWaterfall={carryWaterfall}
+          lpCommentary={lpCommentary}
           onPlayAgain={handlePlayAgain}
         /></ErrorBoundary>
       )}

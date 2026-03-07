@@ -238,12 +238,14 @@ export const ANNIVERSARY_MILESTONES = [5, 10, 15] as const;
 
 // ── 20-Year Mode: Narrative Tone ──
 
-export type NarrativePhaseId = 'scrappy_startup' | 'growing_operator' | 'seasoned_builder' | 'adapting_veteran' | 'legacy_architect';
+export type NarrativePhaseId = 'scrappy_startup' | 'growing_operator' | 'seasoned_builder' | 'adapting_veteran' | 'legacy_architect'
+  | 'deploying_capital' | 'creating_value' | 'harvesting_returns';
 
 export interface NarrativePhaseConfig {
   id: NarrativePhaseId;
   label: string;
   toneGuidance: string;
+  rounds?: number[];  // optional: explicit round mapping for PE phases
 }
 
 export const NARRATIVE_PHASE_CONFIG: NarrativePhaseConfig[] = [
@@ -274,8 +276,42 @@ export const NARRATIVE_PHASE_CONFIG: NarrativePhaseConfig[] = [
   },
 ];
 
+export const PE_NARRATIVE_PHASES: NarrativePhaseConfig[] = [
+  {
+    id: 'deploying_capital',
+    label: 'Deploying Capital',
+    rounds: [1, 2, 3, 4],
+    toneGuidance: 'Early fund execution. The GP is building a portfolio from scratch. '
+      + 'Reference deal pipeline quality, deployment pacing, thesis validation. '
+      + 'Tone: disciplined optimism. The fund is taking shape.',
+  },
+  {
+    id: 'creating_value',
+    label: 'Creating Value',
+    rounds: [5, 6, 7],
+    toneGuidance: 'Mid-fund inflection. Portfolio companies are maturing. '
+      + 'Reference operational improvements, margin expansion, platform integration. '
+      + 'Tone: focused execution. The investment period is closing or closed. '
+      + 'LPs are watching deployment discipline and early results.',
+  },
+  {
+    id: 'harvesting_returns',
+    label: 'Harvesting Returns',
+    rounds: [8, 9, 10],
+    toneGuidance: 'Fund wind-down. Exits are the priority. '
+      + 'Reference DPI progress, carry proximity, LP distributions, portfolio cleanup. '
+      + 'Tone: urgency mixed with reflection. Every decision now has finality. '
+      + 'The hurdle cliff looms. The carry moment is approaching.',
+  },
+];
+
 /** Returns the narrative phase for a given round and maxRounds. */
-export function getNarrativePhase(round: number, maxRounds: number): NarrativePhaseConfig {
+export function getNarrativePhase(round: number, maxRounds: number, isFundManagerMode?: boolean): NarrativePhaseConfig {
+  if (isFundManagerMode) {
+    if (round <= 4) return PE_NARRATIVE_PHASES[0];
+    if (round <= 7) return PE_NARRATIVE_PHASES[1];
+    return PE_NARRATIVE_PHASES[2];
+  }
   if (maxRounds <= 10) {
     // 10-year mode: compressed 3 phases
     if (round <= 3) return NARRATIVE_PHASE_CONFIG[0];
@@ -336,6 +372,72 @@ export const FO_MA_SOURCING_TIER = 1;
 export const FO_MAX_ROUNDS = 5;
 export const FO_QUALITY_FLOOR = 3;
 export const FO_RESTRUCTURING_PENALTY = 0.80;
+
+// ── PE Fund Manager Mode ──
+
+export const PE_FUND_CONFIG = {
+  fundSize: 100_000,                    // $100M committed capital
+  managementFeeRate: 0.02,
+  annualManagementFee: 2_000,           // $2M/year
+  carryRate: 0.20,
+  hurdleRate: 0.08,
+  hurdleReturn: 215_892,               // precomputed: 100_000 * 1.08^10
+  lpSatisfactionStart: 75,
+  lpSatisfactionFloor: 0,
+  lpSatisfactionCeiling: 100,
+  lpSatisfactionGradeCap: 20,          // below this, grade ceiling at C
+  maxConcentration: 0.25,              // LPAC gate: 25% of committed capital ($25M)
+  lpacAutoApproveThreshold: 70,        // satisfaction 70+ = auto-approved
+  lpacHighApproval: 0.85,             // satisfaction 50-69
+  lpacMidApproval: 0.50,              // satisfaction 30-49
+  lpacLowApproval: 0.25,              // satisfaction <30
+  lpTerminationThreatThreshold: 15,
+  investmentPeriodEnd: 5,
+  minDistribution: 1_000,              // $1M minimum
+  minDeploymentForDistribution: 20_000, // 20% of committed capital
+  duration: 'quick' as const,
+  startingMaSourcingTier: 1,           // pre-unlock 3 deals/round
+} as const;
+
+export const FUND_MANAGER_CONFIG = {
+  initialCash: 100_000,
+  founderShares: 0,
+  totalShares: 1000,
+  startingDebt: 0,
+  startingEbitda: 0,
+  noStartingBusiness: true,
+  leaderboardMultiplier: 1.0,
+  label: 'Fund Manager',
+  description: '$100M from LPs. 10 years. Earn your carry.',
+  blockEquityRaises: true,
+  blockEmergencyEquity: true,
+  blockDistributions: true,             // founder distributions; LP distributions separate
+  blockBuybacks: true,
+  blockHoldcoLoan: true,
+  blockIPO: true,
+  blockFamilyOffice: true,
+  forcedLiquidation: true,
+  managementFee: true,
+} as const;
+
+// PE Fund Scoring Grade Thresholds
+export const PE_GRADE_THRESHOLDS = {
+  S: 90,
+  A: 75,
+  B: 60,
+  C: 40,
+  D: 20,
+  F: 0,
+} as const;
+
+export const PE_GRADE_TITLES: Record<string, string> = {
+  S: 'Legendary GP — LPs hand you blank checks',
+  A: 'Top Quartile — Fund II is 3x oversubscribed',
+  B: 'Solid Manager — LPs re-up with mild questions',
+  C: 'Median Fund — Respectable, but Fund II will be a tough raise',
+  D: 'Below Benchmark — Fund II won\'t happen',
+  F: 'Fund Implosion — Your career in PE is over',
+};
 
 // ── Mode Selection Copy ──
 

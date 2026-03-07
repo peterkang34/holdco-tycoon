@@ -14,15 +14,16 @@ import { AllocatePhase } from '../phases/AllocatePhase';
 import { RestructurePhase } from '../phases/RestructurePhase';
 import { InstructionsModal } from '../ui/InstructionsModal';
 import { FamilyOfficeTutorialModal } from '../ui/FamilyOfficeTutorialModal';
+import { FundManagerTutorialModal } from '../ui/FundManagerTutorialModal';
 import { AnnualReportModal } from '../ui/AnnualReportModal';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { UserManualModal } from '../ui/UserManualModal';
 import { FeedbackModal } from '../ui/FeedbackModal';
 import { MetricDrilldownModal } from '../ui/MetricDrilldownModal';
 import { ToastContainer } from '../ui/ToastContainer';
-import { calculateFounderEquityValue, calculateFounderPersonalWealth } from '../../engine/scoring';
+import { calculateFounderEquityValue, calculateFounderPersonalWealth, calculateEnterpriseValue } from '../../engine/scoring';
 import { calculateComplexityCost, getMarketCycleIndicator, calculateMetrics } from '../../engine/simulation';
-import { DIFFICULTY_CONFIG } from '../../data/gameConfig';
+import { DIFFICULTY_CONFIG, PE_FUND_CONFIG } from '../../data/gameConfig';
 import { MARKET_CYCLE_LABELS } from '../../data/mechanicsCopy';
 import { Tooltip } from '../ui/Tooltip';
 import { updateSessionRound, trackEventChoice } from '../../services/telemetry';
@@ -94,6 +95,7 @@ function NavOverflowMenu({ hasReports, onReports, onManual, onFeedback, onTutori
 
 const TUTORIAL_SEEN_KEY = 'holdco-tycoon-tutorial-seen-v3';
 const FO_TUTORIAL_SEEN_KEY = 'holdco-tycoon-fo-tutorial-seen-v1';
+const FM_TUTORIAL_SEEN_KEY = 'holdco-tycoon-fm-tutorial-seen-v1';
 
 const IMPROVEMENT_LABELS: Record<string, string> = {
   operating_playbook: 'Operating Playbook',
@@ -122,6 +124,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   const [drilldownMetric, setDrilldownMetric] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showFOTutorial, setShowFOTutorial] = useState(false);
+  const [showFMTutorial, setShowFMTutorial] = useState(false);
 
   const {
     holdcoName,
@@ -250,10 +253,35 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     executeIPO,
     declineIPO,
     isFamilyOfficeMode,
+    isFundManagerMode,
+    fundName,
     familyOfficeState,
+    distributeToLPs,
+    lpSatisfactionScore,
+    lpCommentary,
+    lpDistributions,
+    fundSize,
+    totalCapitalDeployed,
+    managementFeesCollected,
   } = useGameStore();
 
   const founderOwnership = founderShares / sharesOutstanding;
+
+  // Fund mode: compute dashboard metrics from full state
+  const fundDashMetrics = useMemo(() => {
+    if (!isFundManagerMode) return null;
+    const state = useGameStore.getState();
+    const nav = calculateEnterpriseValue(state);
+    const totalValue = nav + (lpDistributions ?? 0);
+    const fs = fundSize ?? PE_FUND_CONFIG.fundSize;
+    const grossMoic = fs > 0 ? totalValue / fs : 0;
+    const dpi = fs > 0 ? (lpDistributions ?? 0) / fs : 0;
+    const deployPct = fs > 0 ? ((totalCapitalDeployed ?? 0) / fs) * 100 : 0;
+    const estCarry = totalValue > PE_FUND_CONFIG.hurdleReturn
+      ? (totalValue - PE_FUND_CONFIG.hurdleReturn) * PE_FUND_CONFIG.carryRate
+      : 0;
+    return { nav, grossMoic, dpi, deployPct, estCarry };
+  }, [isFundManagerMode, cash, businesses, totalDebt, lpDistributions, fundSize, totalCapitalDeployed]);
 
   const addToast = useToastStore((s) => s.addToast);
 
@@ -668,6 +696,22 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     localStorage.setItem(FO_TUTORIAL_SEEN_KEY, 'true');
   };
 
+  // Show Fund Manager tutorial on first fund mode game start
+  useEffect(() => {
+    if (isFundManagerMode && round === 1) {
+      const hasSeenFMTutorial = localStorage.getItem(FM_TUTORIAL_SEEN_KEY);
+      if (!hasSeenFMTutorial) {
+        setShowFMTutorial(true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run once on mount only
+
+  const handleCloseFMTutorial = () => {
+    setShowFMTutorial(false);
+    localStorage.setItem(FM_TUTORIAL_SEEN_KEY, 'true');
+  };
+
   // Check for game over
   useEffect(() => {
     if (gameOver) {
@@ -876,6 +920,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             interestPenalty={getDistressRestrictions(metrics.distressLevel).interestPenalty}
             capexReduction={capexReduction}
             complexityCost={complexityCost}
+            isFundManagerMode={isFundManagerMode}
+            managementFee={isFundManagerMode ? PE_FUND_CONFIG.annualManagementFee : 0}
+            lpCommentary={isFundManagerMode ? lpCommentary : undefined}
             onContinue={advanceToEvent}
           />
         );
@@ -983,6 +1030,12 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             onExecuteIPO={executeIPO}
             onDeclineIPO={declineIPO}
             isFamilyOfficeMode={isFamilyOfficeMode}
+            isFundManagerMode={isFundManagerMode}
+            fundSize={fundSize}
+            totalCapitalDeployed={totalCapitalDeployed}
+            lpDistributions={lpDistributions}
+            managementFeesCollected={managementFeesCollected}
+            onDistributeToLPs={distributeToLPs}
           />
         );
       default:
@@ -1014,6 +1067,14 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
           foStartingCash={familyOfficeState.foStartingCash}
           philanthropyDeduction={familyOfficeState.philanthropyDeduction}
           onClose={handleCloseFOTutorial}
+        />
+      )}
+
+      {/* Fund Manager Tutorial Modal */}
+      {showFMTutorial && isFundManagerMode && (
+        <FundManagerTutorialModal
+          fundName={fundName || holdcoName}
+          onClose={handleCloseFMTutorial}
         />
       )}
 
@@ -1212,6 +1273,13 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         covenantBreachRounds={covenantBreachRounds}
         isPublic={ipoState?.isPublic}
         isFamilyOfficeMode={isFamilyOfficeMode}
+        isFundManagerMode={isFundManagerMode}
+        fundNav={fundDashMetrics?.nav}
+        fundGrossMoic={fundDashMetrics?.grossMoic}
+        fundDpi={fundDashMetrics?.dpi}
+        fundDeployPct={fundDashMetrics?.deployPct}
+        fundEstCarry={fundDashMetrics?.estCarry}
+        totalCapitalDeployed={totalCapitalDeployed}
         onMetricClick={setDrilldownMetric}
       />
 

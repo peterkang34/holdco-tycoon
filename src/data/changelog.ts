@@ -13,6 +13,30 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 7, 2026',
+    title: 'PE Fund Manager Mode',
+    sections: [
+      {
+        heading: 'New Game Mode',
+        items: [
+          'PE Fund Manager — manage a $100M fund with LP capital, a 10-year life, and a 20% carry above an 8% hurdle rate.',
+          'Two LP characters (Edna Morrison and Chip Henderson) react to your performance with dynamic commentary.',
+          'LPAC governance — large acquisitions require LP Advisory Committee approval based on satisfaction.',
+          'DPI distributions — return capital to LPs to build DPI and improve IRR timing.',
+          'Management fee ($2M/year) deducted automatically from fund cash.',
+          'Forced liquidation at Year 10 with carry waterfall showing your final compensation.',
+          'Separate 6-dimension PE scoring system (Return Generation, Capital Efficiency, Value Creation, Deployment Discipline, Risk Management, LP Satisfaction).',
+        ],
+      },
+      {
+        heading: 'Save Migration',
+        items: [
+          'v36 → v37: PE Fund Manager fields backfilled with defaults for existing saves.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 6, 2026',
     title: 'Deal Cost Clarity & MOIC Consistency',
     hidden: true,
