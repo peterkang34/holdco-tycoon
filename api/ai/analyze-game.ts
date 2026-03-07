@@ -45,25 +45,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Sanitize score fields that are interpolated into the prompt
+    const scoreGrade = sanitizeString(score.grade, 10);
+    const scoreTitle = sanitizeString(score.title, 100);
+    const scoreTotal = typeof score.total === 'number' ? score.total : 0;
+    const scoreValueCreation = typeof score.valueCreation === 'number' ? score.valueCreation : 0;
+    const scoreFcfShareGrowth = typeof score.fcfShareGrowth === 'number' ? score.fcfShareGrowth : 0;
+    const scorePortfolioRoic = typeof score.portfolioRoic === 'number' ? score.portfolioRoic : 0;
+    const scoreCapitalDeployment = typeof score.capitalDeployment === 'number' ? score.capitalDeployment : 0;
+    const scoreBalanceSheetHealth = typeof score.balanceSheetHealth === 'number' ? score.balanceSheetHealth : 0;
+    const scoreStrategicDiscipline = typeof score.strategicDiscipline === 'number' ? score.strategicDiscipline : 0;
+
     const prompt = `You are an experienced investment advisor reviewing a player's ${totalRounds}-year holding company simulation game. The player runs a holdco (not a PE fund) — never use the term "private equity firm". Analyze their performance and provide personalized, actionable feedback.
 
 GAME RESULTS:
 - Holdco Name: ${holdcoName}
 - Difficulty: ${difficulty}
 - Duration: ${totalRounds} years
-- Final Grade: ${score.grade} (${score.total}/100 points)
-- Title: ${score.title}
+- Final Grade: ${scoreGrade} (${scoreTotal}/100 points)
+- Title: ${scoreTitle}
 - Founder Equity Value: ${formatMoneyForPrompt(founderEquityValue)} (founder's share of NAV)
 - Enterprise Value: ${formatMoneyForPrompt(enterpriseValue)} (total portfolio value)
 - Founder Ownership: ${founderOwnership}
 
 SCORE BREAKDOWN:
-- Value Creation (FEV / Capital): ${score.valueCreation}/20
-- FCF/Share Growth: ${score.fcfShareGrowth}/20
-- Portfolio ROIC: ${score.portfolioRoic}/15
-- Capital Deployment: ${score.capitalDeployment}/15
-- Balance Sheet Health: ${score.balanceSheetHealth}/15
-- Strategic Discipline: ${score.strategicDiscipline}/15
+- Value Creation (FEV / Capital): ${scoreValueCreation}/20
+- FCF/Share Growth: ${scoreFcfShareGrowth}/20
+- Portfolio ROIC: ${scorePortfolioRoic}/15
+- Capital Deployment: ${scoreCapitalDeployment}/15
+- Balance Sheet Health: ${scoreBalanceSheetHealth}/15
+- Strategic Discipline: ${scoreStrategicDiscipline}/15
 
 PORTFOLIO ACTIVITY:
 - Total Acquisitions: ${totalAcquisitions}

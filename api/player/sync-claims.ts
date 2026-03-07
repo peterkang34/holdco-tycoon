@@ -4,6 +4,7 @@ import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { LEADERBOARD_KEY } from '../_lib/leaderboard.js';
 import { updatePlayerStats, updateGlobalStats } from '../_lib/playerStats.js';
+import { getClientIp } from '../_lib/rateLimit.js';
 
 /**
  * POST /api/player/sync-claims
@@ -17,6 +18,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const playerId = await getPlayerIdFromToken(req);
   if (!playerId) return res.status(401).json({ error: 'Unauthorized' });
+
+  // Rate limit: 1 request per 5 minutes per IP + per user
+  const ip = getClientIp(req);
+  const ipKey = `ratelimit:sync:${ip}`;
+  const userKey = `ratelimit:sync:user:${playerId}`;
+  const [ipExisting, userExisting] = await Promise.all([kv.get(ipKey), kv.get(userKey)]);
+  if (ipExisting || userExisting) {
+    return res.status(429).json({ error: 'Too many attempts. Try again later.' });
+  }
+  await Promise.all([
+    kv.set(ipKey, '1', { ex: 300 }),
+    kv.set(userKey, '1', { ex: 300 }),
+  ]);
 
   try {
     // 1. Read all KV leaderboard entries
@@ -130,6 +144,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
   } catch (err) {
     console.error('sync-claims error:', err);
-    return res.status(500).json({ error: 'Internal error', detail: String(err) });
+    return res.status(500).json({ error: 'Internal error' });
   }
 }

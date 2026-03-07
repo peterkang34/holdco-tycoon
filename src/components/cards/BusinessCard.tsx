@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { Business, IntegratedPlatform, ActiveTurnaround, formatMoney, formatPercent, formatMultiple } from '../../engine/types';
 import { getProgramById } from '../../data/turnaroundPrograms';
 import { SECTORS } from '../../data/sectors';
@@ -34,7 +34,7 @@ interface BusinessCardProps {
   onToggle?: () => void;
 }
 
-export function BusinessCard({
+export const BusinessCard = memo(function BusinessCard({
   business,
   showDetails = true,
   onSell,
@@ -683,4 +683,4 @@ export function BusinessCard({
       )}
     </div>
   );
-}
+});

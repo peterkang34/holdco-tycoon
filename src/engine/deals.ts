@@ -70,7 +70,7 @@ export function generateDealStructures(
         rate: sellerNoteRate,
         termRounds: sellerNoteTerms,
       },
-      leverage: Math.round((sellerNoteAmount / deal.business.ebitda) * 10) / 10,
+      leverage: deal.business.ebitda > 0 ? Math.round((sellerNoteAmount / deal.business.ebitda) * 10) / 10 : 99.9,
       risk: 'medium',
     });
   }
@@ -93,7 +93,7 @@ export function generateDealStructures(
           rate: interestRate,
           termRounds: bankDebtTerms,
         },
-        leverage: Math.round((bankDebtAmount / deal.business.ebitda) * 10) / 10,
+        leverage: deal.business.ebitda > 0 ? Math.round((bankDebtAmount / deal.business.ebitda) * 10) / 10 : 99.9,
         risk: 'high',
       });
     }
@@ -143,7 +143,7 @@ export function generateDealStructures(
           rate: interestRate,
           termRounds: bankDebtTerms,
         },
-        leverage: Math.round((combinedDebt / deal.business.ebitda) * 10) / 10,
+        leverage: deal.business.ebitda > 0 ? Math.round((combinedDebt / deal.business.ebitda) * 10) / 10 : 99.9,
         risk: 'high',
       });
     }
@@ -172,7 +172,7 @@ export function generateDealStructures(
           termRounds: sellerNoteTerms,
         },
         rolloverEquityPct: config.rolloverPct,
-        leverage: Math.round((noteAmount / deal.business.ebitda) * 10) / 10,
+        leverage: deal.business.ebitda > 0 ? Math.round((noteAmount / deal.business.ebitda) * 10) / 10 : 99.9,
         risk: 'low',
       });
     }

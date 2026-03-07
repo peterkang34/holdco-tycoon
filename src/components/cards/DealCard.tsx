@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, memo } from 'react';
 import { Deal, DealHeat, SellerArchetype, formatMoney, Business } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
 import { getSizeRatioTier } from '../../engine/businesses';
@@ -25,7 +25,7 @@ interface DealCardProps {
   leagueBlocked?: boolean;
 }
 
-export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlatforms = [], isPassed, onPass, collapsible, isExpanded, onToggle, showSwipeHint, onSwipeUsed, leagueBlocked }: DealCardProps) {
+export const DealCard = memo(function DealCard({ deal, onSelect, disabled, unaffordable, availablePlatforms = [], isPassed, onPass, collapsible, isExpanded, onToggle, showSwipeHint, onSwipeUsed, leagueBlocked }: DealCardProps) {
   const [showStory, setShowStory] = useState(false);
   const [loadingAI, setLoadingAI] = useState(false);
   const sector = SECTORS[deal.business.sectorId];
@@ -499,4 +499,4 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
       </div>
     </div>
   );
-}
+});

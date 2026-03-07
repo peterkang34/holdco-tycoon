@@ -17,6 +17,7 @@ import { StatsModal } from './components/ui/StatsModal';
 import { ClaimGamesModal } from './components/ui/ClaimGamesModal';
 import { PrivacyPolicyModal } from './components/ui/PrivacyPolicyModal';
 import { DeleteAccountModal } from './components/ui/DeleteAccountModal';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 
 type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard';
 
@@ -293,7 +294,7 @@ function App() {
           challengeData={challengeData}
         />
       )}
-      {screen === 'game' && <GameScreen onGameOver={handleGameOver} onResetGame={handlePlayAgain} showTutorial={isNewGame} isChallenge={!!challengeData} />}
+      {screen === 'game' && <ErrorBoundary><GameScreen onGameOver={handleGameOver} onResetGame={handlePlayAgain} showTutorial={isNewGame} isChallenge={!!challengeData} /></ErrorBoundary>}
       {screen === 'familyOfficeBridge' && (
         <div className="min-h-screen px-4 sm:px-8 py-8 pb-16 max-w-2xl mx-auto flex flex-col items-center justify-center">
           <span className="text-6xl block mb-6">🦅</span>
@@ -328,7 +329,7 @@ function App() {
         </div>
       )}
       {screen === 'gameOver' && (
-        <GameOverScreen
+        <ErrorBoundary><GameOverScreen
           holdcoName={holdcoName}
           score={score!}
           insights={insights!}
@@ -360,7 +361,7 @@ function App() {
           challengeData={challengeData}
           incomingResult={incomingResult}
           onPlayAgain={handlePlayAgain}
-        />
+        /></ErrorBoundary>
       )}
       {screen === 'familyOfficeResults' && (
         <FamilyOfficeScreen onComplete={handleFamilyOfficeResultsComplete} />

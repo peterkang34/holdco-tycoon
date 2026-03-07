@@ -503,6 +503,7 @@ export const useGameStore = create<GameStore>()(
 
       advanceToEvent: () => {
         const state = get();
+        if (state.phase !== 'collect') return; // Guard: waterfall must only run once per round
         const roundStreams = createRngStreams(state.seed, state.round);
         const sharedBenefits = calculateSharedServicesBenefits(state as GameState);
 
@@ -886,6 +887,7 @@ export const useGameStore = create<GameStore>()(
 
       advanceToAllocate: () => {
         const state = get();
+        if (state.phase !== 'event') return; // Guard: must be in event phase
 
         // If there's a pending proSports event, show it before advancing to allocate
         if (state.pendingProSportsEvent) {
@@ -1014,6 +1016,7 @@ export const useGameStore = create<GameStore>()(
 
       endRound: () => {
         const state = get();
+        if (state.phase !== 'allocate') return; // Guard: must be in allocate phase
         const roundStreams = createRngStreams(state.seed, state.round);
         const sharedBenefits = calculateSharedServicesBenefits(state);
         const focusBonus = calculateSectorFocusBonus(state.businesses);
@@ -2379,6 +2382,7 @@ export const useGameStore = create<GameStore>()(
 
       sellBusiness: (businessId: string) => {
         const state = get();
+        if (state.phase !== 'allocate') return; // Guard: sales only during allocate
         const business = state.businesses.find(b => b.id === businessId);
         if (!business || business.status !== 'active') {
           useToastStore.getState().addToast({ message: 'Action failed: business no longer available', type: 'warning' });
@@ -4502,8 +4506,11 @@ export const useGameStore = create<GameStore>()(
           })
         );
 
-        // Merge storyBeats into current state (avoids overwriting concurrent mutations)
+        // Guard: discard stale stories if round changed during async AI calls
         const freshState = get();
+        if (freshState.round !== state.round) return;
+
+        // Merge storyBeats into current state (avoids overwriting concurrent mutations)
         const storyMap = new Map(updatedBusinesses.map(b => [b.id, b.storyBeats]));
         set({
           businesses: freshState.businesses.map(b => {
@@ -4625,6 +4632,23 @@ export const useGameStore = create<GameStore>()(
         isFamilyOfficeMode: state.isFamilyOfficeMode,
         nextAcquisitionHeatReduction: state.nextAcquisitionHeatReduction,
       }),
+      // Debounced storage to coalesce rapid mutations (game is turn-based, 500ms delay is safe)
+      storage: {
+        getItem: (name) => {
+          const str = localStorage.getItem(name);
+          return str ? JSON.parse(str) : null;
+        },
+        setItem: (() => {
+          let timeout: ReturnType<typeof setTimeout> | null = null;
+          return (name: string, value: unknown) => {
+            if (timeout) clearTimeout(timeout);
+            timeout = setTimeout(() => {
+              localStorage.setItem(name, JSON.stringify(value));
+            }, 500);
+          };
+        })(),
+        removeItem: (name) => localStorage.removeItem(name),
+      },
       onRehydrateStorage: () => (state) => {
         if (state && state.holdcoName) {
           try {
