@@ -366,11 +366,12 @@ export function GameOverScreen({
   const foMultiplier = familyOfficeState?.foMultiplier ?? 1.0;
   const adjustedFEV = Math.round(founderEquityValue * difficultyMultiplier * restructuringMultiplier * foMultiplier);
   const peEntries = leaderboard.filter(e => e.isFundManager);
+  const myCarry = carryWaterfallData?.carry ?? 0;
   const canMakeLeaderboard = isFundManagerMode
-    ? (peEntries.length < 50 || (carryWaterfallData?.grossMoic ?? 0) > Math.min(...peEntries.map(e => e.grossMoic ?? 0)))
+    ? (peEntries.length < 50 || myCarry > Math.min(...peEntries.map(e => e.carryEarned ?? 0)))
     : wouldMakeLeaderboardFromList(leaderboard, adjustedFEV);
   const potentialRank = isFundManagerMode
-    ? peEntries.filter(e => (e.grossMoic ?? 0) > (carryWaterfallData?.grossMoic ?? 0)).length + 1
+    ? peEntries.filter(e => (e.carryEarned ?? 0) > myCarry).length + 1
     : getLeaderboardRankFromList(leaderboard, adjustedFEV);
 
   // Memoize per-business exit valuations — each calls calculateExitValuation with premium/buyer-pool logic
@@ -1495,7 +1496,7 @@ function GameOverLeaderboard({
                   <div className="min-w-[4.5rem]">
                     <p className="text-xs text-text-muted">{displayLabel}</p>
                     <p className="font-mono tabular-nums font-bold text-accent">
-                      {isPE ? `${displayValue.toFixed(2)}x` : formatMoney(displayValue)}
+                      {formatMoney(displayValue)}
                       {!isPE && entry.hasRestructured && <span className="text-red-400 text-[10px] ml-1" title="Restructured — 20% FEV penalty">(R)</span>}
                     </p>
                   </div>

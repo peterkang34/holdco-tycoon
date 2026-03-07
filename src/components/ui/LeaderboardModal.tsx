@@ -93,7 +93,7 @@ function filterAndSort(entries: LeaderboardEntry[], tab: LeaderboardTab): Leader
       break;
     case 'pe':
       filtered = [...peEntries];
-      filtered.sort((a, b) => (b.grossMoic ?? 0) - (a.grossMoic ?? 0));
+      filtered.sort((a, b) => (b.carryEarned ?? 0) - (a.carryEarned ?? 0));
       break;
   }
 
@@ -103,13 +103,13 @@ function filterAndSort(entries: LeaderboardEntry[], tab: LeaderboardTab): Leader
 /** Get the display value for an entry in a given tab */
 function getDisplayValue(entry: LeaderboardEntry, tab: LeaderboardTab): number {
   if (tab === 'distributions') return entry.founderPersonalWealth ?? 0;
-  if (tab === 'pe') return entry.grossMoic ?? 0;
+  if (tab === 'pe') return entry.carryEarned ?? 0;
   return getAdjustedFEV(entry);
 }
 
 function getDisplayLabel(tab: LeaderboardTab): string {
   if (tab === 'distributions') return 'Wealth';
-  if (tab === 'pe') return 'MOIC';
+  if (tab === 'pe') return 'Carry';
   return 'Adj FEV';
 }
 
@@ -194,7 +194,7 @@ export function LeaderboardModal({
     : activeTab === 'distributions'
     ? 'Ranked by founder distributions received'
     : activeTab === 'pe'
-    ? 'PE Fund Manager runs ranked by Gross MOIC'
+    ? 'PE Fund Manager runs ranked by carried interest earned'
     : 'Ranked by adjusted FEV within mode';
 
   return (
@@ -312,14 +312,18 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
         <div className="min-w-[4.5rem]">
           <p className="text-xs text-text-muted">{displayLabel}</p>
           <p className="font-mono tabular-nums font-bold text-accent">
-            {isPE ? `${displayValue.toFixed(2)}x` : formatMoney(displayValue)}
+            {formatMoney(displayValue)}
             {!isPE && entry.hasRestructured && <span className="text-red-400 text-[10px] ml-1" title="Restructured — 20% FEV penalty">(R)</span>}
           </p>
           {showRaw && (
             <p className="text-[11px] text-text-secondary font-mono tabular-nums whitespace-nowrap">Raw: {formatMoney(rawFEV)}</p>
           )}
-          {isPE && entry.netIrr != null && (
-            <p className="text-[11px] text-text-secondary font-mono tabular-nums whitespace-nowrap">{(entry.netIrr * 100).toFixed(1)}% IRR</p>
+          {isPE && (
+            <p className="text-[11px] text-text-secondary font-mono tabular-nums whitespace-nowrap">
+              {entry.grossMoic != null ? `${entry.grossMoic.toFixed(2)}x` : ''}
+              {entry.grossMoic != null && entry.netIrr != null ? ' · ' : ''}
+              {entry.netIrr != null ? `${(entry.netIrr * 100).toFixed(1)}% IRR` : ''}
+            </p>
           )}
         </div>
         <div className="min-w-[3.5rem]">
