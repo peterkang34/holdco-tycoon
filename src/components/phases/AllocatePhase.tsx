@@ -26,7 +26,8 @@ import { SECTOR_LIST, SECTOR_LIST_STANDARD } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
 import { generateDealStructures, getStructureLabel, getStructureDescription } from '../../engine/deals';
-import { calculateExitValuation, calculateAnnualFcf, calculatePortfolioTax } from '../../engine/simulation';
+import { calculateExitValuation, calculateAnnualFcf, calculatePortfolioTax, calculateSectorFocusBonus, getSectorFocusEbitdaBonus } from '../../engine/simulation';
+import { capGrowthRate } from '../../engine/helpers';
 import { getSubTypeAffinity, getSizeRatioTier } from '../../engine/businesses';
 import { SECTORS } from '../../data/sectors';
 import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES, MA_SOURCING_CONFIG, getMASourcingUpgradeCost, getMASourcingAnnualCost } from '../../data/sharedServices';
@@ -468,9 +469,53 @@ export function AllocatePhase({
 
   // Covenant headroom — updates in real-time as cash changes
   const covenantHeadroom = useMemo(() => {
-    const preTaxFcf = activeBusinesses.reduce(
+    // --- Project next-year EBITDA using deterministic growth factors ---
+    // endRound() applies organic growth BEFORE collect phase, so the forecast
+    // should account for base growth rate + systematic bonuses.
+
+    // Shared services growth bonus (marketing_brand: 1.5%, technology_systems: 0.5%)
+    const activeServices = sharedServices.filter(s => s.active);
+    const opcoCount = activeBusinesses.length;
+    const ssScale = opcoCount >= 6 ? 1.2 : opcoCount >= 3 ? 1.0 + (opcoCount - 2) * 0.05 : 1.0;
+    let ssGrowthBonus = 0;
+    for (const s of activeServices) {
+      if (s.type === 'marketing_brand') ssGrowthBonus += 0.015 * ssScale;
+      else if (s.type === 'technology_systems') ssGrowthBonus += 0.005 * ssScale;
+    }
+
+    // Sector focus bonus
+    const focusBonus = calculateSectorFocusBonus(allBusinesses);
+    const focusEbitdaBonus = focusBonus ? getSectorFocusEbitdaBonus(focusBonus.tier) : 0;
+
+    // Diversification bonus (4+ unique sectors: +4%, 6+: +6%)
+    const uniqueSectors = new Set(activeBusinesses.map(b => b.sectorId)).size;
+    const diversificationBonus = uniqueSectors >= 6 ? 0.06 : uniqueSectors >= 4 ? 0.04 : 0;
+
+    // Project each business's next-year EBITDA
+    const projectedBusinesses = activeBusinesses.map(b => {
+      let growthRate = capGrowthRate(b.revenueGrowthRate);
+      growthRate += ssGrowthBonus;
+      growthRate += focusEbitdaBonus;
+      growthRate += diversificationBonus;
+      // Competitive position: leaders +1.5%, commoditized -1.5%
+      if (b.dueDiligence?.competitivePosition === 'leader') growthRate += 0.015;
+      else if (b.dueDiligence?.competitivePosition === 'commoditized') growthRate -= 0.015;
+      // Integration penalty (midpoint of -3% to -8%)
+      if (b.integrationRoundsRemaining > 0) growthRate -= 0.05;
+      // Integration failure growth drag
+      if (b.integrationGrowthDrag && b.integrationGrowthDrag < 0) growthRate += b.integrationGrowthDrag;
+      // Sector-specific SS bonus (+1% for agency/consumer with active SS growth)
+      if ((b.sectorId === 'agency' || b.sectorId === 'consumer') && ssGrowthBonus > 0) growthRate += 0.01;
+
+      const projectedRevenue = Math.round(b.revenue * (1 + growthRate));
+      const projectedEbitda = Math.round(projectedRevenue * b.ebitdaMargin);
+      return { ...b, ebitda: projectedEbitda, revenue: projectedRevenue };
+    });
+
+    const preTaxFcf = projectedBusinesses.reduce(
       (sum, b) => sum + calculateAnnualFcf(b, ssCapexReduction, ssCashConversionBonus), 0
     );
+    const projectedTotalEbitda = projectedBusinesses.reduce((sum, b) => sum + Math.max(0, b.ebitda), 0);
 
     // Operating costs
     const maCostAnnual = maSourcing.active ? getMASourcingAnnualCost(maSourcing.tier) : 0;
@@ -482,17 +527,21 @@ export function AllocatePhase({
 
     // Seller note P&I is computed inside calculateCovenantHeadroom — not included here
 
-    // Earnout estimate (current growth as proxy)
+    // Earnout estimate (using projected growth as proxy)
     const earnoutEst = allBusinesses.reduce((sum, b) => {
       if (b.earnoutRemaining <= 0 || b.earnoutTarget <= 0) return sum;
       if (round > 0 && round - b.acquisitionRound > EARNOUT_EXPIRATION_YEARS) return sum;
       if (b.status === 'active' && b.acquisitionEbitda > 0) {
-        const growth = (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda;
+        const projected = projectedBusinesses.find(p => p.id === b.id);
+        const ebitdaForGrowth = projected ? projected.ebitda : b.ebitda;
+        const growth = (ebitdaForGrowth - b.acquisitionEbitda) / b.acquisitionEbitda;
         if (growth >= b.earnoutTarget) return sum + b.earnoutRemaining;
       } else if (b.status === 'integrated' && b.parentPlatformId) {
         const platform = allBusinesses.find(p => p.id === b.parentPlatformId && p.status === 'active');
         if (platform && platform.acquisitionEbitda > 0) {
-          const growth = (platform.ebitda - platform.acquisitionEbitda) / platform.acquisitionEbitda;
+          const projected = projectedBusinesses.find(p => p.id === platform.id);
+          const ebitdaForGrowth = projected ? projected.ebitda : platform.ebitda;
+          const growth = (ebitdaForGrowth - platform.acquisitionEbitda) / platform.acquisitionEbitda;
           if (growth >= b.earnoutTarget) return sum + b.earnoutRemaining;
         }
       }
@@ -500,7 +549,7 @@ export function AllocatePhase({
     }, 0);
 
     // Tax with penalty included for holdco interest deduction
-    const taxEst = calculatePortfolioTax(activeBusinesses, holdcoLoanBalance, holdcoLoanRate + distressRestrictions.interestPenalty, sharedServicesCostAnnual + maCostAnnual);
+    const taxEst = calculatePortfolioTax(projectedBusinesses, holdcoLoanBalance, holdcoLoanRate + distressRestrictions.interestPenalty, sharedServicesCostAnnual + maCostAnnual);
 
     // Net FCF after tax, operating costs, and opco-level debt service
     // NOTE: holdco P&I, bank debt P&I, and seller note P&I are computed inside calculateCovenantHeadroom — do NOT include here
@@ -509,7 +558,7 @@ export function AllocatePhase({
     return calculateCovenantHeadroom(
       cash,
       totalDebt,
-      totalEbitda,
+      projectedTotalEbitda,
       holdcoLoanBalance,
       holdcoLoanRate,
       holdcoLoanRoundsRemaining,
@@ -518,7 +567,7 @@ export function AllocatePhase({
       distressRestrictions.interestPenalty,
       estimatedNetFcf,
     );
-  }, [cash, totalDebt, totalEbitda, holdcoLoanBalance, holdcoLoanRate, holdcoLoanRoundsRemaining, allBusinesses, interestRate, distressRestrictions.interestPenalty, activeBusinesses, ssCapexReduction, ssCashConversionBonus, sharedServicesCostAnnual, maSourcing, turnaroundTier, activeTurnarounds]);
+  }, [cash, totalDebt, totalEbitda, holdcoLoanBalance, holdcoLoanRate, holdcoLoanRoundsRemaining, allBusinesses, interestRate, distressRestrictions.interestPenalty, activeBusinesses, ssCapexReduction, ssCashConversionBonus, sharedServicesCostAnnual, sharedServices, maSourcing, turnaroundTier, activeTurnarounds]);
 
   // Platform and tuck-in helpers
   const platforms = activeBusinesses.filter(b => b.isPlatform);

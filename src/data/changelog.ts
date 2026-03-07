@@ -26,7 +26,16 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Management fee ($2M/year) deducted automatically from fund cash.',
           'Forced liquidation at Year 10 with carry waterfall showing your final compensation.',
           'Separate 6-dimension PE scoring system (Return Generation, Capital Efficiency, Value Creation, Deployment Discipline, Risk Management, LP Satisfaction).',
-          'PE Fund tab on the global leaderboard — ranked by Gross MOIC with Net IRR displayed.',
+          'PE Fund tab on the global leaderboard — ranked by carry earned.',
+        ],
+      },
+      {
+        heading: 'Bug Fixes',
+        items: [
+          'Next Year Forecast now accounts for expected EBITDA growth from improvements, shared services, sector focus, diversification, and competitive position — previously showed pessimistic projections.',
+          'Management fee ($2M) now correctly deducted in Year 1 cash flow waterfall.',
+          'DPI distribution toasts now show actual DPI value and check 1.0x milestone before 0.5x.',
+          'New acquisitions in PE mode get a 1-year covenant grace period — no more immediate breach from inherited leverage.',
         ],
       },
       {
