@@ -53,6 +53,7 @@ export function createMockBusiness(overrides: Partial<Business> = {}): Business 
     boltOnIds: [],
     synergiesRealized: 0,
     totalAcquisitionCost: 4000,
+    cashEquityInvested: 4000,
     qualityImprovedTiers: 0,
     rolloverEquityPct: 0,
     priorOwnershipCount: 0,

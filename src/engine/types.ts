@@ -135,7 +135,8 @@ export interface Business {
   parentPlatformId?: string; // If this was a tuck-in, the ID of the platform it was merged into
   integrationOutcome?: IntegrationOutcome; // How well the integration went
   synergiesRealized: number; // EBITDA boost from successful integration (in $k)
-  totalAcquisitionCost: number; // Sum of this business + all bolt-ons acquired
+  totalAcquisitionCost: number; // Sum of this business + all bolt-ons acquired (full deal EV incl. debt)
+  cashEquityInvested: number; // Actual cash spent by player (excludes debt financing)
 
   // Merger tracking
   wasMerged?: boolean; // Was this entity created from a merger?

@@ -188,14 +188,11 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
     let returns = 0;
 
     if (business.status === 'sold' && business.exitPrice) {
-      returns = business.exitPrice;
+      returns = business.exitPrice; // Gross exit price (EV at exit)
     } else if (business.status === 'active') {
-      // Use full valuation engine for current value
+      // Use gross EV consistent with sold businesses (exitPrice is also gross)
       const valuation = calculateExitValuation(business, maxRounds, undefined, undefined, state.integratedPlatforms);
-      const grossValue = business.ebitda * valuation.totalMultiple;
-      // Net out business-level debt for realistic MOIC
-      const bizDebt = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining;
-      returns = Math.max(0, grossValue - bizDebt);
+      returns = business.ebitda * valuation.totalMultiple;
     }
 
     totalMoicWeighted += returns;

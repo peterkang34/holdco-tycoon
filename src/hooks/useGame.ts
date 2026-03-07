@@ -1263,7 +1263,7 @@ export const useGameStore = create<GameStore>()(
         if (structure.type === 'share_funded') {
           if (!state.ipoState?.isPublic || !structure.shareTerms) return;
           const newBusiness = executeDealStructure(deal, structure, state.round, state.maxRounds);
-          const businessWithPlatformFields: Business = { ...newBusiness, isPlatform: false, platformScale: 0, boltOnIds: [], synergiesRealized: 0, totalAcquisitionCost: deal.effectivePrice, acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0 };
+          const businessWithPlatformFields: Business = { ...newBusiness, isPlatform: false, platformScale: 0, boltOnIds: [], synergiesRealized: 0, totalAcquisitionCost: deal.effectivePrice, cashEquityInvested: 0, acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0 };
           const newBusinesses = [...state.businesses, businessWithPlatformFields];
           const updatedIPO = {
             ...state.ipoState,
@@ -1301,6 +1301,7 @@ export const useGameStore = create<GameStore>()(
           boltOnIds: [],
           synergiesRealized: 0,
           totalAcquisitionCost: deal.effectivePrice,
+          cashEquityInvested: structure.cashRequired,
           acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0,
         };
 
@@ -1416,7 +1417,7 @@ export const useGameStore = create<GameStore>()(
             earnoutRemaining: 0, earnoutTarget: 0,
             status: 'integrated', isPlatform: false, platformScale: 0, boltOnIds: [],
             parentPlatformId: targetPlatformId, integrationOutcome: outcomeSF, synergiesRealized: synergiesSF,
-            totalAcquisitionCost: deal.effectivePrice, acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0,
+            totalAcquisitionCost: deal.effectivePrice, cashEquityInvested: 0, acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0,
             rolloverEquityPct: 0, integratedPlatformId: platform.integratedPlatformId,
             priorOwnershipCount: deal.business.priorOwnershipCount ?? 0,
           };
@@ -1432,7 +1433,7 @@ export const useGameStore = create<GameStore>()(
               return { ...b, isPlatform: true, platformScale: newPlatformScaleSF, boltOnIds: [...b.boltOnIds, boltOnIdSF],
                 ebitda: b.ebitda + deal.business.ebitda + synergiesSF, revenue: combinedRevenueSF,
                 ebitdaMargin: clampMargin(blendedMarginSF), peakRevenue: Math.max(b.peakRevenue, combinedRevenueSF),
-                synergiesRealized: b.synergiesRealized + synergiesSF, totalAcquisitionCost: b.totalAcquisitionCost + deal.effectivePrice,
+                synergiesRealized: b.synergiesRealized + synergiesSF, totalAcquisitionCost: b.totalAcquisitionCost + deal.effectivePrice, cashEquityInvested: (b.cashEquityInvested ?? b.totalAcquisitionCost),
                 acquisitionMultiple: b.acquisitionMultiple + multipleExpansionSF, organicGrowthRate: b.organicGrowthRate,
                 revenueGrowthRate: b.revenueGrowthRate, integrationGrowthDrag: (b.integrationGrowthDrag ?? 0) + growthDragPenaltySF,
               };
@@ -1524,6 +1525,7 @@ export const useGameStore = create<GameStore>()(
           integrationOutcome: outcome,
           synergiesRealized: synergies,
           totalAcquisitionCost: deal.effectivePrice,
+          cashEquityInvested: structure.cashRequired,
           acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0,
           rolloverEquityPct: 0, // Tuck-ins: bolt-on has 0 rollover; parent's pct applies at exit
           // Propagate integratedPlatformId if the target platform belongs to a forged integrated platform
@@ -1563,6 +1565,7 @@ export const useGameStore = create<GameStore>()(
               peakRevenue: Math.max(b.peakRevenue, combinedRevenue),
               synergiesRealized: b.synergiesRealized + synergies,
               totalAcquisitionCost: b.totalAcquisitionCost + deal.effectivePrice,
+              cashEquityInvested: (b.cashEquityInvested ?? b.totalAcquisitionCost) + structure.cashRequired,
               acquisitionMultiple: b.acquisitionMultiple + multipleExpansion, // Multiple expansion!
               organicGrowthRate: b.organicGrowthRate, // no longer mutated — drag is on separate field
               revenueGrowthRate: b.revenueGrowthRate,
@@ -1786,6 +1789,7 @@ export const useGameStore = create<GameStore>()(
           integrationOutcome: outcome,
           synergiesRealized: (biz1.synergiesRealized || 0) + (biz2.synergiesRealized || 0) + synergies,
           totalAcquisitionCost: combinedTotalCost,
+          cashEquityInvested: (biz1.cashEquityInvested ?? biz1.totalAcquisitionCost) + (biz2.cashEquityInvested ?? biz2.totalAcquisitionCost) + totalMergeCost,
           // Recalculate size tier for merged EBITDA (not Math.max of originals)
           acquisitionSizeTierPremium: calculateSizeTierPremium(combinedEbitda).premium,
           wasMerged: true,
@@ -2042,6 +2046,7 @@ export const useGameStore = create<GameStore>()(
             organicGrowthRate: capGrowthRate(b.organicGrowthRate + growthBoost),
             revenueGrowthRate: capGrowthRate(b.revenueGrowthRate + growthBoost),
             totalAcquisitionCost: b.totalAcquisitionCost + cost,
+            cashEquityInvested: (b.cashEquityInvested ?? b.totalAcquisitionCost) + cost,
             dueDiligence: updatedDueDiligence,
             marginDriftRate: updatedMarginDriftRate,
             improvements: [
@@ -4091,6 +4096,7 @@ export const useGameStore = create<GameStore>()(
           businesses: updatedBusinesses,
           integratedPlatforms: [...state.integratedPlatforms, platform],
           cash: state.cash - integrationCost,
+          totalInvestedCapital: state.totalInvestedCapital + integrationCost,
           actionsThisRound: [
             ...state.actionsThisRound,
             {
@@ -4564,7 +4570,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v35', // v35: Real pro sports teams (200 teams, 8 leagues), women's leagues (WNBA/NWSL)
+      name: 'holdco-tycoon-save-v36', // v36: cashEquityInvested tracking, MOIC scoring fix, platform forge totalInvestedCapital
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

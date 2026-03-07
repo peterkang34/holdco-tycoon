@@ -72,8 +72,9 @@ export const BusinessCard = memo(function BusinessCard({
     ? integratedPlatforms.find(p => p.id === business.integratedPlatformId)?.name
     : undefined;
   const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
-  const gainLoss = exitValuation.netProceeds - totalInvested;
-  const moic = exitValuation.netProceeds / totalInvested;
+  const cashInvested = business.cashEquityInvested ?? totalInvested;
+  const gainLoss = exitValuation.exitPrice - totalInvested; // EV-on-EV comparison
+  const moic = totalInvested > 0 ? exitValuation.exitPrice / totalInvested : 0; // Gross EV MOIC
 
   // League badge for pro sports teams
   const leagueConfig = business.sectorId === 'proSports'
@@ -414,8 +415,11 @@ export const BusinessCard = memo(function BusinessCard({
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 text-[11px] sm:text-xs mb-3">
             <div>
-              <p className="text-text-muted">Invested</p>
-              <p className="font-mono">{formatMoney(totalInvested)}</p>
+              <p className="text-text-muted">Cash Invested</p>
+              <p className="font-mono">{formatMoney(cashInvested)}</p>
+              {cashInvested < totalInvested && (
+                <p className="text-text-muted text-[10px]">Total: {formatMoney(totalInvested)}</p>
+              )}
             </div>
             <div>
               <p className="text-text-muted">MOIC</p>

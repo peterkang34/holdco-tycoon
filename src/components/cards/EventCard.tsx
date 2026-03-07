@@ -158,6 +158,7 @@ export function EventCard({ event, businesses, currentRound, lastEventType, onCh
         const sector = SECTORS[business.sectorId];
         const valuation = calculateExitValuation(business, currentRound, lastEventType);
         const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
+        const cashInvested = business.cashEquityInvested ?? totalInvested;
         const offerAmount = event.offerAmount ?? 0;
         const premiumPct = valuation.exitPrice > 0
           ? ((offerAmount - valuation.exitPrice) / valuation.exitPrice) * 100
@@ -204,8 +205,11 @@ export function EventCard({ event, businesses, currentRound, lastEventType, onCh
                 <p className="text-[10px] text-text-muted">{valuation.totalMultiple.toFixed(1)}x multiple</p>
               </div>
               <div>
-                <p className="text-xs text-text-muted">You Invested</p>
-                <p className="font-mono text-sm font-medium">{formatMoney(totalInvested)}</p>
+                <p className="text-xs text-text-muted">Cash Invested</p>
+                <p className="font-mono text-sm font-medium">{formatMoney(cashInvested)}</p>
+                {cashInvested < totalInvested && (
+                  <p className="text-[10px] text-text-muted">Total: {formatMoney(totalInvested)}</p>
+                )}
               </div>
             </div>
             <div className="flex items-center justify-between pt-2 border-t border-white/10">

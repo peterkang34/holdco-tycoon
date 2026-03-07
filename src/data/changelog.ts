@@ -14,6 +14,27 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'March 6, 2026',
+    title: 'Deal Cost Clarity & MOIC Consistency',
+    hidden: true,
+    sections: [
+      {
+        heading: 'Bug Fixes',
+        items: [
+          '"Cash Invested" now shows your actual cash outlay separately from total deal cost (including debt) on business cards, sell confirmations, and unsolicited offers.',
+          'Fixed MOIC scoring inconsistency — active and sold businesses now use consistent gross valuation.',
+          'Platform forging cost now properly tracked in total invested capital.',
+        ],
+      },
+      {
+        heading: 'Save Migration',
+        items: [
+          'v35 → v36',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 6, 2026',
     title: 'AI Cost Optimization',
     hidden: true,
     sections: [

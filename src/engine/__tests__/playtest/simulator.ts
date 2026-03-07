@@ -818,6 +818,7 @@ function simulateAllocatePhase(
       boltOnIds: [...platform.boltOnIds, boltOnId],
       synergiesRealized: platform.synergiesRealized + synergies,
       totalAcquisitionCost: platform.totalAcquisitionCost + deal.effectivePrice,
+      cashEquityInvested: (platform.cashEquityInvested ?? platform.totalAcquisitionCost) + structure.cashRequired,
     };
 
     // Integration failure drag

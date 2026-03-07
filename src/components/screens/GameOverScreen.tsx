@@ -363,7 +363,7 @@ export function GameOverScreen({
       const valuation = calculateExitValuation(business, maxRounds, undefined, undefined, integratedPlatforms);
       const value = Math.round(business.ebitda * valuation.totalMultiple);
       const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
-      const moic = totalInvested > 0 ? value / totalInvested : 0;
+      const moic = totalInvested > 0 ? value / totalInvested : 0; // EV MOIC (gross/gross)
       return { business, valuation, value, totalInvested, moic };
     }).sort((a, b) => b.value - a.value);
     const portfolioValue = businessValues.reduce((sum, bv) => sum + bv.value, 0);

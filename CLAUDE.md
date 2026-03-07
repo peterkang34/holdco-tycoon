@@ -70,8 +70,8 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
-- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v35`
-- **Tests**: Vitest in `src/engine/__tests__/` — 1427 tests across 25 suites (incl. display-proofreader + playtest system); API integration tests in `api/__tests__/` — 48 tests across 6 suites (health, stats, history, claim-history, export, delete)
+- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v36`
+- **Tests**: Vitest in `src/engine/__tests__/` — 1427 tests across 25 suites (incl. display-proofreader + playtest system); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Rollover Equity**: 6th deal structure — seller reinvests ~25% (standard) or ~20% (quick) as equity; gated behind M&A Tier 2+, Q3+, non-distressed archetypes, noNewDebt; exit split applied AFTER debt payoff; FEV deducts rollover claims; note rate 5%
@@ -147,7 +147,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **CollectPhase needs ALL businesses** (not just activeBusinesses) — `calculateIntegratedDebtService` filters internally
 - **Earn-out display must cap at available cash** — store uses `Math.min(earnoutRemaining, available)`, display must match
 - **Race conditions in async AI calls** — always check state is still current before setting narrative/storyBeats
-- **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety. Current: v35
+- **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety. Current: v36
 - **Integrated platforms**: Margin/growth bonuses are ONE-TIME mutations at forge time (clamped via `clampMargin`/`capGrowthRate`); multiple expansion + recession resistance are automatic via engine; platform sale bonus is tiered by `multipleExpansion` (0.3x for 2.0x+, 0.5x otherwise) via `getPlatformSaleBonus()`
 - **16 sectors, ~98 sub-types**: 15 standard + 1 FO-exclusive (proSports with 8 league sub-types). Overlaps resolved (no cross-sector sub-type duplication); sectors.ts is authoritative
 - **proSports restrictions**: Pro sports teams are standalone trophy assets — blocked from mergers, tuck-ins, platform designation, and platform eligibility. Guards in `useGame.ts` (acquireTuckIn, mergeBusinesses, addToIntegratedPlatform) + `platforms.ts` (checkPlatformEligibility, checkNearEligiblePlatforms) + AllocatePhase UI filters. 200 real teams across 8 leagues (NFL/NBA/MLB/NHL/EPL/MLS/WNBA/NWSL). Women's leagues (WNBA/NWSL) allow flexible deal structures (seller notes, earn-outs). One team per league enforced via `ownedProSportsSubTypes` (league IDs).
@@ -157,7 +157,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **Turnaround durations scale by game mode**: Quick games get ~half duration (T1: 2, T2: 3, T3: 2-3 rounds vs Standard T1: 4, T2: 5, T3: 3-6)
 - **Equity raises**: Private → escalating dilution (`EQUITY_DILUTION_STEP` 10%/raise, `EQUITY_DILUTION_FLOOR` 10%). Public → stock price + -1% sentiment/issuance (`EQUITY_ISSUANCE_SENTIMENT_PENALTY`). Both have 2-round cooldown
 - **Emergency equity raises**: flat 50% discount, NO escalating discount, but DO trigger cooldown
-- **Portfolio valuation uses quality-adjusted multiples**: `midpoint + (quality - 3) × 0.35`, floored at sector min — matches deal generation factor
+- **Portfolio valuation uses quality-adjusted multiples**: `midpoint + (quality - 3) × 0.40`, floored at sector min — matches deal generation factor
 - **Rollover equity exit split**: Applied AFTER debt payoff (`playerProceeds = netProceeds * (1 - rolloverPct)`); merges use EBITDA-weighted average; tuck-ins have rolloverPct: 0 (parent's pct covers); platform sales use per-constituent split with `Math.max(0, ...)` floor; FEV deducts rollover claims from portfolio value; gated behind `!noNewDebt`
 - **20-Year Mode features are gated on `duration === 'standard'`** — Deal Inflation, Succession Events, IPO, Family Office all check mode. 10-year mode stays untouched except compressed narrative tone (3 phases instead of 5)
 - **Deal Inflation applies AFTER quality adjustment, BEFORE competitive position** — in `businesses.ts` deal generation. Financial Crisis resets inflation by -2.0x for 2 rounds via `dealInflationState.crisisResetRoundsRemaining`

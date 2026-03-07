@@ -223,6 +223,7 @@ describe('Full Game Simulation - Aggressive Acquirer', () => {
               newBiz.boltOnIds = [];
               newBiz.synergiesRealized = 0;
               newBiz.totalAcquisitionCost = deal.askingPrice;
+              newBiz.cashEquityInvested = struct.cashRequired;
 
               state = {
                 ...state,

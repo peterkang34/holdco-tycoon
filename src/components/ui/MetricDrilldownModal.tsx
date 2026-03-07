@@ -438,7 +438,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
 
         <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">Per-Business Contribution</p>
         <BusinessTable
-          headers={['Business', 'Invested', 'EBITDA', '% NOPAT']}
+          headers={['Business', 'Total Cost', 'EBITDA', '% NOPAT']}
           rows={activeBusinesses.map(b => [
             b.name,
             formatMoney(b.totalAcquisitionCost || b.acquisitionPrice),
@@ -551,7 +551,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
 
         <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">Per-Business Value</p>
         <BusinessTable
-          headers={['Business', 'Invested', 'Current Value', 'Biz MOIC']}
+          headers={['Business', 'Total Cost', 'Current Value', 'Biz MOIC']}
           rows={activeBusinesses.map(b => {
             const valuation = calculateExitValuation(b, state.round, undefined, undefined, state.integratedPlatforms);
             const currentValue = b.ebitda * valuation.totalMultiple;
@@ -570,7 +570,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
           <>
             <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2 mt-4">Exited Businesses</p>
             <BusinessTable
-              headers={['Business', 'Invested', 'Exit Price', 'Exit MOIC']}
+              headers={['Business', 'Total Cost', 'Exit Price', 'Exit MOIC']}
               rows={state.exitedBusinesses
                 .filter(b => b.status === 'sold' && b.exitPrice && !b.parentPlatformId)
                 .map(b => {

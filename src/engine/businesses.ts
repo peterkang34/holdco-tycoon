@@ -311,6 +311,7 @@ export function generateBusiness(
     boltOnIds: [],
     synergiesRealized: 0,
     totalAcquisitionCost: acquisitionPrice,
+    cashEquityInvested: acquisitionPrice, // Starting businesses are all cash
     rolloverEquityPct: 0,
     priorOwnershipCount: 0,
   };
@@ -1689,6 +1690,7 @@ export function createStartingBusiness(sectorId: SectorId = 'agency', targetEbit
     boltOnIds: [],
     synergiesRealized: 0,
     totalAcquisitionCost: acquisitionPrice,
+    cashEquityInvested: acquisitionPrice, // FO businesses are all cash
     rolloverEquityPct: 0,
   };
 }

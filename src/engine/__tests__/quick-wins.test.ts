@@ -76,6 +76,7 @@ function createTestBusiness(overrides: Partial<Business> = {}): Business {
     boltOnIds: [],
     synergiesRealized: 0,
     totalAcquisitionCost: 4000,
+    cashEquityInvested: 4000,
     rolloverEquityPct: 0,
     priorOwnershipCount: 0,
     ...overrides,

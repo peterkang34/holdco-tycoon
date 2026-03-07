@@ -891,6 +891,40 @@ function migrateV34ToV35(): void {
 }
 
 /**
+ * v35→v36: Add cashEquityInvested to all businesses.
+ * For existing saves we don't know the original deal structure,
+ * so default to totalAcquisitionCost (conservative — overstates cash, but safe).
+ * New games track accurately from acquisition.
+ */
+function migrateV35ToV36(): void {
+  const v35Key = 'holdco-tycoon-save-v35';
+  const v36Key = 'holdco-tycoon-save-v36';
+  if (localStorage.getItem(v36Key)) return;
+  try {
+    const raw = localStorage.getItem(v35Key);
+    if (!raw) return;
+    const v35Data = JSON.parse(raw);
+
+    const addCashEquity = (b: any) => ({
+      ...b,
+      cashEquityInvested: b.cashEquityInvested ?? (b.totalAcquisitionCost || b.acquisitionPrice || 0),
+    });
+
+    if (Array.isArray(v35Data.state?.businesses)) {
+      v35Data.state.businesses = v35Data.state.businesses.map(addCashEquity);
+    }
+    if (Array.isArray(v35Data.state?.exitedBusinesses)) {
+      v35Data.state.exitedBusinesses = v35Data.state.exitedBusinesses.map(addCashEquity);
+    }
+
+    localStorage.setItem(v36Key, JSON.stringify(v35Data));
+    localStorage.removeItem(v35Key);
+  } catch (e) {
+    console.error('v35→v36 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -921,4 +955,5 @@ export function runAllMigrations(): void {
   migrateV32ToV33();
   migrateV33ToV34();
   migrateV34ToV35();
+  migrateV35ToV36();
 }

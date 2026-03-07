@@ -271,7 +271,8 @@ export function AllocatePhase({
       moicMap = new Map();
       for (const biz of standalone) {
         const ev = calculateExitValuation(biz, round, lastEventType, undefined, integratedPlatforms);
-        moicMap.set(biz.id, ev.netProceeds / (biz.totalAcquisitionCost || biz.acquisitionPrice));
+        const totalCost = biz.totalAcquisitionCost || biz.acquisitionPrice;
+        moicMap.set(biz.id, totalCost > 0 ? ev.exitPrice / totalCost : 0);
       }
     }
     return [...standalone].sort((a, b) => {
@@ -3159,7 +3160,8 @@ export function AllocatePhase({
         const biz = sellConfirmBusiness;
         const valuation = calculateExitValuation(biz, round, lastEventType, undefined, integratedPlatforms);
         const totalInvested = biz.totalAcquisitionCost || biz.acquisitionPrice;
-        const sellMoic = valuation.netProceeds / totalInvested;
+        const cashInvested = biz.cashEquityInvested ?? totalInvested;
+        const sellMoic = totalInvested > 0 ? valuation.exitPrice / totalInvested : 0; // EV MOIC
         return (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
             <div className="bg-bg-primary border border-white/10 rounded-xl max-w-md w-full p-6">
@@ -3178,9 +3180,15 @@ export function AllocatePhase({
                   <span className="font-mono font-bold">{formatMoney(valuation.netProceeds)}</span>
                 </div>
                 <div className="flex justify-between text-sm border-t border-white/10 pt-2">
-                  <span className="text-text-muted">Total Invested</span>
-                  <span className="font-mono">{formatMoney(totalInvested)}</span>
+                  <span className="text-text-muted">Cash Invested</span>
+                  <span className="font-mono">{formatMoney(cashInvested)}</span>
                 </div>
+                {cashInvested < totalInvested && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-text-muted">Total Cost</span>
+                    <span className="font-mono text-text-secondary">{formatMoney(totalInvested)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span className="text-text-muted">MOIC</span>
                   <span className={`font-mono font-bold ${sellMoic >= 2 ? 'text-accent' : sellMoic < 1 ? 'text-danger' : ''}`}>
@@ -3329,7 +3337,7 @@ export function AllocatePhase({
         const totalDebt = constituentDetails.reduce((s, d) => s + d.debt, 0);
         const totalNet = Math.max(0, totalExit - totalDebt);
         const totalInvested = constituents.reduce((s, b) => s + (b.totalAcquisitionCost || b.acquisitionPrice), 0);
-        const combinedMoic = totalNet / totalInvested;
+        const combinedMoic = totalInvested > 0 ? totalExit / totalInvested : 0; // EV MOIC
         const sectorEmojis = ip.sectorIds.map(sid => SECTORS[sid]?.emoji).filter(Boolean).join(' ');
 
         return (
