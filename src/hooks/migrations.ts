@@ -917,6 +917,20 @@ function migrateV35ToV36(): void {
       v35Data.state.exitedBusinesses = v35Data.state.exitedBusinesses.map(addCashEquity);
     }
 
+    // Patch FO mainGameSnapshot if player is mid-Family Office
+    if (v35Data.state?.familyOfficeState?.mainGameSnapshot) {
+      try {
+        const snapshot = JSON.parse(v35Data.state.familyOfficeState.mainGameSnapshot);
+        if (Array.isArray(snapshot.businesses)) {
+          snapshot.businesses = snapshot.businesses.map(addCashEquity);
+        }
+        if (Array.isArray(snapshot.exitedBusinesses)) {
+          snapshot.exitedBusinesses = snapshot.exitedBusinesses.map(addCashEquity);
+        }
+        v35Data.state.familyOfficeState.mainGameSnapshot = JSON.stringify(snapshot);
+      } catch { /* snapshot parse failed — safe to skip, fallback handles it */ }
+    }
+
     localStorage.setItem(v36Key, JSON.stringify(v35Data));
     localStorage.removeItem(v35Key);
   } catch (e) {

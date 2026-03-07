@@ -421,12 +421,16 @@ export const BusinessCard = memo(function BusinessCard({
                 <p className="text-text-muted text-[10px]">Total: {formatMoney(totalInvested)}</p>
               )}
             </div>
-            <div>
-              <p className="text-text-muted">MOIC</p>
-              <p className={`font-mono ${moic >= 2 ? 'text-accent' : moic < 1 ? 'text-danger' : ''}`}>
-                {moic.toFixed(1)}x
-              </p>
-            </div>
+            <Tooltip trigger={
+              <div>
+                <p className="text-text-muted">MOIC</p>
+                <p className={`font-mono ${moic >= 2 ? 'text-accent' : moic < 1 ? 'text-danger' : ''}`}>
+                  {moic.toFixed(1)}x
+                </p>
+              </div>
+            }>
+              <p className="text-xs text-text-secondary">Exit Value ÷ Total Deal Cost ({formatMoney(totalInvested)})</p>
+            </Tooltip>
             <div>
               <p className="text-text-muted">Growth</p>
               <p className={`font-mono ${business.organicGrowthRate >= 0 ? 'text-accent' : 'text-danger'}`}>
