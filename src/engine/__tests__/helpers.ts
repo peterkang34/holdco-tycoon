@@ -116,6 +116,7 @@ export function createMockDeal(overrides: Partial<Deal> = {}): Deal {
       boltOnIds: business.boltOnIds,
       synergiesRealized: business.synergiesRealized,
       totalAcquisitionCost: business.totalAcquisitionCost,
+      cashEquityInvested: business.cashEquityInvested,
       rolloverEquityPct: business.rolloverEquityPct,
       priorOwnershipCount: business.priorOwnershipCount,
     },
