@@ -257,7 +257,6 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     fundName,
     familyOfficeState,
     distributeToLPs,
-    lpSatisfactionScore,
     lpCommentary,
     lpDistributions,
     fundSize,

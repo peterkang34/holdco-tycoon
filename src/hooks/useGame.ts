@@ -72,7 +72,7 @@ import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue
 import { getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
 
-import type { GameDifficulty, GameDuration, GameActionType, DealHeat, FundCashFlow } from '../engine/types';
+import type { GameDifficulty, GameDuration, GameActionType, DealHeat } from '../engine/types';
 import { selectLPQuote } from '../data/lpCommentary';
 import type { LPTriggerId, LPSpeaker } from '../data/lpCommentary';
 import { generateRandomSeed, createRngStreams } from '../engine/rng';
@@ -129,7 +129,7 @@ export function checkLPACRequired(
     if (!platform) return { required: false, platformName: '', cumulativeValue: 0 };
     // Sum acquisition prices of all businesses in this platform
     const allBiz = [...state.businesses, ...state.exitedBusinesses];
-    const platformBizIds = [platform.coreBusinessId, ...platform.memberBusinessIds];
+    const platformBizIds = platform.constituentBusinessIds;
     const cumulative = platformBizIds.reduce((sum, id) => {
       const biz = allBiz.find(b => b.id === id);
       return sum + (biz ? biz.acquisitionPrice : 0);
@@ -142,7 +142,7 @@ export function checkLPACRequired(
   // For standalone deals: check if deal + existing businesses in same sector would create concentration
   // Standalone deals themselves can trigger LPAC if their asking price alone exceeds threshold
   if (deal.askingPrice >= threshold) {
-    return { required: true, platformName: deal.name, cumulativeValue: deal.askingPrice };
+    return { required: true, platformName: deal.business.name, cumulativeValue: deal.askingPrice };
   }
 
   return { required: false, platformName: '', cumulativeValue: 0 };
@@ -1289,11 +1289,11 @@ export const useGameStore = create<GameStore>()(
           // Count exits this round
           const exitActions = state.actionsThisRound.filter(a => a.type === 'sell' || a.type === 'sell_platform');
           const strongExits = exitActions.filter(a => {
-            const moic = a.details?.exitMoic ?? 0;
+            const moic = (a.details?.exitMoic as number) ?? 0;
             return moic >= 3.0;
           }).length;
           const weakExits = exitActions.filter(a => {
-            const moic = a.details?.exitMoic ?? 0;
+            const moic = (a.details?.exitMoic as number) ?? 0;
             return moic < 1.0;
           }).length;
           const platformSales = exitActions.filter(a => a.type === 'sell_platform').length;

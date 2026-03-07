@@ -1640,7 +1640,7 @@ function TwentyYearContent() {
 function FundManagerContent() {
   return (
     <>
-      <Heading>Fund Manager Mode</Heading>
+      <SectionTitle>Fund Manager Mode</SectionTitle>
       <P>
         A separate game mode where you manage a $100M PE fund with a 10-year life,
         investing LP capital, earning management fees, and aiming for carried interest above an 8% hurdle.

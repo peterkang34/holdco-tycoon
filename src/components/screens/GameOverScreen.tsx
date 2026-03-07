@@ -730,8 +730,7 @@ export function GameOverScreen({
 
       ) :
 
-      /* Holdco Modes */
-      {/* Bankruptcy Header (replaces normal header) */}
+      /* Holdco Modes — Bankruptcy Header (replaces normal header) */
       bankruptRound ? (
         <div className="text-center mb-8">
           <span className="text-6xl mb-4 block">💀</span>

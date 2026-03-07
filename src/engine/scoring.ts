@@ -7,7 +7,6 @@ import {
   LeaderboardStrategy,
   CarryWaterfall,
   PEScoreBreakdown,
-  FundCashFlow,
 } from './types';
 import { calculateMetrics, calculateSectorFocusBonus, calculateExitValuation } from './simulation';
 import { POST_GAME_INSIGHTS } from '../data/tips';
@@ -779,7 +778,6 @@ export function calculateCarryWaterfall(state: GameState): CarryWaterfall {
     ? (grossTotalReturns - PE_FUND_CONFIG.hurdleReturn) * PE_FUND_CONFIG.carryRate
     : 0;
 
-  const lpReturn = grossTotalReturns - carry;
   const grossMoic = fundSize > 0 ? grossTotalReturns / fundSize : 0;
   const dpi = fundSize > 0 ? lpDistributed / fundSize : 0;
 

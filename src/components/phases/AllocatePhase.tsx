@@ -2593,7 +2593,7 @@ export function AllocatePhase({
               const mgmtFee = PE_FUND_CONFIG.annualManagementFee;
               const turnaroundCost = activeTurnarounds.reduce((sum, t) => {
                 const prog = getProgramById(t.programId);
-                return sum + (prog ? getTurnaroundTierAnnualCost(prog.tier) : 0);
+                return sum + (prog ? getTurnaroundTierAnnualCost(prog.tierId) : 0);
               }, 0);
               const estDebtService = allBusinesses
                 .filter(b => b.status === 'active')
