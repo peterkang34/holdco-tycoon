@@ -103,7 +103,8 @@ export async function updatePlayerStats(playerId: string): Promise<void> {
       }
 
       // Mode breakdown (only count scored games for avg)
-      const modeKey = `${game.difficulty}_${game.duration}`;
+      const isPEGame = (game.strategy as any)?.isFundManager === true;
+      const modeKey = isPEGame ? 'fund_manager' : `${game.difficulty}_${game.duration}`;
       if (!modeAccum[modeKey]) modeAccum[modeKey] = { sum: 0, count: 0, scoredCount: 0 };
       modeAccum[modeKey].count++;
       if (hasScore) {

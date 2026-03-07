@@ -491,8 +491,8 @@ function GameBreakdown({ game }: { game: any }) {
         <span className="text-[11px] text-text-primary truncate flex-1">{game.holdco_name || '--'}</span>
         <span className="text-[10px] font-mono text-accent">{formatMoney(game.adjusted_fev || 0)}</span>
         <span className="text-[10px] font-mono text-text-muted">{game.score}/100</span>
-        <span className="text-[10px] text-text-muted">
-          {game.difficulty === 'normal' ? 'H' : 'E'}/{game.duration === 'quick' ? '10' : '20'}
+        <span className={`text-[10px] ${(game.strategy as any)?.isFundManager ? 'text-purple-400' : 'text-text-muted'}`}>
+          {(game.strategy as any)?.isFundManager ? 'PE' : `${game.difficulty === 'normal' ? 'H' : 'E'}/${game.duration === 'quick' ? '10' : '20'}`}
         </span>
         <span className="text-[10px] text-text-muted">{game.completed_at ? formatDate(game.completed_at) : '--'}</span>
       </button>

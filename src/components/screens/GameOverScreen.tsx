@@ -305,10 +305,10 @@ export function GameOverScreen({
       difficulty,
       duration,
       sector,
-      grade: score.grade,
+      grade: isFundManagerMode ? (peScore?.grade ?? 'F') : score.grade,
       fev: Math.round(founderEquityValue),
       isChallenge: !!challengeData,
-      score: score.total,
+      score: isFundManagerMode ? (peScore?.total ?? 0) : score.total,
       scoreBreakdown: {
         valueCreation: score.valueCreation,
         fcfShareGrowth: score.fcfShareGrowth,
@@ -344,6 +344,15 @@ export function GameOverScreen({
       sourceDealUses: strategyData.sourceDealUses || undefined,
       proactiveOutreachUses: strategyData.proactiveOutreachUses || undefined,
       smbBrokerUses: strategyData.smbBrokerUses || undefined,
+      // PE Fund Mode fields
+      ...(isFundManagerMode ? {
+        gameMode: 'fund_manager',
+        isFundManager: true,
+        netIrr: carryWaterfallData?.netIrr,
+        grossMoic: carryWaterfallData?.grossMoic,
+        carryEarned: carryWaterfallData?.carry,
+        dpi: carryWaterfallData?.dpi,
+      } : {}),
     };
     trackGameComplete(snapshot);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -463,6 +472,7 @@ export function GameOverScreen({
           grossMoic: isFundManagerMode ? carryWaterfallData?.grossMoic : undefined,
           carryEarned: isFundManagerMode ? carryWaterfallData?.carry : undefined,
           strategy: {
+            ...(isFundManagerMode ? { isFundManager: true, fundName: fundName || 'PE Fund' } : {}),
             scoreBreakdown: isFundManagerMode
               ? { valueCreation: 0, fcfShareGrowth: 0, portfolioRoic: 0, capitalDeployment: 0, balanceSheetHealth: 0, strategicDiscipline: 0 }
               : {

@@ -125,6 +125,7 @@ export function trackGameStart(difficulty: string, duration: string, sector: str
         isChallenge: currentMeta.isChallenge,
         sessionDurationMs: Date.now() - currentMeta.startedAt,
         fev: currentMeta.fev,
+        gameMode: currentMeta.gameMode,
       });
       clearSessionMeta();
     }
@@ -222,6 +223,7 @@ export function trackGameAbandon(round: number, maxRounds: number, difficulty: s
     isChallenge,
     sessionDurationMs: meta ? Date.now() - meta.startedAt : undefined,
     fev: fev ?? meta?.fev,
+    gameMode: meta?.gameMode,
   });
 
   clearSessionMeta();

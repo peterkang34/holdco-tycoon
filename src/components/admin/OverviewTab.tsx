@@ -218,8 +218,8 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
               <tbody>
                 {data.leaderboardEntries.map((entry, i) => {
                   const adjFev = computeAdjFev(entry);
-                  const durationLabel = entry.duration === 'quick' ? '10' : '20';
-                  const diffLabel = entry.difficulty === 'normal' ? 'H' : 'E';
+                  const isPE = entry.isFundManager === true;
+                  const modeLabel = isPE ? 'PE' : `${entry.difficulty === 'normal' ? 'H' : 'E'}/${entry.duration === 'quick' ? '10' : '20'}`;
                   const isExpanded = expandedRow === i;
                   const hasStrategy = !!entry.strategy;
 
@@ -235,13 +235,13 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
                           {hasStrategy && <span className="ml-1 text-accent text-[10px]">{isExpanded ? '▼' : '▶'}</span>}
                         </td>
                         <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.initials || '—'}</td>
-                        <td className="py-1.5 pr-3 text-right font-mono text-accent">{formatMoney(adjFev)}</td>
-                        <td className="py-1.5 pr-3 text-right font-mono text-text-secondary">{formatMoney(entry.founderEquityValue)}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono text-accent">{isPE ? formatMoney(entry.carryEarned ?? 0) : formatMoney(adjFev)}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono text-text-secondary">{isPE ? `${(entry.grossMoic ?? 0).toFixed(2)}x` : formatMoney(entry.founderEquityValue)}</td>
                         <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.score ?? '—'}</td>
                         <td className={`py-1.5 pr-3 text-center font-bold ${getGradeColor(entry.grade)}`}>{entry.grade}</td>
                         <td className="py-1.5 pr-3 text-center">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
-                            {diffLabel}/{durationLabel}
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${isPE ? 'bg-purple-500/20 text-purple-400' : entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
+                            {modeLabel}
                           </span>
                         </td>
                         <td className="py-1.5 pr-3">
@@ -293,8 +293,8 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
               <tbody>
                 {data.recentEntries.map((entry, i) => {
                   const adjFev = computeAdjFev(entry);
-                  const durationLabel = entry.duration === 'quick' ? '10' : '20';
-                  const diffLabel = entry.difficulty === 'normal' ? 'H' : 'E';
+                  const isPERecent = entry.isFundManager === true;
+                  const recentModeLabel = isPERecent ? 'PE' : `${entry.difficulty === 'normal' ? 'H' : 'E'}/${entry.duration === 'quick' ? '10' : '20'}`;
                   const dateObj = new Date(entry.date);
                   const timeAgo = getTimeAgo(dateObj);
                   const hasStrategy = !!entry.strategy?.scoreBreakdown;
@@ -313,12 +313,12 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
                           {entry.holdcoName}
                           {hasStrategy && <span className="ml-1 text-accent text-[10px]">{isExpanded ? '▼' : '▶'}</span>}
                         </td>
-                        <td className="py-1.5 pr-3 text-right font-mono text-accent">{formatMoney(adjFev)}</td>
+                        <td className="py-1.5 pr-3 text-right font-mono text-accent">{isPERecent ? formatMoney(entry.carryEarned ?? 0) : formatMoney(adjFev)}</td>
                         <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{entry.score ?? '—'}</td>
                         <td className={`py-1.5 pr-3 text-center font-bold ${getGradeColor(entry.grade)}`}>{entry.grade}</td>
                         <td className="py-1.5 pr-3 text-center">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
-                            {diffLabel}/{durationLabel}
+                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${isPERecent ? 'bg-purple-500/20 text-purple-400' : entry.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
+                            {recentModeLabel}
                           </span>
                         </td>
                         <td className="py-1.5">
@@ -355,15 +355,15 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
             {data.activityFeed.map((evt: ActivityEvent, i: number) => {
               const dateObj = new Date(evt.ts);
               const timeAgo = getTimeAgo(dateObj);
-              const durationLabel = evt.duration === 'quick' ? '10yr' : '20yr';
-              const diffLabel = evt.difficulty === 'normal' ? 'Hard' : 'Easy';
+              const isPEEvt = evt.gameMode === 'fund_manager' || evt.isFundManager === true;
+              const modeDisplay = isPEEvt ? 'PE Fund' : `${evt.difficulty === 'normal' ? 'Hard' : 'Easy'} ${evt.duration === 'quick' ? '10yr' : '20yr'}`;
 
               if (evt.type === 'start') {
                 return (
                   <div key={i} className="flex items-center gap-2 py-1.5 border-b border-border/30 text-xs">
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/20 text-green-400 font-medium w-16 text-center shrink-0">START</span>
                     <span className="text-text-muted font-mono w-16 shrink-0" title={dateObj.toLocaleString()}>{timeAgo}</span>
-                    <span className="text-text-secondary">{diffLabel} {durationLabel}</span>
+                    <span className={`text-text-secondary ${isPEEvt ? 'text-purple-400' : ''}`}>{modeDisplay}</span>
                     {evt.sector && <span className="text-text-muted">· {evt.sector}</span>}
                     {evt.device && <span className="text-text-muted ml-auto">{evt.device}</span>}
                     {evt.gameNumber != null && (
@@ -380,7 +380,7 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 font-medium w-16 text-center shrink-0">ABANDON</span>
                     <span className="text-text-muted font-mono w-16 shrink-0" title={dateObj.toLocaleString()}>{timeAgo}</span>
                     {evt.round != null && <span className="text-text-secondary">Year {evt.round}</span>}
-                    {evt.difficulty && <span className="text-text-muted">· {diffLabel} {durationLabel}</span>}
+                    {evt.difficulty && <span className={`text-text-muted ${isPEEvt ? 'text-purple-400' : ''}`}>· {modeDisplay}</span>}
                     {evt.fev != null && <span className="font-mono text-accent">{formatMoney(evt.fev)}</span>}
                     {mins != null && <span className="text-text-muted ml-auto">{mins}m played</span>}
                     {evt.device && <span className="text-text-muted">{evt.device}</span>}

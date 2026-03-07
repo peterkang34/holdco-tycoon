@@ -69,6 +69,11 @@ export interface LeaderboardEntryAdmin {
   hasRestructured?: boolean;
   familyOfficeCompleted?: boolean;
   foMultiplier?: number;
+  isFundManager?: boolean;
+  fundName?: string;
+  netIrr?: number;
+  grossMoic?: number;
+  carryEarned?: number;
 }
 
 export interface ActivityEvent {
@@ -82,6 +87,8 @@ export interface ActivityEvent {
   round?: number;
   sessionDurationMs?: number;
   fev?: number;
+  gameMode?: string;
+  isFundManager?: boolean;
 }
 
 export interface AnalyticsData {

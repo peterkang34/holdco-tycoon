@@ -53,6 +53,8 @@ interface GameStrategy {
   turnaroundsStarted?: number;
   turnaroundsSucceeded?: number;
   turnaroundsFailed?: number;
+  isFundManager?: boolean;
+  fundName?: string;
 }
 
 interface GameHistoryEntry {
@@ -89,6 +91,7 @@ const MODE_LABELS: Record<string, string> = {
   easy_quick: 'E/10',
   normal_standard: 'H/20',
   normal_quick: 'H/10',
+  fund_manager: 'PE',
 };
 
 const RADAR_LABELS: Record<string, string> = {
@@ -150,8 +153,8 @@ function GameRow({ game }: { game: GameHistoryEntry }) {
                 <p className="font-mono text-sm font-bold text-accent">{formatMoney(game.adjusted_fev)}</p>
               </div>
               <span className={`font-mono font-bold ${getGradeColor(game.grade as any)}`}>{game.grade}</span>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded ${game.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
-                {game.difficulty === 'normal' ? 'H' : 'E'}{game.duration === 'quick' ? '/10' : ''}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded ${game.strategy?.isFundManager ? 'bg-purple-500/20 text-purple-400' : game.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
+                {game.strategy?.isFundManager ? 'PE' : `${game.difficulty === 'normal' ? 'H' : 'E'}${game.duration === 'quick' ? '/10' : ''}`}
               </span>
               {breakdown && (
                 <span className={`text-text-muted text-xs transition-transform ${expanded ? 'rotate-90' : ''}`}>&#9654;</span>
@@ -545,12 +548,13 @@ export function StatsModal() {
           {stats.avg_score_by_mode && Object.keys(stats.avg_score_by_mode).length > 0 && (
             <div>
               <h3 className="text-sm font-bold text-text-muted mb-2">Mode Breakdown</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 {Object.entries(MODE_LABELS).map(([key, label]) => {
                   const avg = stats.avg_score_by_mode[key];
+                  const isPEMode = key === 'fund_manager';
                   return (
-                    <div key={key} className="bg-white/5 rounded-lg p-3 text-center">
-                      <p className="text-xs text-text-muted mb-1">{label}</p>
+                    <div key={key} className={`rounded-lg p-3 text-center ${isPEMode ? 'bg-purple-500/10' : 'bg-white/5'}`}>
+                      <p className={`text-xs mb-1 ${isPEMode ? 'text-purple-400' : 'text-text-muted'}`}>{label}</p>
                       {avg != null ? (
                         <p className="font-mono text-sm font-bold">{avg.toFixed(1)} avg</p>
                       ) : (
