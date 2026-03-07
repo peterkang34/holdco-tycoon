@@ -1465,7 +1465,7 @@ function GameOverLeaderboard({
           {filtered.map((entry, index) => {
             const displayValue = getDisplayValue(entry, activeTab);
             const isPE = activeTab === 'pe';
-            const displayLabel = isPE ? 'MOIC' : showWealth ? 'Wealth' : (entry.founderEquityValue ? 'FEV' : 'EV');
+            const displayLabel = isPE ? 'Carry' : showWealth ? 'Wealth' : (entry.founderEquityValue ? 'FEV' : 'EV');
             const isYou = !!(currentPlayerId && entry.playerId && currentPlayerId === entry.playerId);
             const isVerified = entry.isVerified || !!entry.playerId;
             return (

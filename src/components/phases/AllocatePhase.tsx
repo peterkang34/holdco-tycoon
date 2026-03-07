@@ -2632,7 +2632,7 @@ export function AllocatePhase({
             })()}
 
             {/* Distribute to LPs — Fund Manager mode only */}
-            {isFundManagerMode && activeBusinesses.length > 0 && (() => {
+            {isFundManagerMode && cash > 0 && (() => {
               const dpi = fundSize > 0 ? lpDistributions / fundSize : 0;
               const canDistribute = totalCapitalDeployed >= PE_FUND_CONFIG.minDeploymentForDistribution;
               const parsedDpiDollars = parseInt(dpiAmount) || 0;

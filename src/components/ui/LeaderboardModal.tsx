@@ -284,7 +284,7 @@ function RankBadge({ rank }: { rank: number }) {
 function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEntry; rank: number; showWealth: boolean; tab: LeaderboardTab }) {
   const isPE = tab === 'pe';
   const displayValue = getDisplayValue(entry, tab);
-  const displayLabel = isPE ? 'MOIC' : showWealth ? 'Wealth' : 'Adj FEV';
+  const displayLabel = isPE ? 'Carry' : showWealth ? 'Wealth' : 'Adj FEV';
   const rawFEV = entry.founderEquityValue ?? entry.enterpriseValue;
   const adjFEV = getAdjustedFEV(entry);
   const showRaw = !showWealth && !isPE && rawFEV > 0 && adjFEV !== rawFEV;
@@ -294,11 +294,11 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
   const isVerified = entry.isVerified || !!entry.playerId;
 
   return (
-    <div className={`flex items-center justify-between p-3 rounded-lg ${isYou ? 'bg-accent/15 border border-accent/30' : 'bg-white/5'}`}>
-      <div className="flex items-center gap-4 min-w-0 flex-1">
+    <div className={`flex items-center justify-between px-3 py-3 sm:py-3 rounded-lg ${isYou ? 'bg-accent/15 border border-accent/30' : 'bg-white/5'}`}>
+      <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
         <RankBadge rank={rank} />
         <div className="min-w-0">
-          <p className="font-bold">
+          <p className="font-bold text-sm sm:text-base">
             {entry.initials}
             {isVerified && <span className="text-blue-300 ml-1 text-sm" role="img" aria-label="Verified account" title="Verified account">✓</span>}
             {entry.familyOfficeCompleted && <span className="ml-1" title="Family Office Legacy">🦅</span>}
@@ -308,10 +308,10 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
           <p className="text-xs text-text-muted truncate">{isPE ? (entry.fundName || entry.holdcoName) : entry.holdcoName}</p>
         </div>
       </div>
-      <div className="flex items-center gap-2 sm:gap-4 md:gap-6 text-right shrink-0">
-        <div className="min-w-[4.5rem]">
+      <div className="flex items-center gap-3 sm:gap-4 md:gap-6 text-right shrink-0">
+        <div className="min-w-[4rem] sm:min-w-[4.5rem]">
           <p className="text-xs text-text-muted">{displayLabel}</p>
-          <p className="font-mono tabular-nums font-bold text-accent">
+          <p className="font-mono tabular-nums font-bold text-accent text-sm sm:text-base">
             {formatMoney(displayValue)}
             {!isPE && entry.hasRestructured && <span className="text-red-400 text-[10px] ml-1" title="Restructured — 20% FEV penalty">(R)</span>}
           </p>
@@ -319,18 +319,18 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
             <p className="text-[11px] text-text-secondary font-mono tabular-nums whitespace-nowrap">Raw: {formatMoney(rawFEV)}</p>
           )}
           {isPE && (
-            <p className="text-[11px] text-text-secondary font-mono tabular-nums whitespace-nowrap">
+            <p className="text-[11px] sm:text-xs text-text-secondary font-mono tabular-nums whitespace-nowrap">
               {entry.grossMoic != null ? `${entry.grossMoic.toFixed(2)}x` : ''}
               {entry.grossMoic != null && entry.netIrr != null ? ' · ' : ''}
               {entry.netIrr != null ? `${(entry.netIrr * 100).toFixed(1)}% IRR` : ''}
             </p>
           )}
         </div>
-        <div className="min-w-[3.5rem]">
+        <div className="min-w-[3rem] sm:min-w-[3.5rem]">
           <p className="text-xs text-text-muted">Score</p>
-          <p className={`font-mono tabular-nums ${getGradeColor(entry.grade)}`}>{entry.score} ({entry.grade})</p>
+          <p className={`font-mono tabular-nums text-sm sm:text-base ${getGradeColor(entry.grade)}`}>{entry.score} ({entry.grade})</p>
         </div>
-        <div className="w-8 flex justify-center">
+        <div className="w-8 flex justify-center hidden sm:flex">
           {isPE ? (
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">PE</span>
           ) : entry.difficulty ? (
