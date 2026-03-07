@@ -1206,36 +1206,76 @@ export function GameOverScreen({
       </div>}
 
       {/* Final Metrics */}
-      <div className="card mb-6">
-        <h2 className="text-lg font-bold mb-4">Final Portfolio Summary</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4 text-center">
-          <div>
-            <p className="text-text-muted text-sm">Total Revenue</p>
-            <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(metrics.totalRevenue)}</p>
-          </div>
-          <div>
-            <p className="text-text-muted text-sm">Final EBITDA <span className="text-xs">({(metrics.avgEbitdaMargin * 100).toFixed(0)}%)</span></p>
-            <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(metrics.totalEbitda)}</p>
-          </div>
-          <div>
-            <p className="text-text-muted text-sm">Portfolio MOIC</p>
-            <p className="text-xl sm:text-2xl font-bold font-mono text-accent">{formatMultiple(metrics.portfolioMoic)}</p>
-          </div>
-          <div>
-            <p className="text-text-muted text-sm">Total Distributed</p>
-            <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(metrics.totalDistributions)}</p>
-          </div>
-          <div>
-            <p className="text-text-muted text-sm">Exit Proceeds</p>
-            <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(metrics.totalExitProceeds)}</p>
+      {isFundManagerMode && carryWaterfallData ? (
+        <div className="card mb-6">
+          <h2 className="text-lg font-bold mb-4">Fund Performance Summary</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 text-center">
+            <div>
+              <p className="text-text-muted text-sm">Capital Deployed</p>
+              <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(totalInvestedCapital)}</p>
+              <p className="text-xs text-text-muted">{Math.round(totalInvestedCapital / (carryWaterfallData.returnOfCapital || 1) * 100)}% of {formatMoney(carryWaterfallData.returnOfCapital)}</p>
+            </div>
+            <div>
+              <p className="text-text-muted text-sm">Fund Value Generated</p>
+              <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(Math.round(carryWaterfallData.grossTotalReturns))}</p>
+              <p className="text-xs text-text-muted">Gross MOIC: {carryWaterfallData.grossMoic.toFixed(2)}x</p>
+            </div>
+            <div>
+              <p className="text-text-muted text-sm">LP Distributions</p>
+              <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(Math.round(carryWaterfallData.lpDistributions))}</p>
+              <p className="text-xs text-text-muted">DPI: {carryWaterfallData.dpi.toFixed(2)}x</p>
+            </div>
+            <div>
+              <p className="text-text-muted text-sm">Net IRR</p>
+              <p className={`text-xl sm:text-2xl font-bold font-mono ${carryWaterfallData.netIrr >= 0.08 ? 'text-accent' : carryWaterfallData.netIrr < 0 ? 'text-danger' : ''}`}>
+                {(carryWaterfallData.netIrr * 100).toFixed(1)}%
+              </p>
+              <p className="text-xs text-text-muted">Hurdle: 8.0%</p>
+            </div>
+            <div>
+              <p className="text-text-muted text-sm">Liquidation Value</p>
+              <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(Math.round(carryWaterfallData.liquidationProceeds))}</p>
+              <p className="text-xs text-text-muted">At fund close</p>
+            </div>
+            <div>
+              <p className="text-text-muted text-sm">Management Fees</p>
+              <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(Math.round(carryWaterfallData.managementFees))}</p>
+              <p className="text-xs text-text-muted">2% × {maxRounds} years</p>
+            </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="card mb-6">
+          <h2 className="text-lg font-bold mb-4">Final Portfolio Summary</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-4 text-center">
+            <div>
+              <p className="text-text-muted text-sm">Total Revenue</p>
+              <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(metrics.totalRevenue)}</p>
+            </div>
+            <div>
+              <p className="text-text-muted text-sm">Final EBITDA <span className="text-xs">({(metrics.avgEbitdaMargin * 100).toFixed(0)}%)</span></p>
+              <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(metrics.totalEbitda)}</p>
+            </div>
+            <div>
+              <p className="text-text-muted text-sm">Portfolio MOIC</p>
+              <p className="text-xl sm:text-2xl font-bold font-mono text-accent">{formatMultiple(metrics.portfolioMoic)}</p>
+            </div>
+            <div>
+              <p className="text-text-muted text-sm">Total Distributed</p>
+              <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(metrics.totalDistributions)}</p>
+            </div>
+            <div>
+              <p className="text-text-muted text-sm">Exit Proceeds</p>
+              <p className="text-xl sm:text-2xl font-bold font-mono">{formatMoney(metrics.totalExitProceeds)}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Portfolio */}
       <div className="card mb-6">
-        <h2 className="text-lg font-bold mb-1">Portfolio Companies</h2>
-        <p className="text-xs text-text-muted mb-4">Platforms and standalone companies. Bolt-ons are consolidated into their parent platform.</p>
+        <h2 className="text-lg font-bold mb-1">{isFundManagerMode ? 'Fund Portfolio' : 'Portfolio Companies'}</h2>
+        <p className="text-xs text-text-muted mb-4">{isFundManagerMode ? 'Investment outcomes by portfolio company.' : 'Platforms and standalone companies. Bolt-ons are consolidated into their parent platform.'}</p>
         <div className="space-y-2">
           {allBusinesses.map(business => {
             const sector = SECTORS[business.sectorId];
