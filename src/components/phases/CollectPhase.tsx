@@ -155,7 +155,7 @@ export function CollectPhase({
 
   // Portfolio-level tax with all deductions (uses holdco loan balance, not total debt)
   // Include interest penalty in holdco rate for accurate tax shield (matches actual interest paid)
-  const taxBreakdown = calculatePortfolioTax(activeBusinesses, holdcoLoanBalance, holdcoLoanRate + (interestPenalty ?? 0), sharedServicesCost + (maSourcingCost ?? 0));
+  const taxBreakdown = calculatePortfolioTax(activeBusinesses, holdcoLoanBalance, holdcoLoanRate + (interestPenalty ?? 0), sharedServicesCost + (maSourcingCost ?? 0) + managementFee);
   const hasDeductions = taxBreakdown.totalTaxSavings > 0;
   const effectiveRatePct = Math.round(taxBreakdown.effectiveTaxRate * 100);
 
@@ -171,7 +171,7 @@ export function CollectPhase({
   const uncappedTotalEarnouts = uncappedActiveEarnouts + integratedDebt.earnouts;
 
   // Net FCF WITHOUT earn-outs (to determine how much cash is available for earn-outs)
-  const netFcfBeforeEarnouts = totalBusinessFcf + uncappedActiveEarnouts - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - turnaroundCost - complexityCost - integratedDebt.sellerNotes - integratedDebt.bankDebt;
+  const netFcfBeforeEarnouts = totalBusinessFcf + uncappedActiveEarnouts - taxBreakdown.taxAmount - holdcoInterest - sharedServicesCost - maSourcingCost - turnaroundCost - complexityCost - managementFee - integratedDebt.sellerNotes - integratedDebt.bankDebt;
   const availableForEarnouts = Math.max(0, cash + netFcfBeforeEarnouts);
 
   // Cap earn-outs at available cash (matches store's Math.min logic)
