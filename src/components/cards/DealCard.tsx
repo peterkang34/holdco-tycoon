@@ -27,9 +27,11 @@ interface DealCardProps {
 
 export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlatforms = [], isPassed, onPass, collapsible, isExpanded, onToggle, showSwipeHint, onSwipeUsed, leagueBlocked }: DealCardProps) {
   const [showStory, setShowStory] = useState(false);
+  const [loadingAI, setLoadingAI] = useState(false);
   const sector = SECTORS[deal.business.sectorId];
   const { dueDiligence, qualityRating } = deal.business;
   const addToast = useToastStore((s) => s.addToast);
+  const enhanceSingleDeal = useGameStore((s) => s.enhanceSingleDeal);
 
   const freshnessLabel = deal.freshness === 1 ? 'Expires next year' : `${deal.freshness} years left`;
 
@@ -282,17 +284,24 @@ export function DealCard({ deal, onSelect, disabled, unaffordable, availablePlat
         </div>
       )}
 
-      {/* AI-generated story content */}
+      {/* Company story content — lazy-loads AI on first expand click */}
       {deal.aiContent && (
         <div className="mb-3">
           <button
             onClick={(e) => {
               e.stopPropagation();
-              setShowStory(!showStory);
+              const willShow = !showStory;
+              setShowStory(willShow);
+              // Trigger AI enhancement on first expand if not yet AI-enhanced
+              if (willShow && !deal.aiContent?.aiEnhanced && !loadingAI) {
+                setLoadingAI(true);
+                enhanceSingleDeal(deal.id).finally(() => setLoadingAI(false));
+              }
             }}
             className="text-xs text-accent hover:underline flex items-center gap-1"
           >
             {showStory ? '▼' : '▶'} Company Story
+            {loadingAI && <span className="inline-block w-3 h-3 border border-accent/40 border-t-accent rounded-full animate-spin ml-1" />}
           </button>
           {showStory && (
             <div className="mt-2 p-3 bg-white/5 rounded-lg text-xs space-y-2">

@@ -14,6 +14,22 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'March 6, 2026',
+    title: 'AI Cost Optimization',
+    hidden: true,
+    sections: [
+      {
+        heading: 'Under the Hood',
+        items: [
+          'Deal backstories now load on-demand when you click "Company Story" instead of pre-loading all deals.',
+          'Business update narratives are smarter about when to use AI vs fallback text.',
+          'Event narratives use high-quality handwritten templates directly.',
+          'Removed unused API endpoints.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 6, 2026',
     title: 'Player Stats Upgrade',
     sections: [
       {

@@ -31,6 +31,7 @@ import {
   getSizeRatioTier,
   calculateMultipleExpansion,
   enhanceDealsWithAI,
+  enhanceDealWithAI,
   generateSourcedDeals,
   generateProactiveOutreachDeals,
   generateSMBBrokerDeal,
@@ -44,7 +45,6 @@ import {
 } from '../engine/businesses';
 import { generateBuyerProfile, calculateSizeTierPremium } from '../engine/buyers';
 import {
-  generateEventNarrative,
   getFallbackEventNarrative,
   getFallbackBusinessStory,
   generateBusinessUpdate,
@@ -320,6 +320,7 @@ interface GameStore extends GameState {
 
   // AI enhancement
   triggerAIEnhancement: () => Promise<void>;
+  enhanceSingleDeal: (dealId: string) => Promise<void>;
   fetchEventNarrative: () => Promise<void>;
   generateBusinessStories: () => Promise<void>;
   generateYearChronicle: () => Promise<void>;
@@ -4395,6 +4396,27 @@ export const useGameStore = create<GameStore>()(
         }
       },
 
+      enhanceSingleDeal: async (dealId: string) => {
+        const { dealPipeline, round: snapshotRound } = get();
+        const deal = dealPipeline.find(d => d.id === dealId);
+        if (!deal || deal.aiContent?.aiEnhanced) return; // Already enhanced or not found
+        try {
+          const enhanced = await enhanceDealWithAI(deal);
+          // Guard: discard stale results if round changed
+          const current = get();
+          if (current.round !== snapshotRound) return;
+          // Mark as AI-enhanced
+          if (enhanced.aiContent) {
+            enhanced.aiContent.aiEnhanced = true;
+          }
+          set({
+            dealPipeline: current.dealPipeline.map(d => d.id === dealId ? enhanced : d),
+          });
+        } catch (error) {
+          console.error('Single deal AI enhancement failed:', error);
+        }
+      },
+
       fetchEventNarrative: async () => {
         const state = get();
         const event = state.currentEvent;
@@ -4404,40 +4426,11 @@ export const useGameStore = create<GameStore>()(
         // Skip quiet years
         if (event.type === 'global_quiet') return;
 
-        try {
-          // Build rich context for narrative generation
-          const activeBusinesses = state.businesses.filter(b => b.status === 'active');
-          const affectedBusiness = event.affectedBusinessId
-            ? activeBusinesses.find(b => b.id === event.affectedBusinessId)
-            : undefined;
-          const affectedSector = affectedBusiness
-            ? SECTORS[affectedBusiness.sectorId]?.name
-            : undefined;
-
-          // Try AI generation first
-          const narrative = await generateEventNarrative(
-            event.type,
-            event.effect,
-            `${state.holdcoName} with ${activeBusinesses.length} portfolio companies`,
-            affectedBusiness?.name,
-            affectedSector,
-            state.holdcoName,
-            activeBusinesses.map(b => b.name),
-          );
-
-          const finalNarrative = narrative || getFallbackEventNarrative(event.type);
-          // Guard: only update if the event is still current (prevents resurrecting dismissed events)
-          const current = get().currentEvent;
-          if (current && current.type === event.type && current.affectedBusinessId === event.affectedBusinessId) {
-            set({ currentEvent: { ...current, narrative: finalNarrative } });
-          }
-        } catch (error) {
-          console.error('Failed to fetch event narrative:', error);
-          const fallbackNarrative = getFallbackEventNarrative(event.type);
-          const current = get().currentEvent;
-          if (current && current.type === event.type && current.affectedBusinessId === event.affectedBusinessId) {
-            set({ currentEvent: { ...current, narrative: fallbackNarrative } });
-          }
+        // Use high-quality handwritten fallbacks directly (no AI call needed)
+        const narrative = getFallbackEventNarrative(event.type);
+        const current = get().currentEvent;
+        if (current && current.type === event.type && current.affectedBusinessId === event.affectedBusinessId) {
+          set({ currentEvent: { ...current, narrative } });
         }
       },
 
@@ -4452,41 +4445,51 @@ export const useGameStore = create<GameStore>()(
           state.businesses.map(async (b) => {
             if (b.status !== 'active') return b;
 
-            // Generate a story for every active business each year
             const yearsOwned = state.round - b.acquisitionRound;
             if (yearsOwned < 1) return b; // Skip businesses acquired this round
             const hasRecentImprovement = b.improvements.some(i => i.appliedRound === state.round - 1);
 
-            const sector = SECTORS[b.sectorId];
-            const ebitdaChange = b.ebitda > b.acquisitionEbitda
-              ? `+${((b.ebitda / b.acquisitionEbitda - 1) * 100).toFixed(0)}% since acquisition`
-              : `${((b.ebitda / b.acquisitionEbitda - 1) * 100).toFixed(0)}% since acquisition`;
+            // Only call AI for businesses with meaningful changes
+            const hasMeaningfulChange =
+              hasRecentImprovement ||
+              state.currentEvent?.affectedBusinessId === b.id ||
+              yearsOwned <= 2 ||
+              b.isPlatform ||
+              yearsOwned % 5 === 0;
 
-            // Revenue/margin context for richer narratives
-            const revenueChange = b.acquisitionRevenue > 0
-              ? `${b.revenue > b.acquisitionRevenue ? '+' : ''}${((b.revenue / b.acquisitionRevenue - 1) * 100).toFixed(0)}% since acquisition`
-              : undefined;
-            const marginDelta = b.ebitdaMargin - b.acquisitionMargin;
-            const marginChange = Math.abs(marginDelta) >= 0.01
-              ? `${marginDelta >= 0 ? '+' : ''}${(marginDelta * 100).toFixed(1)} ppt since acquisition (now ${(b.ebitdaMargin * 100).toFixed(0)}%)`
-              : undefined;
+            let storyText: string;
+            if (hasMeaningfulChange) {
+              const sector = SECTORS[b.sectorId];
+              const ebitdaChange = b.ebitda > b.acquisitionEbitda
+                ? `+${((b.ebitda / b.acquisitionEbitda - 1) * 100).toFixed(0)}% since acquisition`
+                : `${((b.ebitda / b.acquisitionEbitda - 1) * 100).toFixed(0)}% since acquisition`;
 
-            const narrative = await generateBusinessUpdate(
-              b.name,
-              sector.name,
-              b.subType,
-              yearsOwned,
-              ebitdaChange,
-              b.qualityRating,
-              state.currentEvent?.type,
-              b.improvements.length > 0 ? b.improvements.map(i => i.type).join(', ') : undefined,
-              b.isPlatform,
-              b.boltOnIds.length,
-              revenueChange,
-              marginChange,
-            );
+              const revenueChange = b.acquisitionRevenue > 0
+                ? `${b.revenue > b.acquisitionRevenue ? '+' : ''}${((b.revenue / b.acquisitionRevenue - 1) * 100).toFixed(0)}% since acquisition`
+                : undefined;
+              const marginDelta = b.ebitdaMargin - b.acquisitionMargin;
+              const marginChange = Math.abs(marginDelta) >= 0.01
+                ? `${marginDelta >= 0 ? '+' : ''}${(marginDelta * 100).toFixed(1)} ppt since acquisition (now ${(b.ebitdaMargin * 100).toFixed(0)}%)`
+                : undefined;
 
-            const storyText = narrative || getFallbackBusinessStory(b.ebitda, b.acquisitionEbitda, yearsOwned);
+              const narrative = await generateBusinessUpdate(
+                b.name,
+                sector.name,
+                b.subType,
+                yearsOwned,
+                ebitdaChange,
+                b.qualityRating,
+                state.currentEvent?.type,
+                b.improvements.length > 0 ? b.improvements.map(i => i.type).join(', ') : undefined,
+                b.isPlatform,
+                b.boltOnIds.length,
+                revenueChange,
+                marginChange,
+              );
+              storyText = narrative || getFallbackBusinessStory(b.ebitda, b.acquisitionEbitda, yearsOwned);
+            } else {
+              storyText = getFallbackBusinessStory(b.ebitda, b.acquisitionEbitda, yearsOwned);
+            }
             const newBeat = {
               round: state.round,
               narrative: storyText,

@@ -227,7 +227,6 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     activeTurnarounds,
     unlockTurnaroundTier,
     startTurnaroundProgram,
-    triggerAIEnhancement,
     sourceDealFlow,
     distressedSale,
     emergencyEquityRaise,
@@ -676,12 +675,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     }
   }, [gameOver, onGameOver]);
 
-  // Trigger AI enhancement when entering allocate phase
-  useEffect(() => {
-    if (phase === 'allocate') {
-      triggerAIEnhancement();
-    }
-  }, [phase, round, triggerAIEnhancement]);
+  // Deal AI enhancement is now lazy-loaded on "Company Story" click in DealCard
 
   // Fetch event narrative when entering event phase
   useEffect(() => {

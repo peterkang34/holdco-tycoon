@@ -2,7 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sanitizeString } from '../_lib/rateLimit.js';
 import { validateAIRequest, callAnthropic } from '../_lib/ai.js';
 
-type NarrativeType = 'event' | 'business_update' | 'year_chronicle' | 'deal_story';
+type NarrativeType = 'event' | 'business_update' | 'year_chronicle';
 
 interface NarrativeRequest {
   type: NarrativeType;
@@ -148,36 +148,6 @@ ${context.narrativeToneGuidance ? `- VOICE/TONE: ${context.narrativeToneGuidance
 Write 3-4 sentences in a shareholder letter style befitting a family office annual review. Keep it under 80 words. Respond with just the narrative text.`;
 }
 
-function buildDealStoryPrompt(context: Record<string, unknown>): string {
-  const archetypeContext = context.sellerArchetype ? `\nSELLER ARCHETYPE: ${String(context.sellerArchetype).replace(/_/g, ' ')}` : '';
-  const archetypeGuidance: Record<string, string> = {
-    retiring_founder: 'The seller is a founder nearing retirement. Emphasize their legacy, long tenure, and desire to see the business continue.',
-    burnt_out_operator: 'The seller is burnt out after years of running the business. Show the toll of entrepreneurship and their readiness to move on.',
-    accidental_holdco: 'This is a divestiture — a larger company shedding a non-core division. Frame it as a corporate strategy decision.',
-    distressed_seller: 'The seller is in financial distress. Show urgency, perhaps a health issue, divorce, or failed expansion that forced their hand.',
-    mbo_candidate: 'Management wants to buy the business. Show a capable team ready to take the reins from an exiting owner.',
-    franchise_breakaway: 'The seller broke away from a franchise system. Show their entrepreneurial drive and why independence matters.',
-  };
-  const guidance = context.sellerArchetype ? archetypeGuidance[context.sellerArchetype as string] || '' : '';
-
-  return `You are creating a rich backstory for an M&A opportunity in a holding company simulation game. Make it feel like a real deal memo.
-
-BUSINESS: ${context.businessName}
-SECTOR: ${context.sector}
-SUBTYPE: ${context.subType}
-${context.revenue ? `REVENUE: ${context.revenue}\n` : ''}EBITDA: ${context.ebitda}${context.ebitdaMargin ? ` (${context.ebitdaMargin} margins)` : ''}
-QUALITY: ${context.quality}/5
-ASKING MULTIPLE: ${context.multiple}x
-DEAL TYPE: ${context.dealType}${archetypeContext}
-
-Create a compelling 3-4 sentence story including:
-1. How the business was founded (specific founder name, year, origin story)
-2. Why they're selling now (make it human and specific)
-3. One unique thing about the business (hidden asset, key relationship, quirk)
-${guidance ? `\nSELLER CONTEXT: ${guidance}` : ''}
-Be creative and specific. Keep it under 100 words. Respond with just the narrative text.`;
-}
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (await validateAIRequest(req, res)) return;
 
@@ -214,9 +184,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         prompt = context.isFamilyOfficeMode
           ? buildFamilyOfficeChroniclePrompt(context)
           : buildYearChroniclePrompt(context);
-        break;
-      case 'deal_story':
-        prompt = buildDealStoryPrompt(context);
         break;
       default:
         return res.status(400).json({ error: 'Invalid narrative type' });

@@ -1,4 +1,4 @@
-import { SectorId, AIGeneratedContent, QualityRating, Business, BuyerProfile, ScoreBreakdown, SellerArchetype, EventType } from '../engine/types';
+import { SectorId, AIGeneratedContent, QualityRating, Business, ScoreBreakdown, SellerArchetype, EventType } from '../engine/types';
 import { SECTORS } from '../data/sectors';
 
 // Cache the AI status to avoid repeated requests
@@ -226,6 +226,7 @@ export function generateFallbackContent(
       quirkPool[Math.floor(Math.random() * quirkPool.length)],
       quirkPool[Math.floor(Math.random() * quirkPool.length)],
     ].filter((v, i, a) => a.indexOf(v) === i), // Remove duplicates
+    aiEnhanced: false,
   };
 
   // Add red flags for lower quality businesses
@@ -410,7 +411,7 @@ export async function generateGameAnalysis(input: GameAnalysisInput): Promise<AI
 }
 
 // Dynamic narrative generation
-export type NarrativeType = 'event' | 'business_update' | 'year_chronicle' | 'deal_story';
+export type NarrativeType = 'event' | 'business_update' | 'year_chronicle';
 
 export async function generateNarrative(
   type: NarrativeType,
@@ -724,46 +725,6 @@ export function getFallbackBusinessStory(
   }
   const stories = FALLBACK_BUSINESS_STORIES[bucket];
   return stories[Math.floor(Math.random() * stories.length)];
-}
-
-// AI-enriched buyer profile — fire-and-forget, deterministic profile works standalone
-export async function generateAIBuyerProfile(
-  profile: BuyerProfile,
-  business: { name: string; sectorId: SectorId; ebitda: number; qualityRating: QualityRating; revenue?: number; ebitdaMargin?: number }
-): Promise<string | null> {
-  const isEnabled = await checkAIStatus();
-  if (!isEnabled) return null;
-
-  const sector = SECTORS[business.sectorId];
-  const ebitdaFormatted = business.ebitda >= 1000
-    ? `$${(business.ebitda / 1000).toFixed(1)}M`
-    : `$${business.ebitda}k`;
-
-  try {
-    const response = await fetch('/api/ai/generate-buyer', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        buyerName: profile.name,
-        buyerType: profile.type,
-        isStrategic: profile.isStrategic,
-        fundSize: profile.fundSize,
-        sectorName: sector.name,
-        businessName: business.name,
-        ebitda: ebitdaFormatted,
-        qualityRating: business.qualityRating,
-        baseThesis: profile.investmentThesis,
-        revenue: business.revenue,
-        ebitdaMargin: business.ebitdaMargin,
-      }),
-    });
-
-    if (!response.ok) return null;
-    const data = await response.json();
-    return data.thesis || null;
-  } catch {
-    return null;
-  }
 }
 
 // Fallback analysis when AI is not available

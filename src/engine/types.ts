@@ -196,6 +196,7 @@ export interface AIGeneratedContent {
   quirks: string[]; // Unique/interesting details about the business
   redFlags?: string[]; // Hidden concerns (revealed through due diligence)
   opportunities?: string[]; // Upside potential
+  aiEnhanced?: boolean; // true when AI-generated, false/undefined for fallback
 }
 
 export interface Deal {
