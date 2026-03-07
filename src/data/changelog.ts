@@ -26,6 +26,7 @@ export const CHANGELOG: ChangelogEntry[] = [
           'Management fee ($2M/year) deducted automatically from fund cash.',
           'Forced liquidation at Year 10 with carry waterfall showing your final compensation.',
           'Separate 6-dimension PE scoring system (Return Generation, Capital Efficiency, Value Creation, Deployment Discipline, Risk Management, LP Satisfaction).',
+          'PE Fund tab on the global leaderboard — ranked by Gross MOIC with Net IRR displayed.',
         ],
       },
       {

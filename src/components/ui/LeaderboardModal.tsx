@@ -6,7 +6,7 @@ import { Modal } from './Modal';
 import { RESTRUCTURING_FEV_PENALTY } from '../../data/gameConfig';
 import { useAuthStore } from '../../hooks/useAuth';
 
-type LeaderboardTab = 'overall' | 'hard20' | 'hard10' | 'easy20' | 'easy10' | 'distributions';
+type LeaderboardTab = 'overall' | 'hard20' | 'hard10' | 'easy20' | 'easy10' | 'distributions' | 'pe';
 
 interface TabDef {
   id: LeaderboardTab;
@@ -21,6 +21,7 @@ const TABS: TabDef[] = [
   { id: 'easy20', label: 'Easy / 20yr', mobileLabel: 'E/20' },
   { id: 'easy10', label: 'Easy / 10yr', mobileLabel: 'E/10' },
   { id: 'distributions', label: 'Distributions', mobileLabel: 'Dist' },
+  { id: 'pe', label: 'PE Fund', mobileLabel: 'PE' },
 ];
 
 const TAB_DISPLAY_CAP = 50;
@@ -61,30 +62,38 @@ function getEntryDuration(entry: LeaderboardEntry): GameDuration {
 function filterAndSort(entries: LeaderboardEntry[], tab: LeaderboardTab): LeaderboardEntry[] {
   let filtered: LeaderboardEntry[];
 
+  // PE entries are separated — exclude from holdco tabs, holdco entries excluded from PE tab
+  const holdcoEntries = entries.filter(e => !e.isFundManager);
+  const peEntries = entries.filter(e => e.isFundManager);
+
   switch (tab) {
     case 'overall':
-      filtered = [...entries];
+      filtered = [...holdcoEntries];
       filtered.sort((a, b) => getAdjustedFEV(b) - getAdjustedFEV(a));
       break;
     case 'hard20':
-      filtered = entries.filter(e => getEntryDifficulty(e) === 'normal' && getEntryDuration(e) === 'standard');
+      filtered = holdcoEntries.filter(e => getEntryDifficulty(e) === 'normal' && getEntryDuration(e) === 'standard');
       filtered.sort((a, b) => getAdjustedFEV(b) - getAdjustedFEV(a));
       break;
     case 'hard10':
-      filtered = entries.filter(e => getEntryDifficulty(e) === 'normal' && getEntryDuration(e) === 'quick');
+      filtered = holdcoEntries.filter(e => getEntryDifficulty(e) === 'normal' && getEntryDuration(e) === 'quick');
       filtered.sort((a, b) => getAdjustedFEV(b) - getAdjustedFEV(a));
       break;
     case 'easy20':
-      filtered = entries.filter(e => getEntryDifficulty(e) === 'easy' && getEntryDuration(e) === 'standard');
+      filtered = holdcoEntries.filter(e => getEntryDifficulty(e) === 'easy' && getEntryDuration(e) === 'standard');
       filtered.sort((a, b) => getAdjustedFEV(b) - getAdjustedFEV(a));
       break;
     case 'easy10':
-      filtered = entries.filter(e => getEntryDifficulty(e) === 'easy' && getEntryDuration(e) === 'quick');
+      filtered = holdcoEntries.filter(e => getEntryDifficulty(e) === 'easy' && getEntryDuration(e) === 'quick');
       filtered.sort((a, b) => getAdjustedFEV(b) - getAdjustedFEV(a));
       break;
     case 'distributions':
-      filtered = entries.filter(e => (e.founderPersonalWealth ?? 0) > 0);
+      filtered = holdcoEntries.filter(e => (e.founderPersonalWealth ?? 0) > 0);
       filtered.sort((a, b) => (b.founderPersonalWealth ?? 0) - (a.founderPersonalWealth ?? 0));
+      break;
+    case 'pe':
+      filtered = [...peEntries];
+      filtered.sort((a, b) => (b.grossMoic ?? 0) - (a.grossMoic ?? 0));
       break;
   }
 
@@ -94,11 +103,13 @@ function filterAndSort(entries: LeaderboardEntry[], tab: LeaderboardTab): Leader
 /** Get the display value for an entry in a given tab */
 function getDisplayValue(entry: LeaderboardEntry, tab: LeaderboardTab): number {
   if (tab === 'distributions') return entry.founderPersonalWealth ?? 0;
+  if (tab === 'pe') return entry.grossMoic ?? 0;
   return getAdjustedFEV(entry);
 }
 
 function getDisplayLabel(tab: LeaderboardTab): string {
   if (tab === 'distributions') return 'Wealth';
+  if (tab === 'pe') return 'MOIC';
   return 'Adj FEV';
 }
 
@@ -131,6 +142,8 @@ function getGhostValue(
       return hypotheticalRawFEV && hypotheticalRawFEV > 0 ? hypotheticalRawFEV : -1;
     case 'distributions':
       return hypotheticalWealth && hypotheticalWealth > 0 ? hypotheticalWealth : -1;
+    case 'pe':
+      return -1; // No ghost row for PE tab (PE games always end before viewing leaderboard mid-game)
   }
 }
 
@@ -180,6 +193,8 @@ export function LeaderboardModal({
     ? 'All runs ranked by adjusted FEV'
     : activeTab === 'distributions'
     ? 'Ranked by founder distributions received'
+    : activeTab === 'pe'
+    ? 'PE Fund Manager runs ranked by Gross MOIC'
     : 'Ranked by adjusted FEV within mode';
 
   return (
@@ -267,11 +282,12 @@ function RankBadge({ rank }: { rank: number }) {
 }
 
 function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEntry; rank: number; showWealth: boolean; tab: LeaderboardTab }) {
+  const isPE = tab === 'pe';
   const displayValue = getDisplayValue(entry, tab);
-  const displayLabel = showWealth ? 'Wealth' : 'Adj FEV';
+  const displayLabel = isPE ? 'MOIC' : showWealth ? 'Wealth' : 'Adj FEV';
   const rawFEV = entry.founderEquityValue ?? entry.enterpriseValue;
   const adjFEV = getAdjustedFEV(entry);
-  const showRaw = !showWealth && rawFEV > 0 && adjFEV !== rawFEV;
+  const showRaw = !showWealth && !isPE && rawFEV > 0 && adjFEV !== rawFEV;
 
   const currentPlayerId = useAuthStore((s) => s.player?.id);
   const isYou = !!(currentPlayerId && entry.playerId && currentPlayerId === entry.playerId);
@@ -286,20 +302,24 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
             {entry.initials}
             {isVerified && <span className="text-blue-300 ml-1 text-sm" role="img" aria-label="Verified account" title="Verified account">✓</span>}
             {entry.familyOfficeCompleted && <span className="ml-1" title="Family Office Legacy">🦅</span>}
+            {isPE && <span className="ml-1" title="PE Fund Manager">🏦</span>}
             {isYou && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium">You</span>}
           </p>
-          <p className="text-xs text-text-muted truncate">{entry.holdcoName}</p>
+          <p className="text-xs text-text-muted truncate">{isPE ? (entry.fundName || entry.holdcoName) : entry.holdcoName}</p>
         </div>
       </div>
       <div className="flex items-center gap-2 sm:gap-4 md:gap-6 text-right shrink-0">
         <div className="min-w-[4.5rem]">
           <p className="text-xs text-text-muted">{displayLabel}</p>
           <p className="font-mono tabular-nums font-bold text-accent">
-            {formatMoney(displayValue)}
-            {entry.hasRestructured && <span className="text-red-400 text-[10px] ml-1" title="Restructured — 20% FEV penalty">(R)</span>}
+            {isPE ? `${displayValue.toFixed(2)}x` : formatMoney(displayValue)}
+            {!isPE && entry.hasRestructured && <span className="text-red-400 text-[10px] ml-1" title="Restructured — 20% FEV penalty">(R)</span>}
           </p>
           {showRaw && (
             <p className="text-[11px] text-text-secondary font-mono tabular-nums whitespace-nowrap">Raw: {formatMoney(rawFEV)}</p>
+          )}
+          {isPE && entry.netIrr != null && (
+            <p className="text-[11px] text-text-secondary font-mono tabular-nums whitespace-nowrap">{(entry.netIrr * 100).toFixed(1)}% IRR</p>
           )}
         </div>
         <div className="min-w-[3.5rem]">
@@ -307,7 +327,9 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
           <p className={`font-mono tabular-nums ${getGradeColor(entry.grade)}`}>{entry.score} ({entry.grade})</p>
         </div>
         <div className="w-8 flex justify-center">
-          {entry.difficulty ? (
+          {isPE ? (
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">PE</span>
+          ) : entry.difficulty ? (
             <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
               {entry.difficulty === 'normal' ? 'H' : 'E'}{entry.duration === 'quick' ? '/10' : ''}
             </span>

@@ -62,7 +62,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       legacyGrade,
       foMultiplier,
       strategy,
+      isFundManager,
+      fundName,
+      netIrr,
+      grossMoic,
+      carryEarned,
     } = body || {};
+
+    const isPE = isFundManager === true;
 
     // initials: 2-4 uppercase alpha chars
     if (typeof initials !== 'string' || !/^[A-Z]{2,4}$/.test(initials)) {
@@ -93,7 +100,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     // grade must match score range
-    if (!gradeMatchesScore(grade as Grade, score)) {
+    // PE uses different grade thresholds (S:90, A:75, B:60, C:40, D:20) — skip holdco validation
+    if (!isPE && !gradeMatchesScore(grade as Grade, score)) {
       return res.status(400).json({ error: 'grade does not match score range' });
     }
 
@@ -121,29 +129,31 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const validPersonalWealth = typeof founderPersonalWealth === 'number' && founderPersonalWealth >= 0 && founderPersonalWealth <= 100000000000
       ? Math.round(founderPersonalWealth) : 0;
 
-    // --- Plausibility Checks ---
-    // S-grade (score >= 95) requires at least 3 active businesses
-    if (score >= 95 && businessCount < 3) {
-      return res.status(400).json({ error: 'Implausible: S-grade with fewer than 3 businesses' });
-    }
-
-    // FEV cannot exceed EV × 1.2 (buffer for rounding)
-    if (typeof founderEquityValue === 'number' && founderEquityValue > enterpriseValue * 1.2) {
-      return res.status(400).json({ error: 'Implausible: FEV exceeds EV × 1.2' });
-    }
-
-    // Score > 0 but all 6 breakdown dimensions are 0 → reject
-    if (score > 0 && strategy?.scoreBreakdown) {
-      const sb = strategy.scoreBreakdown;
-      if (sb.valueCreation === 0 && sb.fcfShareGrowth === 0 && sb.portfolioRoic === 0 &&
-          sb.capitalDeployment === 0 && sb.balanceSheetHealth === 0 && sb.strategicDiscipline === 0) {
-        return res.status(400).json({ error: 'Implausible: score > 0 but all dimensions are 0' });
+    // --- Plausibility Checks (holdco mode only — PE uses different scoring) ---
+    if (!isPE) {
+      // S-grade (score >= 95) requires at least 3 active businesses
+      if (score >= 95 && businessCount < 3) {
+        return res.status(400).json({ error: 'Implausible: S-grade with fewer than 3 businesses' });
       }
-    }
 
-    // Zero acquisitions (totalAcquisitions === 0) with 5+ businesses → reject
-    if (strategy?.totalAcquisitions === 0 && businessCount >= 5) {
-      return res.status(400).json({ error: 'Implausible: no acquisitions with 5+ businesses' });
+      // FEV cannot exceed EV × 1.2 (buffer for rounding)
+      if (typeof founderEquityValue === 'number' && founderEquityValue > enterpriseValue * 1.2) {
+        return res.status(400).json({ error: 'Implausible: FEV exceeds EV × 1.2' });
+      }
+
+      // Score > 0 but all 6 breakdown dimensions are 0 → reject
+      if (score > 0 && strategy?.scoreBreakdown) {
+        const sb = strategy.scoreBreakdown;
+        if (sb.valueCreation === 0 && sb.fcfShareGrowth === 0 && sb.portfolioRoic === 0 &&
+            sb.capitalDeployment === 0 && sb.balanceSheetHealth === 0 && sb.strategicDiscipline === 0) {
+          return res.status(400).json({ error: 'Implausible: score > 0 but all dimensions are 0' });
+        }
+      }
+
+      // Zero acquisitions (totalAcquisitions === 0) with 5+ businesses → reject
+      if (strategy?.totalAcquisitions === 0 && businessCount >= 5) {
+        return res.status(400).json({ error: 'Implausible: no acquisitions with 5+ businesses' });
+      }
     }
 
     // --- Rate Limiting (uses x-real-ip, not spoofable x-forwarded-for) ---
@@ -236,6 +246,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       avgEbitdaMargin: typeof avgEbitdaMargin === 'number' ? Math.round(avgEbitdaMargin * 1000) / 1000 : undefined,
       familyOfficeCompleted: familyOfficeCompleted === true ? true : undefined,
       legacyGrade: typeof legacyGrade === 'string' && ['Enduring','Influential','Established','Fragile'].includes(legacyGrade) ? legacyGrade : undefined,
+      // PE Fund Manager fields
+      ...(isPE ? {
+        isFundManager: true,
+        fundName: typeof fundName === 'string' ? fundName.trim().slice(0, 50) : undefined,
+        netIrr: typeof netIrr === 'number' ? Math.round(netIrr * 10000) / 10000 : undefined,
+        grossMoic: typeof grossMoic === 'number' ? Math.round(grossMoic * 100) / 100 : undefined,
+        carryEarned: typeof carryEarned === 'number' ? Math.round(carryEarned) : undefined,
+      } : {}),
       strategy: validStrategy,
       // Player accounts fields — only verified (non-anonymous) accounts get playerId on leaderboard
       ...(verifiedPlayerId ? { playerId: verifiedPlayerId } : {}),
@@ -243,8 +261,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...(claimToken ? { claimToken } : {}),
     };
 
-    // Add to sorted set with adjusted FEV as the ranking score
-    await kv.zadd(LEADERBOARD_KEY, { score: adjustedFEV, member: JSON.stringify(entry) });
+    // Add to sorted set — PE entries use grossMoic × fundSize as proxy score, holdco uses adjusted FEV
+    const sortScore = isPE && typeof grossMoic === 'number' ? Math.round(grossMoic * 100000) : adjustedFEV;
+    await kv.zadd(LEADERBOARD_KEY, { score: sortScore, member: JSON.stringify(entry) });
 
     // Prune to max entries: remove lowest-scoring entries beyond the limit
     const totalCount = await kv.zcard(LEADERBOARD_KEY);

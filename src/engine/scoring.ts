@@ -652,7 +652,7 @@ export async function loadLeaderboard(): Promise<LeaderboardEntry[]> {
  */
 export async function saveToLeaderboard(
   entry: Omit<LeaderboardEntry, 'id' | 'date'>,
-  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number; hasRestructured?: boolean; submittedMultiplier?: number; familyOfficeCompleted?: boolean; legacyGrade?: string; foMultiplier?: number; strategy?: LeaderboardStrategy }
+  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number; hasRestructured?: boolean; submittedMultiplier?: number; familyOfficeCompleted?: boolean; legacyGrade?: string; foMultiplier?: number; strategy?: LeaderboardStrategy; isFundManager?: boolean; fundName?: string; netIrr?: number; grossMoic?: number; carryEarned?: number }
 ): Promise<LeaderboardEntry> {
   const newEntry: LeaderboardEntry = {
     ...entry,
@@ -706,6 +706,11 @@ export async function saveToLeaderboard(
     ...(extra?.legacyGrade ? { legacyGrade: extra.legacyGrade } : {}),
     ...(extra?.foMultiplier != null ? { foMultiplier: extra.foMultiplier } : {}),
     ...(extra?.strategy ? { strategy: extra.strategy } : {}),
+    ...(extra?.isFundManager ? { isFundManager: true } : {}),
+    ...(extra?.fundName ? { fundName: extra.fundName } : {}),
+    ...(extra?.netIrr != null ? { netIrr: extra.netIrr } : {}),
+    ...(extra?.grossMoic != null ? { grossMoic: extra.grossMoic } : {}),
+    ...(extra?.carryEarned != null ? { carryEarned: extra.carryEarned } : {}),
     claimToken, // Store locally for future claiming (Phase 2)
   };
   saveToLocalLeaderboard(localEntry);

@@ -79,7 +79,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **Modes**: Easy ($20M fund, 80% ownership) / Normal ($5M self-funded, 100% ownership) × Quick Play (10yr) / Full Game (20yr) + Fund Manager ($100M PE fund, 10yr, unlocked at B grade)
 - **PE Fund Mode**: $100M committed capital, 2% mgmt fee, 8% hurdle, 20% carry. LP satisfaction 0-100, LPAC governance, DPI distributions, forced liquidation at Year 10. Separate 6-dimension PE scoring (Return Gen/Cap Efficiency/Value Creation/Deployment/Risk/LP Satisfaction). Blocks: equity raises, buybacks, distributions, holdco loan, IPO, FO
 - **Scoring**: FEV (Founder Equity Value = EV × ownership%) is primary metric; leaderboard uses adjustedFEV with difficulty multiplier
-- **Leaderboard**: 6 tabs (Overall/Hard-20/Hard-10/Easy-20/Easy-10/Distributions); client-side filtering from single KV set; 500 stored, 50 displayed per tab
+- **Leaderboard**: 7 tabs (Overall/Hard-20/Hard-10/Easy-20/Easy-10/Distributions/PE Fund); client-side filtering from single KV set; 500 stored, 50 displayed per tab; PE entries separated from holdco tabs (filtered by isFundManager flag), PE tab sorted by Gross MOIC
 - **Player Accounts**: Optional Supabase auth (Google OAuth + Magic Link); anonymous sessions auto-created on first visit; `linkIdentity`/`updateUser` preserves UUID on upgrade; GET API strips `playerId` → returns `isVerified` boolean; verified badge only for non-anonymous accounts; game history claimed via distributed lock (KV setnx); pre-computed player_stats/global_stats updated on submit/claim (non-blocking); account deletion anonymizes KV leaderboard entries then cascades via Supabase admin; data export bundles profile+games+stats as JSON; anonymous users with no games cleaned up monthly (90-day cutoff)
 
 ## Key Files
@@ -178,7 +178,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **`state.totalDebt`** = holdcoLoanBalance + Σ(business.bankDebtBalance) — does NOT include seller notes
 - **Tax calc**: Pass `holdcoLoanBalance` (not `totalDebt`) to `calculatePortfolioTax` — per-business bank debt interest is in opcoInterest
 - **Waterfall order**: Holdco P&I → Bank debt P&I → Seller notes → Earnouts
-- **Leaderboard FEV**: All tabs show `Adj FEV` consistently using `DIFFICULTY_CONFIG` multiplier
+- **Leaderboard FEV**: Holdco tabs show `Adj FEV` consistently using `DIFFICULTY_CONFIG` multiplier; PE tab shows `MOIC` (Gross MOIC) with Net IRR sub-line
 
 - **Seeded RNG**: All engine functions accept optional `rng?: SeededRng` last param; when omitted, falls back to `Math.random()`. RNG is NOT in Zustand (non-serializable) — reconstruct from `state.seed + state.round`. 5 streams: deals, events, simulation, market, cosmetic. NEVER pass RNG to async functions (AI generation).
 - **Challenge mode**: URL format `?c=SEED.DIFF.DUR` (challenge) + `&r=NAME.FEV.SCORE...` (result). Base36-encoded for compact URLs. Comparison supports 2-4 players. Ranked by FEV (not composite score); tiebreaker is TSR (FEV + distributions).

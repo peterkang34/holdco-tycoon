@@ -134,7 +134,7 @@ export function GameOverScreen({
   const [leaderboardError, setLeaderboardError] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
-  const [leaderboardTab, setLeaderboardTab] = useState<LeaderboardTab>('overall');
+  const [leaderboardTab, setLeaderboardTab] = useState<LeaderboardTab>(isFundManagerMode ? 'pe' : 'overall');
   const [challengeCopied, setChallengeCopied] = useState(false);
   const [scoreboardLinkCopied, setScoreboardLinkCopied] = useState(false);
   const [showComparison, setShowComparison] = useState(!!incomingResult);
@@ -365,8 +365,13 @@ export function GameOverScreen({
   const restructuringMultiplier = hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0;
   const foMultiplier = familyOfficeState?.foMultiplier ?? 1.0;
   const adjustedFEV = Math.round(founderEquityValue * difficultyMultiplier * restructuringMultiplier * foMultiplier);
-  const canMakeLeaderboard = wouldMakeLeaderboardFromList(leaderboard, adjustedFEV);
-  const potentialRank = getLeaderboardRankFromList(leaderboard, adjustedFEV);
+  const peEntries = leaderboard.filter(e => e.isFundManager);
+  const canMakeLeaderboard = isFundManagerMode
+    ? (peEntries.length < 50 || (carryWaterfallData?.grossMoic ?? 0) > Math.min(...peEntries.map(e => e.grossMoic ?? 0)))
+    : wouldMakeLeaderboardFromList(leaderboard, adjustedFEV);
+  const potentialRank = isFundManagerMode
+    ? peEntries.filter(e => (e.grossMoic ?? 0) > (carryWaterfallData?.grossMoic ?? 0)).length + 1
+    : getLeaderboardRankFromList(leaderboard, adjustedFEV);
 
   // Memoize per-business exit valuations — each calls calculateExitValuation with premium/buyer-pool logic
   const fevBreakdown = useMemo(() => {
@@ -429,11 +434,11 @@ export function GameOverScreen({
     try {
       const entry = await saveToLeaderboard(
         {
-          holdcoName,
+          holdcoName: isFundManagerMode ? (fundName || 'PE Fund') : holdcoName,
           initials: initials.toUpperCase(),
           enterpriseValue,
-          score: score.total,
-          grade: score.grade,
+          score: isFundManagerMode ? (peScore?.total ?? 0) : score.total,
+          grade: isFundManagerMode ? (peScore?.grade ?? 'F') : score.grade,
           businessCount: activeBusinesses.length,
         },
         {
@@ -450,15 +455,23 @@ export function GameOverScreen({
           familyOfficeCompleted: !!familyOfficeState?.legacyScore,
           legacyGrade: familyOfficeState?.legacyScore?.grade,
           foMultiplier: foMultiplier > 1.0 ? foMultiplier : undefined,
+          // PE Fund Manager fields
+          isFundManager: isFundManagerMode || undefined,
+          fundName: isFundManagerMode ? (fundName || 'PE Fund') : undefined,
+          netIrr: isFundManagerMode ? carryWaterfallData?.netIrr : undefined,
+          grossMoic: isFundManagerMode ? carryWaterfallData?.grossMoic : undefined,
+          carryEarned: isFundManagerMode ? carryWaterfallData?.carry : undefined,
           strategy: {
-            scoreBreakdown: {
-              valueCreation: score.valueCreation,
-              fcfShareGrowth: score.fcfShareGrowth,
-              portfolioRoic: score.portfolioRoic,
-              capitalDeployment: score.capitalDeployment,
-              balanceSheetHealth: score.balanceSheetHealth,
-              strategicDiscipline: score.strategicDiscipline,
-            },
+            scoreBreakdown: isFundManagerMode
+              ? { valueCreation: 0, fcfShareGrowth: 0, portfolioRoic: 0, capitalDeployment: 0, balanceSheetHealth: 0, strategicDiscipline: 0 }
+              : {
+                  valueCreation: score.valueCreation,
+                  fcfShareGrowth: score.fcfShareGrowth,
+                  portfolioRoic: score.portfolioRoic,
+                  capitalDeployment: score.capitalDeployment,
+                  balanceSheetHealth: score.balanceSheetHealth,
+                  strategicDiscipline: score.strategicDiscipline,
+                },
             archetype: strategyData.archetype,
             sophisticationScore: strategyData.sophisticationScore,
             antiPatterns: strategyData.antiPatterns.length > 0 ? strategyData.antiPatterns : undefined,
@@ -506,6 +519,13 @@ export function GameOverScreen({
         familyOfficeCompleted: !!familyOfficeState?.legacyScore,
         legacyGrade: familyOfficeState?.legacyScore?.grade,
         foMultiplier: foMultiplier > 1.0 ? foMultiplier : undefined,
+        ...(isFundManagerMode ? {
+          isFundManager: true,
+          fundName: fundName || 'PE Fund',
+          netIrr: carryWaterfallData?.netIrr,
+          grossMoic: carryWaterfallData?.grossMoic,
+          carryEarned: carryWaterfallData?.carry,
+        } : {}),
       };
       setLeaderboard(prev => {
         // Avoid duplicates if the entry is somehow already present
@@ -1001,8 +1021,8 @@ export function GameOverScreen({
         </div>
       )}
 
-      {/* Save to Leaderboard (hidden in fund mode) */}
-      {!isFundManagerMode && !hasSaved && !leaderboardLoading && canMakeLeaderboard && (
+      {/* Save to Leaderboard */}
+      {!hasSaved && !leaderboardLoading && canMakeLeaderboard && (
         <div className="card mb-6 border-yellow-400/30">
           <div className="text-center">
             <p className="text-yellow-400 font-bold mb-2">
@@ -1078,8 +1098,8 @@ export function GameOverScreen({
         );
       })()}
 
-      {/* Global Leaderboard (hidden in fund mode) */}
-      {!isFundManagerMode && <GameOverLeaderboard
+      {/* Global Leaderboard */}
+      {<GameOverLeaderboard
         allEntries={leaderboard}
         loading={leaderboardLoading}
         error={leaderboardError}
@@ -1087,7 +1107,7 @@ export function GameOverScreen({
         savedEntryId={savedEntryId}
         activeTab={leaderboardTab}
         onTabChange={setLeaderboardTab}
-        showWealth={leaderboardTab === 'distributions'}
+        showWealth={leaderboardTab === 'distributions' || leaderboardTab === 'pe'}
       />}
 
       {/* Challenge Scoreboard (hidden in fund mode) */}
@@ -1443,7 +1463,8 @@ function GameOverLeaderboard({
         <div className="space-y-2 max-h-[400px] overflow-y-auto">
           {filtered.map((entry, index) => {
             const displayValue = getDisplayValue(entry, activeTab);
-            const displayLabel = showWealth ? 'Wealth' : (entry.founderEquityValue ? 'FEV' : 'EV');
+            const isPE = activeTab === 'pe';
+            const displayLabel = isPE ? 'MOIC' : showWealth ? 'Wealth' : (entry.founderEquityValue ? 'FEV' : 'EV');
             const isYou = !!(currentPlayerId && entry.playerId && currentPlayerId === entry.playerId);
             const isVerified = entry.isVerified || !!entry.playerId;
             return (
@@ -1464,17 +1485,18 @@ function GameOverLeaderboard({
                       {entry.initials}
                       {isVerified && <span className="text-blue-300 ml-1 text-sm" role="img" aria-label="Verified account" title="Verified account">✓</span>}
                       {entry.familyOfficeCompleted && <span className="ml-1" title="Family Office Legacy">🦅</span>}
+                      {isPE && <span className="ml-1" title="PE Fund Manager">🏦</span>}
                       {isYou && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium">You</span>}
                     </p>
-                    <p className="text-xs text-text-muted truncate">{entry.holdcoName}</p>
+                    <p className="text-xs text-text-muted truncate">{isPE ? (entry.fundName || entry.holdcoName) : entry.holdcoName}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-4 sm:gap-6 text-right shrink-0">
                   <div className="min-w-[4.5rem]">
                     <p className="text-xs text-text-muted">{displayLabel}</p>
                     <p className="font-mono tabular-nums font-bold text-accent">
-                      {formatMoney(displayValue)}
-                      {entry.hasRestructured && <span className="text-red-400 text-[10px] ml-1" title="Restructured — 20% FEV penalty">(R)</span>}
+                      {isPE ? `${displayValue.toFixed(2)}x` : formatMoney(displayValue)}
+                      {!isPE && entry.hasRestructured && <span className="text-red-400 text-[10px] ml-1" title="Restructured — 20% FEV penalty">(R)</span>}
                     </p>
                   </div>
                   <div className="min-w-[3.5rem]">
@@ -1482,7 +1504,9 @@ function GameOverLeaderboard({
                     <p className={`font-mono tabular-nums ${getGradeColor(entry.grade)}`}>{entry.score} ({entry.grade})</p>
                   </div>
                   <div className="w-8 flex justify-center">
-                    {entry.difficulty ? (
+                    {isPE ? (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-400">PE</span>
+                    ) : entry.difficulty ? (
                       <span className={`text-[10px] px-1.5 py-0.5 rounded ${entry.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
                         {entry.difficulty === 'normal' ? 'H' : 'E'}{entry.duration === 'quick' ? '/10' : ''}
                       </span>
