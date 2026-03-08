@@ -106,7 +106,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
         }
 
-        const modeKey = `${game.difficulty}_${game.duration}`;
+        const isPEGame = (game.strategy as any)?.isFundManager === true;
+        const modeKey = isPEGame ? 'fund_manager' : `${game.difficulty}_${game.duration}`;
         if (!modeScores[modeKey]) modeScores[modeKey] = { sum: 0, count: 0, scoredCount: 0 };
         modeScores[modeKey].count++;
         if (hasScore) {

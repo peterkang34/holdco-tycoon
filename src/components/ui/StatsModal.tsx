@@ -55,6 +55,9 @@ interface GameStrategy {
   turnaroundsFailed?: number;
   isFundManager?: boolean;
   fundName?: string;
+  carryEarned?: number;
+  netIrr?: number;
+  grossMoic?: number;
 }
 
 interface GameHistoryEntry {
@@ -150,7 +153,11 @@ function GameRow({ game }: { game: GameHistoryEntry }) {
             </div>
             <div className="flex items-center gap-3 shrink-0 text-right">
               <div>
-                <p className="font-mono text-sm font-bold text-accent">{formatMoney(game.adjusted_fev)}</p>
+                {game.strategy?.isFundManager && game.strategy.carryEarned != null ? (
+                  <p className="font-mono text-sm font-bold text-purple-300">{formatMoney(Math.round(game.strategy.carryEarned))}</p>
+                ) : (
+                  <p className="font-mono text-sm font-bold text-accent">{formatMoney(game.adjusted_fev)}</p>
+                )}
               </div>
               <span className={`font-mono font-bold ${getGradeColor(game.grade as any)}`}>{game.grade}</span>
               <span className={`text-[10px] px-1.5 py-0.5 rounded ${game.strategy?.isFundManager ? 'bg-purple-500/20 text-purple-400' : game.difficulty === 'normal' ? 'bg-orange-500/20 text-orange-400' : 'bg-accent/20 text-accent'}`}>
@@ -265,6 +272,26 @@ function GameRow({ game }: { game: GameHistoryEntry }) {
               {game.has_restructured && (
                 <div className="col-span-2">
                   <span className="text-orange-400/80">Restructured</span>
+                </div>
+              )}
+
+              {/* PE Fund metrics */}
+              {s.isFundManager && s.grossMoic != null && (
+                <div>
+                  <span className="text-text-muted">MOIC</span>
+                  <span className="ml-1 font-mono">{s.grossMoic.toFixed(2)}x</span>
+                </div>
+              )}
+              {s.isFundManager && s.netIrr != null && (
+                <div>
+                  <span className="text-text-muted">Net IRR</span>
+                  <span className="ml-1 font-mono">{(s.netIrr * 100).toFixed(1)}%</span>
+                </div>
+              )}
+              {s.isFundManager && s.carryEarned != null && (
+                <div>
+                  <span className="text-text-muted">Carry</span>
+                  <span className="ml-1 font-mono text-purple-300">{formatMoney(Math.round(s.carryEarned))}</span>
                 </div>
               )}
 

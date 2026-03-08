@@ -487,7 +487,13 @@ export function GameOverScreen({
           grossMoic: isFundManagerMode ? carryWaterfallData?.grossMoic : undefined,
           carryEarned: isFundManagerMode ? carryWaterfallData?.carry : undefined,
           strategy: {
-            ...(isFundManagerMode ? { isFundManager: true, fundName: fundName || 'PE Fund' } : {}),
+            ...(isFundManagerMode ? {
+              isFundManager: true,
+              fundName: fundName || 'PE Fund',
+              carryEarned: carryWaterfallData?.carry,
+              netIrr: carryWaterfallData?.netIrr,
+              grossMoic: carryWaterfallData?.grossMoic,
+            } : {}),
             scoreBreakdown: isFundManagerMode
               ? { valueCreation: 0, fcfShareGrowth: 0, portfolioRoic: 0, capitalDeployment: 0, balanceSheetHealth: 0, strategicDiscipline: 0 }
               : {

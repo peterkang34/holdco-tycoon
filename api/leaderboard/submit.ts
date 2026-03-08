@@ -197,6 +197,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           maSourcingTier: typeof s.maSourcingTier === 'number' ? s.maSourcingTier : 0,
           sharedServicesActive: typeof s.sharedServicesActive === 'number' ? s.sharedServicesActive : 0,
           rolloverEquityCount: typeof s.rolloverEquityCount === 'number' ? s.rolloverEquityCount : 0,
+          // PE Fund Manager fields (pass through for game_history)
+          ...(s.isFundManager === true ? {
+            isFundManager: true,
+            ...(typeof s.fundName === 'string' ? { fundName: String(s.fundName).slice(0, 50) } : {}),
+            ...(typeof s.carryEarned === 'number' ? { carryEarned: Math.round(s.carryEarned) } : {}),
+            ...(typeof s.netIrr === 'number' ? { netIrr: Math.round(s.netIrr * 10000) / 10000 } : {}),
+            ...(typeof s.grossMoic === 'number' ? { grossMoic: Math.round(s.grossMoic * 100) / 100 } : {}),
+          } : {}),
         };
       }
     }
