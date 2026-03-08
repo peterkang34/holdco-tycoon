@@ -55,6 +55,13 @@ export function CommunityTab({ token }: { token: string }) {
   const [repairing, setRepairing] = useState(false);
   const [repairResult, setRepairResult] = useState<string | null>(null);
 
+  // Merge state
+  const [mergeMode, setMergeMode] = useState(false);
+  const [mergeSource, setMergeSource] = useState<string | null>(null);
+  const [mergeTarget, setMergeTarget] = useState<string | null>(null);
+  const [merging, setMerging] = useState(false);
+  const [mergeResult, setMergeResult] = useState<string | null>(null);
+
   // Fetch community data
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -197,6 +204,24 @@ export function CommunityTab({ token }: { token: string }) {
             {repairResult && (
               <span className="text-[10px] text-text-muted">{repairResult}</span>
             )}
+            <button
+              onClick={() => {
+                setMergeMode(m => !m);
+                setMergeSource(null);
+                setMergeTarget(null);
+                setMergeResult(null);
+              }}
+              className={`text-[10px] px-2 py-0.5 rounded transition-colors ${
+                mergeMode
+                  ? 'bg-danger/20 text-danger hover:bg-danger/30'
+                  : 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
+              }`}
+            >
+              {mergeMode ? 'Cancel Merge' : 'Merge Players'}
+            </button>
+            {mergeResult && (
+              <span className="text-[10px] text-text-muted">{mergeResult}</span>
+            )}
           </div>
           <div className="flex gap-2">
             <input
@@ -224,6 +249,77 @@ export function CommunityTab({ token }: { token: string }) {
           </div>
         </div>
 
+        {/* Merge mode banner */}
+        {mergeMode && (
+          <div className="mb-3 p-3 rounded bg-purple-500/10 border border-purple-500/30 text-xs space-y-2">
+            <p className="text-purple-300 font-medium">
+              {!mergeSource
+                ? '① Click the player to merge FROM (the duplicate that will be deleted)'
+                : !mergeTarget
+                  ? '② Now click the player to merge INTO (the one to keep)'
+                  : '③ Confirm merge below'}
+            </p>
+            {mergeSource && (
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-text-muted">From:</span>
+                <span className="font-mono text-danger">
+                  {data.players.find(p => p.id === mergeSource)?.display_name || mergeSource}
+                  {' '}({data.players.find(p => p.id === mergeSource)?.total_games ?? '?'} games)
+                </span>
+                {mergeTarget && (
+                  <>
+                    <span className="text-text-muted">→ Into:</span>
+                    <span className="font-mono text-accent">
+                      {data.players.find(p => p.id === mergeTarget)?.display_name || mergeTarget}
+                      {' '}({data.players.find(p => p.id === mergeTarget)?.total_games ?? '?'} games)
+                    </span>
+                    <button
+                      onClick={async () => {
+                        setMerging(true);
+                        setMergeResult(null);
+                        try {
+                          const res = await fetch('/api/admin/merge-player', {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              Authorization: `Bearer ${token}`,
+                            },
+                            body: JSON.stringify({ sourceId: mergeSource, targetId: mergeTarget }),
+                          });
+                          const json = await res.json();
+                          if (res.ok) {
+                            setMergeResult(`Merged ${json.gamesMoved} games from ${json.source.name} → ${json.target.name}`);
+                            setMergeMode(false);
+                            setMergeSource(null);
+                            setMergeTarget(null);
+                            fetchData();
+                          } else {
+                            setMergeResult(json.error || 'Merge failed');
+                          }
+                        } catch {
+                          setMergeResult('Network error');
+                        } finally {
+                          setMerging(false);
+                        }
+                      }}
+                      disabled={merging}
+                      className="bg-danger/20 text-danger px-3 py-1 rounded hover:bg-danger/30 transition-colors disabled:opacity-50 font-medium"
+                    >
+                      {merging ? 'Merging...' : 'Confirm Merge'}
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={() => { setMergeSource(null); setMergeTarget(null); }}
+                  className="text-text-muted hover:text-text-primary px-1"
+                >
+                  Reset
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-xs min-w-[600px]">
@@ -248,9 +344,25 @@ export function CommunityTab({ token }: { token: string }) {
               {data.players.map(player => (
                 <Fragment key={player.id}>
                   <tr
-                    onClick={() => openPlayerDetail(player.id)}
+                    onClick={() => {
+                      if (mergeMode) {
+                        if (!mergeSource) {
+                          setMergeSource(player.id);
+                        } else if (!mergeTarget && player.id !== mergeSource) {
+                          setMergeTarget(player.id);
+                        }
+                      } else {
+                        openPlayerDetail(player.id);
+                      }
+                    }}
                     className={`border-b border-border/30 cursor-pointer transition-colors ${
-                      selectedPlayerId === player.id ? 'bg-accent/10' : 'hover:bg-white/5'
+                      mergeMode && mergeSource === player.id
+                        ? 'bg-danger/15'
+                        : mergeMode && mergeTarget === player.id
+                          ? 'bg-accent/15'
+                          : selectedPlayerId === player.id
+                            ? 'bg-accent/10'
+                            : 'hover:bg-white/5'
                     }`}
                   >
                     <td className="py-2 px-2 text-text-primary truncate max-w-[160px]">
