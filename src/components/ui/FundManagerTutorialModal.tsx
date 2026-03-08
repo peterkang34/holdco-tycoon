@@ -74,6 +74,10 @@ export function FundManagerTutorialModal({ fundName, onClose }: FundManagerTutor
             Over 10 years, you need to turn $100M into at least ~${hurdleAmount}M before carry kicks in.
             Above that, <strong className="text-purple-300">you keep 20%</strong>.
           </p>
+          <p className="text-text-secondary text-sm mt-2">
+            Unsold businesses at fund close are sold at a <strong className="text-amber-300">10% discount</strong>.
+            Return capital early for a <strong className="text-green-300">carry bonus up to 1.30x</strong>.
+          </p>
         </>
       ),
     },

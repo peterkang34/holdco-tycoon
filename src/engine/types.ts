@@ -499,6 +499,8 @@ export interface CarryWaterfall {
   hurdleCleared: boolean;
   aboveHurdle: number;
   carry: number;
+  baseCarry: number;
+  irrMultiplier: number;
   managementFees: number;
   totalGpEconomics: number;
   grossMoic: number;

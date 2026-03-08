@@ -14,6 +14,19 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'March 7, 2026',
+    title: 'PE Fund Endgame Incentives',
+    sections: [
+      {
+        heading: 'Balance',
+        items: [
+          'Forced Liquidation Discount — unsold Year 10 businesses now sell at 90% of market value. Sell early for full value.',
+          'Supercarry — your carry multiplier scales with Net IRR (0.70x\u20131.30x). Distribute early to boost IRR and earn bonus carry.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 7, 2026',
     title: 'PE Fund Manager Mode',
     sections: [
       {

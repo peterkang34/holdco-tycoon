@@ -8,6 +8,8 @@ import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLe
 import { calculateExitValuation } from '../../engine/simulation';
 import { AIAnalysisSection } from '../ui/AIAnalysisSection';
 import { DIFFICULTY_CONFIG, RESTRUCTURING_FEV_PENALTY } from '../../data/gameConfig';
+import { getOutcomeReactions } from '../../data/lpCommentary';
+import { createRngStreams } from '../../engine/rng';
 import { EV_WATERFALL_LABELS } from '../../data/mechanicsCopy';
 import { getGradeColor, getRankColor } from '../../utils/gradeColors';
 import { TABS, filterAndSort, getDisplayValue } from '../ui/LeaderboardModal';
@@ -118,7 +120,7 @@ export function GameOverScreen({
   fundName,
   peScore,
   carryWaterfall: carryWaterfallData,
-  lpCommentary,
+  lpCommentary: _lpCommentary,
   onPlayAgain,
 }: GameOverScreenProps) {
   const familyOfficeState = useGameStore(s => s.familyOfficeState);
@@ -142,7 +144,19 @@ export function GameOverScreen({
   const [showFeedback, setShowFeedback] = useState(false);
   // Carry waterfall step progression (fund mode)
   const [waterfallStep, setWaterfallStep] = useState(0);
-  const maxWaterfallSteps = carryWaterfallData?.hurdleCleared ? 6 : 4; // Skip carry + what-if if below hurdle
+  const maxWaterfallSteps = carryWaterfallData?.hurdleCleared ? 7 : 4; // Skip carry + supercarry + what-if if below hurdle
+
+  // Outcome-based LP reactions (replace generic in-game comments with performance-aware quotes)
+  const outcomeReactions = useMemo(() => {
+    if (!isFundManagerMode || !carryWaterfallData) return null;
+    const rng = createRngStreams(seed, maxRounds);
+    return getOutcomeReactions(
+      carryWaterfallData.grossMoic,
+      carryWaterfallData.hurdleCleared,
+      carryWaterfallData.netIrr,
+      rng.cosmetic,
+    );
+  }, [isFundManagerMode, carryWaterfallData, seed, maxRounds]);
 
   // Build challenge params from current game (works for both challenge and solo games)
   const currentChallengeParams: ChallengeParams = useMemo(() => (
@@ -352,6 +366,7 @@ export function GameOverScreen({
         grossMoic: carryWaterfallData?.grossMoic,
         carryEarned: carryWaterfallData?.carry,
         dpi: carryWaterfallData?.dpi,
+        irrMultiplier: carryWaterfallData?.irrMultiplier,
       } : {}),
     };
     trackGameComplete(snapshot);
@@ -696,28 +711,64 @@ export function GameOverScreen({
                 </div>
               )}
               {/* Step 4: Your Carry (only if hurdle cleared) */}
-              {waterfallStep >= 4 && carryWaterfallData.hurdleCleared && (
-                <div className="bg-purple-500/10 rounded-lg p-3 border-l-2 border-purple-400">
-                  <p className="text-sm font-medium mb-1 text-purple-300">Step 4: Your Carry</p>
-                  <p className="text-xs text-text-muted">20% of above-hurdle profits: {formatMoney(Math.round(carryWaterfallData.aboveHurdle))} x 20% = <span className="font-bold text-purple-300">{formatMoney(Math.round(carryWaterfallData.carry))}</span></p>
-                  <p className="text-xs text-text-muted">Management fees earned: {formatMoney(Math.round(carryWaterfallData.managementFees))}</p>
-                  <p className="text-xs font-bold text-purple-300">Total GP Economics: {formatMoney(Math.round(carryWaterfallData.totalGpEconomics))}</p>
-                </div>
-              )}
-              {/* Step 5: What If? (only if hurdle cleared) */}
-              {waterfallStep >= 5 && carryWaterfallData.hurdleCleared && (
+              {waterfallStep >= 4 && carryWaterfallData.hurdleCleared && (() => {
+                const tierLabel = carryWaterfallData.irrMultiplier >= 1.30 ? 'Legendary'
+                  : carryWaterfallData.irrMultiplier >= 1.20 ? 'Exceptional'
+                  : carryWaterfallData.irrMultiplier >= 1.10 ? 'Top Quartile'
+                  : carryWaterfallData.irrMultiplier >= 1.00 ? 'Solid'
+                  : carryWaterfallData.irrMultiplier >= 0.85 ? 'Below Median'
+                  : 'Poor';
+                const tierColor = carryWaterfallData.irrMultiplier > 1.0 ? 'text-green-400'
+                  : carryWaterfallData.irrMultiplier >= 1.0 ? 'text-purple-300'
+                  : 'text-amber-400';
+                return (
+                  <div className="bg-purple-500/10 rounded-lg p-3 border-l-2 border-purple-400">
+                    <p className="text-sm font-medium mb-1 text-purple-300">Step 4: Your Carry</p>
+                    <p className="text-xs text-text-muted">Base carry (20% of above-hurdle): {formatMoney(Math.round(carryWaterfallData.aboveHurdle))} x 20% = {formatMoney(Math.round(carryWaterfallData.baseCarry))}</p>
+                    <p className="text-xs text-text-muted">
+                      IRR Multiplier: <span className={`font-bold ${tierColor}`}>{carryWaterfallData.irrMultiplier.toFixed(2)}x</span>
+                      {' '}({tierLabel})
+                    </p>
+                    <p className="text-xs font-bold text-purple-300">Adjusted Carry: {formatMoney(Math.round(carryWaterfallData.carry))}</p>
+                    <p className="text-xs text-text-muted mt-1">Management fees earned: {formatMoney(Math.round(carryWaterfallData.managementFees))}</p>
+                    <p className="text-xs font-bold text-purple-300">Total GP Economics: {formatMoney(Math.round(carryWaterfallData.totalGpEconomics))}</p>
+                  </div>
+                );
+              })()}
+              {/* Step 5: Supercarry Tier (only if hurdle cleared) */}
+              {waterfallStep >= 5 && carryWaterfallData.hurdleCleared && (() => {
+                const mult = carryWaterfallData.irrMultiplier;
+                const bonusPct = Math.round((mult - 1.0) * 100);
+                return (
+                  <div className={`bg-white/5 rounded-lg p-3 border-l-2 ${mult > 1.0 ? 'border-green-400' : mult < 1.0 ? 'border-amber-400' : 'border-white/20'}`}>
+                    <p className="text-sm font-medium mb-1">Step 5: Supercarry</p>
+                    {mult > 1.0 && (
+                      <p className="text-xs text-green-400">Your early distributions boosted carry by {bonusPct}%.</p>
+                    )}
+                    {mult < 1.0 && (
+                      <p className="text-xs text-amber-400">Distributing earlier would have increased carry.</p>
+                    )}
+                    {mult === 1.0 && (
+                      <p className="text-xs text-text-muted">Baseline multiplier — solid IRR performance.</p>
+                    )}
+                    <p className="text-xs text-text-muted mt-1">Net MOIC to LPs: {((carryWaterfallData.grossTotalReturns - carryWaterfallData.carry) / carryWaterfallData.returnOfCapital).toFixed(2)}x</p>
+                  </div>
+                );
+              })()}
+              {/* Step 6: What If? (only if hurdle cleared) */}
+              {waterfallStep >= 6 && carryWaterfallData.hurdleCleared && (
                 <div className="bg-white/5 rounded-lg p-3 border-l-2 border-white/20">
-                  <p className="text-sm font-medium mb-1">Step 5: What If?</p>
+                  <p className="text-sm font-medium mb-1">Step 6: What If?</p>
                   <p className="text-xs text-text-muted">At 3.5x MOIC: Carry = {formatMoney(Math.round(Math.max(0, (350_000 - carryWaterfallData.hurdleAmount) * 0.20)))}</p>
                   <p className="text-xs text-text-muted">At 2.0x MOIC: Carry = {200_000 > carryWaterfallData.hurdleAmount ? formatMoney(Math.round((200_000 - carryWaterfallData.hurdleAmount) * 0.20)) : '$0 (below hurdle)'}</p>
                   <p className="text-xs text-text-muted">Net MOIC to LPs: {((carryWaterfallData.grossTotalReturns - carryWaterfallData.carry) / carryWaterfallData.returnOfCapital).toFixed(2)}x</p>
                 </div>
               )}
-              {/* Step 6: LP Reactions */}
-              {waterfallStep >= (carryWaterfallData.hurdleCleared ? 6 : 4) && lpCommentary && lpCommentary.length > 0 && (
+              {/* Step 7: LP Reactions (outcome-based, reflecting actual fund performance) */}
+              {waterfallStep >= (carryWaterfallData.hurdleCleared ? 7 : 4) && outcomeReactions && outcomeReactions.length > 0 && (
                 <div className="bg-white/5 rounded-lg p-3 border-l-2 border-blue-400">
                   <p className="text-sm font-medium mb-2">LP Reactions</p>
-                  {lpCommentary.slice(-2).map((lp, i) => (
+                  {outcomeReactions.map((lp, i) => (
                     <div key={i} className="flex items-start gap-2 mb-2">
                       <span className={`w-6 h-6 rounded-full text-[9px] font-bold flex items-center justify-center shrink-0 ${lp.speaker === 'edna' ? 'bg-blue-500/30 text-blue-300' : 'bg-amber-500/30 text-amber-300'}`}>
                         {lp.speaker === 'edna' ? 'EM' : 'CH'}

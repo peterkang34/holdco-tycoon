@@ -181,6 +181,7 @@ export interface GameCompleteSnapshot {
   grossMoic?: number;
   carryEarned?: number;
   dpi?: number;
+  irrMultiplier?: number;
   lpSatisfaction?: number;
 }
 

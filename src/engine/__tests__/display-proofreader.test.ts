@@ -105,6 +105,7 @@ import {
   FILLER_REPUTATION_COST_MAX,
   FILLER_REPUTATION_HEAT_REDUCTION,
   PE_FUND_CONFIG,
+  PE_IRR_CARRY_TIERS,
   FUND_MANAGER_CONFIG,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
@@ -2170,6 +2171,44 @@ describe('Display Proofreader', () => {
       expect(cov).toContain('forced_liquidation');
       expect(cov).toContain('carry_earned');
       expect(cov).toContain('pe_scoring_completed');
+    });
+
+    it('forcedLiquidationDiscount matches UI copy (Strategy A+B)', () => {
+      expect(PE_FUND_CONFIG.forcedLiquidationDiscount).toBe(0.90);
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('90% of market value');
+      expect(manual).toContain('10% forced-seller discount');
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('90% of market value');
+      expect(allocate).toContain('10% discount');
+    });
+
+    it('PE_IRR_CARRY_TIERS baseline is 1.00 at 12% IRR (Strategy A)', () => {
+      const baselineTier = PE_IRR_CARRY_TIERS.find(t => t.multiplier === 1.00);
+      expect(baselineTier).toBeDefined();
+      expect(baselineTier!.minIrr).toBe(0.12);
+      // Tiers are sorted descending by minIrr
+      for (let i = 1; i < PE_IRR_CARRY_TIERS.length; i++) {
+        expect(PE_IRR_CARRY_TIERS[i].minIrr).toBeLessThan(PE_IRR_CARRY_TIERS[i - 1].minIrr);
+      }
+    });
+
+    it('UserManual mentions liquidation discount and supercarry (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Forced Liquidation');
+      expect(manual).toContain('Supercarry');
+      expect(manual).toContain('1.30x');
+      expect(manual).toContain('0.70x');
+    });
+
+    it('Year 9 warning mentions liquidation discount (Strategy B)', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      expect(allocate).toContain('90% of market value');
+    });
+
+    it('telemetry includes irrMultiplier for PE mode (Strategy B)', () => {
+      const gameOver = readComponent('components/screens/GameOverScreen.tsx');
+      expect(gameOver).toContain('irrMultiplier');
     });
   });
 });

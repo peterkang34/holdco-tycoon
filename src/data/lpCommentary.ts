@@ -273,6 +273,130 @@ export function selectLPQuote(
   return variants[idx];
 }
 
+// ── Outcome-based LP reactions for carry waterfall (game over) ──
+
+type OutcomeTier = 'legendary' | 'exceptional' | 'strong' | 'solid' | 'mediocre' | 'poor' | 'loss';
+
+const outcomeQuotes: Record<OutcomeTier, { edna: string[]; chip: string[] }> = {
+  legendary: {
+    edna: [
+      'This is the best fund I\'ve ever been part of. My board is already asking about Fund II.',
+      'Extraordinary returns. You\'ve earned every cent of that carry.',
+      'I\'ve been in this business 30 years. This is a top-decile result.',
+    ],
+    chip: [
+      'Unbelievable. I\'m doubling my commitment to your next fund.',
+      'That carry check is well deserved. What a ride.',
+      'This is why I invest in PE. Legendary returns.',
+    ],
+  },
+  exceptional: {
+    edna: [
+      'An exceptional result. My board is very pleased with the returns.',
+      'Top-quartile performance across every metric. Well done.',
+      'This is what institutional capital deserves. Outstanding fund management.',
+    ],
+    chip: [
+      'Hell of a fund. I\'m in for the next one, no question.',
+      'These are the kind of returns that make careers. Impressive.',
+      'Excellent execution from start to finish. Count me in for Fund II.',
+    ],
+  },
+  strong: {
+    edna: [
+      'A strong result. My board is satisfied and would consider a re-up.',
+      'Above our expectations. This demonstrates real value creation.',
+      'Solid above-hurdle returns. I\'ll recommend continued allocation.',
+    ],
+    chip: [
+      'Good fund. Not spectacular, but definitely above average.',
+      'Strong returns. I\'d back you again.',
+      'Respectable carry. You did what you said you\'d do.',
+    ],
+  },
+  solid: {
+    edna: [
+      'You cleared the hurdle. Adequate, if not exceptional.',
+      'A satisfactory result. My board will want to see improvement in Fund II.',
+      'Returns met the minimum threshold. There\'s room for growth.',
+    ],
+    chip: [
+      'Cleared the hurdle. Not bad, not great. Middle of the pack.',
+      'Decent result. I\'d consider another fund, depending on terms.',
+      'You did okay. Not going to lie, I was hoping for more.',
+    ],
+  },
+  mediocre: {
+    edna: [
+      'Below the hurdle. My board is disappointed.',
+      'We didn\'t get our preferred return. A difficult conversation awaits.',
+      'Subpar performance. I cannot recommend re-allocation.',
+    ],
+    chip: [
+      'Under the hurdle? That\'s tough. At least we got capital back.',
+      'No carry earned. I expected better, honestly.',
+      'Disappointing. The deals were there — the execution wasn\'t.',
+    ],
+  },
+  poor: {
+    edna: [
+      'A significant loss of value. My board is furious.',
+      'This is the worst performing fund in our portfolio. Unacceptable.',
+      'I will be recommending we never allocate to this team again.',
+    ],
+    chip: [
+      'We lost money. There\'s really no way to spin this.',
+      'Brutal result. I\'ve learned an expensive lesson here.',
+      'I trusted you with my capital and this is what I got. Painful.',
+    ],
+  },
+  loss: {
+    edna: [
+      'A catastrophic outcome. My beneficiaries have been materially harmed.',
+      'Total failure. I\'ve initiated a review with outside counsel.',
+      'This fund will be studied as a cautionary tale.',
+    ],
+    chip: [
+      'I can\'t believe how badly this went. Just... wow.',
+      'A complete disaster. I should have stuck with index funds.',
+      'This is the kind of loss that ends careers. And partnerships.',
+    ],
+  },
+};
+
+/**
+ * Determine outcome tier from carry waterfall results.
+ */
+function getOutcomeTier(grossMoic: number, hurdleCleared: boolean, netIrr: number): OutcomeTier {
+  if (grossMoic < 0.7) return 'loss';
+  if (grossMoic < 1.0) return 'poor';
+  if (!hurdleCleared) return 'mediocre';
+  if (netIrr >= 0.25) return 'legendary';
+  if (netIrr >= 0.20) return 'exceptional';
+  if (netIrr >= 0.15) return 'strong';
+  return 'solid';
+}
+
+/**
+ * Generate outcome-based LP reactions for the carry waterfall game-over screen.
+ * Returns one Edna quote and one Chip quote based on actual fund performance.
+ */
+export function getOutcomeReactions(
+  grossMoic: number,
+  hurdleCleared: boolean,
+  netIrr: number,
+  rng: SeededRng,
+): { speaker: LPSpeaker; text: string }[] {
+  const tier = getOutcomeTier(grossMoic, hurdleCleared, netIrr);
+  const quotes = outcomeQuotes[tier];
+  const ednaIdx = Math.floor(rng.next() * quotes.edna.length);
+  const chipIdx = Math.floor(rng.next() * quotes.chip.length);
+  return [
+    { speaker: 'edna', text: quotes.edna[ednaIdx] },
+    { speaker: 'chip', text: quotes.chip[chipIdx] },
+  ];
+}
+
 /**
  * Get all available speakers for a trigger.
  */

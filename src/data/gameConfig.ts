@@ -397,7 +397,17 @@ export const PE_FUND_CONFIG = {
   minDeploymentForDistribution: 20_000, // 20% of committed capital
   duration: 'quick' as const,
   startingMaSourcingTier: 1,           // pre-unlock 3 deals/round
+  forcedLiquidationDiscount: 0.90,    // 10% haircut on Year 10 auto-sales
 } as const;
+
+export const PE_IRR_CARRY_TIERS = [
+  { minIrr: 0.25, multiplier: 1.30 },  // Legendary (supercarry)
+  { minIrr: 0.20, multiplier: 1.20 },  // Exceptional
+  { minIrr: 0.15, multiplier: 1.10 },  // Top quartile
+  { minIrr: 0.12, multiplier: 1.00 },  // Solid (baseline)
+  { minIrr: 0.08, multiplier: 0.85 },  // Below median
+  { minIrr: 0.00, multiplier: 0.70 },  // Capital preserved but poor
+] as const;
 
 export const FUND_MANAGER_CONFIG = {
   initialCash: 100_000,

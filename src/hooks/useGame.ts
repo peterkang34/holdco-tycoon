@@ -1472,7 +1472,7 @@ export const useGameStore = create<GameStore>()(
             const lastEvent = state.eventHistory[state.eventHistory.length - 1];
             for (const biz of updatedBusinesses.filter(b => b.status === 'active')) {
               const valuation = calculateExitValuation(biz, state.round, lastEvent?.type, undefined, state.integratedPlatforms);
-              let grossEV = biz.ebitda * valuation.totalMultiple;
+              let grossEV = biz.ebitda * valuation.totalMultiple * PE_FUND_CONFIG.forcedLiquidationDiscount;
 
               // Distress discount for forced sellers
               const bizMetrics = endMetrics; // Use portfolio-level distress

@@ -1570,13 +1570,13 @@ export function AllocatePhase({
             {isFundManagerMode && round === maxRounds && (
               <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 mb-4">
                 <p className="font-bold text-red-300 mb-1">Fund Closes This Year</p>
-                <p className="text-sm text-text-muted">No new standalone acquisitions. Tuck-ins are still permitted. Consider distributing cash to lock in your DPI.</p>
+                <p className="text-sm text-text-muted">Unsold businesses will be liquidated at a 10% discount. Tuck-ins are still permitted. Consider distributing cash to lock in your DPI.</p>
               </div>
             )}
             {isFundManagerMode && round === maxRounds - 1 && (
               <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 mb-4">
                 <p className="font-bold text-amber-300 mb-1">Final Year Next Round</p>
-                <p className="text-sm text-text-muted">All remaining businesses will be liquidated at market value. Consider making distributions now to lock in your DPI.</p>
+                <p className="text-sm text-text-muted">All remaining businesses will be liquidated at <strong className="text-amber-300">90% of market value</strong>. Sell businesses now for full value or distribute cash to lock in your DPI.</p>
               </div>
             )}
             {/* M&A Focus Settings */}

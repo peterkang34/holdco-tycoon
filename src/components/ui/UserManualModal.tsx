@@ -1687,10 +1687,28 @@ function FundManagerContent() {
 
       <SubHeading>Forced Liquidation</SubHeading>
       <P>
-        At Year 10, all remaining portfolio companies are sold automatically. Distressed businesses
-        receive a discount (0.70x for covenant breach, 0.85x for stressed). The carry waterfall
+        At Year 10, all remaining portfolio companies are sold automatically at <strong>90% of market value</strong> (a
+        10% forced-seller discount). Distressed businesses receive additional discounts (0.70x for covenant
+        breach, 0.85x for stressed), stacking with the liquidation discount. The carry waterfall
         determines your final compensation.
       </P>
+
+      <SubHeading>Supercarry</SubHeading>
+      <P>
+        Your carried interest is multiplied based on the fund&apos;s Net IRR. Higher IRR (driven by earlier
+        distributions) earns a carry bonus up to 1.30x. Below-median IRR reduces carry.
+      </P>
+      <DataTable
+        headers={['Net IRR', 'Carry Multiplier', 'Tier']}
+        rows={[
+          ['25%+', '1.30x', 'Legendary'],
+          ['20%+', '1.20x', 'Exceptional'],
+          ['15%+', '1.10x', 'Top Quartile'],
+          ['12%+', '1.00x', 'Solid (baseline)'],
+          ['8%+', '0.85x', 'Below Median'],
+          ['0%+', '0.70x', 'Poor'],
+        ]}
+      />
 
       <SubHeading>PE Scoring</SubHeading>
       <P>

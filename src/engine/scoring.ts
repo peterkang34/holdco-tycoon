@@ -11,7 +11,7 @@ import {
 import { calculateMetrics, calculateSectorFocusBonus, calculateExitValuation } from './simulation';
 import { POST_GAME_INSIGHTS } from '../data/tips';
 import { getAllDedupedBusinesses } from './helpers';
-import { RESTRUCTURING_FEV_PENALTY, PE_FUND_CONFIG, PE_GRADE_THRESHOLDS, PE_GRADE_TITLES } from '../data/gameConfig';
+import { RESTRUCTURING_FEV_PENALTY, PE_FUND_CONFIG, PE_IRR_CARRY_TIERS, PE_GRADE_THRESHOLDS, PE_GRADE_TITLES } from '../data/gameConfig';
 import { calculatePublicCompanyBonus } from './ipo';
 
 const LEADERBOARD_KEY = 'holdco-tycoon-leaderboard';
@@ -778,15 +778,34 @@ export function calculateCarryWaterfall(state: GameState): CarryWaterfall {
   // At game end, all businesses liquidated, portfolio = 0, debt = 0
   const grossTotalReturns = lpDistributed + state.cash;
 
-  // Carry calculation
-  const carry = grossTotalReturns > PE_FUND_CONFIG.hurdleReturn
-    ? (grossTotalReturns - PE_FUND_CONFIG.hurdleReturn) * PE_FUND_CONFIG.carryRate
+  // Base carry calculation (before IRR multiplier)
+  const carryRate = PE_FUND_CONFIG.carryRate;
+  const baseCarry = grossTotalReturns > PE_FUND_CONFIG.hurdleReturn
+    ? (grossTotalReturns - PE_FUND_CONFIG.hurdleReturn) * carryRate
     : 0;
+
+  // Two-pass approach: compute base net IRR using base carry
+  const baseNetTerminal = state.cash - baseCarry;
+  const baseIrrFlows: { round: number; amount: number }[] = [
+    { round: 0, amount: -fundSize },
+    ...(state.fundCashFlows || []),
+    { round: 10, amount: baseNetTerminal },
+  ];
+  const baseNetIrr = calculateIRR(baseIrrFlows);
+
+  // Look up IRR multiplier from tiers (sorted descending by minIrr)
+  let irrMultiplier = 0.70; // default for loss
+  for (const tier of PE_IRR_CARRY_TIERS) {
+    if (baseNetIrr >= tier.minIrr) { irrMultiplier = tier.multiplier; break; }
+  }
+
+  // Apply multiplier to get adjusted carry
+  const carry = baseCarry * irrMultiplier;
 
   const grossMoic = fundSize > 0 ? grossTotalReturns / fundSize : 0;
   const dpi = fundSize > 0 ? lpDistributed / fundSize : 0;
 
-  // Net IRR: build cash flows from LP perspective
+  // Final net IRR with adjusted carry
   const netTerminalValue = state.cash - carry;
   const irrCashFlows: { round: number; amount: number }[] = [
     { round: 0, amount: -fundSize },
@@ -806,6 +825,8 @@ export function calculateCarryWaterfall(state: GameState): CarryWaterfall {
     hurdleCleared: grossTotalReturns > PE_FUND_CONFIG.hurdleReturn,
     aboveHurdle: Math.max(0, grossTotalReturns - PE_FUND_CONFIG.hurdleReturn),
     carry,
+    baseCarry,
+    irrMultiplier,
     managementFees,
     totalGpEconomics,
     grossMoic,
