@@ -222,6 +222,15 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     fillerReputationInvest,
     fillerReputationFree,
     fillerPass,
+    cyberBreachUpgrade,
+    cyberBreachSettle,
+    cyberBreachAbsorb,
+    antitrustDivest,
+    antitrustFight,
+    antitrustRestructure,
+    competitorAccelerate,
+    competitorDifferentiate,
+    competitorAbsorb,
     forgeIntegratedPlatform,
     addToIntegratedPlatform,
     sellPlatform,
@@ -340,6 +349,16 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       case 'fillerReputationInvest': fillerReputationInvest(); break;
       case 'fillerReputationFree': fillerReputationFree(); break;
       case 'fillerPass': fillerPass(); break;
+      // New event choices
+      case 'cyberBreachUpgrade': cyberBreachUpgrade(); break;
+      case 'cyberBreachSettle': cyberBreachSettle(); break;
+      case 'cyberBreachAbsorb': cyberBreachAbsorb(); break;
+      case 'antitrustDivest': antitrustDivest(); break;
+      case 'antitrustFight': antitrustFight(); break;
+      case 'antitrustRestructure': antitrustRestructure(); break;
+      case 'competitorAccelerate': competitorAccelerate(); break;
+      case 'competitorDifferentiate': competitorDifferentiate(); break;
+      case 'competitorAbsorb': competitorAbsorb(); break;
     }
     // Only advance if the action succeeded (cleared currentEvent)
     // If it failed (e.g., insufficient cash), event stays on screen

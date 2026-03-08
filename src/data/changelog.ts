@@ -13,6 +13,34 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 8, 2026',
+    title: 'Market Event Overhaul',
+    sections: [
+      {
+        heading: 'New Events',
+        items: [
+          'Yield Curve Inversion — a warning signal that doubles recession probability next year.',
+          'Talent Market Shift — high-talent sectors take a temporary margin hit (2 rounds).',
+          'Private Credit Boom — bank debt rates drop 1.5% for 3 rounds.',
+          'Cyber Breach — a data breach hits one of your businesses. Upgrade security, settle, or absorb the damage.',
+          'Antitrust Scrutiny — regulators question your sector concentration (3+ same-sector businesses). Divest, fight, or restructure.',
+          'Competitor Acquisition — a rival in your sector gets acquired. Accelerate, differentiate, or absorb the pressure.',
+        ],
+      },
+      {
+        heading: 'Balance & Fixes',
+        items: [
+          'Tax Strategy filler event now grants a permanent +1ppt margin boost (cost increased to $200-350K).',
+          'Anti-repeat cooldown prevents back-to-back recessions, crises, and credit tightening.',
+          'Portfolio events now shuffle order each year for better variety.',
+          'PE Fund mode gets tailored quiet year flavor text and LP satisfaction reactions to global events.',
+          'Fixed 10 sector event descriptions that incorrectly said "margin compression" instead of "revenue decline".',
+          'Added Generational Wealth Transfer positive event for Wealth Management sector.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 7, 2026',
     title: 'PE Fund Endgame Incentives',
     sections: [

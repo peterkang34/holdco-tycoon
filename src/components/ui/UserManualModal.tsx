@@ -1108,6 +1108,9 @@ function EventsContent() {
           ['Inflation', 'Margin compression across portfolio; costs rise faster than revenue'],
           ['Credit Tightening', 'Bank debt unavailable for several rounds; LBO structures blocked; deal heat reduced by 1 tier (fewer competing buyers)'],
           ['Financial Crisis', 'Exit multiples -1.0x. Interest rate +2%. Existing bank debt rates +1.5%. Credit tightening for 2 rounds. 3-4 distressed deals appear at 30-50% off. ~2% probability — devastating for leveraged players, but a gift for cash-rich allocators.'],
+          ['Yield Curve Inversion', 'Doubles the probability of a recession in the following year. A warning signal for leveraged portfolios.'],
+          ['Talent Market Shift', 'High-talent sectors (SaaS, Wealth Mgmt, B2B Services, Healthcare, Agency) lose -2ppt margin (-1ppt with HR shared services).'],
+          ['Private Credit Boom', 'Existing bank debt rates drop 1.5%. Competitive lending environment for 3 rounds.'],
           ['Quiet Year', 'Nothing significant happens; a chance to execute your plan undisturbed. Capped at 2 per game (10yr) or 4 per game (20yr).'],
         ]}
       />
@@ -1152,6 +1155,9 @@ function EventsContent() {
           ['Seller Note Renegotiation', 'A seller asks to renegotiate their note terms'],
           ['Seller Deception Discovered', 'Revenue drops 25%, quality -1 on a recently acquired business. Choose how to respond.'],
           ['Working Capital Crunch', 'A newly acquired business needs $200-600K in working capital. Inject cash or accept revenue penalty.'],
+          ['Cyber Breach', 'A business suffers a data breach — revenue drops 15%, quality -1. Choose how to respond.'],
+          ['Antitrust Scrutiny', 'Regulators examine your sector concentration (requires 3+ businesses in same sector). Divest, fight, or restructure.'],
+          ['Competitor Acquisition', 'A competitor acquires a rival in your sector (requires 2+ businesses). Accelerate growth, differentiate, or absorb the impact.'],
         ]}
       />
 
@@ -1171,7 +1177,10 @@ function EventsContent() {
           ['Seller Deception', 'Business acquired within 2 rounds (non-cash structure)', 'Invest in Turnaround (20% EBITDA, 65% restore chance) · Fire Sale (sell at 60% fair value) · Absorb Hit (free, stays dropped)'],
           ['Working Capital Crunch', 'Business acquired in the previous round', 'Inject Cash (full cost, no penalty) · Emergency Credit ($50% cost, +1% interest) · Absorb Hit (-10% revenue for 2 rounds)'],
           ['Management Succession', '20yr mode, business held 8+ years, Q3+', 'Invest in External Hire ($300-500K, 75% restore) · Promote from Within (free, 50%+ restore) · Sell Business (85% fair value)'],
-          ['Tax Strategy Review', 'Filler event (no specific trigger)', 'Optimize Deductions (safe tax savings) · Aggressive Filing (higher savings, audit risk) · Skip (no effect)'],
+          ['Cyber Breach', 'Business with quality 3+', 'Security Upgrade ($cost, quality +1, +8% revenue) · Settle & Patch ($cost, quality +1, -5% revenue) · Absorb Hit (free, -10% revenue)'],
+          ['Antitrust Scrutiny', '3+ businesses in same sector', 'Divest Weakest (sell at market, -$500K fees) · Fight in Court ($500K, 60% clearance / 40% forced sale at 80%) · Restructure ($750K, dissolve sector platform)'],
+          ['Competitor Acquisition', '2+ businesses in same sector', 'Accelerate Growth (heat discount on next deal, -5% growth, -3% revenue) · Differentiate ($cost, +2ppt margin, -5% growth, -3% revenue) · Absorb Impact (free, -5% growth, -3% revenue)'],
+          ['Tax Strategy Review', 'Filler event (no specific trigger)', 'Optimize Deductions (permanent +1ppt margin, $200-350K) · Aggressive Filing (higher savings, audit risk) · Skip (no effect)'],
           ['Industry Conference', 'Filler event (no specific trigger)', 'Network for Deals (chance at a bonus deal) · Recruit Talent (growth/quality boost) · Skip (no effect)'],
           ['Operational Audit', 'Filler event (no specific trigger)', 'Invest in Improvements (margin boost) · Cut Costs (short-term cash, margin risk) · Skip (no effect)'],
           ['Reputation Building', 'Filler event (no specific trigger)', 'PR Investment (exit multiple boost) · Community Engagement (quality boost) · Stay Quiet (no effect)'],

@@ -357,7 +357,13 @@ export type EventType =
   | 'filler_tax_strategy'
   | 'filler_industry_conference'
   | 'filler_operational_audit'
-  | 'filler_reputation_building';
+  | 'filler_reputation_building'
+  | 'portfolio_cyber_breach'
+  | 'portfolio_antitrust_scrutiny'
+  | 'portfolio_competitor_acquisition'
+  | 'global_yield_curve_inversion'
+  | 'global_talent_market_shift'
+  | 'global_private_credit_boom';
 
 export interface EventChoice {
   label: string;
@@ -579,6 +585,9 @@ export interface GameState {
   eventHistory: GameEvent[];
   creditTighteningRoundsRemaining: number;
   inflationRoundsRemaining: number;
+  recessionProbMultiplier?: number; // Yield curve inversion: 2x recession prob next round, then resets
+  talentMarketShiftRoundsRemaining?: number; // Great Resignation: margin pressure for high-talent sectors
+  privateCreditRoundsRemaining?: number; // Private credit boom: extra financing option
 
   // History
   metricsHistory: HistoricalMetrics[];

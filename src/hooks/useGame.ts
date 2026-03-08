@@ -345,6 +345,17 @@ interface GameStore extends GameState {
   fillerReputationFree: () => void;
   fillerPass: () => void;
 
+  // New event choice handlers
+  cyberBreachUpgrade: () => void;
+  cyberBreachSettle: () => void;
+  cyberBreachAbsorb: () => void;
+  antitrustDivest: () => void;
+  antitrustFight: () => void;
+  antitrustRestructure: () => void;
+  competitorAccelerate: () => void;
+  competitorDifferentiate: () => void;
+  competitorAbsorb: () => void;
+
   // MA Sourcing
   upgradeMASourcing: () => void;
   toggleMASourcing: () => void;
@@ -930,6 +941,18 @@ export const useGameStore = create<GameStore>()(
         }
         if (gameState.inflationRoundsRemaining > 0) {
           gameState.inflationRoundsRemaining--;
+        }
+        // Reset yield curve inversion multiplier (consumed this round)
+        if ((gameState.recessionProbMultiplier ?? 1) > 1) {
+          gameState.recessionProbMultiplier = 1;
+        }
+        // Decrement talent market shift (margin hit applied once in applyEventEffects; counter is for UI/future use)
+        if ((gameState.talentMarketShiftRoundsRemaining ?? 0) > 0) {
+          gameState.talentMarketShiftRoundsRemaining = gameState.talentMarketShiftRoundsRemaining! - 1;
+        }
+        // Decrement private credit boom (rate reduction applied once in applyEventEffects; counter is for UI/future use)
+        if ((gameState.privateCreditRoundsRemaining ?? 0) > 0) {
+          gameState.privateCreditRoundsRemaining = gameState.privateCreditRoundsRemaining! - 1;
         }
         // Decrement deal inflation crisis reset counter
         if (gameState.dealInflationState?.crisisResetRoundsRemaining > 0) {
@@ -4304,17 +4327,15 @@ export const useGameStore = create<GameStore>()(
       fillerTaxInvest: () => {
         const state = get();
         if (!state.currentEvent || state.currentEvent.type !== 'filler_tax_strategy') return;
-        // Guard: need at least one active business to boost
         const activeBusinesses = state.businesses.filter(b => b.status === 'active');
         if (activeBusinesses.length === 0) return;
-        // Parse cost from event effect string
-        const costMatch = state.currentEvent.effect.match(/Pay \$([0-9.]+[KM]?)/);
-        const cost = costMatch ? parseInt(costMatch[1].replace('K', '')) : randomInt(FILLER_TAX_STRATEGY_COST_MIN, FILLER_TAX_STRATEGY_COST_MAX);
+        const cost = state.currentEvent.choices?.[0]?.cost ?? randomInt(FILLER_TAX_STRATEGY_COST_MIN, FILLER_TAX_STRATEGY_COST_MAX);
         if (state.cash < cost) return;
         const targetId = state.currentEvent.affectedBusinessId;
         const businesses = state.businesses.map(b => {
           if (b.id === targetId && b.status === 'active') {
-            return { ...b, ebitdaMargin: clampMargin(b.ebitdaMargin + FILLER_TAX_STRATEGY_MARGIN_BOOST) };
+            const newMargin = clampMargin(b.ebitdaMargin + FILLER_TAX_STRATEGY_MARGIN_BOOST);
+            return { ...b, ebitdaMargin: newMargin, ebitda: Math.round(b.revenue * newMargin) };
           }
           return b;
         });
@@ -4339,8 +4360,7 @@ export const useGameStore = create<GameStore>()(
       fillerConferenceAttend: () => {
         const state = get();
         if (!state.currentEvent || state.currentEvent.type !== 'filler_industry_conference') return;
-        const costMatch = state.currentEvent.effect.match(/Pay \$([0-9.]+[KM]?)/);
-        const cost = costMatch ? parseInt(costMatch[1].replace('K', '')) : randomInt(FILLER_CONFERENCE_COST_MIN, FILLER_CONFERENCE_COST_MAX);
+        const cost = state.currentEvent.choices?.[0]?.cost ?? randomInt(FILLER_CONFERENCE_COST_MIN, FILLER_CONFERENCE_COST_MAX);
         if (state.cash < cost) return;
         const confStreams = createRngStreams(state.seed, state.round);
         const confInflation = calculateDealInflation(state.round, state.duration, state.dealInflationState);
@@ -4379,8 +4399,7 @@ export const useGameStore = create<GameStore>()(
       fillerAuditFull: () => {
         const state = get();
         if (!state.currentEvent || state.currentEvent.type !== 'filler_operational_audit') return;
-        const costMatch = state.currentEvent.effect.match(/Pay \$([0-9.]+[KM]?)/);
-        const cost = costMatch ? parseInt(costMatch[1].replace('K', '')) : randomInt(FILLER_AUDIT_COST_MIN, FILLER_AUDIT_COST_MAX);
+        const cost = state.currentEvent.choices?.[0]?.cost ?? randomInt(FILLER_AUDIT_COST_MIN, FILLER_AUDIT_COST_MAX);
         if (state.cash < cost) return;
         const auditStreams = createRngStreams(state.seed, state.round);
         const auditRng = auditStreams.events.fork('audit-full');
@@ -4395,15 +4414,19 @@ export const useGameStore = create<GameStore>()(
         let cashAdjust = -cost;
         if (roll < FILLER_AUDIT_SUCCESS_CHANCE) {
           // Success: +1.5ppt permanent margin
-          businesses = businesses.map(b =>
-            b.id === targetBiz.id ? { ...b, ebitdaMargin: clampMargin(b.ebitdaMargin + FILLER_AUDIT_MARGIN_BOOST) } : b
-          );
+          businesses = businesses.map(b => {
+            if (b.id !== targetBiz.id) return b;
+            const newMargin = clampMargin(b.ebitdaMargin + FILLER_AUDIT_MARGIN_BOOST);
+            return { ...b, ebitdaMargin: newMargin, ebitda: Math.round(b.revenue * newMargin) };
+          });
         } else if (roll < FILLER_AUDIT_SUCCESS_CHANCE + FILLER_AUDIT_ISSUE_CHANCE) {
-          // Compliance issue: -$100K, -1ppt for 1 round
+          // Compliance issue: -$100K, -1ppt
           cashAdjust -= FILLER_AUDIT_ISSUE_COST;
-          businesses = businesses.map(b =>
-            b.id === targetBiz.id ? { ...b, ebitdaMargin: clampMargin(b.ebitdaMargin - FILLER_AUDIT_ISSUE_MARGIN_HIT) } : b
-          );
+          businesses = businesses.map(b => {
+            if (b.id !== targetBiz.id) return b;
+            const newMargin = clampMargin(b.ebitdaMargin - FILLER_AUDIT_ISSUE_MARGIN_HIT);
+            return { ...b, ebitdaMargin: newMargin, ebitda: Math.round(b.revenue * newMargin) };
+          });
         }
         // Remaining probability: nothing extra happens (just the cost)
         set({
@@ -4423,9 +4446,11 @@ export const useGameStore = create<GameStore>()(
         if (roll < FILLER_AUDIT_LIGHT_CHANCE && activeBusinesses.length > 0) {
           const rngPick = auditStreams.events.fork('audit-light-pick');
           const targetBiz = activeBusinesses[Math.floor(rngPick.next() * activeBusinesses.length)];
-          const businesses = state.businesses.map(b =>
-            b.id === targetBiz.id ? { ...b, ebitdaMargin: clampMargin(b.ebitdaMargin + FILLER_AUDIT_LIGHT_MARGIN_BOOST) } : b
-          );
+          const businesses = state.businesses.map(b => {
+            if (b.id !== targetBiz.id) return b;
+            const newMargin = clampMargin(b.ebitdaMargin + FILLER_AUDIT_LIGHT_MARGIN_BOOST);
+            return { ...b, ebitdaMargin: newMargin, ebitda: Math.round(b.revenue * newMargin) };
+          });
           set({ businesses, currentEvent: null, eventHistory: [...state.eventHistory, state.currentEvent] });
         } else {
           set({ currentEvent: null, eventHistory: [...state.eventHistory, state.currentEvent] });
@@ -4435,8 +4460,7 @@ export const useGameStore = create<GameStore>()(
       fillerReputationInvest: () => {
         const state = get();
         if (!state.currentEvent || state.currentEvent.type !== 'filler_reputation_building') return;
-        const costMatch = state.currentEvent.effect.match(/Pay \$([0-9.]+[KM]?)/);
-        const cost = costMatch ? parseInt(costMatch[1].replace('K', '')) : randomInt(FILLER_REPUTATION_COST_MIN, FILLER_REPUTATION_COST_MAX);
+        const cost = state.currentEvent.choices?.[0]?.cost ?? randomInt(FILLER_REPUTATION_COST_MIN, FILLER_REPUTATION_COST_MAX);
         if (state.cash < cost) return;
         set({
           cash: state.cash - cost,
@@ -4466,6 +4490,272 @@ export const useGameStore = create<GameStore>()(
           currentEvent: null,
           eventHistory: [...state.eventHistory, state.currentEvent],
         });
+      },
+
+      // ── New Event Choice Handlers ──
+
+      cyberBreachUpgrade: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'portfolio_cyber_breach') return;
+        const cost = state.currentEvent.choices?.[0]?.cost ?? 750;
+        if (state.cash < cost) return;
+        const targetId = state.currentEvent.affectedBusinessId;
+        const businesses = state.businesses.map(b => {
+          if (b.id !== targetId || b.status !== 'active') return b;
+          const restoredQuality = Math.min(5, b.qualityRating + 1) as 1 | 2 | 3 | 4 | 5;
+          const newRevenue = Math.round(b.revenue * 1.08);
+          const newEbitda = Math.round(newRevenue * b.ebitdaMargin);
+          return { ...b, qualityRating: restoredQuality, revenue: newRevenue, ebitda: newEbitda, peakRevenue: Math.max(b.peakRevenue, newRevenue) };
+        });
+        const newState = { ...state, cash: state.cash - cost, businesses, currentEvent: null };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+      },
+
+      cyberBreachSettle: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'portfolio_cyber_breach') return;
+        const cost = state.currentEvent.choices?.[1]?.cost ?? 400;
+        if (state.cash < cost) return;
+        const targetId = state.currentEvent.affectedBusinessId;
+        const businesses = state.businesses.map(b => {
+          if (b.id !== targetId || b.status !== 'active') return b;
+          const restoredQuality = Math.min(5, b.qualityRating + 1) as 1 | 2 | 3 | 4 | 5;
+          const newRevenue = Math.round(b.revenue * 0.95);
+          const newEbitda = Math.round(newRevenue * b.ebitdaMargin);
+          return { ...b, qualityRating: restoredQuality, revenue: newRevenue, ebitda: newEbitda };
+        });
+        const newState = { ...state, cash: state.cash - cost, businesses, currentEvent: null };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+      },
+
+      cyberBreachAbsorb: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'portfolio_cyber_breach') return;
+        const targetId = state.currentEvent.affectedBusinessId;
+        const businesses = state.businesses.map(b => {
+          if (b.id !== targetId || b.status !== 'active') return b;
+          const newRevenue = Math.round(b.revenue * 0.90);
+          const newEbitda = Math.round(newRevenue * b.ebitdaMargin);
+          return { ...b, revenue: newRevenue, ebitda: newEbitda };
+        });
+        const newState = { ...state, businesses, currentEvent: null };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+      },
+
+      antitrustDivest: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'portfolio_antitrust_scrutiny') return;
+        const targetId = state.currentEvent.affectedBusinessId;
+        if (!targetId) return;
+        const biz = state.businesses.find(b => b.id === targetId);
+        if (!biz) return;
+        const valuation = calculateExitValuation(biz, state.round, undefined, undefined, state.integratedPlatforms);
+        const salePrice = Math.round(biz.ebitda * valuation.totalMultiple);
+        // Full debt payoff including bolt-ons, earnouts, rollover
+        const boltOnIds = new Set(biz.boltOnIds || []);
+        const boltOnDebt = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0);
+        const debtPayoff = biz.sellerNoteBalance + biz.bankDebtBalance + biz.earnoutRemaining + boltOnDebt;
+        const netProceeds = Math.max(0, salePrice - debtPayoff);
+        const rolloverPct = biz.rolloverEquityPct || 0;
+        const playerProceeds = rolloverPct > 0 ? Math.round(netProceeds * (1 - rolloverPct)) : netProceeds;
+        let updatedBusinesses = state.businesses.map(b => {
+          if (b.id === targetId) return { ...b, status: 'sold' as const, exitPrice: salePrice, exitRound: state.round, earnoutRemaining: 0 };
+          if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 };
+          return b;
+        });
+        // Platform dissolution check
+        let updatedPlatforms = state.integratedPlatforms;
+        if (biz.integratedPlatformId) {
+          const platform = state.integratedPlatforms.find(p => p.id === biz.integratedPlatformId);
+          if (platform) {
+            if (checkPlatformDissolution(platform, updatedBusinesses)) {
+              updatedPlatforms = updatedPlatforms.filter(p => p.id !== platform.id);
+              updatedBusinesses = updatedBusinesses.map(b =>
+                b.integratedPlatformId === platform.id ? { ...b, integratedPlatformId: undefined } : b
+              );
+            } else {
+              updatedPlatforms = updatedPlatforms.map(p =>
+                p.id === platform.id
+                  ? { ...p, constituentBusinessIds: p.constituentBusinessIds.filter(id => id !== biz.id) }
+                  : p
+              );
+            }
+          }
+        }
+        const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
+        const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
+          ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
+          : state.sharedServices;
+        const exitedBoltOns = state.businesses
+          .filter(b => boltOnIds.has(b.id))
+          .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 }));
+        const newState = {
+          ...state,
+          cash: state.cash + playerProceeds, // $500K legal costs already deducted by applyEventEffects
+          businesses: updatedBusinesses,
+          exitedBusinesses: [
+            ...state.exitedBusinesses,
+            { ...biz, status: 'sold' as const, exitPrice: salePrice, exitRound: state.round, earnoutRemaining: 0 },
+            ...exitedBoltOns,
+          ],
+          totalExitProceeds: state.totalExitProceeds + playerProceeds,
+          totalDebt: computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance),
+          integratedPlatforms: updatedPlatforms,
+          sharedServices: updatedServices,
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Divested ${biz.name} for ${formatMoney(playerProceeds)} net proceeds (antitrust)`, type: 'warning' });
+      },
+
+      antitrustFight: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'portfolio_antitrust_scrutiny') return;
+        const cost = state.currentEvent.choices?.[1]?.cost ?? 500;
+        if (state.cash < cost) return;
+        const fightStreams = createRngStreams(state.seed, state.round);
+        const roll = fightStreams.events.fork('antitrust-fight').next();
+        if (roll < 0.60) {
+          // Clearance — just pay legal costs
+          const newState = { ...state, cash: state.cash - cost, currentEvent: null };
+          set({ ...newState, metrics: calculateMetrics(newState) });
+          useToastStore.getState().addToast({ message: 'Antitrust clearance granted! Legal costs only.', type: 'success' });
+        } else {
+          // Forced divestiture at 80%
+          const targetId = state.currentEvent.affectedBusinessId;
+          const biz = state.businesses.find(b => b.id === targetId);
+          if (!biz) return;
+          const valuation = calculateExitValuation(biz, state.round, undefined, undefined, state.integratedPlatforms);
+          const salePrice = Math.round(biz.ebitda * valuation.totalMultiple * 0.80);
+          const boltOnIds = new Set(biz.boltOnIds || []);
+          const boltOnDebt = state.businesses
+            .filter(b => boltOnIds.has(b.id))
+            .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0);
+          const debtPayoff = biz.sellerNoteBalance + biz.bankDebtBalance + biz.earnoutRemaining + boltOnDebt;
+          const netProceeds = Math.max(0, salePrice - debtPayoff);
+          const rolloverPct = biz.rolloverEquityPct || 0;
+          const playerProceeds = rolloverPct > 0 ? Math.round(netProceeds * (1 - rolloverPct)) : netProceeds;
+          let updatedBusinesses = state.businesses.map(b => {
+            if (b.id === targetId) return { ...b, status: 'sold' as const, exitPrice: salePrice, exitRound: state.round, earnoutRemaining: 0 };
+            if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 };
+            return b;
+          });
+          let updatedPlatforms = state.integratedPlatforms;
+          if (biz.integratedPlatformId) {
+            const platform = state.integratedPlatforms.find(p => p.id === biz.integratedPlatformId);
+            if (platform) {
+              if (checkPlatformDissolution(platform, updatedBusinesses)) {
+                updatedPlatforms = updatedPlatforms.filter(p => p.id !== platform.id);
+                updatedBusinesses = updatedBusinesses.map(b =>
+                  b.integratedPlatformId === platform.id ? { ...b, integratedPlatformId: undefined } : b
+                );
+              } else {
+                updatedPlatforms = updatedPlatforms.map(p =>
+                  p.id === platform.id
+                    ? { ...p, constituentBusinessIds: p.constituentBusinessIds.filter(id => id !== biz.id) }
+                    : p
+                );
+              }
+            }
+          }
+          const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
+          const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
+            ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
+            : state.sharedServices;
+          const exitedBoltOns = state.businesses
+            .filter(b => boltOnIds.has(b.id))
+            .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 }));
+          const newState = {
+            ...state,
+            cash: Math.max(0, state.cash + playerProceeds - cost),
+            businesses: updatedBusinesses,
+            exitedBusinesses: [
+              ...state.exitedBusinesses,
+              { ...biz, status: 'sold' as const, exitPrice: salePrice, exitRound: state.round, earnoutRemaining: 0 },
+              ...exitedBoltOns,
+            ],
+            totalExitProceeds: state.totalExitProceeds + playerProceeds,
+            totalDebt: computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance),
+            integratedPlatforms: updatedPlatforms,
+            sharedServices: updatedServices,
+            currentEvent: null,
+          };
+          set({ ...newState, metrics: calculateMetrics(newState) });
+          useToastStore.getState().addToast({ message: `Court ruled against you — forced sale of ${biz.name} at 80% value`, type: 'danger' });
+        }
+      },
+
+      antitrustRestructure: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'portfolio_antitrust_scrutiny') return;
+        const cost = state.currentEvent.choices?.[2]?.cost ?? 750;
+        if (state.cash < cost) return;
+        const targetId = state.currentEvent.affectedBusinessId;
+        const biz = state.businesses.find(b => b.id === targetId);
+        if (!biz) return;
+        // Dissolve any integrated platform in this sector
+        const sectorPlatforms = state.integratedPlatforms.filter(p => p.sectorIds.includes(biz.sectorId));
+        const dissolvedPlatformIds = new Set(sectorPlatforms.map(p => p.id));
+        const integratedPlatforms = state.integratedPlatforms.filter(p => !dissolvedPlatformIds.has(p.id));
+        const businesses = state.businesses.map(b => {
+          if (b.integratedPlatformId && dissolvedPlatformIds.has(b.integratedPlatformId)) {
+            return { ...b, integratedPlatformId: undefined, isPlatform: false, platformScale: 0 };
+          }
+          return b;
+        });
+        const newState = { ...state, cash: state.cash - cost, businesses, integratedPlatforms, currentEvent: null };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        useToastStore.getState().addToast({ message: `Restructured operations — ${dissolvedPlatformIds.size > 0 ? 'platform dissolved' : 'no platform impact'}`, type: 'warning' });
+      },
+
+      competitorAccelerate: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'portfolio_competitor_acquisition') return;
+        const targetId = state.currentEvent.affectedBusinessId;
+        const businesses = state.businesses.map(b => {
+          if (b.id !== targetId || b.status !== 'active') return b;
+          const newGrowth = b.revenueGrowthRate - 0.05;
+          const newRevenue = Math.round(b.revenue * 0.97);
+          const newEbitda = Math.round(newRevenue * b.ebitdaMargin);
+          return { ...b, revenueGrowthRate: newGrowth, revenue: newRevenue, ebitda: newEbitda };
+        });
+        const newState = { ...state, businesses, nextAcquisitionHeatReduction: 1, currentEvent: null };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+      },
+
+      competitorDifferentiate: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'portfolio_competitor_acquisition') return;
+        const cost = state.currentEvent.choices?.[1]?.cost ?? 300;
+        if (state.cash < cost) return;
+        const targetId = state.currentEvent.affectedBusinessId;
+        const businesses = state.businesses.map(b => {
+          if (b.id !== targetId || b.status !== 'active') return b;
+          const newGrowth = b.revenueGrowthRate - 0.05;
+          const newRevenue = Math.round(b.revenue * 0.97);
+          const newMargin = clampMargin(b.ebitdaMargin + 0.02);
+          const newEbitda = Math.round(newRevenue * newMargin);
+          return { ...b, revenueGrowthRate: newGrowth, revenue: newRevenue, ebitdaMargin: newMargin, ebitda: newEbitda };
+        });
+        const newState = { ...state, cash: state.cash - cost, businesses, currentEvent: null };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+      },
+
+      competitorAbsorb: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'portfolio_competitor_acquisition') return;
+        const targetId = state.currentEvent.affectedBusinessId;
+        const businesses = state.businesses.map(b => {
+          if (b.id !== targetId || b.status !== 'active') return b;
+          const newGrowth = b.revenueGrowthRate - 0.05;
+          const newRevenue = Math.round(b.revenue * 0.97);
+          const newEbitda = Math.round(newRevenue * b.ebitdaMargin);
+          return { ...b, revenueGrowthRate: newGrowth, revenue: newRevenue, ebitda: newEbitda };
+        });
+        const newState = { ...state, businesses, currentEvent: null };
+        set({ ...newState, metrics: calculateMetrics(newState) });
       },
 
       forgeIntegratedPlatform: (recipeId: string, businessIds: string[]) => {

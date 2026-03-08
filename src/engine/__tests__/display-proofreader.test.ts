@@ -1813,8 +1813,8 @@ describe('Display Proofreader', () => {
     });
 
     it('Filler Tax Strategy constants are calibrated', () => {
-      expect(FILLER_TAX_STRATEGY_COST_MIN).toBe(150);
-      expect(FILLER_TAX_STRATEGY_COST_MAX).toBe(250);
+      expect(FILLER_TAX_STRATEGY_COST_MIN).toBe(200);
+      expect(FILLER_TAX_STRATEGY_COST_MAX).toBe(350);
       expect(FILLER_TAX_STRATEGY_MARGIN_BOOST).toBe(0.01);
       expect(FILLER_TAX_STRATEGY_DURATION).toBe(2);
       expect(FILLER_TAX_STRATEGY_WRITEOFF).toBe(50);

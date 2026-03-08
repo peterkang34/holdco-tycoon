@@ -18,6 +18,8 @@ import {
   formatMoney,
   GameDuration,
   DistressLevel,
+  SectorId,
+  EventType,
 } from './types';
 import type { SeededRng } from './rng';
 import { SECTORS } from '../data/sectors';
@@ -292,10 +294,13 @@ export type MarketCyclePhase = 'Expansion' | 'Growth' | 'Stable' | 'Contraction'
 const EVENT_CYCLE_WEIGHTS: Partial<Record<string, number>> = {
   global_bull_market: 2,
   global_interest_cut: 1,
+  global_private_credit_boom: 1,
   global_quiet: 0,
   global_inflation: -1,
   global_interest_hike: -1,
   global_credit_tightening: -1,
+  global_yield_curve_inversion: -1,
+  global_talent_market_shift: -1,
   global_recession: -2,
   global_financial_crisis: -3,
 };
@@ -802,10 +807,10 @@ function generateFillerEvent(state: GameState, rng?: SeededRng): GameEvent {
         type: 'filler_tax_strategy',
         title: chosen.title,
         description: `${chosen.description} A tax consultant proposes optimizing ${bizName}'s structure.`,
-        effect: `Pay ${formatMoney(cost)} for +1ppt margin on ${bizName} for ${FILLER_TAX_STRATEGY_DURATION} rounds, take ${formatMoney(FILLER_TAX_STRATEGY_WRITEOFF)} write-off, or pass`,
+        effect: `Pay ${formatMoney(cost)} for permanent +1ppt margin on ${bizName}, take ${formatMoney(FILLER_TAX_STRATEGY_WRITEOFF)} write-off, or pass`,
         affectedBusinessId: lowestMarginBiz?.id,
         choices: [
-          { label: `Invest ${formatMoney(cost)}`, description: `+1ppt margin on ${bizName} for ${FILLER_TAX_STRATEGY_DURATION} rounds`, action: 'fillerTaxInvest', variant: 'positive' as const },
+          { label: `Invest ${formatMoney(cost)}`, description: `Permanent +1ppt margin on ${bizName}`, action: 'fillerTaxInvest', variant: 'positive' as const, cost },
           { label: `Write-off ${formatMoney(FILLER_TAX_STRATEGY_WRITEOFF)}`, description: `Receive ${formatMoney(FILLER_TAX_STRATEGY_WRITEOFF)} tax write-off`, action: 'fillerTaxWriteoff', variant: 'neutral' as const },
           { label: 'Pass', description: 'No action', action: 'fillerPass', variant: 'negative' as const },
         ],
@@ -820,7 +825,7 @@ function generateFillerEvent(state: GameState, rng?: SeededRng): GameEvent {
         description: chosen.description,
         effect: `Pay ${formatMoney(cost)} for 1 micro deal (warm heat), send team for free (${Math.round(FILLER_CONFERENCE_FREE_DEAL_CHANCE * 100)}% chance of deal), or skip`,
         choices: [
-          { label: `Attend ${formatMoney(cost)}`, description: '1 guaranteed micro deal (warm heat)', action: 'fillerConferenceAttend', variant: 'positive' as const },
+          { label: `Attend ${formatMoney(cost)}`, description: '1 guaranteed micro deal (warm heat)', action: 'fillerConferenceAttend', variant: 'positive' as const, cost },
           { label: 'Send Team (Free)', description: `${Math.round(FILLER_CONFERENCE_FREE_DEAL_CHANCE * 100)}% chance of 1 deal`, action: 'fillerConferenceFree', variant: 'neutral' as const },
           { label: 'Skip', description: 'No action', action: 'fillerPass', variant: 'negative' as const },
         ],
@@ -835,7 +840,7 @@ function generateFillerEvent(state: GameState, rng?: SeededRng): GameEvent {
         description: chosen.description,
         effect: `Pay ${formatMoney(cost)}: ${Math.round(FILLER_AUDIT_SUCCESS_CHANCE * 100)}% chance +1.5ppt margin (permanent), ${Math.round(FILLER_AUDIT_ISSUE_CHANCE * 100)}% risk of compliance issue. Light review (free, ${Math.round(FILLER_AUDIT_LIGHT_CHANCE * 100)}% chance +0.5ppt). Or decline.`,
         choices: [
-          { label: `Full Audit ${formatMoney(cost)}`, description: `${Math.round(FILLER_AUDIT_SUCCESS_CHANCE * 100)}% +1.5ppt permanent, ${Math.round(FILLER_AUDIT_ISSUE_CHANCE * 100)}% compliance risk`, action: 'fillerAuditFull', variant: 'positive' as const },
+          { label: `Full Audit ${formatMoney(cost)}`, description: `${Math.round(FILLER_AUDIT_SUCCESS_CHANCE * 100)}% +1.5ppt permanent, ${Math.round(FILLER_AUDIT_ISSUE_CHANCE * 100)}% compliance risk`, action: 'fillerAuditFull', variant: 'positive' as const, cost },
           { label: 'Light Review (Free)', description: `${Math.round(FILLER_AUDIT_LIGHT_CHANCE * 100)}% chance +0.5ppt on 1 opco`, action: 'fillerAuditLight', variant: 'neutral' as const },
           { label: 'Decline', description: 'No action', action: 'fillerPass', variant: 'negative' as const },
         ],
@@ -850,7 +855,7 @@ function generateFillerEvent(state: GameState, rng?: SeededRng): GameEvent {
         description: chosen.description,
         effect: `Pay ${formatMoney(cost)} for -1 heat tier on next acquisition, host free event (adds 1 warm deal), or pass`,
         choices: [
-          { label: `Invest ${formatMoney(cost)}`, description: 'Next acquisition gets -1 heat tier (better pricing)', action: 'fillerReputationInvest', variant: 'positive' as const },
+          { label: `Invest ${formatMoney(cost)}`, description: 'Next acquisition gets -1 heat tier (better pricing)', action: 'fillerReputationInvest', variant: 'positive' as const, cost },
           { label: 'Host Event (Free)', description: 'Adds 1 warm deal to pipeline', action: 'fillerReputationFree', variant: 'neutral' as const },
           { label: 'Pass', description: 'No action', action: 'fillerPass', variant: 'negative' as const },
         ],
@@ -872,13 +877,28 @@ function generateFillerEvent(state: GameState, rng?: SeededRng): GameEvent {
 export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | null {
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
   const sharedServicesBenefits = calculateSharedServicesBenefits(state);
+  // Note: recessionProbMultiplier and talentMarketShiftRoundsRemaining are consumed/decremented
+  // in advanceToEvent (the caller), not here. This function only reads them.
+
+  // Anti-repeat: 1-round cooldown for severe global events
+  const lastGlobalEvent = [...state.eventHistory].reverse().find(e => e.type.startsWith('global_'));
+  const cooldownTypes = new Set(['global_recession', 'global_financial_crisis', 'global_credit_tightening']);
 
   // Roll for global event
   const globalRoll = rng ? rng.next() : Math.random();
   let cumulativeProb = 0;
 
   for (const eventDef of GLOBAL_EVENTS) {
-    cumulativeProb += eventDef.probability;
+    // Skip if this severe event fired last round
+    let prob = eventDef.probability;
+    if (cooldownTypes.has(eventDef.type) && lastGlobalEvent?.type === eventDef.type) {
+      prob = 0;
+    }
+    // Yield curve inversion: double recession probability for one round
+    if (eventDef.type === 'global_recession' && (state.recessionProbMultiplier ?? 1) > 1) {
+      prob *= state.recessionProbMultiplier!;
+    }
+    cumulativeProb += prob;
     if (globalRoll < cumulativeProb) {
       // Quiet year cap: if capped, skip to portfolio/sector events
       if (eventDef.type === 'global_quiet' && isQuietYearCapped(state)) {
@@ -894,11 +914,18 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
         const ctRounds = isQuickGame ? 1 : 2;
         effect = `Exit multiples -1.0x. Interest rate +2%. Existing bank debt rates +1.5%. Credit tightening for ${ctRounds} round${ctRounds === 1 ? '' : 's'}. But: 3-4 distressed deals appear at 30-50% off.`;
       }
+      // PE Fund mode: replace quiet year flavor text
+      const title = (eventDef.type === 'global_quiet' && state.isFundManagerMode)
+        ? 'Steady Quarter'
+        : eventDef.title;
+      const description = (eventDef.type === 'global_quiet' && state.isFundManagerMode)
+        ? 'Portfolio operations proceed as planned. LP update goes smoothly.'
+        : eventDef.description;
       return {
         id: `event_${state.round}_${eventDef.type}`,
         type: eventDef.type,
-        title: eventDef.title,
-        description: eventDef.description,
+        title,
+        description,
         effect,
         tip: eventDef.tip,
         tipSource: eventDef.tipSource,
@@ -906,12 +933,15 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
     }
   }
 
-  // Roll for portfolio event
+  // Roll for portfolio event (shuffle to eliminate positional bias in cumulative scan)
   if (activeBusinesses.length > 0) {
     const portfolioRoll = rng ? rng.next() : Math.random();
     cumulativeProb = 0;
+    const shuffledPortfolioEvents = rng
+      ? rng.shuffle([...PORTFOLIO_EVENTS])
+      : (() => { const arr = [...PORTFOLIO_EVENTS]; for (let i = arr.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [arr[i], arr[j]] = [arr[j], arr[i]]; } return arr; })();
 
-    for (const eventDef of PORTFOLIO_EVENTS) {
+    for (const eventDef of shuffledPortfolioEvents) {
       let adjustedProb = eventDef.probability;
 
       // Trigger conditions for new portfolio events
@@ -991,9 +1021,9 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
         }
       }
 
-      // Management Succession: 20yr mode, 8+ years held, Q3+, not resolved
+      // Management Succession: 20yr mode, 8+ years held, Q3+, not resolved. Blocked in PE Fund mode explicitly.
       if (eventDef.type === 'portfolio_management_succession') {
-        if (state.duration !== 'standard') {
+        if (state.duration !== 'standard' || state.isFundManagerMode) {
           adjustedProb = 0;
         } else {
           const eligible = activeBusinesses.filter(b =>
@@ -1003,6 +1033,29 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
           );
           adjustedProb = eligible.length > 0 ? SUCCESSION_PROB : 0;
         }
+      }
+
+      // Cyber breach: any active business
+      // (no additional gating — any business can be breached)
+
+      // Antitrust scrutiny: need 3+ businesses in same sector
+      if (eventDef.type === 'portfolio_antitrust_scrutiny') {
+        const sectorCounts = new Map<SectorId, number>();
+        for (const b of activeBusinesses) {
+          sectorCounts.set(b.sectorId, (sectorCounts.get(b.sectorId) || 0) + 1);
+        }
+        const hasConcentration = [...sectorCounts.values()].some(c => c >= 3);
+        if (!hasConcentration) adjustedProb = 0;
+      }
+
+      // Competitor acquisition: need 2+ businesses in a sector
+      if (eventDef.type === 'portfolio_competitor_acquisition') {
+        const sectorCounts = new Map<SectorId, number>();
+        for (const b of activeBusinesses) {
+          sectorCounts.set(b.sectorId, (sectorCounts.get(b.sectorId) || 0) + 1);
+        }
+        const hasMultiple = [...sectorCounts.values()].some(c => c >= 2);
+        if (!hasMultiple) adjustedProb = 0;
       }
 
       // Adjust talent events based on shared services
@@ -1225,6 +1278,82 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
             effect: eventDef.effectDescription,
             tip: eventDef.tip,
             tipSource: eventDef.tipSource,
+            affectedBusinessId: affectedBusiness.id,
+            choices,
+          };
+        } else if (eventDef.type === 'portfolio_cyber_breach') {
+          // Cybersecurity Breach: any active business
+          const securityUpgradeCost = Math.round(randomInt(500, 1000, rng));
+          const settleCost = Math.round(randomInt(300, 500, rng));
+          choices = [
+            { label: `Security Upgrade (${formatMoney(securityUpgradeCost)})`, description: 'Full revenue recovery over 2 rounds, quality restored', action: 'cyberBreachUpgrade', variant: 'positive', cost: securityUpgradeCost },
+            { label: `Settle (${formatMoney(settleCost)})`, description: '-5% permanent revenue hit, quality restored', action: 'cyberBreachSettle', variant: 'neutral', cost: settleCost },
+            { label: 'Absorb Damage', description: '-10% permanent revenue hit, quality stays reduced', action: 'cyberBreachAbsorb', variant: 'negative' },
+          ];
+          return {
+            id: `event_${state.round}_${eventDef.type}`,
+            type: eventDef.type,
+            title: eventDef.title,
+            description: `A data breach at ${affectedBusiness.name} has exposed customer information. Revenue dropped 15% and quality has fallen.`,
+            effect: eventDef.effectDescription,
+            tip: eventDef.tip,
+            tipSource: eventDef.tipSource,
+            affectedBusinessId: affectedBusiness.id,
+            choices,
+          };
+        } else if (eventDef.type === 'portfolio_antitrust_scrutiny') {
+          // Antitrust: 3+ businesses in same sector
+          const sectorCounts = new Map<SectorId, number>();
+          for (const b of activeBusinesses) {
+            sectorCounts.set(b.sectorId, (sectorCounts.get(b.sectorId) || 0) + 1);
+          }
+          const concentratedSector = [...sectorCounts.entries()].find(([, count]) => count >= 3);
+          if (!concentratedSector) break; // shouldn't happen if eligibility gate worked
+          const sectorBiz = activeBusinesses.filter(b => b.sectorId === concentratedSector[0]);
+          // Pick weakest for potential divestiture
+          const weakest = sectorBiz.reduce((a, b) => a.ebitda < b.ebitda ? a : b);
+          const valuation = calculateExitValuation(weakest, state.round, undefined, undefined, state.integratedPlatforms);
+          const divestPrice = Math.round(weakest.ebitda * valuation.totalMultiple);
+          const discountDivestPrice = Math.round(divestPrice * 0.80);
+          choices = [
+            { label: `Divest ${weakest.name} (${formatMoney(divestPrice)})`, description: 'Sell weakest business at market price. Clean resolution.', action: 'antitrustDivest', variant: 'neutral' },
+            { label: 'Fight in Court ($500K)', description: `60% clearance, 40% forced sale at ${formatMoney(discountDivestPrice)}`, action: 'antitrustFight', variant: 'negative', cost: 500 },
+            { label: 'Restructure ($750K)', description: 'Keep all businesses but lose platform status in this sector', action: 'antitrustRestructure', variant: 'negative', cost: 750 },
+          ];
+          affectedBusiness = weakest;
+          return {
+            id: `event_${state.round}_${eventDef.type}`,
+            type: eventDef.type,
+            title: eventDef.title,
+            description: `Regulators are scrutinizing your ${concentratedSector[1]}-company position in ${SECTORS[concentratedSector[0]]?.name || concentratedSector[0]}. Legal costs of $500K are immediate.`,
+            effect: eventDef.effectDescription,
+            tip: eventDef.tip,
+            affectedBusinessId: affectedBusiness.id,
+            choices,
+          };
+        } else if (eventDef.type === 'portfolio_competitor_acquisition') {
+          // Competitor Acquisition: need 2+ in a sector
+          const sectorCounts = new Map<SectorId, number>();
+          for (const b of activeBusinesses) {
+            sectorCounts.set(b.sectorId, (sectorCounts.get(b.sectorId) || 0) + 1);
+          }
+          const targetSector = [...sectorCounts.entries()].find(([, count]) => count >= 2);
+          if (!targetSector) break;
+          const sectorBiz = activeBusinesses.filter(b => b.sectorId === targetSector[0]);
+          affectedBusiness = pickRandom(sectorBiz, rng) || affectedBusiness;
+          const diffCost = randomInt(200, 400, rng);
+          choices = [
+            { label: 'Accelerate M&A', description: 'Next acquisition gets -1 heat tier (better pricing). Accept growth and revenue hit.', action: 'competitorAccelerate', variant: 'positive' },
+            { label: `Invest in Differentiation (${formatMoney(diffCost)})`, description: '+2ppt margin boost. Accept growth and revenue hit.', action: 'competitorDifferentiate', variant: 'neutral', cost: diffCost },
+            { label: 'Do Nothing', description: 'Accept competitive pressure (-5% growth, -3% revenue)', action: 'competitorAbsorb', variant: 'negative' },
+          ];
+          return {
+            id: `event_${state.round}_${eventDef.type}`,
+            type: eventDef.type,
+            title: eventDef.title,
+            description: `A key competitor of ${affectedBusiness.name} has been acquired by a well-capitalized strategic buyer. Competition is intensifying in ${SECTORS[affectedBusiness.sectorId]?.name || affectedBusiness.sectorId}.`,
+            effect: eventDef.effectDescription,
+            tip: eventDef.tip,
             affectedBusinessId: affectedBusiness.id,
             choices,
           };
@@ -1913,6 +2042,78 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
       break;
     }
 
+    // ── New Global Events ──
+
+    case 'global_yield_curve_inversion': {
+      // No immediate effect — doubles recession probability next round
+      newState.recessionProbMultiplier = 2.0;
+      break;
+    }
+
+    case 'global_talent_market_shift': {
+      // -2ppt margin for high talent-dependency sectors for 2 rounds
+      newState.talentMarketShiftRoundsRemaining = 2;
+      const highTalentSectors = new Set<SectorId>(['agency', 'saas', 'healthcare', 'b2bServices', 'wealthManagement']);
+      const hrActive = state.sharedServices.some(s => s.type === 'recruiting_hr' && s.active);
+      const marginHit = hrActive ? 0.01 : 0.02; // HR shared service halves the impact
+      newState.businesses = newState.businesses.map(b => {
+        if (b.status !== 'active' || !highTalentSectors.has(b.sectorId)) return b;
+        const beforeEbitda = b.ebitda;
+        const rawMargin = clampMargin(b.ebitdaMargin - marginHit);
+        const rawEbitda = Math.round(b.revenue * rawMargin);
+        const floored = applyEbitdaFloor(rawEbitda, b.revenue, rawMargin, b.acquisitionEbitda);
+        impacts.push({
+          businessId: b.id, businessName: b.name, metric: 'margin',
+          before: b.ebitdaMargin, after: floored.margin, delta: floored.margin - b.ebitdaMargin,
+        });
+        impacts.push({
+          businessId: b.id, businessName: b.name, metric: 'ebitda',
+          before: beforeEbitda, after: floored.ebitda, delta: floored.ebitda - beforeEbitda,
+          deltaPercent: beforeEbitda > 0 ? (floored.ebitda - beforeEbitda) / beforeEbitda : 0,
+        });
+        return { ...b, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
+      });
+      break;
+    }
+
+    case 'global_private_credit_boom': {
+      // Reduce existing bank debt rates by 1.5% (floor 1%) and set counter for UI
+      newState.privateCreditRoundsRemaining = 3;
+      newState.businesses = newState.businesses.map(b => {
+        if (b.status !== 'active' || b.bankDebtBalance <= 0) return b;
+        return { ...b, bankDebtRate: Math.max(0.01, b.bankDebtRate - 0.015) };
+      });
+      break;
+    }
+
+    // ── New Portfolio Events ──
+
+    case 'portfolio_cyber_breach': {
+      // Immediate: -15% revenue, quality -1
+      if (event.affectedBusinessId) {
+        newState.businesses = newState.businesses.map(b => {
+          if (b.id !== event.affectedBusinessId || b.status !== 'active') return b;
+          const newQuality = Math.max(1, b.qualityRating - 1) as 1 | 2 | 3 | 4 | 5;
+          const newRevenue = Math.round(b.revenue * 0.85);
+          const rawEbitda = Math.round(newRevenue * b.ebitdaMargin);
+          const floored = applyEbitdaFloor(rawEbitda, newRevenue, b.ebitdaMargin, b.acquisitionEbitda);
+          impacts.push({ businessId: b.id, businessName: b.name, metric: 'revenue', before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: -0.15 });
+          return { ...b, qualityRating: newQuality, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
+        });
+      }
+      break;
+    }
+
+    case 'portfolio_antitrust_scrutiny': {
+      // Immediate: $500K legal costs
+      newState.cash = Math.max(0, newState.cash - 500);
+      break;
+    }
+
+    case 'portfolio_competitor_acquisition':
+      // No immediate effect — all effects applied through choice handlers
+      break;
+
     case 'global_quiet':
     case 'filler_tax_strategy':
     case 'filler_industry_conference':
@@ -1922,6 +2123,26 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
       break;
   }
 
+  // PE Fund mode: global events affect LP satisfaction directly
+  if (state.isFundManagerMode && typeof newState.lpSatisfactionScore === 'number') {
+    const lpDelta: Partial<Record<EventType, number>> = {
+      global_recession: -5,
+      global_financial_crisis: -8,
+      global_bull_market: 3,
+      global_interest_hike: -2,
+      global_interest_cut: 2,
+      global_inflation: -3,
+      global_credit_tightening: -2,
+      global_yield_curve_inversion: -2,
+      global_talent_market_shift: -3,
+      global_private_credit_boom: 2,
+    };
+    const delta = lpDelta[event.type] ?? 0;
+    if (delta !== 0) {
+      newState.lpSatisfactionScore = Math.max(0, Math.min(100, newState.lpSatisfactionScore + delta));
+    }
+  }
+
   // Events with choices should pass through with choices preserved
   const hasChoices = event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand'
     || event.type === 'portfolio_seller_note_renego' || event.type === 'portfolio_key_man_risk'
@@ -1929,7 +2150,9 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
     || event.type === 'portfolio_seller_deception' || event.type === 'portfolio_working_capital_crunch'
     || event.type === 'portfolio_management_succession'
     || event.type === 'filler_tax_strategy' || event.type === 'filler_industry_conference'
-    || event.type === 'filler_operational_audit' || event.type === 'filler_reputation_building';
+    || event.type === 'filler_operational_audit' || event.type === 'filler_reputation_building'
+    || event.type === 'portfolio_cyber_breach' || event.type === 'portfolio_antitrust_scrutiny'
+    || event.type === 'portfolio_competitor_acquisition';
 
   // Attach impacts to the event in state
   newState.currentEvent = !hasChoices && impacts.length > 0

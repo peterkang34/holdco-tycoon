@@ -54,6 +54,18 @@ export function EventCard({ event, businesses, currentRound, lastEventType, onCh
         return '🔥';
       case 'unsolicited_offer':
         return '💰';
+      case 'portfolio_cyber_breach':
+        return '🛡️';
+      case 'portfolio_antitrust_scrutiny':
+        return '⚖️';
+      case 'portfolio_competitor_acquisition':
+        return '🏁';
+      case 'global_yield_curve_inversion':
+        return '📉';
+      case 'global_talent_market_shift':
+        return '👥';
+      case 'global_private_credit_boom':
+        return '💳';
       case 'sector_event':
         return '📊';
       default:
@@ -68,6 +80,7 @@ export function EventCard({ event, businesses, currentRound, lastEventType, onCh
     event.type === 'portfolio_breakthrough' ||
     event.type === 'portfolio_referral_deal' ||
     event.type === 'sector_consolidation_boom' ||
+    event.type === 'global_private_credit_boom' ||
     (event.type === 'sector_event' && !event.effect.includes('-'));
 
   const isNegative = event.type === 'global_recession' ||
@@ -79,6 +92,10 @@ export function EventCard({ event, businesses, currentRound, lastEventType, onCh
     event.type === 'portfolio_compliance' ||
     event.type === 'portfolio_key_man_risk' ||
     event.type === 'portfolio_supplier_shift' ||
+    event.type === 'portfolio_cyber_breach' ||
+    event.type === 'portfolio_antitrust_scrutiny' ||
+    event.type === 'global_yield_curve_inversion' ||
+    event.type === 'global_talent_market_shift' ||
     (event.type === 'sector_event' && event.effect.includes('-'));
 
   const borderColor = event.type === 'global_quiet' ? 'border-white/20' :
