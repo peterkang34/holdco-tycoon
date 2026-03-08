@@ -3239,7 +3239,12 @@ export function AllocatePhase({
       <div className="fixed bottom-0 left-0 right-0 md:hidden bg-bg-primary/95 backdrop-blur-sm border-t border-white/10 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] z-40 flex items-center justify-between" style={{ touchAction: 'none' }}>
         <div className="flex items-center gap-1">
           <button
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            onClick={() => {
+              // Scroll the overflow container (flex-1 overflow-auto parent) or window
+              const scrollParent = document.querySelector('.flex-1.overflow-auto');
+              if (scrollParent) scrollParent.scrollTo({ top: 0, behavior: 'smooth' });
+              else window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
             className="min-h-[44px] min-w-[44px] flex items-center justify-center text-text-muted hover:text-text-primary transition-colors rounded-lg bg-white/5"
             aria-label="Scroll to top"
           >
@@ -3259,7 +3264,7 @@ export function AllocatePhase({
           {tabs.map(tab => (
             <button
               key={tab.id}
-              onClick={() => { setActiveTab(tab.id); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onClick={() => { setActiveTab(tab.id); const sp = document.querySelector('.flex-1.overflow-auto'); if (sp) sp.scrollTo({ top: 0, behavior: 'smooth' }); else window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               className={`px-3 py-1.5 rounded-md transition-colors text-xs font-medium ${
                 activeTab === tab.id
                   ? 'bg-accent text-bg-primary'

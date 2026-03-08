@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -19,6 +19,14 @@ const SIZE_CLASSES = {
 } as const;
 
 export function Modal({ isOpen, onClose, title, subtitle, header, children, size = 'md' }: ModalProps) {
+  // Prevent background scroll when modal is open (mobile scroll-through fix)
+  useEffect(() => {
+    if (!isOpen) return;
+    const original = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = original; };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const closeButton = (
@@ -55,7 +63,7 @@ export function Modal({ isOpen, onClose, title, subtitle, header, children, size
       {/* Mobile bottom sheet */}
       <div className="fixed inset-0 bg-black/80 z-50 md:hidden" onClick={onClose}>
         <div
-          className="fixed bottom-0 left-0 right-0 bg-bg-primary border-t border-white/10 rounded-t-2xl max-h-[90dvh] overflow-y-auto p-4 pb-[env(safe-area-inset-bottom,16px)] animate-slide-up z-50"
+          className="fixed bottom-0 left-0 right-0 bg-bg-primary border-t border-white/10 rounded-t-2xl max-h-[90dvh] overflow-y-auto overscroll-contain p-4 pb-[env(safe-area-inset-bottom,16px)] animate-slide-up z-50"
           onClick={e => e.stopPropagation()}
         >
           {/* Drag handle */}
