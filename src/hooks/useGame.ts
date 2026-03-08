@@ -664,7 +664,8 @@ export const useGameStore = create<GameStore>()(
         // Collect FCF when transitioning from collect to event phase (annual)
         // Portfolio tax (with interest/SS+MA deductions for tax shield) is computed inside
         // PE Fund Manager: management fee deducted from cash, tax-deductible
-        const managementFee = state.isFundManagerMode ? Math.min(PE_FUND_CONFIG.annualManagementFee, state.cash) : 0;
+        // Fee is contractual (2% of committed capital) — not capped by pre-FCF cash
+        const managementFee = state.isFundManagerMode ? PE_FUND_CONFIG.annualManagementFee : 0;
 
         // Use holdcoLoanRate + penalty for tax deduction (matches actual interest paid)
         const totalDeductibleCosts = sharedServicesCost + maSourcingCost + managementFee;
