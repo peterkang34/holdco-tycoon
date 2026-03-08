@@ -641,7 +641,7 @@ export interface GameState {
   lpSatisfactionScore?: number;         // hidden 0-100
   lpCommentary?: LPComment[];           // historical LP comments
   fundCashFlows?: FundCashFlow[];       // LP-perspective cash flows for IRR
-  totalCapitalDeployed?: number;        // cumulative acquisition deal value (asking price, incl. debt)
+  totalCapitalDeployed?: number;        // cumulative equity capital deployed from fund (cash checks only, excl. leverage)
   lpDistributions?: number;             // cumulative cash distributed to LPs
   dpiMilestones?: { half: boolean; full: boolean };  // one-time DPI milestone flags
 }

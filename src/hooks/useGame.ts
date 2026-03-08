@@ -1624,15 +1624,15 @@ export const useGameStore = create<GameStore>()(
             businesses: newBusinesses,
             totalDebt: computeTotalDebt(newBusinesses, state.holdcoLoanBalance),
             totalInvestedCapital: state.totalInvestedCapital + deal.effectivePrice,
-            // PE Fund: track total deal value deployed
-            ...(state.isFundManagerMode ? { totalCapitalDeployed: (state.totalCapitalDeployed || 0) + deal.effectivePrice } : {}),
+            // PE Fund: share-funded = $0 equity capital deployed from fund
+            ...(state.isFundManagerMode ? { totalCapitalDeployed: state.totalCapitalDeployed || 0 } : {}),
             dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
             acquisitionsThisRound: state.acquisitionsThisRound + 1,
             lastAcquisitionResult: 'success',
             nextAcquisitionHeatReduction: consumeHeatReduction ? 0 : state.nextAcquisitionHeatReduction,
             actionsThisRound: [...state.actionsThisRound, {
               type: 'acquire', round: state.round,
-              details: { businessId: newBusiness.id, businessName: deal.business.name, sector: SECTORS[deal.business.sectorId].name, structure: 'share_funded', price: deal.effectivePrice, askingPrice: deal.effectivePrice, heat: deal.heat },
+              details: { businessId: newBusiness.id, businessName: deal.business.name, sector: SECTORS[deal.business.sectorId].name, structure: 'share_funded', price: deal.effectivePrice, askingPrice: deal.effectivePrice, heat: deal.heat, cashDeployed: 0 },
             }],
             metrics: calculateMetrics({ ...state, businesses: newBusinesses, ipoState: updatedIPO, sharesOutstanding: updatedIPO.sharesOutstanding }),
           });
@@ -1669,14 +1669,14 @@ export const useGameStore = create<GameStore>()(
           acquisitionsThisRound: state.acquisitionsThisRound + 1,
           lastAcquisitionResult: 'success',
           nextAcquisitionHeatReduction: consumeHeatReduction ? 0 : state.nextAcquisitionHeatReduction,
-          // PE Fund: track total deal value deployed (asking price, not equity check)
-          ...(state.isFundManagerMode ? { totalCapitalDeployed: (state.totalCapitalDeployed || 0) + deal.effectivePrice } : {}),
+          // PE Fund: track equity capital deployed from fund (cash check, not total EV)
+          ...(state.isFundManagerMode ? { totalCapitalDeployed: (state.totalCapitalDeployed || 0) + structure.cashRequired } : {}),
           actionsThisRound: [
             ...state.actionsThisRound,
             {
               type: 'acquire',
               round: state.round,
-              details: { businessId: newBusiness.id, businessName: deal.business.name, sector: SECTORS[deal.business.sectorId].name, structure: structure.type, price: deal.effectivePrice, askingPrice: deal.effectivePrice, heat: deal.heat },
+              details: { businessId: newBusiness.id, businessName: deal.business.name, sector: SECTORS[deal.business.sectorId].name, structure: structure.type, price: deal.effectivePrice, askingPrice: deal.effectivePrice, heat: deal.heat, cashDeployed: structure.cashRequired },
             },
           ],
           metrics: calculateMetrics({
@@ -1804,8 +1804,8 @@ export const useGameStore = create<GameStore>()(
             sharesOutstanding: updatedIPO.sharesOutstanding,
             totalDebt: newTotalDebtSF,
             totalInvestedCapital: state.totalInvestedCapital + deal.effectivePrice + restructuringCostSF,
-            // PE Fund: track total deal value deployed
-            ...(state.isFundManagerMode ? { totalCapitalDeployed: (state.totalCapitalDeployed || 0) + deal.effectivePrice } : {}),
+            // PE Fund: share-funded tuck-in = $0 equity capital deployed from fund
+            ...(state.isFundManagerMode ? { totalCapitalDeployed: state.totalCapitalDeployed || 0 } : {}),
             businesses: tuckInBusinessesSF,
             dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
             acquisitionsThisRound: state.acquisitionsThisRound + 1,
@@ -1817,7 +1817,7 @@ export const useGameStore = create<GameStore>()(
               details: { businessId: boltOnIdSF, businessName: deal.business.name, sector: SECTORS[deal.business.sectorId].name,
                 platformId: targetPlatformId, structure: 'share_funded', price: deal.effectivePrice, askingPrice: deal.effectivePrice,
                 integrationOutcome: outcomeSF, synergies: synergiesSF, restructuringCost: restructuringCostSF,
-                growthDragPenalty: growthDragPenaltySF, heat: deal.heat, sizeRatio: sizeRatioSF, sizeRatioTier: sizeRatioTierSF },
+                growthDragPenalty: growthDragPenaltySF, heat: deal.heat, sizeRatio: sizeRatioSF, sizeRatioTier: sizeRatioTierSF, cashDeployed: 0 },
             }],
             metrics: calculateMetrics({ ...state, cash: tuckInCashSF, totalDebt: newTotalDebtSF, businesses: tuckInBusinessesSF, ipoState: updatedIPO, sharesOutstanding: updatedIPO.sharesOutstanding }),
           });
@@ -1948,8 +1948,8 @@ export const useGameStore = create<GameStore>()(
           cash: tuckInCash,
           totalDebt: newTotalDebt,
           totalInvestedCapital: state.totalInvestedCapital + deal.effectivePrice + restructuringCost,
-          // PE Fund: track total deal value deployed
-          ...(state.isFundManagerMode ? { totalCapitalDeployed: (state.totalCapitalDeployed || 0) + deal.effectivePrice } : {}),
+          // PE Fund: track equity capital deployed from fund (cash check, not total EV)
+          ...(state.isFundManagerMode ? { totalCapitalDeployed: (state.totalCapitalDeployed || 0) + structure.cashRequired } : {}),
           businesses: [...updatedBusinesses, boltOnBusiness],
           dealPipeline: state.dealPipeline.filter(d => d.id !== deal.id),
           acquisitionsThisRound: state.acquisitionsThisRound + 1,
@@ -1976,6 +1976,7 @@ export const useGameStore = create<GameStore>()(
                 heat: effectiveDeal.heat,
                 sizeRatio,
                 sizeRatioTier,
+                cashDeployed: structure.cashRequired,
               },
             },
           ],

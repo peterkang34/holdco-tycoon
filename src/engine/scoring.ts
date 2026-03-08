@@ -903,7 +903,8 @@ export function calculatePEFundScore(state: GameState): PEScoreBreakdown {
       if (rh.round <= 5) {
         for (const action of rh.actions) {
           if (action.type === 'acquire' || action.type === 'acquire_tuck_in') {
-            capitalByYear5 += (action.details.price as number) || 0;
+            // Use cashDeployed (equity check) if available, fall back to price for old saves
+            capitalByYear5 += (action.details.cashDeployed as number) ?? (action.details.price as number) ?? 0;
           }
         }
       }
