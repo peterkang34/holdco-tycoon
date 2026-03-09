@@ -7,7 +7,7 @@ import { getGradeColor } from '../../utils/gradeColors';
 import { SECTORS } from '../../data/sectors';
 import { computeAdjFev, MultiplierBadges } from './adminShared';
 import { AnalyticsChart } from './AnalyticsChart';
-import type { AnalyticsData, Totals, ActivityEvent, DayData, GameCompletionAdmin } from './adminTypes';
+import type { AnalyticsData, Totals, ActivityEvent, DayData, GameCompletionAdmin, LeaderboardEntryAdmin } from './adminTypes';
 
 function getTimeAgo(date: Date): string {
   const now = Date.now();
@@ -273,7 +273,16 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
       )}
 
       {/* All Completed Games Feed (includes anonymous) */}
-      {data.completionEntries && data.completionEntries.length > 0 && (
+      {data.completionEntries && data.completionEntries.length > 0 && (() => {
+        // Build lookup: completionId → initials from leaderboard entries
+        const leaderboardInitials = new Map<string, string>();
+        for (const entry of [...(data.leaderboardEntries || []), ...(data.recentEntries || [])]) {
+          const e = entry as LeaderboardEntryAdmin & { completionId?: string };
+          if (e.initials && e.completionId) {
+            leaderboardInitials.set(e.completionId, e.initials);
+          }
+        }
+        return (
         <div className="card p-4 mt-4">
           <h3 className="text-sm font-semibold text-text-secondary mb-3">
             All Completed Games (Last 50)
@@ -299,12 +308,14 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
                   const modeLabel = isPE ? 'PE' : `${c.difficulty === 'normal' ? 'H' : 'E'}/${c.duration === 'quick' ? '10' : '20'}`;
                   const dateObj = new Date(c.date);
                   const timeAgo = getTimeAgo(dateObj);
+                  // Cross-reference: if completion has a matching leaderboard entry, use those initials
+                  const resolvedInitials = c.initials || leaderboardInitials.get(c.completionId) || null;
                   return (
                     <tr key={i} className="border-b border-border/50">
                       <td className="py-1.5 pr-3 text-text-muted font-mono" title={dateObj.toLocaleString()}>{timeAgo}</td>
                       <td className="py-1.5 pr-3 text-center">
-                        {c.initials
-                          ? <span className="font-mono font-bold text-text-primary">{c.initials}</span>
+                        {resolvedInitials
+                          ? <span className="font-mono font-bold text-text-primary">{resolvedInitials}</span>
                           : <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-text-muted">anon</span>
                         }
                       </td>
@@ -331,7 +342,8 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
             </table>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* Leaderboard Submissions (with strategy drill-down) */}
       {data.recentEntries && data.recentEntries.length > 0 && (
