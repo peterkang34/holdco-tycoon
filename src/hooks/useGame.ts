@@ -1091,13 +1091,13 @@ export const useGameStore = create<GameStore>()(
           const eventRng = roundStreams.cosmetic.fork('eventLPReaction');
           // Only comment ~50% of the time to avoid fatigue
           if (eventRng.next() < 0.50) {
-            const isNegativeEvent = ['global_recession', 'global_financial_crisis', 'global_interest_rate_hike',
-              'global_regulatory_crackdown', 'global_yield_curve_inversion', 'global_talent_market_shift',
+            const isNegativeEvent = ['global_recession', 'global_financial_crisis', 'global_interest_hike',
+              'global_credit_tightening', 'global_yield_curve_inversion', 'global_talent_market_shift',
               'portfolio_cyber_breach', 'portfolio_antitrust_scrutiny'].includes(event.type);
-            const isPositiveEvent = ['global_economic_boom', 'global_deregulation', 'global_private_credit_boom',
-              'portfolio_referral_deal', 'portfolio_operational_windfall'].includes(event.type);
+            const isPositiveEvent = ['global_bull_market', 'global_interest_cut', 'global_private_credit_boom',
+              'portfolio_referral_deal', 'portfolio_breakthrough'].includes(event.type);
             const isRecession = event.type === 'global_recession' || event.type === 'global_financial_crisis';
-            const isBoom = event.type === 'global_economic_boom';
+            const isBoom = event.type === 'global_bull_market';
 
             let triggerId: LPTriggerId;
             if (isRecession) triggerId = 'event_recession';
