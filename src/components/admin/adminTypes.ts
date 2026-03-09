@@ -91,6 +91,26 @@ export interface ActivityEvent {
   isFundManager?: boolean;
 }
 
+export interface CompletionStrategy {
+  scoreBreakdown?: {
+    valueCreation: number;
+    fcfShareGrowth: number;
+    portfolioRoic: number;
+    capitalDeployment: number;
+    balanceSheetHealth: number;
+    strategicDiscipline: number;
+  };
+  sectorIds?: string[];
+  dealStructureTypes?: Record<string, number>;
+  platformsForged?: number;
+  totalAcquisitions?: number;
+  totalSells?: number;
+  antiPatterns?: string[];
+  peakLeverage?: number;
+  turnaroundsStarted?: number;
+  turnaroundsSucceeded?: number;
+}
+
 export interface GameCompletionAdmin {
   completionId: string;
   holdcoName: string;
@@ -112,6 +132,7 @@ export interface GameCompletionAdmin {
   sophisticationScore?: number;
   device?: string;
   isChallenge?: boolean;
+  strategy?: CompletionStrategy;
 }
 
 export interface AnalyticsData {

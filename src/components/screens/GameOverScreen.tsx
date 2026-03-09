@@ -404,6 +404,28 @@ export function GameOverScreen({
       archetype: strategyData.archetype,
       sophisticationScore: strategyData.sophisticationScore,
       isChallenge: !!challengeData,
+      // Strategy breakdown for admin drill-down
+      strategy: {
+        scoreBreakdown: isFundManagerMode
+          ? { valueCreation: 0, fcfShareGrowth: 0, portfolioRoic: 0, capitalDeployment: 0, balanceSheetHealth: 0, strategicDiscipline: 0 }
+          : {
+              valueCreation: score.valueCreation,
+              fcfShareGrowth: score.fcfShareGrowth,
+              portfolioRoic: score.portfolioRoic,
+              capitalDeployment: score.capitalDeployment,
+              balanceSheetHealth: score.balanceSheetHealth,
+              strategicDiscipline: score.strategicDiscipline,
+            },
+        sectorIds: strategyData.sectorIds,
+        dealStructureTypes: strategyData.dealStructureTypes,
+        platformsForged: strategyData.platformCount,
+        totalAcquisitions: strategyData.totalAcquisitions,
+        totalSells: strategyData.totalSells,
+        antiPatterns: strategyData.antiPatterns.length > 0 ? strategyData.antiPatterns : undefined,
+        peakLeverage: Math.round(strategyData.peakLeverage * 10) / 10,
+        turnaroundsStarted: strategyData.turnaroundsStarted,
+        turnaroundsSucceeded: strategyData.turnaroundsSucceeded,
+      },
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

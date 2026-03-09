@@ -167,6 +167,7 @@ interface OverviewTabProps {
 export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyData }: OverviewTabProps) {
   const [expandedRow, setExpandedRow] = useState<number | null>(null);
   const [expandedRecentRow, setExpandedRecentRow] = useState<number | null>(null);
+  const [expandedCompletionRow, setExpandedCompletionRow] = useState<number | null>(null);
 
   return (
     <>
@@ -308,10 +309,13 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
                   const modeLabel = isPE ? 'PE' : `${c.difficulty === 'normal' ? 'H' : 'E'}/${c.duration === 'quick' ? '10' : '20'}`;
                   const dateObj = new Date(c.date);
                   const timeAgo = getTimeAgo(dateObj);
-                  // Cross-reference: if completion has a matching leaderboard entry, use those initials
                   const resolvedInitials = c.initials || leaderboardInitials.get(c.completionId) || null;
+                  const hasStrategy = !!c.strategy?.scoreBreakdown;
+                  const isExpanded = expandedCompletionRow === i;
                   return (
-                    <tr key={i} className="border-b border-border/50">
+                    <Fragment key={i}>
+                    <tr className={`border-b border-border/50 ${hasStrategy ? 'cursor-pointer hover:bg-white/5' : ''}`}
+                        onClick={() => hasStrategy && setExpandedCompletionRow(isExpanded ? null : i)}>
                       <td className="py-1.5 pr-3 text-text-muted font-mono" title={dateObj.toLocaleString()}>{timeAgo}</td>
                       <td className="py-1.5 pr-3 text-center">
                         {resolvedInitials
@@ -319,7 +323,10 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
                           : <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-text-muted">anon</span>
                         }
                       </td>
-                      <td className="py-1.5 pr-3 text-text-secondary truncate max-w-[150px]">{c.holdcoName}</td>
+                      <td className="py-1.5 pr-3 text-text-secondary truncate max-w-[150px]">
+                        {c.holdcoName}
+                        {hasStrategy && <span className="ml-1 text-accent text-[10px]">{isExpanded ? '▼' : '▶'}</span>}
+                      </td>
                       <td className="py-1.5 pr-3 text-right font-mono text-accent">
                         {isPE ? formatMoney(c.carryEarned ?? 0) : formatMoney(c.founderEquityValue)}
                       </td>
@@ -336,6 +343,58 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
                         {c.device && <span className="text-[10px]">{c.device === 'mobile' ? '📱' : c.device === 'tablet' ? '📱' : '💻'}</span>}
                       </td>
                     </tr>
+                    {isExpanded && c.strategy && (
+                      <tr>
+                        <td colSpan={8}>
+                          <div className="px-4 pb-3 pt-2 bg-bg-secondary/50 border-t border-border/30">
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-[11px]">
+                              {c.strategy.scoreBreakdown && !isPE && (
+                                <div>
+                                  <p className="text-text-muted font-semibold mb-1">Score Breakdown</p>
+                                  <ScoreRadar dimensions={[
+                                    { label: 'Value', value: c.strategy.scoreBreakdown.valueCreation, max: 20 },
+                                    { label: 'FCF/Sh', value: c.strategy.scoreBreakdown.fcfShareGrowth, max: 20 },
+                                    { label: 'ROIC', value: c.strategy.scoreBreakdown.portfolioRoic, max: 15 },
+                                    { label: 'Deploy', value: c.strategy.scoreBreakdown.capitalDeployment, max: 15 },
+                                    { label: 'B/S', value: c.strategy.scoreBreakdown.balanceSheetHealth, max: 15 },
+                                    { label: 'Strat', value: c.strategy.scoreBreakdown.strategicDiscipline, max: 15 },
+                                  ]} size={110} />
+                                </div>
+                              )}
+                              <div>
+                                <p className="text-text-muted font-semibold mb-1">Activity</p>
+                                <p>Acquisitions: {c.strategy.totalAcquisitions ?? '—'}</p>
+                                <p>Exits: {c.strategy.totalSells ?? '—'}</p>
+                                <p>Platforms: {c.strategy.platformsForged ?? 0}</p>
+                                <p>Peak Leverage: {c.strategy.peakLeverage ?? '—'}x</p>
+                              </div>
+                              {c.strategy.sectorIds && c.strategy.sectorIds.length > 0 && (
+                                <div>
+                                  <p className="text-text-muted font-semibold mb-1">Sectors</p>
+                                  <p>{c.strategy.sectorIds.map(id => SECTORS[id]?.emoji || id).join(' ')}</p>
+                                </div>
+                              )}
+                              {c.strategy.dealStructureTypes && Object.keys(c.strategy.dealStructureTypes).length > 0 && (
+                                <div>
+                                  <p className="text-text-muted font-semibold mb-1">Deal Structures</p>
+                                  {Object.entries(c.strategy.dealStructureTypes).sort((a, b) => b[1] - a[1]).map(([k, v]) => (
+                                    <p key={k}>{k}: {v}</p>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            {c.strategy.antiPatterns && c.strategy.antiPatterns.length > 0 && (
+                              <div className="mt-2 flex gap-1 flex-wrap">
+                                {c.strategy.antiPatterns.map(p => (
+                                  <span key={p} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">{p}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                    </Fragment>
                   );
                 })}
               </tbody>

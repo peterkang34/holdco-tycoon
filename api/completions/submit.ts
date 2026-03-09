@@ -12,6 +12,44 @@ const VALID_GRADES = ['S', 'A', 'B', 'C', 'D', 'F'] as const;
 const VALID_DIFFICULTIES = ['easy', 'normal'] as const;
 const VALID_DURATIONS = ['standard', 'quick'] as const;
 
+function sanitizeStrategy(raw: Record<string, unknown>): Record<string, unknown> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const s: Record<string, unknown> = {};
+  // Score breakdown
+  if (raw.scoreBreakdown && typeof raw.scoreBreakdown === 'object') {
+    const sb = raw.scoreBreakdown as Record<string, unknown>;
+    s.scoreBreakdown = {
+      valueCreation: Number(sb.valueCreation) || 0,
+      fcfShareGrowth: Number(sb.fcfShareGrowth) || 0,
+      portfolioRoic: Number(sb.portfolioRoic) || 0,
+      capitalDeployment: Number(sb.capitalDeployment) || 0,
+      balanceSheetHealth: Number(sb.balanceSheetHealth) || 0,
+      strategicDiscipline: Number(sb.strategicDiscipline) || 0,
+    };
+  }
+  // Sector IDs (array of strings, max 20)
+  if (Array.isArray(raw.sectorIds)) {
+    s.sectorIds = raw.sectorIds.filter((id): id is string => typeof id === 'string').slice(0, 20);
+  }
+  // Deal structure types (record of string→number)
+  if (raw.dealStructureTypes && typeof raw.dealStructureTypes === 'object') {
+    const dt: Record<string, number> = {};
+    for (const [k, v] of Object.entries(raw.dealStructureTypes as Record<string, unknown>)) {
+      if (typeof v === 'number') dt[k.slice(0, 30)] = Math.round(v);
+    }
+    if (Object.keys(dt).length > 0) s.dealStructureTypes = dt;
+  }
+  // Numeric fields
+  for (const key of ['platformsForged', 'totalAcquisitions', 'totalSells', 'peakLeverage', 'turnaroundsStarted', 'turnaroundsSucceeded']) {
+    if (typeof raw[key] === 'number') s[key] = Math.round((raw[key] as number) * 10) / 10;
+  }
+  // Anti-patterns (array of strings)
+  if (Array.isArray(raw.antiPatterns)) {
+    s.antiPatterns = raw.antiPatterns.filter((p): p is string => typeof p === 'string').slice(0, 10);
+  }
+  return Object.keys(s).length > 0 ? s : undefined;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Always return ok: true to client (fire-and-forget pattern)
   const ok = () => res.status(200).json({ ok: true });
@@ -92,6 +130,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Strategy summary only
       archetype: typeof body.archetype === 'string' ? body.archetype.slice(0, 50) : undefined,
       sophisticationScore: typeof body.sophisticationScore === 'number' ? Math.max(0, Math.min(100, Math.round(body.sophisticationScore))) : undefined,
+      // Strategy breakdown (for admin drill-down)
+      strategy: body.strategy && typeof body.strategy === 'object' ? sanitizeStrategy(body.strategy) : undefined,
       // Metadata
       device: ['desktop', 'mobile', 'tablet'].includes(body.device) ? body.device : undefined,
       isChallenge: body.isChallenge === true ? true : undefined,
