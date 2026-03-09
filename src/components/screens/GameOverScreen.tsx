@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { ScoreBreakdown, PostGameInsight, Business, Metrics, LeaderboardEntry, formatMoney, formatMultiple, HistoricalMetrics, GameDifficulty, GameDuration, IntegratedPlatform, PEScoreBreakdown, CarryWaterfall, LPComment } from '../../engine/types';
 import type { IPOState } from '../../engine/types';
 import { calculatePublicCompanyBonus } from '../../engine/ipo';
@@ -15,6 +15,7 @@ import { getGradeColor, getRankColor } from '../../utils/gradeColors';
 import { TABS, filterAndSort, getDisplayValue } from '../ui/LeaderboardModal';
 import type { LeaderboardTab } from '../ui/LeaderboardModal';
 import { trackGameComplete, trackChallengeCreate, trackChallengeShare, type GameCompleteSnapshot } from '../../services/telemetry';
+import { submitGameCompletion } from '../../services/completionApi';
 import {
   type ChallengeParams,
   type PlayerResult,
@@ -372,6 +373,40 @@ export function GameOverScreen({
     trackGameComplete(snapshot);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Auto-submit game completion for admin feed (independent of leaderboard)
+  const completionSubmittedRef = useRef(false);
+  useEffect(() => {
+    if (completionSubmittedRef.current) return;
+    completionSubmittedRef.current = true;
+    if (window.location.hash.includes('fo-test')) return;
+
+    const gameScore = isFundManagerMode ? (peScore?.total ?? 0) : score.total;
+    const gameGrade = isFundManagerMode ? (peScore?.grade ?? 'F') : score.grade;
+    const completionId = `${seed}-${difficulty}-${duration}-${isFundManagerMode ? 'pe' : 'hc'}-${gameScore}-${gameGrade}`;
+
+    submitGameCompletion({
+      completionId,
+      holdcoName: isFundManagerMode ? (fundName || 'PE Fund') : holdcoName,
+      enterpriseValue: Math.round(enterpriseValue),
+      founderEquityValue: Math.round(founderEquityValue),
+      score: gameScore,
+      grade: gameGrade,
+      businessCount: businesses.filter(b => b.status === 'active').length,
+      difficulty,
+      duration,
+      totalRounds: maxRounds,
+      hasRestructured,
+      isFundManager: isFundManagerMode || undefined,
+      fundName: isFundManagerMode ? fundName : undefined,
+      netIrr: isFundManagerMode ? carryWaterfallData?.netIrr : undefined,
+      grossMoic: isFundManagerMode ? carryWaterfallData?.grossMoic : undefined,
+      carryEarned: isFundManagerMode ? carryWaterfallData?.carry : undefined,
+      archetype: strategyData.archetype,
+      sophisticationScore: strategyData.sophisticationScore,
+      isChallenge: !!challengeData,
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Deduplicate: exitedBusinesses wins over businesses (a sold biz exists in both)
   // Filter out 'integrated' status (bolt-ons are folded into platform EBITDA)
   const allBusinesses = useMemo(() => {
@@ -457,16 +492,20 @@ export function GameOverScreen({
     setSaving(true);
     setSaveError(false);
     try {
+      const gameScore = isFundManagerMode ? (peScore?.total ?? 0) : score.total;
+      const gameGrade = isFundManagerMode ? (peScore?.grade ?? 'F') : score.grade;
+      const completionId = `${seed}-${difficulty}-${duration}-${isFundManagerMode ? 'pe' : 'hc'}-${gameScore}-${gameGrade}`;
       const entry = await saveToLeaderboard(
         {
           holdcoName: isFundManagerMode ? (fundName || 'PE Fund') : holdcoName,
           initials: initials.toUpperCase(),
           enterpriseValue,
-          score: isFundManagerMode ? (peScore?.total ?? 0) : score.total,
-          grade: isFundManagerMode ? (peScore?.grade ?? 'F') : score.grade,
+          score: gameScore,
+          grade: gameGrade,
           businessCount: activeBusinesses.length,
         },
         {
+          completionId,
           totalRounds: maxRounds,
           totalInvestedCapital,
           totalRevenue: metrics.totalRevenue,

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
-import { LEADERBOARD_KEY } from '../_lib/leaderboard.js';
+import { LEADERBOARD_KEY, COMPLETIONS_KEY } from '../_lib/leaderboard.js';
 import { verifyAdminToken } from '../_lib/adminAuth.js';
 import { getWeekKey } from '../_lib/telemetry.js';
 
@@ -215,11 +215,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       completed: Number(results[allTimeOffset + 1]) || 0,
     };
 
-    // Fetch leaderboard top 25 (negative indices = highest scores) + recent 25 by date
+    // Fetch leaderboard top 25 + recent 25 + game completions (in parallel)
     let leaderboardEntries: unknown[] = [];
     let recentEntries: unknown[] = [];
+    let completionEntries: unknown[] = [];
     try {
-      const raw = await kv.zrange(LEADERBOARD_KEY, 0, -1);
+      const [raw, rawCompletions] = await Promise.all([
+        kv.zrange(LEADERBOARD_KEY, 0, -1).catch(() => [] as unknown[]),
+        kv.zrange(COMPLETIONS_KEY, -50, -1).catch(() => [] as unknown[]),
+      ]);
+
       const allEntries = raw.map((entry) => {
         try {
           return typeof entry === 'string' ? JSON.parse(entry) : entry;
@@ -235,8 +240,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       recentEntries = [...allEntries]
         .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
         .slice(0, 25);
+
+      // Completions: most recent first
+      completionEntries = rawCompletions.map((entry) => {
+        try {
+          return typeof entry === 'string' ? JSON.parse(entry) : entry;
+        } catch {
+          return null;
+        }
+      }).filter(Boolean).reverse();
     } catch {
-      // Non-critical — continue without leaderboard data
+      // Non-critical — continue without leaderboard/completion data
     }
 
     // Activity feed: recent starts + abandons
@@ -280,7 +294,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     res.setHeader('Cache-Control', 'private, no-cache');
-    return res.status(200).json({ allTime, months, leaderboardEntries, recentEntries, activityFeed, cohortRetention });
+    return res.status(200).json({ allTime, months, leaderboardEntries, recentEntries, completionEntries, activityFeed, cohortRetention });
   } catch (error) {
     console.error('Analytics error:', error);
     return res.status(500).json({ error: 'Failed to fetch analytics' });

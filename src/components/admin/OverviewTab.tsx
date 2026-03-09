@@ -7,7 +7,7 @@ import { getGradeColor } from '../../utils/gradeColors';
 import { SECTORS } from '../../data/sectors';
 import { computeAdjFev, MultiplierBadges } from './adminShared';
 import { AnalyticsChart } from './AnalyticsChart';
-import type { AnalyticsData, Totals, ActivityEvent, DayData } from './adminTypes';
+import type { AnalyticsData, Totals, ActivityEvent, DayData, GameCompletionAdmin } from './adminTypes';
 
 function getTimeAgo(date: Date): string {
   const now = Date.now();
@@ -272,10 +272,71 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
         </div>
       )}
 
-      {/* Recent Games Feed */}
+      {/* All Completed Games Feed (includes anonymous) */}
+      {data.completionEntries && data.completionEntries.length > 0 && (
+        <div className="card p-4 mt-4">
+          <h3 className="text-sm font-semibold text-text-secondary mb-3">
+            All Completed Games (Last 50)
+            <span className="text-[10px] text-text-muted ml-2 font-normal">Includes players who skipped leaderboard</span>
+          </h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-text-muted border-b border-border">
+                  <th className="text-left py-2 pr-3">Date</th>
+                  <th className="text-center py-2 pr-3">Player</th>
+                  <th className="text-left py-2 pr-3">Name</th>
+                  <th className="text-right py-2 pr-3">FEV</th>
+                  <th className="text-center py-2 pr-3">Score</th>
+                  <th className="text-center py-2 pr-3">Grade</th>
+                  <th className="text-center py-2 pr-3">Mode</th>
+                  <th className="text-left py-2">Info</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.completionEntries.map((c: GameCompletionAdmin, i: number) => {
+                  const isPE = c.isFundManager === true;
+                  const modeLabel = isPE ? 'PE' : `${c.difficulty === 'normal' ? 'H' : 'E'}/${c.duration === 'quick' ? '10' : '20'}`;
+                  const dateObj = new Date(c.date);
+                  const timeAgo = getTimeAgo(dateObj);
+                  return (
+                    <tr key={i} className="border-b border-border/50">
+                      <td className="py-1.5 pr-3 text-text-muted font-mono" title={dateObj.toLocaleString()}>{timeAgo}</td>
+                      <td className="py-1.5 pr-3 text-center">
+                        {c.initials
+                          ? <span className="font-mono font-bold text-text-primary">{c.initials}</span>
+                          : <span className="text-[10px] px-1.5 py-0.5 rounded bg-white/5 text-text-muted">anon</span>
+                        }
+                      </td>
+                      <td className="py-1.5 pr-3 text-text-secondary truncate max-w-[150px]">{c.holdcoName}</td>
+                      <td className="py-1.5 pr-3 text-right font-mono text-accent">
+                        {isPE ? formatMoney(c.carryEarned ?? 0) : formatMoney(c.founderEquityValue)}
+                      </td>
+                      <td className="py-1.5 pr-3 text-center font-mono text-text-secondary">{c.score ?? '—'}</td>
+                      <td className={`py-1.5 pr-3 text-center font-bold ${getGradeColor(c.grade)}`}>{c.grade}</td>
+                      <td className="py-1.5 pr-3 text-center">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${isPE ? 'bg-purple-500/20 text-purple-400' : c.difficulty === 'normal' ? 'bg-warning/20 text-warning' : 'bg-accent/20 text-accent'}`}>
+                          {modeLabel}
+                        </span>
+                      </td>
+                      <td className="py-1.5 text-text-muted">
+                        {c.archetype && <span className="text-[10px] mr-1">{c.archetype}</span>}
+                        {c.isChallenge && <span className="text-[10px] px-1 py-0.5 rounded bg-blue-500/20 text-blue-400 mr-1">challenge</span>}
+                        {c.device && <span className="text-[10px]">{c.device === 'mobile' ? '📱' : c.device === 'tablet' ? '📱' : '💻'}</span>}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Leaderboard Submissions (with strategy drill-down) */}
       {data.recentEntries && data.recentEntries.length > 0 && (
         <div className="card p-4 mt-4">
-          <h3 className="text-sm font-semibold text-text-secondary mb-3">Recent Games (Last 25)</h3>
+          <h3 className="text-sm font-semibold text-text-secondary mb-3">Leaderboard Submissions (Last 25)</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>

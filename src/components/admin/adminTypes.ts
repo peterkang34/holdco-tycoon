@@ -91,11 +91,35 @@ export interface ActivityEvent {
   isFundManager?: boolean;
 }
 
+export interface GameCompletionAdmin {
+  completionId: string;
+  holdcoName: string;
+  initials?: string;
+  enterpriseValue?: number;
+  founderEquityValue: number;
+  score: number;
+  grade: string;
+  difficulty: string;
+  duration?: string;
+  businessCount?: number;
+  date: string;
+  hasRestructured?: boolean;
+  isFundManager?: boolean;
+  fundName?: string;
+  grossMoic?: number;
+  carryEarned?: number;
+  archetype?: string;
+  sophisticationScore?: number;
+  device?: string;
+  isChallenge?: boolean;
+}
+
 export interface AnalyticsData {
   allTime: { started: number; completed: number };
   months: MonthData[];
   leaderboardEntries: LeaderboardEntryAdmin[];
   recentEntries: LeaderboardEntryAdmin[];
+  completionEntries: GameCompletionAdmin[];
   activityFeed: ActivityEvent[];
   cohortRetention: CohortRow[];
 }

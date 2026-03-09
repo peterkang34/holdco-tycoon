@@ -652,7 +652,7 @@ export async function loadLeaderboard(): Promise<LeaderboardEntry[]> {
  */
 export async function saveToLeaderboard(
   entry: Omit<LeaderboardEntry, 'id' | 'date'>,
-  extra?: { totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number; hasRestructured?: boolean; submittedMultiplier?: number; familyOfficeCompleted?: boolean; legacyGrade?: string; foMultiplier?: number; strategy?: LeaderboardStrategy; isFundManager?: boolean; fundName?: string; netIrr?: number; grossMoic?: number; carryEarned?: number }
+  extra?: { completionId?: string; totalRounds: number; totalInvestedCapital: number; totalRevenue: number; avgEbitdaMargin: number; difficulty?: GameDifficulty; duration?: string; founderEquityValue?: number; founderPersonalWealth?: number; hasRestructured?: boolean; submittedMultiplier?: number; familyOfficeCompleted?: boolean; legacyGrade?: string; foMultiplier?: number; strategy?: LeaderboardStrategy; isFundManager?: boolean; fundName?: string; netIrr?: number; grossMoic?: number; carryEarned?: number }
 ): Promise<LeaderboardEntry> {
   const newEntry: LeaderboardEntry = {
     ...entry,

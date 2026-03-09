@@ -267,6 +267,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...(verifiedPlayerId ? { playerId: verifiedPlayerId } : {}),
       ...(playerId ? { submittedBy: playerId } : {}),  // Always store submitter UUID (anon + verified)
       ...(claimToken ? { claimToken } : {}),
+      ...(typeof body?.completionId === 'string' ? { completionId: body.completionId.slice(0, 100) } : {}),
     };
 
     // Add to sorted set — PE entries use grossMoic × fundSize as proxy score, holdco uses adjusted FEV
