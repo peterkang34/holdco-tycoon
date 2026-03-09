@@ -1683,9 +1683,9 @@ function FundManagerContent() {
 
       <SubHeading>LP Satisfaction</SubHeading>
       <P>
-        A hidden 0-100 score reflecting LP confidence. Affected by DPI pace, deployment discipline,
+        A 0-100 score reflecting LP confidence, visible on the dashboard gauge. Affected by DPI pace, deployment discipline,
         MOIC progress, and leverage management. Below 20, your grade is capped at C.
-        LP characters (Edna Blackwell and Chip Saunders) provide commentary reflecting sentiment.
+        LP characters (Edna Morrison and Chip Henderson) provide commentary on market events, deal quality, and fund performance.
       </P>
 
       <SubHeading>Blocked Mechanics</SubHeading>

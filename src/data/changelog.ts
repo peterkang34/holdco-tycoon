@@ -13,6 +13,21 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 9, 2026',
+    title: 'LP Interaction Overhaul (PE Fund Mode)',
+    sections: [
+      {
+        heading: 'LP Engagement',
+        items: [
+          'LP Satisfaction gauge now visible on the dashboard — see your LPs\' mood at a glance.',
+          'LPAC governance is live — large deals now trigger LP Advisory Committee review with approval/denial feedback.',
+          'LPs react to market events — Edna and Chip comment on recessions, booms, and portfolio headwinds.',
+          'LPs react to your deals — commentary on expensive entries, leveraged structures, good values, and harvest-period acquisitions.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 8, 2026',
     title: 'Market Event Overhaul',
     sections: [

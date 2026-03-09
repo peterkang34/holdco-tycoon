@@ -27,6 +27,7 @@ interface DashboardProps {
   fundDeployPct?: number;
   fundEstCarry?: number;
   totalCapitalDeployed?: number;
+  lpSatisfactionScore?: number;
   onMetricClick?: (key: string) => void;
 }
 
@@ -53,6 +54,7 @@ export function Dashboard({
   fundDeployPct = 0,
   fundEstCarry = 0,
   totalCapitalDeployed = 0,
+  lpSatisfactionScore = 75,
   onMetricClick,
 }: DashboardProps) {
   const getCashStatus = () => {
@@ -320,6 +322,29 @@ export function Dashboard({
 
       {/* Status Badges */}
       <div className="flex flex-wrap gap-1 sm:gap-2 mt-3 sm:mt-4">
+        {/* Fund mode: LP Satisfaction gauge */}
+        {isFundManagerMode && (
+          <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full flex items-center gap-1.5 ${
+            lpSatisfactionScore >= 70 ? 'bg-green-500/20 text-green-400' :
+            lpSatisfactionScore >= 40 ? 'bg-yellow-500/20 text-yellow-400' :
+            'bg-red-500/20 text-red-400'
+          }`}
+          title={`LP Satisfaction: ${lpSatisfactionScore}/100. Above 70 = LPAC auto-approves. Below 15 = termination threat.`}>
+            LP Mood: {lpSatisfactionScore >= 70 ? 'Satisfied' : lpSatisfactionScore >= 40 ? 'Cautious' : 'Unhappy'}
+            <span className="inline-flex items-center">
+              <span className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden inline-block align-middle">
+                <span
+                  className={`h-full block rounded-full transition-all duration-500 ${
+                    lpSatisfactionScore >= 70 ? 'bg-green-400' :
+                    lpSatisfactionScore >= 40 ? 'bg-yellow-400' :
+                    'bg-red-400'
+                  }`}
+                  style={{ width: `${lpSatisfactionScore}%` }}
+                />
+              </span>
+            </span>
+          </span>
+        )}
         {/* Fund mode: deployment pace badge (Years 1-5) */}
         {isFundManagerMode && round <= 5 && (
           <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${

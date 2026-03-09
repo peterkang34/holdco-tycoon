@@ -624,7 +624,7 @@ export interface GameState {
   // Deal heat / acquisition limits
   acquisitionsThisRound: number;
   maxAcquisitionsPerRound: number;
-  lastAcquisitionResult: 'success' | 'snatched' | 'blocked_same_league' | null;
+  lastAcquisitionResult: 'success' | 'snatched' | 'blocked_same_league' | 'lpac_denied' | null;
   lastIntegrationOutcome: IntegrationOutcome | null;
 
   // Founder tracking

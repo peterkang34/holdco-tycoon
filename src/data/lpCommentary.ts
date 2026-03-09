@@ -27,7 +27,18 @@ export type LPTriggerId =
   | 'termination_threat'
   | 'lpac_approved'
   | 'lpac_denied'
-  | 'zero_businesses_extended';
+  | 'zero_businesses_extended'
+  // Event reactions
+  | 'event_recession'
+  | 'event_boom'
+  | 'event_negative'
+  | 'event_positive'
+  // Deal reactions
+  | 'deal_expensive'
+  | 'deal_leveraged'
+  | 'deal_good_value'
+  | 'deal_first'
+  | 'deal_harvest_period';
 
 /** LP quotes: 3 variants per trigger/speaker for seeded RNG variety */
 const lpQuotes: Record<string, Partial<Record<LPSpeaker, string[]>>> = {
@@ -254,6 +265,106 @@ const lpQuotes: Record<string, Partial<Record<LPSpeaker, string[]>>> = {
       'There\'s nothing left to manage. We\'re counting the days until this fund expires.',
       'An empty portfolio with fees still accruing. My board is furious.',
       'No portfolio companies for over a year. What are we paying management fees for?',
+    ],
+  },
+  // ── Event Reactions ──
+  event_recession: {
+    edna: [
+      'Recession conditions. I trust you\'re stress-testing the portfolio.',
+      'My board is watching closely. Protect value above all.',
+      'Downturns separate the disciplined managers from the reckless ones.',
+    ],
+    chip: [
+      'Recession means bargains. I hope you have dry powder ready.',
+      'This is when the best vintage years are made. Stay aggressive.',
+      'Blood in the streets. Time to deploy.',
+    ],
+  },
+  event_boom: {
+    edna: [
+      'Strong tailwinds. Don\'t let the good times mask operational weakness.',
+      'Rising tides lift all boats — my board wants to see alpha, not beta.',
+      'Use this window to realize exits. Cycles don\'t last forever.',
+    ],
+    chip: [
+      'Everything\'s running hot. Love to see it.',
+      'Great environment for exits. Don\'t get greedy — take some chips off the table.',
+      'Enjoy the boom, but remember what comes after.',
+    ],
+  },
+  event_negative: {
+    edna: [
+      'Noted. I expect a plan for how you\'re managing through this.',
+      'Headwinds are part of the business. Show me you can navigate them.',
+      'My board will want an update on portfolio exposure to this.',
+    ],
+    chip: [
+      'Bumps in the road. That\'s why we have a diversified portfolio.',
+      'Not ideal, but these things happen. Stay the course.',
+      'I\'ve seen worse. Keep your head down and execute.',
+    ],
+  },
+  event_positive: {
+    edna: [
+      'Favorable conditions. Make the most of this window.',
+      'Good news for the portfolio. I\'ll note this in my quarterly report.',
+      'Helpful tailwind. Don\'t waste it.',
+    ],
+    chip: [
+      'Nice break for the portfolio. Let\'s capitalize.',
+      'Good timing. Markets are giving us a gift.',
+      'Tailwinds! This is when you press the advantage.',
+    ],
+  },
+  // ── Deal Reactions ──
+  deal_expensive: {
+    edna: [
+      'That\'s a full price. I hope the growth thesis is airtight.',
+      'Premium valuation. My board tracks entry multiples closely.',
+      'I\'ll need to see operational improvement to justify that entry point.',
+    ],
+    chip: [
+      'Paying up for quality? I can live with that — if you can grow into it.',
+      'Not cheap. But sometimes you get what you pay for.',
+      'Rich price. Make sure the value creation plan is real.',
+    ],
+  },
+  deal_leveraged: {
+    edna: [
+      'That\'s significant leverage for one position. Monitor the covenants.',
+      'A lot of debt on this deal. I hope the cash flow supports it.',
+      'Leveraged entry noted. My risk committee will want an update.',
+    ],
+    chip: [
+      'Heavy leverage — that\'s PE. Just make sure the business can service it.',
+      'Bold structure. High risk, high reward.',
+      'I like the leverage if the thesis is right. Big if.',
+    ],
+  },
+  deal_good_value: {
+    edna: [
+      'Reasonable entry multiple. This is disciplined capital deployment.',
+      'Fair value. The kind of deal that makes a good fund great.',
+      'A sensible price. I appreciate the discipline.',
+    ],
+    chip: [
+      'Nice entry point. This is why I back this fund.',
+      'Good price for a solid business. Well done.',
+      'That\'s the kind of value we should be finding. More of this.',
+    ],
+  },
+  deal_first: {
+    chip: [
+      'First deal in the portfolio. The journey begins.',
+      'Deal one. Let\'s see what you can build from here.',
+      'First acquisition closed. Now show me what you can do with it.',
+    ],
+  },
+  deal_harvest_period: {
+    edna: [
+      'A new acquisition in the harvest period. Unusual — explain the thesis.',
+      'We\'re supposed to be exiting, not buying. This needs justification.',
+      'My board expected distributions by now, not new deployments.',
     ],
   },
 };

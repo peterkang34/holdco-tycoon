@@ -72,7 +72,7 @@ import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue
 import { getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
 
-import type { GameDifficulty, GameDuration, GameActionType, DealHeat } from '../engine/types';
+import type { GameDifficulty, GameDuration, GameActionType, DealHeat, LPComment } from '../engine/types';
 import { selectLPQuote } from '../data/lpCommentary';
 import type { LPTriggerId, LPSpeaker } from '../data/lpCommentary';
 import { generateRandomSeed, createRngStreams } from '../engine/rng';
@@ -168,6 +168,56 @@ function computeTotalDebt(businesses: Business[], holdcoLoanBalance: number): nu
   return holdcoLoanBalance + businesses
     .filter(b => b.status === 'active' || b.status === 'integrated')
     .reduce((sum, b) => sum + b.bankDebtBalance, 0);
+}
+
+/**
+ * Generate LP commentary in reaction to a deal (PE Fund mode only).
+ * Returns updated commentary array or null if no comment generated.
+ */
+function generateDealLPComment(
+  state: GameState,
+  deal: Deal,
+  structure: DealStructure,
+): LPComment | null {
+  if (!state.isFundManagerMode) return null;
+  const streams = createRngStreams(state.seed, state.round);
+  const rng = streams.cosmetic.fork(`deal_reaction:${deal.id}`);
+
+  // Only comment ~60% of the time to avoid fatigue
+  if (rng.next() > 0.60) return null;
+
+  const activeCount = state.businesses.filter(b => b.status === 'active').length;
+  const round = state.round;
+
+  let triggerId: LPTriggerId;
+  let speaker: LPSpeaker;
+
+  // Calculate entry multiple (askingPrice / EBITDA)
+  const entryMultiple = deal.business.ebitda > 0 ? deal.effectivePrice / deal.business.ebitda : 0;
+
+  // Priority: first deal > harvest period > expensive > leveraged > good value
+  if (activeCount === 0) {
+    triggerId = 'deal_first';
+    speaker = 'chip';
+  } else if (round > PE_FUND_CONFIG.investmentPeriodEnd) {
+    triggerId = 'deal_harvest_period';
+    speaker = 'edna';
+  } else if (entryMultiple >= 8.0) {
+    triggerId = 'deal_expensive';
+    speaker = rng.next() > 0.5 ? 'edna' : 'chip';
+  } else if (structure.bankDebt && structure.bankDebt.amount > deal.effectivePrice * 0.55) {
+    triggerId = 'deal_leveraged';
+    speaker = rng.next() > 0.5 ? 'edna' : 'chip';
+  } else if (entryMultiple <= 4.5 && entryMultiple > 0) {
+    triggerId = 'deal_good_value';
+    speaker = rng.next() > 0.5 ? 'edna' : 'chip';
+  } else {
+    return null; // Nothing noteworthy
+  }
+
+  const text = selectLPQuote(triggerId, speaker, rng);
+  if (!text) return null;
+  return { round, speaker, text };
 }
 
 /**
@@ -1036,6 +1086,37 @@ export const useGameStore = create<GameStore>()(
           return b;
         });
 
+        // PE Fund: generate LP reaction to market event
+        if (state.isFundManagerMode && event) {
+          const eventRng = roundStreams.cosmetic.fork('eventLPReaction');
+          // Only comment ~50% of the time to avoid fatigue
+          if (eventRng.next() < 0.50) {
+            const isNegativeEvent = ['global_recession', 'global_financial_crisis', 'global_interest_rate_hike',
+              'global_regulatory_crackdown', 'global_yield_curve_inversion', 'global_talent_market_shift',
+              'portfolio_cyber_breach', 'portfolio_antitrust_scrutiny'].includes(event.type);
+            const isPositiveEvent = ['global_economic_boom', 'global_deregulation', 'global_private_credit_boom',
+              'portfolio_referral_deal', 'portfolio_operational_windfall'].includes(event.type);
+            const isRecession = event.type === 'global_recession' || event.type === 'global_financial_crisis';
+            const isBoom = event.type === 'global_economic_boom';
+
+            let triggerId: LPTriggerId;
+            if (isRecession) triggerId = 'event_recession';
+            else if (isBoom) triggerId = 'event_boom';
+            else if (isNegativeEvent) triggerId = 'event_negative';
+            else if (isPositiveEvent) triggerId = 'event_positive';
+            else triggerId = 'event_negative'; // fallback (shouldn't hit due to 50% gate)
+
+            // Only generate for noteworthy events (positive or negative)
+            if (isNegativeEvent || isPositiveEvent || isRecession || isBoom) {
+              const speaker: LPSpeaker = eventRng.next() > 0.5 ? 'edna' : 'chip';
+              const text = selectLPQuote(triggerId, speaker, eventRng);
+              if (text) {
+                gameState.lpCommentary = [...(gameState.lpCommentary || []), { round: state.round, speaker, text }];
+              }
+            }
+          }
+        }
+
         set({
           ...gameState,
           eventHistory: event ? [...state.eventHistory, event] : state.eventHistory,
@@ -1606,6 +1687,32 @@ export const useGameStore = create<GameStore>()(
 
         if (state.cash < structure.cashRequired) return;
 
+        // PE Fund: LPAC gate check
+        if (state.isFundManagerMode) {
+          const lpacCheck = checkLPACRequired(deal, state);
+          if (lpacCheck.required) {
+            const lpacStreams = createRngStreams(state.seed, state.round);
+            const approved = rollLPACApproval(state, lpacStreams.market.fork(`lpac:${deal.id}`));
+            const cosmeticRng = lpacStreams.cosmetic.fork(`lpac:${deal.id}`);
+            const triggerId: LPTriggerId = approved ? 'lpac_approved' : 'lpac_denied';
+            const speaker: LPSpeaker = approved ? (cosmeticRng.next() > 0.5 ? 'edna' : 'chip') : 'edna';
+            const text = selectLPQuote(triggerId, speaker, cosmeticRng);
+            const updatedCommentary = [...(state.lpCommentary || [])];
+            if (text) {
+              updatedCommentary.push({ round: state.round, speaker, text });
+            }
+            if (!approved) {
+              set({
+                lastAcquisitionResult: 'lpac_denied',
+                lpCommentary: updatedCommentary,
+              });
+              return;
+            }
+            // Approved — continue with acquisition, but store the comment
+            set({ lpCommentary: updatedCommentary });
+          }
+        }
+
         // Apply reputation building heat reduction if active
         let effectiveDeal = deal;
         let consumeHeatReduction = false;
@@ -1683,6 +1790,12 @@ export const useGameStore = create<GameStore>()(
         const newBusinesses = [...state.businesses, businessWithPlatformFields];
         const newTotalDebt = computeTotalDebt(newBusinesses, state.holdcoLoanBalance);
 
+        // PE Fund: generate LP reaction to deal
+        const dealComment = generateDealLPComment(state, deal, structure);
+        const dealCommentary = dealComment
+          ? { lpCommentary: [...(state.lpCommentary || []), dealComment] }
+          : {};
+
         set({
           cash: state.cash - structure.cashRequired,
           totalDebt: newTotalDebt,
@@ -1694,6 +1807,7 @@ export const useGameStore = create<GameStore>()(
           nextAcquisitionHeatReduction: consumeHeatReduction ? 0 : state.nextAcquisitionHeatReduction,
           // PE Fund: track equity capital deployed from fund (cash check, not total EV)
           ...(state.isFundManagerMode ? { totalCapitalDeployed: (state.totalCapitalDeployed || 0) + structure.cashRequired } : {}),
+          ...dealCommentary,
           actionsThisRound: [
             ...state.actionsThisRound,
             {
@@ -1731,6 +1845,31 @@ export const useGameStore = create<GameStore>()(
         if (state.acquisitionsThisRound >= state.maxAcquisitionsPerRound) return;
 
         if (state.cash < structure.cashRequired) return;
+
+        // PE Fund: LPAC gate check for tuck-ins into concentrated platforms
+        if (state.isFundManagerMode) {
+          const lpacCheck = checkLPACRequired(deal, state, targetPlatformId);
+          if (lpacCheck.required) {
+            const lpacStreams = createRngStreams(state.seed, state.round);
+            const approved = rollLPACApproval(state, lpacStreams.market.fork(`lpac:tuckin:${deal.id}`));
+            const cosmeticRng = lpacStreams.cosmetic.fork(`lpac:tuckin:${deal.id}`);
+            const triggerId: LPTriggerId = approved ? 'lpac_approved' : 'lpac_denied';
+            const speaker: LPSpeaker = approved ? (cosmeticRng.next() > 0.5 ? 'edna' : 'chip') : 'edna';
+            const text = selectLPQuote(triggerId, speaker, cosmeticRng);
+            const updatedCommentary = [...(state.lpCommentary || [])];
+            if (text) {
+              updatedCommentary.push({ round: state.round, speaker, text });
+            }
+            if (!approved) {
+              set({
+                lastAcquisitionResult: 'lpac_denied',
+                lpCommentary: updatedCommentary,
+              });
+              return;
+            }
+            set({ lpCommentary: updatedCommentary });
+          }
+        }
 
         // Apply reputation building heat reduction if active
         let effectiveDeal = deal;

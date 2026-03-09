@@ -268,6 +268,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     distributeToLPs,
     lpCommentary,
     lpDistributions,
+    lpSatisfactionScore,
     fundSize,
     totalCapitalDeployed,
     managementFeesCollected,
@@ -373,7 +374,13 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   const handleAcquire = useCallback((deal: Deal, structure: DealStructure) => {
     acquireBusiness(deal, structure);
     const result = useGameStore.getState().lastAcquisitionResult;
-    if (result === 'blocked_same_league') {
+    if (result === 'lpac_denied') {
+      addToast({
+        message: `LPAC Blocked: ${deal.business.name}`,
+        detail: 'LP Advisory Committee denied this deal due to concentration risk',
+        type: 'danger',
+      });
+    } else if (result === 'blocked_same_league') {
       addToast({
         message: `Cannot acquire ${deal.business.name}`,
         detail: 'You already own a team in this league — one per league allowed',
@@ -398,7 +405,20 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         type: 'success',
       });
     }
-  }, [acquireBusiness, addToast]);
+    // Show LP deal reaction toast if one was generated
+    if (result === 'success' && isFundManagerMode) {
+      const updatedCommentary = useGameStore.getState().lpCommentary || [];
+      const lastComment = updatedCommentary[updatedCommentary.length - 1];
+      if (lastComment && lastComment.round === round) {
+        const name = lastComment.speaker === 'edna' ? 'Edna Morrison' : 'Chip Henderson';
+        addToast({
+          message: `${name}:`,
+          detail: `"${lastComment.text}"`,
+          type: 'info',
+        });
+      }
+    }
+  }, [acquireBusiness, addToast, isFundManagerMode, round]);
 
   const handleAcquireTuckIn = useCallback((deal: Deal, structure: DealStructure, platformId: string) => {
     const platform = businesses.find(b => b.id === platformId);
@@ -406,6 +426,14 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     const state = useGameStore.getState();
     const result = state.lastAcquisitionResult;
     const integrationOutcome = state.lastIntegrationOutcome;
+    if (result === 'lpac_denied') {
+      addToast({
+        message: `LPAC Blocked: ${deal.business.name}`,
+        detail: 'LP Advisory Committee denied this tuck-in due to concentration risk',
+        type: 'danger',
+      });
+      return;
+    }
     if (result === 'snatched') {
       addToast({
         message: `Outbid on ${deal.business.name}`,
@@ -972,6 +1000,8 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             lastEventType={lastEventType}
             onChoice={handleEventChoice}
             onContinue={advanceToAllocate}
+            isFundManagerMode={isFundManagerMode}
+            lpCommentary={lpCommentary}
           />
         );
       case 'allocate':
@@ -1302,6 +1332,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         fundDeployPct={fundDashMetrics?.deployPct}
         fundEstCarry={fundDashMetrics?.estCarry}
         totalCapitalDeployed={totalCapitalDeployed}
+        lpSatisfactionScore={lpSatisfactionScore}
         onMetricClick={setDrilldownMetric}
       />
 

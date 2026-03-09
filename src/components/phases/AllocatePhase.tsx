@@ -118,7 +118,7 @@ interface AllocatePhaseProps {
   covenantBreachRounds?: number; // kept for caller compat, not used internally
   acquisitionsThisRound: number;
   maxAcquisitionsPerRound: number;
-  lastAcquisitionResult: 'success' | 'snatched' | 'blocked_same_league' | null;
+  lastAcquisitionResult: 'success' | 'snatched' | 'blocked_same_league' | 'lpac_denied' | null;
   turnaroundTier: TurnaroundTier;
   activeTurnarounds: ActiveTurnaround[];
   onUnlockTurnaroundTier: () => void;
