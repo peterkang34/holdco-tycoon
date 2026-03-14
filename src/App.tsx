@@ -25,13 +25,13 @@ type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBrid
 function App() {
   const [isAdmin, setIsAdmin] = useState(window.location.hash === '#/admin');
   const [isFoTest, setIsFoTest] = useState(window.location.hash === '#/fo-test');
-  const [isGoTest, setIsGoTest] = useState(window.location.hash === '#/go-test');
+  const [isGoTest, setIsGoTest] = useState(window.location.hash.startsWith('#/go-test'));
 
   useEffect(() => {
     const onHash = () => {
       setIsAdmin(window.location.hash === '#/admin');
       setIsFoTest(window.location.hash === '#/fo-test');
-      setIsGoTest(window.location.hash === '#/go-test');
+      setIsGoTest(window.location.hash.startsWith('#/go-test'));
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
@@ -151,7 +151,7 @@ function App() {
       // Game data stays in localStorage and is overwritten cleanly on next startGame().
       setScreen('intro');
     }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isGoTest]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleStart = (name: string, startingSector: SectorId, difficulty: GameDifficulty = 'easy', duration: GameDuration = 'standard', seed?: number) => {
     startGame(name, startingSector, difficulty, duration, seed);

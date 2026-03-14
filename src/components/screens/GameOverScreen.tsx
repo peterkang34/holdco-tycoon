@@ -136,7 +136,10 @@ export function GameOverScreen({
   // ── Stores & Auth ──
   const familyOfficeState = useGameStore(s => s.familyOfficeState);
   const lpSatisfactionScore = useGameStore(s => s.lpSatisfactionScore);
-  const isLoggedIn = useIsLoggedIn();
+  const isReallyLoggedIn = useIsLoggedIn();
+  // Force anonymous mode on test pages so signup CTAs are visible
+  const isTestMode = window.location.hash.includes('go-test') || window.location.hash.includes('fo-test');
+  const isLoggedIn = isTestMode ? false : isReallyLoggedIn;
   const { openAccountModal } = useAuthStore();
 
 
@@ -817,9 +820,6 @@ export function GameOverScreen({
       {/* ── Section 9: Play Again with Intent (always shown) ── */}
       <PlayAgainSection
         onPlayAgain={onPlayAgain}
-        difficulty={difficulty}
-        duration={duration}
-        isFundManagerMode={isFundManagerMode}
         onShowFeedback={() => setShowFeedback(true)}
       />
 

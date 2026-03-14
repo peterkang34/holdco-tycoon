@@ -89,7 +89,7 @@ export function ProfileAchievementSection({
               </button>
             </div>
             <p className="text-xs text-text-muted mt-2 text-center">
-              Google or email. Takes 10 seconds.
+              Just your email. Takes 10 seconds.
             </p>
           </div>
         )}

@@ -4,7 +4,6 @@
  * Variants: ?v=holdco (default), ?v=pe, ?v=bankrupt, ?v=pe-bankrupt
  */
 import { useGameStore } from '../hooks/useGame';
-import { useAuthStore } from '../hooks/useAuth';
 import { calculateMetrics } from '../engine/simulation';
 import { calculateFinalScore, calculatePEFundScore, calculateCarryWaterfall } from '../engine/scoring';
 import type { Business, GameState, Metrics, HistoricalMetrics, RoundHistoryEntry, GameAction } from '../engine/types';
@@ -248,9 +247,6 @@ export function setupGoTest(variant: GoTestVariant): {
   const carryWaterfall = isFundManager
     ? calculateCarryWaterfall(finalState)
     : undefined;
-
-  // Force anonymous mode so signup CTAs are visible during testing
-  useAuthStore.setState({ player: null });
 
   return { score, carryWaterfall };
 }
