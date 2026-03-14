@@ -311,10 +311,15 @@ function GameRow({ game }: { game: GameHistoryEntry }) {
                 <div className="col-span-2 mt-1">
                   <span className="text-text-muted">Achievements: </span>
                   <span className="text-amber-400/90">
-                    {s.earnedAchievementIds.map(id => {
+                    {s.earnedAchievementIds.map((id, i) => {
                       const a = ACHIEVEMENT_PREVIEW.find(ach => ach.id === id);
-                      return a ? `${a.emoji} ${a.name}` : id;
-                    }).join('  ')}
+                      if (!a) return <span key={id}>{id}</span>;
+                      return (
+                        <span key={id} title={a.description} className="cursor-default">
+                          {i > 0 && '  '}{a.emoji} {a.name}
+                        </span>
+                      );
+                    })}
                   </span>
                 </div>
               )}
@@ -657,7 +662,7 @@ export function StatsModal() {
                 {unearnedAchievements.length > 0 && (
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mt-2">
                     {unearnedAchievements.map(a => (
-                      <div key={a.id} className="flex items-center gap-1.5 bg-white/[0.02] border border-white/5 rounded-lg p-2">
+                      <div key={a.id} className="flex items-center gap-1.5 bg-white/[0.02] border border-white/5 rounded-lg p-2" title={a.description}>
                         <span className="text-sm opacity-40 grayscale shrink-0">{a.emoji}</span>
                         <p className="text-[11px] text-text-muted/60 truncate">{a.name}</p>
                       </div>

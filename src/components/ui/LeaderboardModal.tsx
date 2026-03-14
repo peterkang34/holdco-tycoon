@@ -311,7 +311,7 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
             <p className="text-[10px] leading-tight mt-0.5">
               {entry.strategy.earnedAchievementIds.slice(0, 6).map(id => {
                 const a = ACHIEVEMENT_PREVIEW.find(ach => ach.id === id);
-                return a ? <span key={id} title={a.name} className="mr-0.5">{a.emoji}</span> : null;
+                return a ? <span key={id} title={`${a.name}: ${a.description}`} className="mr-0.5 cursor-default">{a.emoji}</span> : null;
               })}
               {entry.strategy.earnedAchievementIds.length > 6 && <span className="text-text-muted">+{entry.strategy.earnedAchievementIds.length - 6}</span>}
             </p>
