@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
-import { LEADERBOARD_KEY, DIFFICULTY_MULTIPLIER } from '../_lib/leaderboard.js';
+import { LEADERBOARD_KEY, COMPLETIONS_KEY, DIFFICULTY_MULTIPLIER } from '../_lib/leaderboard.js';
 import { verifyAdminToken } from '../_lib/adminAuth.js';
 
 const OLD_KEY = 'leaderboard:v1';
@@ -22,6 +22,7 @@ const FO_MULTIPLIER_BY_GRADE: Record<string, number> = {
  * GET /api/leaderboard/migrate?action=migrate_v1            — migrate v1 entries to v2
  * GET /api/leaderboard/migrate?action=apply_fo_multiplier   — backfill foMultiplier for FO entries
  * GET /api/leaderboard/migrate?delete=ENTRY_ID              — delete a specific entry by ID
+ * GET /api/leaderboard/migrate?deleteName=HOLDCO_NAME       — delete ALL entries matching holdco name
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -49,6 +50,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         } catch { /* skip malformed */ }
       }
       return res.status(200).json({ deleted, id: deleteId });
+    }
+
+    // Delete by holdco name (bulk — leaderboard + completions)
+    const deleteName = req.query.deleteName;
+    if (typeof deleteName === 'string' && deleteName.length > 0) {
+      const allEntries = await kv.zrange(NEW_KEY, 0, -1);
+      const deleted: { id: string; holdcoName: string }[] = [];
+      for (const raw of allEntries) {
+        try {
+          const entry: any = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (entry?.holdcoName === deleteName) {
+            await kv.zrem(NEW_KEY, typeof raw === 'string' ? raw : JSON.stringify(raw));
+            deleted.push({ id: entry.id, holdcoName: entry.holdcoName });
+          }
+        } catch { /* skip malformed */ }
+      }
+
+      // Also clean completions feed
+      const completionEntries = await kv.zrange(COMPLETIONS_KEY, 0, -1);
+      const deletedCompletions: string[] = [];
+      for (const raw of completionEntries) {
+        try {
+          const entry: any = typeof raw === 'string' ? JSON.parse(raw) : raw;
+          if (entry?.holdcoName === deleteName) {
+            await kv.zrem(COMPLETIONS_KEY, typeof raw === 'string' ? raw : JSON.stringify(raw));
+            deletedCompletions.push(entry.id ?? 'unknown');
+          }
+        } catch { /* skip malformed */ }
+      }
+
+      return res.status(200).json({
+        leaderboard: { deletedCount: deleted.length, deleted },
+        completions: { deletedCount: deletedCompletions.length, deleted: deletedCompletions },
+        name: deleteName,
+      });
     }
 
     // Migrate v1 → v2

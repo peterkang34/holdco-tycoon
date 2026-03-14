@@ -21,7 +21,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         items: [
           'FEV is now the hero — your Founder Equity Value (or Carry Earned in PE mode) is front and center.',
           'Collapsible FEV breakdown — see exactly how portfolio value, debt, ownership, and multipliers produce your final number.',
-          'Achievement teaser — see which achievements you unlocked this game (full tracking coming soon).',
+          'Unified achievements section — see what you unlocked this game with unique emoji icons, and browse all 20 achievements in a full-screen modal.',
           'Score breakdown demoted — your grade is still there, now with per-dimension tips to help you improve.',
         ],
       },

@@ -6,7 +6,7 @@
 import { useGameStore } from '../hooks/useGame';
 import { calculateMetrics } from '../engine/simulation';
 import { calculateFinalScore, calculatePEFundScore, calculateCarryWaterfall } from '../engine/scoring';
-import type { Business, GameState, Metrics, HistoricalMetrics } from '../engine/types';
+import type { Business, GameState, Metrics, HistoricalMetrics, RoundHistoryEntry, GameAction } from '../engine/types';
 
 function makeBusiness(overrides: Partial<Business> & { id: string; name: string; sectorId: string }): Business {
   return {
@@ -65,6 +65,33 @@ function makeHistory(rounds: number, metrics: Metrics): HistoricalMetrics[] {
     fcf: metrics.totalFcf * (0.5 + 0.5 * (i / rounds)),
     nopat: metrics.totalEbitda * 0.75 * (0.5 + 0.5 * (i / rounds)),
     investedCapital: 15000,
+  }));
+}
+
+function makeRoundHistory(rounds: number, isBankrupt: boolean, metrics: Metrics): RoundHistoryEntry[] {
+  const actions: GameAction[] = isBankrupt ? [] : [
+    { type: 'acquire', round: 1, details: { businessId: 'test-1', dealStructure: 'cash' } },
+    { type: 'acquire', round: 3, details: { businessId: 'test-2', dealStructure: 'bank_debt' } },
+    { type: 'acquire', round: 5, details: { businessId: 'test-3', dealStructure: 'seller_note' } },
+    { type: 'acquire', round: 7, details: { businessId: 'test-sold', dealStructure: 'rollover_equity' } },
+    { type: 'sell', round: 12, details: { businessId: 'test-sold' } },
+    { type: 'start_turnaround', round: 4, details: { businessId: 'test-3', program: 'operational_excellence' } },
+    { type: 'start_turnaround', round: 6, details: { businessId: 'test-2', program: 'revenue_acceleration' } },
+    { type: 'start_turnaround', round: 8, details: { businessId: 'test-1', program: 'margin_recovery' } },
+    { type: 'turnaround_resolved', round: 7, details: { businessId: 'test-3', outcome: 'success' } },
+    { type: 'turnaround_resolved', round: 9, details: { businessId: 'test-2', outcome: 'success' } },
+    { type: 'distribute', round: 10, details: { amount: 5000 } },
+  ];
+
+  return Array.from({ length: rounds }, (_, i) => ({
+    round: i + 1,
+    actions: actions.filter(a => a.round === i + 1),
+    chronicle: null,
+    event: null,
+    metrics: { ...metrics, totalEbitda: metrics.totalEbitda * (0.5 + 0.5 * (i / rounds)) },
+    businessCount: isBankrupt ? 0 : 3,
+    cash: isBankrupt ? -500 : 8000,
+    totalDebt: isBankrupt ? 15000 : 2000,
   }));
 }
 
@@ -203,10 +230,12 @@ export function setupGoTest(variant: GoTestVariant): {
   const fullState = useGameStore.getState();
   const metrics = calculateMetrics(fullState);
   const metricsHistory = makeHistory(round, metrics);
+  const roundHistory = makeRoundHistory(round, isBankrupt, metrics);
 
   useGameStore.setState({
     metrics,
     metricsHistory,
+    roundHistory,
   });
 
   // Calculate scores

@@ -30,8 +30,7 @@ import {
   FEVHeroSection,
   CarryHeroSection,
   CarryWaterfallSection,
-  AccountSignupCTA,
-  AchievementTeaser,
+  ProfileAchievementSection,
   LeaderboardSaveInput,
   GameOverLeaderboard,
   ChallengeShareSection,
@@ -139,7 +138,7 @@ export function GameOverScreen({
   const lpSatisfactionScore = useGameStore(s => s.lpSatisfactionScore);
   const isLoggedIn = useIsLoggedIn();
   const { openAccountModal } = useAuthStore();
-  const [nudgeDismissedThisSession, setNudgeDismissedThisSession] = useState(false);
+
 
   // ── Leaderboard State ──
   const [initials, setInitials] = useState('');
@@ -388,7 +387,7 @@ export function GameOverScreen({
   useEffect(() => {
     if (completionSubmittedRef.current) return;
     completionSubmittedRef.current = true;
-    if (window.location.hash.includes('fo-test')) return;
+    if (window.location.hash.includes('fo-test') || window.location.hash.includes('go-test')) return;
 
     const gameScore = isFundManagerMode ? (peScore?.total ?? 0) : score.total;
     const gameGrade = isFundManagerMode ? (peScore?.grade ?? 'F') : score.grade;
@@ -727,25 +726,10 @@ export function GameOverScreen({
         />
       )}
 
-      {/* ── Section 2: Account Signup CTA ── */}
-      <AccountSignupCTA
-        isLoggedIn={isLoggedIn}
-        canMakeLeaderboard={canMakeLeaderboard}
-        potentialRank={potentialRank}
-        founderEquityValue={founderEquityValue}
-        isBankruptcy={isBankruptcy}
-        isFirstGame={isFirstGame}
-        hasSavedToLeaderboard={hasSaved}
-        score={score}
-        onSignUp={() => openAccountModal()}
-        onDismiss={() => setNudgeDismissedThisSession(true)}
-        isDismissed={nudgeDismissedThisSession}
-      />
-
-      {/* ── Section 3: Achievement Teaser (shown even in bankruptcy per Peter's decision) ── */}
-      <AchievementTeaser
-        achievements={earnedAchievements.map(a => ({ id: a.id, name: a.name, description: a.description, category: a.category }))}
-        totalPossible={ACHIEVEMENT_PREVIEW.length}
+      {/* ── Section 2: Achievements + Profile (merged section) ── */}
+      <ProfileAchievementSection
+        earnedAchievements={earnedAchievements}
+        allAchievements={ACHIEVEMENT_PREVIEW}
         isLoggedIn={isLoggedIn}
         onSignUp={() => openAccountModal()}
       />
