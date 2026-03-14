@@ -386,6 +386,35 @@ export function GameOverScreen({
     trackGameComplete(snapshot);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // ── Achievement Preview (must be above submitGameCompletion so it can reference earnedAchievements) ──
+  const earnedAchievements = useMemo(() => {
+    const initialCapital = DIFFICULTY_CONFIG[difficulty]?.initialCash ?? 20000;
+    const ctx: AchievementContext = {
+      strategyData,
+      score,
+      businesses,
+      exitedBusinesses,
+      totalDebt,
+      totalDistributions,
+      founderEquityValue,
+      difficulty,
+      duration,
+      bankruptRound,
+      isFundManagerMode,
+      carryEarned: carryWaterfallData?.carry,
+      lpSatisfaction: lpSatisfactionScore ?? undefined,
+      initialCapital,
+    };
+    return ACHIEVEMENT_PREVIEW.filter(a => a.check(ctx));
+  }, [strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions, founderEquityValue, difficulty, duration, bankruptRound, isFundManagerMode, carryWaterfallData]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Persist earned achievements to localStorage for cross-game unlock gating
+  useEffect(() => {
+    if (earnedAchievements.length > 0) {
+      saveEarnedAchievements(earnedAchievements.map(a => a.id));
+    }
+  }, [earnedAchievements]);
+
   // ── Auto-submit Completion ──
   const completionSubmittedRef = useRef(false);
   useEffect(() => {
@@ -437,16 +466,7 @@ export function GameOverScreen({
         peakLeverage: Math.round(strategyData.peakLeverage * 10) / 10,
         turnaroundsStarted: strategyData.turnaroundsStarted,
         turnaroundsSucceeded: strategyData.turnaroundsSucceeded,
-        earnedAchievementIds: (() => {
-          const initialCapital = DIFFICULTY_CONFIG[difficulty]?.initialCash ?? 20000;
-          const ctx: AchievementContext = {
-            strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions,
-            founderEquityValue, difficulty, duration, bankruptRound, isFundManagerMode,
-            carryEarned: carryWaterfallData?.carry, lpSatisfaction: lpSatisfactionScore ?? undefined, initialCapital,
-          };
-          const ids = ACHIEVEMENT_PREVIEW.filter(a => a.check(ctx)).map(a => a.id);
-          return ids.length > 0 ? ids : undefined;
-        })(),
+        earnedAchievementIds: earnedAchievements.length > 0 ? earnedAchievements.map(a => a.id) : undefined,
       },
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -645,35 +665,6 @@ export function GameOverScreen({
       setSaving(false);
     }
   };
-
-  // ── Achievement Preview ──
-  const earnedAchievements = useMemo(() => {
-    const initialCapital = DIFFICULTY_CONFIG[difficulty]?.initialCash ?? 20000;
-    const ctx: AchievementContext = {
-      strategyData,
-      score,
-      businesses,
-      exitedBusinesses,
-      totalDebt,
-      totalDistributions,
-      founderEquityValue,
-      difficulty,
-      duration,
-      bankruptRound,
-      isFundManagerMode,
-      carryEarned: carryWaterfallData?.carry,
-      lpSatisfaction: lpSatisfactionScore ?? undefined,
-      initialCapital,
-    };
-    return ACHIEVEMENT_PREVIEW.filter(a => a.check(ctx));
-  }, [strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions, founderEquityValue, difficulty, duration, bankruptRound, isFundManagerMode, carryWaterfallData]);
-
-  // Persist earned achievements to localStorage for cross-game unlock gating
-  useEffect(() => {
-    if (earnedAchievements.length > 0) {
-      saveEarnedAchievements(earnedAchievements.map(a => a.id));
-    }
-  }, [earnedAchievements]);
 
   // ── Derived ──
   const isBankruptcy = !!bankruptRound;

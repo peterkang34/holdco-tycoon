@@ -970,7 +970,7 @@ export function AllocatePhase({
                         <span className="font-mono">
                           {formatMoney(structure.bankDebt.amount)} @ {formatPercent(structure.bankDebt.rate)}
                           {lendingSynergy > 0 && structure.bankDebt.rate < interestRate && (
-                            <span className="ml-1.5 text-[10px] text-emerald-400" title={`Private credit synergy: -${(lendingSynergy * 100).toFixed(2)}% on bank debt`} aria-label={`Private credit synergy: ${(lendingSynergy * 100).toFixed(2)} percent discount on bank debt`}>Synergy</span>
+                            <span className="ml-1.5 text-[11px] text-emerald-400 bg-emerald-400/10 px-1 py-0.5 rounded" title={`Private credit synergy: -${(lendingSynergy * 100).toFixed(2)}% on bank debt`} aria-label={`Private credit synergy: ${(lendingSynergy * 100).toFixed(2)} percent discount on bank debt`}>-{(lendingSynergy * 100).toFixed(1)}%</span>
                           )}
                         </span>
                       </div>

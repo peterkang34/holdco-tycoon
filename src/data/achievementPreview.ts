@@ -47,7 +47,7 @@ export interface AchievementDef {
   name: string;
   description: string;
   emoji: string;
-  category: 'milestone' | 'feat' | 'mastery' | 'creative' | 'mode';
+  category: 'milestone' | 'feat' | 'mastery' | 'mode';
   check: (ctx: AchievementContext) => boolean;
   unlocks?: string; // Content gated behind this achievement (e.g., prestige sectors)
 }

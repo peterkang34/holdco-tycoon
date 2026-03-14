@@ -7,7 +7,11 @@ const ACHIEVEMENTS_KEY = 'holdco-tycoon-achievements';
 export function getEarnedAchievementIds(): string[] {
   try {
     const raw = localStorage.getItem(ACHIEVEMENTS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    // Validate: must be an array of strings (guard against corruption)
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((id): id is string => typeof id === 'string');
   } catch {
     return [];
   }

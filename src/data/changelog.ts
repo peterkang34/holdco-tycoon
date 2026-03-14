@@ -19,7 +19,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         heading: 'Private Credit Sector (Prestige Unlock)',
         items: [
-          'New prestige sector: Private Credit & Lending — 4 sub-types with unique platform recipes.',
+          'New prestige sector: Private Credit & Lending — 6 sub-types with unique platform recipes.',
           'Earn the "Clean Sheet" achievement (zero anti-patterns, B+ grade) to unlock it.',
           'Owning Private Credit businesses gives a bank debt rate discount on all new deals (up to -1.50%).',
           'First-ever 3-sector platform recipe: Financial Services Conglomerate (Private Credit + Wealth Management + Insurance).',
@@ -28,7 +28,7 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         heading: 'Achievements System',
         items: [
-          '21 achievements across 5 categories — milestones, feats, mastery, creative, and mode-specific.',
+          '21 achievements across 4 categories — milestones, feats, mastery, and mode-specific.',
           'Achievements are now visible in My Stats — see what you\'ve earned across all games.',
           'Community leaderboard shows achievement badges for each player.',
           'Per-game achievement breakdown in game history details.',
@@ -45,7 +45,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         items: [
           'FEV is now the hero — your Founder Equity Value (or Carry Earned in PE mode) is front and center.',
           'Collapsible FEV breakdown — see exactly how portfolio value, debt, ownership, and multipliers produce your final number.',
-          'Unified achievements section — see what you unlocked this game with unique emoji icons, and browse all 20 achievements in a full-screen modal.',
+          'Unified achievements section — see what you unlocked this game with unique emoji icons, and browse all 21 achievements in a full-screen modal.',
           'Score breakdown demoted — your grade is still there, now with per-dimension tips to help you improve.',
         ],
       },

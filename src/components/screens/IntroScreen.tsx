@@ -555,7 +555,7 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
                     <p className="text-[11px] text-text-muted/60 mt-1">
                       {needsAccount
                         ? 'Achievement earned! Sign in to unlock this sector.'
-                        : 'Earn the Clean Sheet achievement to unlock this sector.'}
+                        : 'Earn the Clean Sheet achievement to unlock — finish a game with zero anti-patterns and a B grade or better.'}
                     </p>
                   </div>
                 );
