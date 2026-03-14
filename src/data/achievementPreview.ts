@@ -17,6 +17,10 @@ export interface AchievementContext {
     archetype: string;
     antiPatterns: string[];
     sophisticationScore: number;
+    // Phase 2B additions
+    sharedServicesActive: number;
+    allTimeSectorCount: number;
+    recessionAcquisitionCount: number;
   };
   score: {
     total: number;
@@ -36,6 +40,7 @@ export interface AchievementContext {
   difficulty: string;
   duration: string;
   bankruptRound?: number;
+  hasRestructured: boolean;
   isFundManagerMode: boolean;
   carryEarned?: number;
   lpSatisfaction?: number;
@@ -47,7 +52,7 @@ export interface AchievementDef {
   name: string;
   description: string;
   emoji: string;
-  category: 'milestone' | 'feat' | 'mastery' | 'mode';
+  category: 'milestone' | 'feat' | 'mastery' | 'creative' | 'mode';
   check: (ctx: AchievementContext) => boolean;
 }
 
@@ -88,10 +93,13 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
   {
     id: 'debt_free',
     name: 'Debt Free',
-    description: 'End the game with zero debt and no bankruptcy.',
+    description: 'End the game with zero debt (including seller notes) and no bankruptcy.',
     emoji: '🕊️',
     category: 'milestone',
-    check: (ctx) => ctx.totalDebt === 0 && !ctx.bankruptRound,
+    check: (ctx) =>
+      ctx.totalDebt === 0 &&
+      !ctx.bankruptRound &&
+      ctx.businesses.every(b => (b.sellerNoteBalance ?? 0) === 0),
   },
   {
     id: 'first_distribution',
@@ -152,14 +160,13 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
       ),
   },
   {
-    id: 'the_contrarian',
-    name: 'The Contrarian',
-    description: 'Make 3+ acquisitions and earn a B grade or better.',
-    emoji: '🧠',
+    id: 'shared_services_maven',
+    name: 'Shared Services Maven',
+    description: 'Activate all 3 shared services with 5+ active businesses.',
+    emoji: '🔗',
     category: 'feat',
     check: (ctx) =>
-      ctx.strategyData.totalAcquisitions >= 3 &&
-      ['S', 'A', 'B'].includes(ctx.score.grade),
+      ctx.strategyData.sharedServicesActive >= 3 && ctx.strategyData.activeCount >= 5,
   },
 
   // ── Mastery ──
@@ -202,6 +209,88 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
     check: (ctx) =>
       ctx.initialCapital > 0 && ctx.founderEquityValue >= ctx.initialCapital * 10,
   },
+  {
+    id: 'clean_sheet',
+    name: 'Clean Sheet',
+    description: 'Complete a game with zero anti-patterns and earn at least a B grade.',
+    emoji: '📋',
+    category: 'mastery',
+    check: (ctx) =>
+      ctx.strategyData.antiPatterns.length === 0 &&
+      ['S', 'A', 'B'].includes(ctx.score.grade),
+  },
+  {
+    id: 'sophistication_100',
+    name: 'Master Operator',
+    description: 'Reach the maximum sophistication score (100).',
+    emoji: '🎓',
+    category: 'mastery',
+    check: (ctx) => ctx.strategyData.sophisticationScore === 100,
+  },
+
+  // ── Creative Play ──
+  {
+    id: 'the_contrarian',
+    name: 'The Contrarian',
+    description: 'Make 3+ acquisitions and earn a B grade or better.',
+    emoji: '🧠',
+    category: 'creative',
+    check: (ctx) =>
+      ctx.strategyData.totalAcquisitions >= 3 &&
+      ['S', 'A', 'B'].includes(ctx.score.grade),
+  },
+  {
+    id: 'recession_buyer',
+    name: 'Recession Buyer',
+    description: 'Make 2+ acquisitions during recessions and earn a B grade.',
+    emoji: '🌧️',
+    category: 'creative',
+    check: (ctx) =>
+      ctx.strategyData.recessionAcquisitionCount >= 2 &&
+      ['S', 'A', 'B'].includes(ctx.score.grade),
+  },
+  {
+    id: 'the_minimalist',
+    name: 'The Minimalist',
+    description: 'Complete a game with 3 or fewer total acquisitions and earn a B grade.',
+    emoji: '🧘',
+    category: 'creative',
+    check: (ctx) =>
+      ctx.strategyData.totalAcquisitions <= 3 &&
+      ctx.strategyData.totalAcquisitions >= 1 &&
+      ['S', 'A', 'B'].includes(ctx.score.grade),
+  },
+  {
+    id: 'diversification_play',
+    name: 'Diversification Play',
+    description: 'Own active businesses across 6+ sectors and earn a B grade or better.',
+    emoji: '🌈',
+    category: 'creative',
+    check: (ctx) =>
+      ctx.strategyData.sectorIds.length >= 6 &&
+      ['S', 'A', 'B'].includes(ctx.score.grade),
+  },
+  {
+    id: 'phoenix_rising',
+    name: 'Phoenix Rising',
+    description: 'Restructure and still earn a C grade or better.',
+    emoji: '🔥',
+    category: 'creative',
+    check: (ctx) =>
+      ctx.hasRestructured &&
+      ['S', 'A', 'B', 'C'].includes(ctx.score.grade),
+  },
+  {
+    id: 'no_leverage',
+    name: 'No Leverage',
+    description: 'Complete a game without ever using leverage and earn a C grade or better.',
+    emoji: '🪶',
+    category: 'creative',
+    check: (ctx) =>
+      ctx.strategyData.peakLeverage === 0 &&
+      !ctx.bankruptRound &&
+      ['S', 'A', 'B', 'C'].includes(ctx.score.grade),
+  },
 
   // ── Mode-Specific ──
   {
@@ -239,15 +328,5 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
     category: 'mode',
     check: (ctx) =>
       ctx.duration === 'quick' && ['S', 'A', 'B'].includes(ctx.score.grade),
-  },
-  {
-    id: 'clean_sheet',
-    name: 'Clean Sheet',
-    description: 'Complete a game with zero anti-patterns and earn at least a B grade.',
-    emoji: '📋',
-    category: 'mastery',
-    check: (ctx) =>
-      ctx.strategyData.antiPatterns.length === 0 &&
-      ['S', 'A', 'B'].includes(ctx.score.grade),
   },
 ];

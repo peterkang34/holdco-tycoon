@@ -6,10 +6,11 @@ const CATEGORY_META: Record<string, { label: string; flavor: string }> = {
   milestone: { label: 'MILESTONES', flavor: 'The fundamentals. Every great holdco starts here.' },
   feat: { label: 'FEATS', flavor: 'Distinctive plays that show real skill.' },
   mastery: { label: 'MASTERY', flavor: 'The elite tier. Few reach it.' },
+  creative: { label: 'CREATIVE PLAY', flavor: 'Unusual strategies that prove there\'s more than one way to build a holdco.' },
   mode: { label: 'CHALLENGE MODES', flavor: 'Prove yourself under different conditions.' },
 };
 
-const CATEGORY_ORDER = ['milestone', 'feat', 'mastery', 'mode'];
+const CATEGORY_ORDER = ['milestone', 'feat', 'mastery', 'creative', 'mode'];
 
 interface AchievementBrowserModalProps {
   isOpen: boolean;
@@ -53,7 +54,7 @@ export function AchievementBrowserModal({
         {!isLoggedIn && (
           <div className="rounded-xl p-4 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20">
             <p className="text-sm text-text-secondary mb-3">
-              Create a free account to collect achievements, track your progress across games, and unlock new sectors and gameplay events.
+              Create a free account to track achievements, unlock new sectors and platform recipes, and compete on the leaderboard.
             </p>
             <button
               onClick={onSignUp}

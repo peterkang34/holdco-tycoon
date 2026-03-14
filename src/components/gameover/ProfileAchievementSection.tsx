@@ -64,7 +64,7 @@ export function ProfileAchievementSection({
         {/* Browse all + unlock info */}
         <div className="pt-3 border-t border-white/10">
           <p className="text-sm text-text-secondary mb-2">
-            Achievements unlock new sectors, deal structures, and gameplay events.
+            Achievements unlock new sectors and platform recipes.
           </p>
           <button
             onClick={() => setShowBrowser(true)}
@@ -78,7 +78,7 @@ export function ProfileAchievementSection({
         {!isLoggedIn && (
           <div className="mt-4 pt-4 border-t border-white/10">
             <p className="text-sm text-text-secondary mb-3">
-              Create a free account to collect achievements, track your game history, and unlock new gameplay.
+              Create a free account to track achievements, unlock new sectors, and compete on the leaderboard.
             </p>
             <div className="flex gap-3">
               <button

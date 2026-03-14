@@ -28,7 +28,8 @@ export const CHANGELOG: ChangelogEntry[] = [
       {
         heading: 'Achievements System',
         items: [
-          '21 achievements across 4 categories — milestones, feats, mastery, and mode-specific.',
+          '28 achievements across 5 categories — milestones, feats, mastery, creative play, and mode-specific.',
+          'New Creative Play category rewards unconventional strategies — Minimalist, Diversification Play, Phoenix Rising, No Leverage, and more.',
           'Achievements are now visible in My Stats — see what you\'ve earned across all games.',
           'Community leaderboard shows achievement badges for each player.',
           'Per-game achievement breakdown in game history details.',

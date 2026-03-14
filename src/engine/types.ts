@@ -748,6 +748,8 @@ export interface LeaderboardStrategy {
   lpSatisfaction?: number;
   smartExitMoic?: number;
   earnedAchievementIds?: string[];
+  // Phase 2B additions
+  recessionAcquisitionCount?: number;
 }
 
 export interface LeaderboardEntry {

@@ -79,9 +79,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const ALL_ACHIEVEMENT_IDS = [
       'first_acquisition', 'portfolio_builder', 'exit_strategist', 'platform_architect',
       'debt_free', 'first_distribution', 'turnaround_artist', 'deal_architect',
-      'roll_up_machine', 'sector_specialist', 'smart_exit', 'the_contrarian',
+      'roll_up_machine', 'sector_specialist', 'smart_exit', 'shared_services_maven',
       'the_compounder', 's_tier', 'balanced_allocator', 'value_creation_machine',
-      'carry_king', 'lp_whisperer', 'hard_mode_hero', 'speed_run', 'clean_sheet',
+      'clean_sheet', 'sophistication_100',
+      'the_contrarian', 'recession_buyer', 'the_minimalist', 'diversification_play',
+      'phoenix_rising', 'no_leverage',
+      'carry_king', 'lp_whisperer', 'hard_mode_hero', 'speed_run',
     ];
 
     const missingAchievements = ALL_ACHIEVEMENT_IDS.filter(id => !earnedIds.includes(id));

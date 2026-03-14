@@ -320,6 +320,17 @@ export function GameOverScreen({
     const proactiveOutreachUses = allActions.filter(a => a.type === 'proactive_outreach').length;
     const smbBrokerUses = allActions.filter(a => a.type === 'smb_broker').length;
 
+    // Recession acquisition count: acquisitions made in rounds with recession/crisis events
+    const recessionRounds = new Set<number>();
+    for (const rh of state.roundHistory) {
+      if (rh.event && (rh.event.type === 'global_recession' || rh.event.type === 'global_financial_crisis')) {
+        recessionRounds.add(rh.round);
+      }
+    }
+    const recessionAcquisitionCount = allActions.filter(a =>
+      acquireTypes.has(a.type) && a.round != null && recessionRounds.has(a.round)
+    ).length;
+
     return {
       totalAcquisitions, totalSells, turnaroundsStarted, turnaroundsSucceeded, turnaroundsFailed,
       peakLeverage, peakDistressLevel, sectorIds, dealStructureTypes, rolloverEquityCount,
@@ -327,6 +338,9 @@ export function GameOverScreen({
       endingSubTypes, avgEndingEbitda, endingConstruction,
       maSourcingTier: state.maSourcing.tier,
       sourceDealUses, proactiveOutreachUses, smbBrokerUses,
+      sharedServicesActive,
+      allTimeSectorCount: allTimeSectorIds.length,
+      recessionAcquisitionCount,
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -407,6 +421,7 @@ export function GameOverScreen({
       difficulty,
       duration,
       bankruptRound,
+      hasRestructured,
       isFundManagerMode,
       carryEarned: carryWaterfallData?.carry,
       lpSatisfaction: lpSatisfactionScore ?? undefined,
@@ -478,6 +493,8 @@ export function GameOverScreen({
         totalDistributions: Math.round(isFundManagerMode ? (lpDistributions || 0) : totalDistributions),
         totalDebt: Math.round(totalDebt),
         activeCount: strategyData.activeCount,
+        sharedServicesActive: strategyData.sharedServicesActive,
+        recessionAcquisitionCount: strategyData.recessionAcquisitionCount > 0 ? strategyData.recessionAcquisitionCount : undefined,
         lpSatisfaction: isFundManagerMode ? (lpSatisfactionScore ?? undefined) : undefined,
         smartExitMoic: (() => {
           const best = exitedBusinesses

@@ -57,6 +57,11 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
   // value_creation_machine: FEV >= 10x initial capital
   if (initialCapital > 0 && founderEquityValue >= initialCapital * 10) earned.push('value_creation_machine');
 
+  // phoenix_rising: restructured + C+ grade
+  if (game.has_restructured === true && ['S', 'A', 'B', 'C'].includes(grade ?? '')) {
+    earned.push('phoenix_rising');
+  }
+
   // ── Achievements from score breakdown columns (works for games with score data) ──
 
   // the_compounder: Portfolio ROIC >= 12
@@ -85,6 +90,10 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
     const carryEarned = (strategy.carryEarned as number) ?? 0;
     const lpSatisfaction = (strategy.lpSatisfaction as number) ?? -1;
     const smartExitMoic = (strategy.smartExitMoic as number) ?? -1;
+    const peakLeverage = (strategy.peakLeverage as number) ?? -1;
+    const sophisticationScore = (strategy.sophisticationScore as number) ?? -1;
+    const sharedServicesActive = (strategy.sharedServicesActive as number) ?? -1;
+    const recessionAcquisitionCount = (strategy.recessionAcquisitionCount as number) ?? -1;
 
     // first_acquisition from strategy (more precise)
     if (totalAcquisitions >= 1 && !earned.includes('first_acquisition')) earned.push('first_acquisition');
@@ -108,22 +117,20 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
     if (dealStructureTypes && Object.keys(dealStructureTypes).length >= 4) earned.push('deal_architect');
 
     // sector_specialist: 3+ active businesses all in same sector
-    // sectorIds now tracks ACTIVE sectors only (fixed in GameOverScreen)
     if (sectorIds && sectorIds.length === 1 && activeCount >= 3) earned.push('sector_specialist');
 
-    // the_contrarian: 3+ ACQUISITIONS (not active count) and B+ grade
+    // the_contrarian: 3+ ACQUISITIONS and B+ grade
     if (totalAcquisitions >= 3 && ['S', 'A', 'B'].includes(grade ?? '')) {
       if (!earned.includes('the_contrarian')) earned.push('the_contrarian');
     }
 
-    // debt_free: zero debt at game end and no bankruptcy
+    // debt_free: zero debt at game end and no bankruptcy (totalDebt excludes seller notes, so this is approximate)
     if (totalDebt === 0 && game.has_restructured !== true) earned.push('debt_free');
 
     // smart_exit: sold a business at 3x+ MOIC
     if (smartExitMoic >= 3) earned.push('smart_exit');
 
     // clean_sheet: zero anti-patterns + B+ grade
-    // antiPatterns may be undefined (omitted) when empty — treat as zero anti-patterns
     const hasAntiPatterns = Array.isArray(antiPatterns) ? antiPatterns.length > 0 : false;
     if (!hasAntiPatterns && ['S', 'A', 'B'].includes(grade ?? '')) {
       earned.push('clean_sheet');
@@ -134,6 +141,30 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
 
     // lp_whisperer: 90%+ LP satisfaction in PE mode
     if (isFundManager && lpSatisfaction >= 90) earned.push('lp_whisperer');
+
+    // shared_services_maven: all 3 SS active + 5 businesses
+    if (sharedServicesActive >= 3 && activeCount >= 5) earned.push('shared_services_maven');
+
+    // sophistication_100: max sophistication score
+    if (sophisticationScore === 100) earned.push('sophistication_100');
+
+    // the_minimalist: 3 or fewer acquisitions + B grade
+    if (totalAcquisitions >= 1 && totalAcquisitions <= 3 && ['S', 'A', 'B'].includes(grade ?? '')) {
+      earned.push('the_minimalist');
+    }
+
+    // diversification_play: 6+ active sectors
+    if (sectorIds && sectorIds.length >= 6) earned.push('diversification_play');
+
+    // no_leverage: zero peak leverage + C+ grade
+    if (peakLeverage === 0 && game.has_restructured !== true && ['S', 'A', 'B', 'C'].includes(grade ?? '')) {
+      earned.push('no_leverage');
+    }
+
+    // recession_buyer: 3+ acquisitions during recessions + B grade
+    if (recessionAcquisitionCount >= 3 && ['S', 'A', 'B'].includes(grade ?? '')) {
+      earned.push('recession_buyer');
+    }
 
     // If the game already has earnedAchievementIds, include them directly
     // (this is the definitive source — computed at game-over with full context)
