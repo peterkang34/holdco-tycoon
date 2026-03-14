@@ -8,6 +8,8 @@ interface LeaderboardSaveInputProps {
   saveError: boolean;
   onSave: () => void;
   leaderboardLoading: boolean;
+  isLoggedIn: boolean;
+  onSignUp: () => void;
 }
 
 export function LeaderboardSaveInput({
@@ -20,11 +22,34 @@ export function LeaderboardSaveInput({
   saveError,
   onSave,
   leaderboardLoading,
+  isLoggedIn,
+  onSignUp,
 }: LeaderboardSaveInputProps) {
   if (hasSaved) {
     return (
-      <div className="card mb-6 border-accent/30 text-center">
-        <p className="text-accent font-bold">Score saved to global leaderboard!</p>
+      <div className="card mb-6 border-accent/30">
+        <div className="text-center">
+          <p className="text-accent font-bold text-lg mb-1">Score saved to global leaderboard!</p>
+          <p className="text-text-muted text-sm">Rank #{potentialRank}</p>
+        </div>
+
+        {/* Post-save signup nudge for anonymous users */}
+        {!isLoggedIn && (
+          <div className="mt-4 pt-4 border-t border-white/10">
+            <p className="text-sm text-text-secondary text-center mb-3">
+              Right now your entry says "Anonymous." Create a free account to put your name on the board and start unlocking achievements.
+            </p>
+            <button
+              onClick={onSignUp}
+              className="btn-primary w-full min-h-[44px] text-sm font-medium"
+            >
+              Create Account — Keep Your Rank
+            </button>
+            <p className="text-xs text-text-muted mt-2 text-center">
+              Google or email. Takes 10 seconds.
+            </p>
+          </div>
+        )}
       </div>
     );
   }

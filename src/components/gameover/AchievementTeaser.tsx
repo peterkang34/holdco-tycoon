@@ -44,7 +44,7 @@ export function AchievementTeaser({
             >
               <div className="flex items-start gap-2">
                 <span className="text-sm mt-0.5 shrink-0" role="img" aria-label="unlocked">
-                  &#x1F512;
+                  &#x1F513;
                 </span>
                 <div>
                   <p className="text-sm font-bold">{achievement.name}</p>
@@ -56,27 +56,24 @@ export function AchievementTeaser({
         </div>
       )}
 
-      {/* Footer */}
-      {!isLoggedIn ? (
-        <div className="pt-3 border-t border-white/10">
+      {/* Footer — what achievements unlock */}
+      <div className="pt-3 border-t border-white/10">
+        <p className="text-sm text-text-secondary mb-1">
+          Achievements unlock new sectors, deal structures, and gameplay events.
+        </p>
+        {!isLoggedIn ? (
+          <button
+            onClick={onSignUp}
+            className="text-sm text-accent hover:text-accent-secondary inline-flex items-center min-h-[44px] font-medium"
+          >
+            Sign up to start tracking achievements &rarr;
+          </button>
+        ) : (
           <p className="text-xs text-text-muted">
-            Achievements are saved to your player profile.{' '}
-            <button
-              onClick={onSignUp}
-              className="text-accent hover:text-accent-secondary inline-flex items-center min-h-[44px]"
-            >
-              Sign up to start tracking &rarr;
-            </button>
+            Full tracking is coming soon — you'll get credit for games you play now.
           </p>
-        </div>
-      ) : (
-        <div className="pt-3 border-t border-white/10">
-          <p className="text-xs text-text-muted">
-            {count} achievement{count !== 1 ? 's' : ''} unlocked this game. Full tracking is coming
-            soon — you'll get credit for this game automatically.
-          </p>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

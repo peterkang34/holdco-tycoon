@@ -710,6 +710,23 @@ export function GameOverScreen({
         />
       )}
 
+      {/* ── Section 1.5: Leaderboard Save (immediately after hero, high visibility) ── */}
+      {!isBankruptcy && (
+        <LeaderboardSaveInput
+          canMakeLeaderboard={canMakeLeaderboard}
+          potentialRank={potentialRank}
+          initials={initials}
+          onInitialsChange={setInitials}
+          hasSaved={hasSaved}
+          saving={saving}
+          saveError={saveError}
+          onSave={handleSaveScore}
+          leaderboardLoading={leaderboardLoading}
+          isLoggedIn={isLoggedIn}
+          onSignUp={() => openAccountModal()}
+        />
+      )}
+
       {/* ── Section 2: Account Signup CTA ── */}
       <AccountSignupCTA
         isLoggedIn={isLoggedIn}
@@ -718,6 +735,7 @@ export function GameOverScreen({
         founderEquityValue={founderEquityValue}
         isBankruptcy={isBankruptcy}
         isFirstGame={isFirstGame}
+        hasSavedToLeaderboard={hasSaved}
         score={score}
         onSignUp={() => openAccountModal()}
         onDismiss={() => setNudgeDismissedThisSession(true)}
@@ -743,18 +761,7 @@ export function GameOverScreen({
             />
           )}
 
-          {/* Section 4b: Leaderboard Save + Global Leaderboard */}
-          <LeaderboardSaveInput
-            canMakeLeaderboard={canMakeLeaderboard}
-            potentialRank={potentialRank}
-            initials={initials}
-            onInitialsChange={setInitials}
-            hasSaved={hasSaved}
-            saving={saving}
-            saveError={saveError}
-            onSave={handleSaveScore}
-            leaderboardLoading={leaderboardLoading}
-          />
+          {/* Section 4b: Global Leaderboard */}
           <GameOverLeaderboard
             allEntries={leaderboard}
             loading={leaderboardLoading}

@@ -7,6 +7,7 @@ interface AccountSignupCTAProps {
   founderEquityValue: number;
   isBankruptcy: boolean;
   isFirstGame: boolean;
+  hasSavedToLeaderboard: boolean;
   score: { grade: string };
   onSignUp: () => void;
   onDismiss: () => void;
@@ -17,6 +18,23 @@ function isGoodGrade(grade: string): boolean {
   return grade === 'S' || grade === 'A' || grade === 'B';
 }
 
+const BENEFIT_LIST = (
+  <ul className="text-sm text-text-secondary space-y-2">
+    <li className="flex items-start gap-2">
+      <span className="text-accent mt-0.5">&#x2022;</span>
+      <span>Unlock achievements that open new sectors, deal types, and gameplay events</span>
+    </li>
+    <li className="flex items-start gap-2">
+      <span className="text-accent mt-0.5">&#x2022;</span>
+      <span>Your name on the leaderboard permanently</span>
+    </li>
+    <li className="flex items-start gap-2">
+      <span className="text-accent mt-0.5">&#x2022;</span>
+      <span>Game history, stats, and progress tracking across sessions</span>
+    </li>
+  </ul>
+);
+
 export function AccountSignupCTA({
   isLoggedIn,
   canMakeLeaderboard,
@@ -24,6 +42,7 @@ export function AccountSignupCTA({
   founderEquityValue,
   isBankruptcy,
   isFirstGame,
+  hasSavedToLeaderboard,
   score,
   onSignUp,
   onDismiss,
@@ -31,18 +50,18 @@ export function AccountSignupCTA({
 }: AccountSignupCTAProps) {
   if (isDismissed) return null;
 
+  // If user just saved to leaderboard, the LeaderboardSaveInput already shows a signup nudge
+  // Don't double up — skip the CTA
+  if (hasSavedToLeaderboard && !isLoggedIn) return null;
+
   // Signed-in variant: compact profile card
   if (isLoggedIn) {
     return (
       <div className="card mb-6">
         <p className="text-xs font-bold tracking-widest text-text-muted mb-3">YOUR PROFILE</p>
-        <p className="text-sm text-text-secondary">Achievements: Coming soon</p>
-        <button
-          onClick={() => console.log('[AccountSignupCTA] View Full Profile clicked')}
-          className="text-sm text-accent hover:text-accent-secondary mt-3 inline-flex items-center min-h-[44px]"
-        >
-          View Full Profile &rarr;
-        </button>
+        <p className="text-sm text-text-secondary">
+          Achievements you earn unlock new sectors, deal types, and gameplay events. Full tracking is coming soon — you'll get credit for games you play now.
+        </p>
       </div>
     );
   }
@@ -55,61 +74,36 @@ export function AccountSignupCTA({
     header = 'Every great allocator has a few bad years';
     body = (
       <p className="text-sm text-text-secondary">
-        Create an account to track your progress. Your next run starts with lessons from this one.
+        Create an account to track your progress and start unlocking achievements. Achievements open new sectors, deal types, and gameplay events — your next run starts with more options.
       </p>
-    );
-  } else if (isFirstGame) {
-    header = 'Create Your Player Profile';
-    body = (
-      <ul className="text-sm text-text-secondary space-y-2">
-        <li className="flex items-start gap-2">
-          <span className="text-accent mt-0.5">&#x2022;</span>
-          <span>Achievement tracking (unlock new sectors and recipes)</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-accent mt-0.5">&#x2022;</span>
-          <span>Your name on the leaderboard permanently</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-accent mt-0.5">&#x2022;</span>
-          <span>Game history and stats across sessions</span>
-        </li>
-      </ul>
     );
   } else if (canMakeLeaderboard) {
-    header = `You made the leaderboard at #${potentialRank}`;
+    header = `You ranked #${potentialRank} on the leaderboard`;
     body = (
-      <p className="text-sm text-text-secondary">
-        Create an account to put your name on it. Right now it just says &ldquo;Anonymous.&rdquo;
-      </p>
+      <>
+        <p className="text-sm text-text-secondary mb-3">
+          Create an account to put your name on the board. Right now it says "Anonymous."
+        </p>
+        {BENEFIT_LIST}
+      </>
     );
   } else if (isGoodGrade(score.grade)) {
     const fevDisplay = formatMoney(founderEquityValue);
     header = `Your ${fevDisplay} holdco deserves a home`;
     body = (
-      <p className="text-sm text-text-secondary">
-        Create a free account to save your stats, claim leaderboard rank #{potentialRank}, and start tracking achievements.
-      </p>
+      <>
+        <p className="text-sm text-text-secondary mb-3">
+          Create a free account to save your stats and start earning achievements that unlock new gameplay.
+        </p>
+        {BENEFIT_LIST}
+      </>
     );
-  } else {
-    // Default — same as first game
+  } else if (isFirstGame) {
     header = 'Create Your Player Profile';
-    body = (
-      <ul className="text-sm text-text-secondary space-y-2">
-        <li className="flex items-start gap-2">
-          <span className="text-accent mt-0.5">&#x2022;</span>
-          <span>Achievement tracking (unlock new sectors and recipes)</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-accent mt-0.5">&#x2022;</span>
-          <span>Your name on the leaderboard permanently</span>
-        </li>
-        <li className="flex items-start gap-2">
-          <span className="text-accent mt-0.5">&#x2022;</span>
-          <span>Game history and stats across sessions</span>
-        </li>
-      </ul>
-    );
+    body = BENEFIT_LIST;
+  } else {
+    header = 'Create Your Player Profile';
+    body = BENEFIT_LIST;
   }
 
   return (
