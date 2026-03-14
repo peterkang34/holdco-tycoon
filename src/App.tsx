@@ -18,17 +18,20 @@ import { ClaimGamesModal } from './components/ui/ClaimGamesModal';
 import { PrivacyPolicyModal } from './components/ui/PrivacyPolicyModal';
 import { DeleteAccountModal } from './components/ui/DeleteAccountModal';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { setupGoTest, getGoTestVariant } from './utils/goTestSetup';
 
 type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard';
 
 function App() {
   const [isAdmin, setIsAdmin] = useState(window.location.hash === '#/admin');
   const [isFoTest, setIsFoTest] = useState(window.location.hash === '#/fo-test');
+  const [isGoTest, setIsGoTest] = useState(window.location.hash === '#/go-test');
 
   useEffect(() => {
     const onHash = () => {
       setIsAdmin(window.location.hash === '#/admin');
       setIsFoTest(window.location.hash === '#/fo-test');
+      setIsGoTest(window.location.hash === '#/go-test');
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
@@ -126,6 +129,12 @@ function App() {
     // #/fo-test shortcut — set up mock FO-eligible state and show bridge
     if (isFoTest) {
       return; // handled in render
+    }
+    // #/go-test shortcut — set up mock game state and show game over screen
+    if (isGoTest) {
+      setupGoTest(getGoTestVariant());
+      setScreen('gameOver');
+      return;
     }
     const currentState = useGameStore.getState();
     if (holdcoName && round > 0 && !gameOver) {
