@@ -44,7 +44,7 @@ import {
   getSizeRatioTier,
   calculateIntegrationGrowthPenalty,
 } from '../../businesses';
-import { generateDealStructures, executeDealStructure } from '../../deals';
+import { generateDealStructures, executeDealStructure, calculateLendingSynergyDiscount } from '../../deals';
 import { calculateFinalScore, calculateEnterpriseValue, calculateFounderEquityValue } from '../../scoring';
 import { getDistressRestrictions } from '../../distress';
 import { createRngStreams } from '../../rng';
@@ -651,6 +651,20 @@ function simulateAllocatePhase(
     state.requiresRestructuring || state.covenantBreachRounds >= 1,
   );
 
+  // Check for prestige sector deals in pipeline
+  if (pipeline.some(d => d.business.sectorId === 'privateCredit')) {
+    coverage.record('prestige_sector_in_pipeline', state.round);
+  }
+
+  // Calculate lending synergy for deal structures
+  const lendingSynergy = calculateLendingSynergyDiscount(
+    state.businesses,
+    state.creditTighteningRoundsRemaining > 0,
+  );
+  if (lendingSynergy > 0) {
+    coverage.record('lending_synergy_applied', state.round);
+  }
+
   // Early-game safety net: Normal mode, rounds 1-3, check for brokered micro deals
   if (
     state.difficulty === 'normal' &&
@@ -742,6 +756,7 @@ function simulateAllocatePhase(
       gameState.duration,
       deal.sellerArchetype,
       gameState.ipoState ?? undefined,
+      lendingSynergy,
     );
 
     // Find preferred structure or fall back to first affordable
@@ -788,6 +803,7 @@ function simulateAllocatePhase(
       gameState.requiresRestructuring || gameState.covenantBreachRounds >= 1,
       gameState.maSourcing.tier, gameState.duration, deal.sellerArchetype,
       gameState.ipoState ?? undefined,
+      lendingSynergy,
     );
     const structure = structures.find(s => gameState.cash >= s.cashRequired);
     if (!structure) continue;

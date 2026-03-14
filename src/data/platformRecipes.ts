@@ -432,7 +432,7 @@ export const PLATFORM_RECIPES: PlatformRecipe[] = [
     bonuses: { marginBoost: 0.03, growthBoost: 0.04, multipleExpansion: 1.5, recessionResistanceReduction: 0.85 },
     integrationCostFraction: 0.20,
     description: 'Technology-driven lending across multiple products. Shared origination, underwriting, and servicing.',
-    realWorldExample: 'LendingClub post-Radius, Clearco, Pipe',
+    realWorldExample: 'OnDeck (Enova), Credibly, Kapitus',
   },
 
   // ═══ CROSS-SECTOR PLATFORMS ═══
@@ -538,7 +538,7 @@ export const PLATFORM_RECIPES: PlatformRecipe[] = [
     bonuses: { marginBoost: 0.06, growthBoost: 0.04, multipleExpansion: 2.5, recessionResistanceReduction: 0.65 },
     integrationCostFraction: 0.30,
     description: 'The holy grail: lending, advising, and insuring under one roof. Total financial services integration.',
-    realWorldExample: 'Berkshire Hathaway, Markel Corporation, Leucadia (Jefferies)',
+    realWorldExample: 'Berkshire Hathaway, Allianz Group, Fairfax Financial',
   },
 ];
 

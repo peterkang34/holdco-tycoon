@@ -101,6 +101,10 @@ export const FEATURE_REGISTRY = {
   filler_event_choice: 'filler_event_choice',
   early_game_safety_net: 'early_game_safety_net',
 
+  // Private Credit & Synergy (2)
+  lending_synergy_applied: 'lending_synergy_applied',
+  prestige_sector_in_pipeline: 'prestige_sector_in_pipeline',
+
   // PE Fund Mode (9)
   fund_mode_started: 'fund_mode_started',
   lp_distribution: 'lp_distribution',

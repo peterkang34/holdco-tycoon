@@ -106,6 +106,9 @@ describe.each(MODES)('$label Playtest', ({ difficulty, duration }) => {
       'forced_liquidation',
       'carry_earned',
       'pe_scoring_completed',
+      // Private Credit features require achievement unlock (not available in simulator)
+      'lending_synergy_applied',
+      'prestige_sector_in_pipeline',
     ];
 
     for (const strategy of strategies) {

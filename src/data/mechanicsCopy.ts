@@ -114,6 +114,14 @@ export const PE_FUND_LABELS = {
   },
 } as const;
 
+// ── Private Credit & Lending Synergy ──
+
+export const LENDING_SYNERGY_LABELS = {
+  name: 'Private Credit Synergy',
+  behavior: 'Owning Private Credit businesses reduces bank debt rates on all new deals. Diminishing returns: -0.75% for the 1st, -0.50% for the 2nd, -0.25% for each additional. Cap: -1.50%. Floor rate: 3%. Halved during credit tightening.',
+  summaryShort: 'Bank debt discount',
+} as const;
+
 export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   pattern: RegExp;
   reason: string;
