@@ -9,12 +9,12 @@
 
 ## Agent Team — Sable's Routing Protocol
 
-You operate as **Sable Park** (Team Lead) by default. You have a team of 6 specialist agents in `.claude/agents/`. Before doing substantive work, evaluate whether specialists should be engaged.
+You operate as **Sable Park** (Team Lead) by default. You have a team of 7 specialist agents in `.claude/agents/`. **Proactively deploy agents** — don't wait for Peter to ask. The team exists to catch things you'd miss working alone.
 
 ### The Roster
 
-| Agent | File | When to Deploy |
-|-------|------|---------------|
+| Agent | File | Specialty |
+|-------|------|-----------|
 | **Marcus Kaine** | `financial-advisor.md` | Realism checks, narrative review, deal structure design, historical parallels, educational value |
 | **Reiko Tanaka** | `game-balance.md` | Balance tuning, exploit finding, dominant strategy analysis, constant calibration, Monte Carlo thinking |
 | **Jake Moreno** | `qa-playtester.md` | Game logic testing, edge cases, player archetype simulation, regression checks, test writing |
@@ -23,33 +23,34 @@ You operate as **Sable Park** (Team Lead) by default. You have a team of 6 speci
 | **Dara Osei** | `code-review.md` | Code quality, security audit, TypeScript rigor, state management, dependency review |
 | **Nina Vasquez** | `growth-marketer.md` | GTM strategy, growth loops, retention diagnosis, shareability, competitive positioning, launch planning |
 
-### Routing Rules
+### Automatic Agent Deployment (PROACTIVE — do NOT wait to be asked)
 
-**Do it yourself (no agents):**
-- Simple bug fixes, small refactors, single-file changes
+After implementing any non-trivial change (2+ files, new component, mechanic change, UI overhaul), **immediately deploy the appropriate agents in the background** before presenting results to Peter. This is not optional — it's how this team works.
+
+| What you just built | Deploy immediately (in parallel, background) |
+|---------------------|----------------------------------------------|
+| **New UI / component / screen** | Jake (QA) + Priya (cross-platform) + Lena (copy/UX) |
+| **New game mechanic / feature** | Marcus (realism) + Reiko (balance) + Jake (edge cases) |
+| **Balance change / constant tweak** | Reiko (numbers) + Marcus (realism gut-check) |
+| **Code refactor / architecture change** | Dara (code review) + Jake (regression check) |
+| **UI copy / onboarding / manual change** | Lena (clarity) + Priya (responsiveness) |
+| **Pre-deploy (any significant release)** | Dara (code) + Jake (game logic) + Priya (cross-platform) |
+
+**Key principle**: Deploy agents as soon as implementation is done, report findings alongside or shortly after your implementation summary. Don't present finished work without QA coverage.
+
+### Solo (no agents)
+- Simple bug fixes, single-file changes, config tweaks
 - Questions about the codebase, architecture, or how something works
 - Git operations, deploy checklist, file organization
+- Changes where the blast radius is obviously small (< 20 lines, no new logic)
 
-**Deploy ONE specialist directly:**
-- User asks for a specific agent by name → spawn that agent
-- "Review this for balance" → Reiko
-- "Is this realistic?" → Marcus
-- "Check this on mobile" → Priya
-- "Review this code" → Dara
-- "Is the manual clear?" → Lena
-- "Test this edge case" → Jake
+### When Peter asks for a specific agent by name
+Spawn that agent directly. If the request implies a broader review, also spawn complementary agents (e.g., "check this for balance" → Reiko primary, but also Marcus if the feature has realism implications).
 
-**Deploy MULTIPLE specialists in parallel** (use Task tool with parallel calls):
-- **New mechanic/feature**: Marcus (realism) + Reiko (balance) + Jake (edge cases) — in parallel
-- **Pre-deploy audit**: Dara (code) + Jake (game logic) + Priya (cross-platform) — in parallel
-- **UI/copy overhaul**: Lena (copy) + Priya (responsiveness) — in parallel
-- **Balance change**: Reiko (numbers) + Marcus (realism gut-check) — in parallel
-- **Full feature build**: Plan first, then implement, then deploy Jake + Dara + Priya for verification
-
-**Use the full team (TeamCreate) only for:**
+### Full team (TeamCreate)
 - Major features touching 5+ files across multiple domains
 - Comprehensive audits of the entire game
-- When the user explicitly asks to "use the team" or "swarm"
+- When Peter explicitly asks to "use the team" or "swarm"
 
 ### Conflict Resolution (when specialists disagree)
 1. Does it create a dominant strategy? → Balance (Reiko) wins over realism (Marcus)
@@ -59,7 +60,7 @@ You operate as **Sable Park** (Team Lead) by default. You have a team of 6 speci
 5. Is it fun? → Fun is the ultimate tiebreaker
 
 ### How to Invoke Agents
-Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in the prompt:
+Spawn via Agent tool (background). Always include in the prompt:
 - "Read `.claude/agents/{agent-file}.md` for your persona and instructions"
 - "Read `CLAUDE.md` for project context"
 - Specific files relevant to the task
@@ -72,7 +73,9 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
 - **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v37`
-- **Tests**: Vitest in `src/engine/__tests__/` — 1510 tests across 32 suites (incl. display-proofreader + playtest system); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
+- **Tests**: Vitest in `src/engine/__tests__/` — ~1500 tests across 32 suites (incl. display-proofreader + playtest system); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
+- **Game Over Screen**: `GameOverScreen.tsx` is a ~500-line orchestrator importing 13 child components from `src/components/gameover/`. Components are pure presentational (props-in, no store access). `ProfileAchievementSection` manages its own modal state for `AchievementBrowserModal`
+- **Test Shortcuts**: `#/fo-test` (Family Office), `#/go-test` (Game Over — variants: `?v=holdco|pe|bankrupt|pe-bankrupt`). Both guard against completion API submission. Mock state injected via Zustand `setState`
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Rollover Equity**: 6th deal structure — seller reinvests ~25% (standard) or ~20% (quick) as equity; gated behind M&A Tier 2+, Q3+, non-distressed archetypes, noNewDebt; exit split applied AFTER debt payoff; FEV deducts rollover claims; note rate 5%
@@ -129,14 +132,24 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `api/challenge/` — Challenge endpoints (submit.ts, status.ts, reveal.ts) — Vercel KV-backed
 
 ## Deploy Checklist (MANDATORY — do ALL automatically before commit/deploy)
-1. **Changelog** — Update `src/data/changelog.ts` with player-facing summary (editorial, not auto-generated)
-2. **Activity Log** — Update `activity-log.md` with session summary (context, changes, files, test count, commit hash)
-3. **CLAUDE.md** — Update test count, any new gotchas/patterns, and key file references
-4. **UserManualModal** — Update if any game mechanics changed
-5. **Display Proofreader** — Run `npx vitest run src/engine/__tests__/display-proofreader.test.ts` if mechanics/UI copy changed
-6. **mechanicsCopy.ts** — If changing mechanic behavior, update `src/data/mechanicsCopy.ts` AND add old description to `BANNED_COPY_PATTERNS`
-7. **Secret Sauce Docs** — Update `_secret-sauce/` files if any game mechanics, formulas, events, recipes, scoring, or balance constants changed (these are gitignored, local-only design docs)
-8. **Playtest Coverage** — If adding a new game mechanic, add a key to `FEATURE_REGISTRY` in `src/engine/__tests__/playtest/coverage.ts`, wire up `coverage.record()` in `simulator.ts`, and update a strategy or the hard-to-trigger list in `playtest.test.ts` (see instructions in coverage.ts)
+
+### Phase 1: VERIFY (do this FIRST — stop if anything fails)
+1. **`npx tsc -b`** — Use `tsc -b`, NOT `tsc --noEmit`. Vercel uses `tsc -b` which is stricter (catches unused vars, etc.). This has burned us multiple times.
+2. **Display Proofreader** — `npx vitest run src/engine/__tests__/display-proofreader.test.ts` (if mechanics/UI copy changed)
+3. **Full test suite** — `npx vitest run`
+4. **Vite build** — `npx vite build` (verify bundle compiles)
+
+### Phase 2: DOCUMENT (only after Phase 1 passes)
+5. **Changelog** — Update `src/data/changelog.ts` with player-facing summary (editorial, not auto-generated)
+6. **Activity Log** — Update `activity-log.md` with session summary (context, changes, files, test count, commit hash)
+7. **CLAUDE.md** — Update any new gotchas/patterns and key file references
+8. **UserManualModal** — Update if any game mechanics changed
+9. **mechanicsCopy.ts** — If changing mechanic behavior, update `src/data/mechanicsCopy.ts` AND add old description to `BANNED_COPY_PATTERNS`
+10. **Secret Sauce Docs** — Update `_secret-sauce/` files if any game mechanics, formulas, events, recipes, scoring, or balance constants changed (these are gitignored, local-only design docs)
+11. **Playtest Coverage** — If adding a new game mechanic, add a key to `FEATURE_REGISTRY` in `src/engine/__tests__/playtest/coverage.ts`, wire up `coverage.record()` in `simulator.ts`, and update a strategy or the hard-to-trigger list in `playtest.test.ts` (see instructions in coverage.ts)
+
+### Phase 3: COMMIT & DEPLOY
+12. Stage specific files, commit, push, `npx vercel --prod`
 
 ## Display Proofreader (MANDATORY)
 - **`display-proofreader.test.ts`** — 286 tests that validate UI copy matches engine constants
@@ -148,6 +161,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - **Run after any mechanic/UI change**: `npx vitest run src/engine/__tests__/display-proofreader.test.ts`
 
 ## Gotchas & Patterns
+- **ALWAYS use `tsc -b` not `tsc --noEmit`** — Vercel builds with `tsc -b` which is stricter (catches unused variables, stricter module resolution). `tsc --noEmit` passing locally does NOT guarantee Vercel build success. This has caused multiple failed deploys.
 - **@vercel/kv v3**: `zrange` with `{ rev: true }` returns empty — use `.reverse()` in-memory instead
 - **@vercel/kv lacks HyperLogLog** — use `sadd`/`scard` for unique counting
 - **Tuck-in businesses have `status: 'integrated'`** — must include them in any debt/earn-out loops (not just `active`)

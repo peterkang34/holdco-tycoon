@@ -15,6 +15,8 @@ interface AchievementBrowserModalProps {
   onClose: () => void;
   allAchievements: AchievementDef[];
   earnedIds: Set<string>;
+  isLoggedIn: boolean;
+  onSignUp: () => void;
 }
 
 export function AchievementBrowserModal({
@@ -22,6 +24,8 @@ export function AchievementBrowserModal({
   onClose,
   allAchievements,
   earnedIds,
+  isLoggedIn,
+  onSignUp,
 }: AchievementBrowserModalProps) {
   const earnedCount = earnedIds.size;
   const totalCount = allAchievements.length;
@@ -44,6 +48,24 @@ export function AchievementBrowserModal({
   return (
     <Modal isOpen={isOpen} onClose={onClose} header={header}>
       <div className="space-y-6">
+        {/* Signup CTA for anonymous users */}
+        {!isLoggedIn && (
+          <div className="rounded-xl p-4 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20">
+            <p className="text-sm text-text-secondary mb-3">
+              Create a free account to collect achievements, track your progress across games, and unlock new sectors and gameplay events.
+            </p>
+            <button
+              onClick={onSignUp}
+              className="btn-primary w-full min-h-[44px] text-sm font-medium"
+            >
+              Sign Up to Start Tracking (Free)
+            </button>
+            <p className="text-xs text-text-muted mt-2 text-center">
+              Google or email. Takes 10 seconds.
+            </p>
+          </div>
+        )}
+
         {CATEGORY_ORDER.map((category) => {
           const meta = CATEGORY_META[category];
           const items = allAchievements.filter((a) => a.category === category);

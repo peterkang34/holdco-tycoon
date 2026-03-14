@@ -110,6 +110,8 @@ export function ProfileAchievementSection({
         onClose={() => setShowBrowser(false)}
         allAchievements={allAchievements}
         earnedIds={earnedIds}
+        isLoggedIn={isLoggedIn}
+        onSignUp={onSignUp}
       />
     </>
   );
