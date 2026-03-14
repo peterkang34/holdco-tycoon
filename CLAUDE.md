@@ -21,6 +21,7 @@ You operate as **Sable Park** (Team Lead) by default. You have a team of 6 speci
 | **Priya Chandran** | `cross-platform-qa.md` | Mobile responsiveness, browser compat, performance, accessibility, visual QA |
 | **Lena Xu** | `player-advocate.md` | UI copy review, tooltip/manual writing, changelog drafts, onboarding clarity, information architecture |
 | **Dara Osei** | `code-review.md` | Code quality, security audit, TypeScript rigor, state management, dependency review |
+| **Nina Vasquez** | `growth-marketer.md` | GTM strategy, growth loops, retention diagnosis, shareability, competitive positioning, launch planning |
 
 ### Routing Rules
 
@@ -71,7 +72,7 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
 - **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v37`
-- **Tests**: Vitest in `src/engine/__tests__/` — 1510 tests across 32 suites (incl. display-proofreader + playtest system); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
+- **Tests**: Vitest in `src/engine/__tests__/` — 1396 tests across 31 suites (incl. display-proofreader + playtest system); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
 - **All monetary values in thousands** (1000 = $1M)
 - **Wind down feature REMOVED** — selling is always strictly better (EBITDA floor 30%, exit multiple floor 2.0x); `wound_down` status kept in types for save compat only
 - **Rollover Equity**: 6th deal structure — seller reinvests ~25% (standard) or ~20% (quick) as equity; gated behind M&A Tier 2+, Q3+, non-distressed archetypes, noNewDebt; exit split applied AFTER debt payoff; FEV deducts rollover claims; note rate 5%
@@ -102,6 +103,10 @@ Spawn via Task tool with `subagent_type: "general-purpose"`. Always include in t
 - `src/engine/familyOffice.ts` — Family Office V2 engine (eligibility, FO multiplier, legacy scoring)
 - `src/data/platformRecipes.ts` — 38 integrated platform recipes (32 within-sector + 6 cross-sector)
 - `src/engine/platforms.ts` — Platform eligibility, forging, bonus application
+- `src/components/screens/GameOverScreen.tsx` — Game over orchestrator (~500 lines, imports 13 child components from `src/components/gameover/`)
+- `src/components/gameover/` — 13 extracted game-over components (FEVHeroSection, CarryHeroSection, ScoreBreakdownSection, PortfolioSummary, etc.)
+- `src/data/achievementPreview.ts` — 20 achievement definitions with pure predicate check functions
+- `src/data/archetypeNames.ts` — Shared strategy archetype display name mapping
 - `src/components/ui/LeaderboardModal.tsx` — Tabbed leaderboard (exports filtering utils for GameOverScreen)
 - `src/hooks/useAuth.ts` — Auth Zustand store (player state, modal toggles, nudge dismissals)
 - `src/lib/supabase.ts` — Supabase client, anonymous auth, auth state listener, token helpers

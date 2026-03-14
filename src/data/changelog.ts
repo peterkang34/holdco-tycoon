@@ -13,6 +13,29 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 14, 2026',
+    title: 'Game Over Screen Redesign',
+    sections: [
+      {
+        heading: 'New Layout',
+        items: [
+          'FEV is now the hero — your Founder Equity Value (or Carry Earned in PE mode) is front and center.',
+          'Collapsible FEV breakdown — see exactly how portfolio value, debt, ownership, and multipliers produce your final number.',
+          'Achievement teaser — see which achievements you unlocked this game (full tracking coming soon).',
+          'Score breakdown demoted — your grade is still there, now with per-dimension tips to help you improve.',
+        ],
+      },
+      {
+        heading: 'Quality of Life',
+        items: [
+          'Portfolio companies list and FEV breakdown default to collapsed — less scrolling on mobile.',
+          'Responsive bankruptcy headers — "BANKRUPT" and "FUND COLLAPSE" scale properly on small screens.',
+          'Better touch targets throughout for mobile players.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 9, 2026',
     title: 'LP Interaction Overhaul (PE Fund Mode)',
     sections: [

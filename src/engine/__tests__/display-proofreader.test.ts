@@ -1552,8 +1552,8 @@ describe('Display Proofreader', () => {
         expect(content).not.toMatch(/yr rem\)/);
       });
 
-      it('Strategy D: GameOverScreen uses EV_WATERFALL_LABELS for waterfall', () => {
-        const content = readComponent('components/screens/GameOverScreen.tsx');
+      it('Strategy D: FEVHeroSection uses EV_WATERFALL_LABELS for waterfall', () => {
+        const content = readComponent('components/gameover/FEVHeroSection.tsx');
         expect(content).toContain('EV_WATERFALL_LABELS');
       });
 
@@ -2101,9 +2101,8 @@ describe('Display Proofreader', () => {
       expect(dash).toContain('fundDpi');
     });
 
-    it('GameOverScreen shows carry waterfall in fund mode (Strategy B)', () => {
-      const gos = readComponent('components/screens/GameOverScreen.tsx');
-      expect(gos).toContain('isFundManagerMode');
+    it('CarryWaterfallSection shows carry waterfall in fund mode (Strategy B)', () => {
+      const gos = readComponent('components/gameover/CarryWaterfallSection.tsx');
       expect(gos).toContain('carryWaterfall');
       expect(gos).toContain('waterfallStep');
     });
