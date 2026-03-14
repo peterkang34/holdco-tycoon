@@ -68,6 +68,8 @@ import {
   calculateComplexityCost,
 } from '../engine/simulation';
 import { executeDealStructure } from '../engine/deals';
+import { getUnlockedSectorIds } from './useUnlocks';
+import { useAuthStore } from './useAuth';
 import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue, calculateFounderEquityValue, calculateFounderPersonalWealth } from '../engine/scoring';
 import { getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
@@ -561,7 +563,7 @@ export const useGameStore = create<GameStore>()(
 
         // Fund mode: empty portfolio, $100M cash, pre-unlocked M&A
         if (isFundManagerMode) {
-          const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds, false, round1Streams.deals, 0, PE_FUND_CONFIG.fundSize, null, false, false, 'easy');
+          const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds, false, round1Streams.deals, 0, PE_FUND_CONFIG.fundSize, null, false, false, 'easy', [], [], false);
 
           const newState: GameState = {
             ...initialState,
@@ -620,7 +622,10 @@ export const useGameStore = create<GameStore>()(
         }
 
         const startingBusiness = createStartingBusiness(startingSector!, diffConfig.startingEbitda, diffConfig.startingMultipleCap, round1Streams.cosmetic);
-        const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds, false, round1Streams.deals, 0, diffConfig.initialCash, null, false, false, difficulty);
+        const isChallenge = seed != null;
+        const isAnonymous = useAuthStore.getState().player?.isAnonymous ?? true;
+        const unlockedSectorIds = isChallenge ? [] : getUnlockedSectorIds(isAnonymous);
+        const initialDealPipeline = generateDealPipeline([], 1, undefined, undefined, undefined, 0, 0, false, undefined, maxRounds, false, round1Streams.deals, 0, diffConfig.initialCash, null, false, false, difficulty, [], unlockedSectorIds, isChallenge);
 
         // Holdco loan setup: Normal mode gets a structured loan, Easy mode has none
         const holdcoLoanBalance = diffConfig.startingDebt;
@@ -1193,6 +1198,8 @@ export const useGameStore = create<GameStore>()(
           state.isFamilyOfficeMode ?? false,
           state.difficulty,
           ownedProSportsSubTypes,
+          state.isChallenge ? [] : getUnlockedSectorIds(useAuthStore.getState().player?.isAnonymous ?? true),
+          state.isChallenge,
         );
 
         // Inject distressed deals during Financial Crisis (bypass MAX_DEALS cap)
@@ -4181,6 +4188,8 @@ export const useGameStore = create<GameStore>()(
           FO_MA_SOURCING_TIER, true, undefined, FO_MAX_ROUNDS,
           false, round1Streams.deals, FO_DEAL_INFLATION, foStartingCash, null, false, true, state.difficulty,
           [], // no owned pro sports yet at FO start
+          [], // FO mode includes all sectors via isFamilyOfficeMode=true
+          false,
         );
 
         set({

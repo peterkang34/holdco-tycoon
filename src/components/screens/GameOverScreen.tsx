@@ -23,6 +23,7 @@ import { ChallengeComparison } from '../ui/ChallengeComparison';
 import { FeedbackModal } from '../ui/FeedbackModal';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { ACHIEVEMENT_PREVIEW, type AchievementContext } from '../../data/achievementPreview';
+import { saveEarnedAchievements } from '../../hooks/useUnlocks';
 import { HOLDCO_GRADE_TIPS, PE_GRADE_TIPS } from '../../data/gradeTips';
 
 import {
@@ -436,6 +437,16 @@ export function GameOverScreen({
         peakLeverage: Math.round(strategyData.peakLeverage * 10) / 10,
         turnaroundsStarted: strategyData.turnaroundsStarted,
         turnaroundsSucceeded: strategyData.turnaroundsSucceeded,
+        earnedAchievementIds: (() => {
+          const initialCapital = DIFFICULTY_CONFIG[difficulty]?.initialCash ?? 20000;
+          const ctx: AchievementContext = {
+            strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions,
+            founderEquityValue, difficulty, duration, bankruptRound, isFundManagerMode,
+            carryEarned: carryWaterfallData?.carry, lpSatisfaction: lpSatisfactionScore ?? undefined, initialCapital,
+          };
+          const ids = ACHIEVEMENT_PREVIEW.filter(a => a.check(ctx)).map(a => a.id);
+          return ids.length > 0 ? ids : undefined;
+        })(),
       },
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -588,6 +599,7 @@ export function GameOverScreen({
             sourceDealUses: strategyData.sourceDealUses || undefined,
             proactiveOutreachUses: strategyData.proactiveOutreachUses || undefined,
             smbBrokerUses: strategyData.smbBrokerUses || undefined,
+            earnedAchievementIds: earnedAchievements.length > 0 ? earnedAchievements.map(a => a.id) : undefined,
           },
         }
       );
@@ -655,6 +667,13 @@ export function GameOverScreen({
     };
     return ACHIEVEMENT_PREVIEW.filter(a => a.check(ctx));
   }, [strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions, founderEquityValue, difficulty, duration, bankruptRound, isFundManagerMode, carryWaterfallData]);
+
+  // Persist earned achievements to localStorage for cross-game unlock gating
+  useEffect(() => {
+    if (earnedAchievements.length > 0) {
+      saveEarnedAchievements(earnedAchievements.map(a => a.id));
+    }
+  }, [earnedAchievements]);
 
   // ── Derived ──
   const isBankruptcy = !!bankruptRound;

@@ -305,7 +305,8 @@ export function calculateAddToPlatformCost(
 /**
  * Check whether a platform should dissolve after a constituent is removed.
  * Returns true (should dissolve) if the remaining active constituents
- * no longer meet the recipe's minSubTypes requirement.
+ * no longer meet the recipe's minSubTypes requirement, OR if a cross-sector
+ * recipe no longer has representation from all required sectors.
  */
 export function checkPlatformDissolution(
   platform: IntegratedPlatform,
@@ -321,5 +322,13 @@ export function checkPlatformDissolution(
   );
 
   const distinctSubTypes = new Set(constituents.map(b => b.subType));
-  return distinctSubTypes.size < recipe.minSubTypes;
+  if (distinctSubTypes.size < recipe.minSubTypes) return true;
+
+  // Cross-sector recipes: verify all required sectors still represented
+  if (recipe.crossSectorIds) {
+    const sectorsRepresented = new Set(constituents.map(b => b.sectorId));
+    if (!recipe.crossSectorIds.every(s => sectorsRepresented.has(s))) return true;
+  }
+
+  return false;
 }

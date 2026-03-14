@@ -14,6 +14,30 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'March 14, 2026',
+    title: 'Private Credit & Achievements',
+    sections: [
+      {
+        heading: 'Private Credit Sector (Prestige Unlock)',
+        items: [
+          'New prestige sector: Private Credit & Lending — 4 sub-types with unique platform recipes.',
+          'Earn the "Clean Sheet" achievement (zero anti-patterns, B+ grade) to unlock it.',
+          'Owning Private Credit businesses gives a bank debt rate discount on all new deals (up to -1.50%).',
+          'First-ever 3-sector platform recipe: Financial Services Conglomerate (Private Credit + Wealth Management + Insurance).',
+        ],
+      },
+      {
+        heading: 'Achievements System',
+        items: [
+          '21 achievements across 5 categories — milestones, feats, mastery, creative, and mode-specific.',
+          'Achievements are now visible in My Stats — see what you\'ve earned across all games.',
+          'Community leaderboard shows achievement badges for each player.',
+          'Per-game achievement breakdown in game history details.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 14, 2026',
     title: 'Game Over Screen Redesign',
     sections: [
       {

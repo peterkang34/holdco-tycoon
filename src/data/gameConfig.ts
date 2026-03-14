@@ -50,6 +50,13 @@ export const INTEGRATION_DRAG_EPSILON = 0.0005;        // below this, zero out
 export const INTEGRATION_RESTRUCTURING_PCT = 0.15;     // bumped from 0.07
 export const INTEGRATION_RESTRUCTURING_MERGER_PCT = 0.12; // mergers gentler
 
+// ── Private Credit Financing Synergy (Diminishing Returns) ──
+
+export const LENDING_SYNERGY_SCHEDULE = [0.0075, 0.005, 0.0025] as const; // per PC business: -75bp, -50bp, -25bp
+export const LENDING_SYNERGY_MAX_REDUCTION = 0.015;  // -150bp hard cap (3 businesses to reach)
+export const LENDING_SYNERGY_MIN_RATE = 0.03;         // 3% floor — debt is never free
+export const LENDING_SYNERGY_CRISIS_MULTIPLIER = 0.5;  // halved during credit tightening
+
 // ── Covenant / Bankruptcy Constants ──
 
 export const COVENANT_BREACH_ROUNDS_THRESHOLD = 2; // breach years before restructuring/bankruptcy

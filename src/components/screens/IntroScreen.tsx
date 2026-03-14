@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SectorId, GameDifficulty, GameDuration } from '../../engine/types';
-import { SECTOR_LIST_STANDARD } from '../../data/sectors';
+import { SECTOR_LIST_STANDARD, UNLOCKABLE_SECTORS, SECTORS, getAvailableSectors } from '../../data/sectors';
+import { isAchievementEarned, getUnlockedSectorIds } from '../../hooks/useUnlocks';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { ChangelogModal } from '../ui/ChangelogModal';
 import { UserManualModal } from '../ui/UserManualModal';
@@ -73,6 +74,11 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
   const [showHurdleTooltip, setShowHurdleTooltip] = useState(false);
   const [showCarryTooltip, setShowCarryTooltip] = useState(false);
 
+  // Compute available sectors (includes unlocked prestige sectors for non-challenge)
+  const isAnonymous = useAuthStore((s) => s.player?.isAnonymous ?? true);
+  const sectorPickerList = isChallenge
+    ? SECTOR_LIST_STANDARD
+    : getAvailableSectors(false, getUnlockedSectorIds(isAnonymous), false);
 
   // Sync challenge settings when challengeData arrives
   useEffect(() => {
@@ -510,7 +516,7 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
                 <span className="text-[11px] text-text-muted ml-2">— sector revealed on launch</span>
               </button>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mb-4">
-                {SECTOR_LIST_STANDARD.map(sector => (
+                {sectorPickerList.map(sector => (
                   <button
                     key={sector.id}
                     type="button"
@@ -531,6 +537,29 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
                   </button>
                 ))}
               </div>
+
+              {/* Locked prestige sectors teaser — only show if NOT already in the picker list */}
+              {(Object.entries(UNLOCKABLE_SECTORS) as [SectorId, { gateAchievementId: string; requiresAccount: boolean }][]).map(([sectorId, gate]) => {
+                const sector = SECTORS[sectorId];
+                // Skip if already in the selectable list
+                if (sectorPickerList.some(s => s.id === sectorId)) return null;
+                const hasAchievement = isAchievementEarned(gate.gateAchievementId);
+                const needsAccount = hasAchievement && gate.requiresAccount && isAnonymous;
+                return (
+                  <div key={sectorId} className="mb-4 p-3 rounded-lg border border-white/5 bg-white/[0.02] opacity-60">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl grayscale">{sector.emoji}</span>
+                      <span className="text-sm font-medium text-text-secondary">{sector.name}</span>
+                      <span className="ml-auto text-[10px] text-amber-400/70 font-medium">🔒 Prestige</span>
+                    </div>
+                    <p className="text-[11px] text-text-muted/60 mt-1">
+                      {needsAccount
+                        ? 'Achievement earned! Sign in to unlock this sector.'
+                        : 'Earn the Clean Sheet achievement to unlock this sector.'}
+                    </p>
+                  </div>
+                );
+              })}
 
               <button
                 type="submit"

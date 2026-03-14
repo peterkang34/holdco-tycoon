@@ -7,6 +7,8 @@ import { formatMoney } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
 import SparklineChart from './SparklineChart';
 import { ScoreRadar } from '../admin/ScoreRadar';
+import { ACHIEVEMENT_PREVIEW } from '../../data/achievementPreview';
+import { getEarnedAchievementIds } from '../../hooks/useUnlocks';
 
 interface GlobalStats {
   total_games: number;
@@ -58,6 +60,7 @@ interface GameStrategy {
   carryEarned?: number;
   netIrr?: number;
   grossMoic?: number;
+  earnedAchievementIds?: string[];
 }
 
 interface GameHistoryEntry {
@@ -302,6 +305,19 @@ function GameRow({ game }: { game: GameHistoryEntry }) {
                   <span className="text-red-400/80">{s.antiPatterns.map(ap => ap.replace(/_/g, ' ')).join(', ')}</span>
                 </div>
               )}
+
+              {/* Achievements earned this game */}
+              {s.earnedAchievementIds && s.earnedAchievementIds.length > 0 && (
+                <div className="col-span-2 mt-1">
+                  <span className="text-text-muted">Achievements: </span>
+                  <span className="text-amber-400/90">
+                    {s.earnedAchievementIds.map(id => {
+                      const a = ACHIEVEMENT_PREVIEW.find(ach => ach.id === id);
+                      return a ? `${a.emoji} ${a.name}` : id;
+                    }).join('  ')}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -447,6 +463,11 @@ export function StatsModal() {
   const chronologicalHistory = useMemo(() => [...history].reverse(), [history]);
 
   const hasMoreHistory = historyTotal > history.length;
+
+  // Achievements from localStorage (cross-game, no API needed)
+  const earnedIds = useMemo(() => new Set(getEarnedAchievementIds()), [showStatsModal]);
+  const earnedAchievements = ACHIEVEMENT_PREVIEW.filter(a => earnedIds.has(a.id));
+  const unearnedAchievements = ACHIEVEMENT_PREVIEW.filter(a => !earnedIds.has(a.id));
 
   return (
     <Modal isOpen={showStatsModal} onClose={closeStatsModal} title="My Stats" size="lg">
@@ -611,6 +632,45 @@ export function StatsModal() {
               </div>
             </div>
           )}
+
+          {/* Achievements */}
+          <div>
+            <h3 className="text-sm font-bold text-text-muted mb-2">
+              Achievements
+              <span className="font-normal ml-1">({earnedAchievements.length}/{ACHIEVEMENT_PREVIEW.length})</span>
+            </h3>
+            {earnedAchievements.length > 0 ? (
+              <div className="space-y-1.5">
+                {earnedAchievements.map(a => (
+                  <div key={a.id} className="flex items-start gap-2 bg-green-500/5 border border-green-500/10 rounded-lg p-2.5">
+                    <span className="text-base shrink-0">{a.emoji}</span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold">{a.name}</p>
+                      <p className="text-xs text-text-muted">{a.description}</p>
+                      {a.unlocks && (
+                        <p className="text-[10px] text-emerald-400/80 mt-0.5">Unlocked: {a.unlocks}</p>
+                      )}
+                    </div>
+                    <span className="text-green-400 text-xs shrink-0 mt-0.5">✓</span>
+                  </div>
+                ))}
+                {unearnedAchievements.length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mt-2">
+                    {unearnedAchievements.map(a => (
+                      <div key={a.id} className="flex items-center gap-1.5 bg-white/[0.02] border border-white/5 rounded-lg p-2">
+                        <span className="text-sm opacity-40 grayscale shrink-0">{a.emoji}</span>
+                        <p className="text-[11px] text-text-muted/60 truncate">{a.name}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="bg-white/5 rounded-lg p-4 text-center">
+                <p className="text-text-muted text-sm">Complete games to earn achievements and unlock new content.</p>
+              </div>
+            )}
+          </div>
 
           {/* Performance Trend */}
           {history.length >= 3 ? (

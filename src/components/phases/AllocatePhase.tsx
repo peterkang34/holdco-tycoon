@@ -25,7 +25,7 @@ import { EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, E
 import { SECTOR_LIST, SECTOR_LIST_STANDARD } from '../../data/sectors';
 import { BusinessCard } from '../cards/BusinessCard';
 import { DealCard } from '../cards/DealCard';
-import { generateDealStructures, getStructureLabel, getStructureDescription } from '../../engine/deals';
+import { generateDealStructures, getStructureLabel, getStructureDescription, calculateLendingSynergyDiscount } from '../../engine/deals';
 import { calculateExitValuation, calculateAnnualFcf, calculatePortfolioTax, calculateSectorFocusBonus, getSectorFocusEbitdaBonus } from '../../engine/simulation';
 import { capGrowthRate } from '../../engine/helpers';
 import { getSubTypeAffinity, getSizeRatioTier } from '../../engine/businesses';
@@ -640,11 +640,12 @@ export function AllocatePhase({
   const renderDealStructuring = () => {
     if (!selectedDeal) return null;
 
-    const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening, maxRoundsFromStore ?? 20, !distressRestrictions.canTakeDebt, maSourcing?.tier ?? 0, duration ?? 'standard', selectedDeal.sellerArchetype, ipoState ?? undefined);
+    const lendingSynergy = calculateLendingSynergyDiscount(allBusinesses, creditTightening);
+    const structures = generateDealStructures(selectedDeal, cash, interestRate, creditTightening, maxRoundsFromStore ?? 20, !distressRestrictions.canTakeDebt, maSourcing?.tier ?? 0, duration ?? 'standard', selectedDeal.sellerArchetype, ipoState ?? undefined, lendingSynergy);
 
     // Compute minimum cash required based on cheapest available deal structure
     // (pass full deal price as cash to see ALL structures that would be available)
-    const hypotheticalStructures = generateDealStructures(selectedDeal, selectedDeal.effectivePrice, interestRate, creditTightening, maxRoundsFromStore ?? 20, !distressRestrictions.canTakeDebt, maSourcing?.tier ?? 0, duration ?? 'standard', selectedDeal.sellerArchetype, ipoState ?? undefined);
+    const hypotheticalStructures = generateDealStructures(selectedDeal, selectedDeal.effectivePrice, interestRate, creditTightening, maxRoundsFromStore ?? 20, !distressRestrictions.canTakeDebt, maSourcing?.tier ?? 0, duration ?? 'standard', selectedDeal.sellerArchetype, ipoState ?? undefined, lendingSynergy);
     const minCashForDeal = hypotheticalStructures.length > 0
       ? Math.min(...hypotheticalStructures.map(s => s.cashRequired))
       : selectedDeal.effectivePrice;
@@ -966,7 +967,12 @@ export function AllocatePhase({
                     {structure.bankDebt && (
                       <div className="flex justify-between">
                         <span className="text-text-muted">Bank Debt</span>
-                        <span className="font-mono">{formatMoney(structure.bankDebt.amount)} @ {formatPercent(structure.bankDebt.rate)}</span>
+                        <span className="font-mono">
+                          {formatMoney(structure.bankDebt.amount)} @ {formatPercent(structure.bankDebt.rate)}
+                          {lendingSynergy > 0 && structure.bankDebt.rate < interestRate && (
+                            <span className="ml-1.5 text-[10px] text-emerald-400" title={`Private credit synergy: -${(lendingSynergy * 100).toFixed(2)}% on bank debt`}>Synergy</span>
+                          )}
+                        </span>
                       </div>
                     )}
                     {structure.earnout && (

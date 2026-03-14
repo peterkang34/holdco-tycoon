@@ -73,7 +73,7 @@ Spawn via Agent tool (background). Always include in the prompt:
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
 - **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v37`
-- **Tests**: Vitest in `src/engine/__tests__/` — ~1500 tests across 32 suites (incl. display-proofreader + playtest system); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
+- **Tests**: Vitest in `src/engine/__tests__/` — ~1553 tests across 34 suites (incl. display-proofreader + playtest system + synergy + unlocks); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
 - **Game Over Screen**: `GameOverScreen.tsx` is a ~500-line orchestrator importing 13 child components from `src/components/gameover/`. Components are pure presentational (props-in, no store access). `ProfileAchievementSection` manages its own modal state for `AchievementBrowserModal`
 - **Test Shortcuts**: `#/fo-test` (Family Office), `#/go-test` (Game Over — variants: `?v=holdco|pe|bankrupt|pe-bankrupt`). Both guard against completion API submission. Mock state injected via Zustand `setState`
 - **All monetary values in thousands** (1000 = $1M)
@@ -85,6 +85,45 @@ Spawn via Agent tool (background). Always include in the prompt:
 - **Scoring**: FEV (Founder Equity Value = EV × ownership%) is primary metric; leaderboard uses adjustedFEV with difficulty multiplier
 - **Leaderboard**: 7 tabs (Overall/Hard-20/Hard-10/Easy-20/Easy-10/Distributions/PE Fund); client-side filtering from single KV set; 500 stored, 50 displayed per tab; PE entries separated from holdco tabs (filtered by isFundManager flag), PE tab sorted by carry earned (GP compensation = FEV equivalent)
 - **Player Accounts**: Optional Supabase auth (Google OAuth + Magic Link); anonymous sessions auto-created on first visit; `linkIdentity`/`updateUser` preserves UUID on upgrade; GET API strips `playerId` → returns `isVerified` boolean; verified badge only for non-anonymous accounts; game history claimed via distributed lock (KV setnx); pre-computed player_stats/global_stats updated on submit/claim (non-blocking); account deletion anonymizes KV leaderboard entries then cascades via Supabase admin; data export bundles profile+games+stats as JSON; anonymous users with no games cleaned up monthly (90-day cutoff)
+
+## Documentation Governance
+
+All design docs, plans, specs, and agent reports go in specific locations. **Do NOT create new markdown files in random directories.**
+
+```
+_secret-sauce/              # GITIGNORED — private game design docs
+├── mechanics/              # Core game mechanic docs (how the game works today)
+├── specs/                  # Feature specifications (what to build next)
+├── analysis/               # Growth, retention, exploit analysis (strategic research)
+├── reviews/                # Agent phase review reports (feedback on specs/shipped work)
+└── plans/                  # Implementation plans for secret-sauce features
+
+docs/                       # GIT-TRACKED — historical decision records & agent analysis
+├── pe-fund-mode/           # PE fund brainstorms, audits, stress tests
+├── ipo-system/             # IPO overhaul plans and reviews
+├── 20yr-mode/              # 20-year mode brainstorms
+├── ebitda-tiers/           # Tier system designs and balance reviews
+├── market-events/          # Market event audits
+├── multiplayer/            # Multiplayer brainstorms and research
+├── feedback/               # Feedback flow audits
+├── misc/                   # One-off reviews and analyses
+└── reflections/            # Blog posts, learning arcs
+
+plans/                      # GIT-TRACKED — implementation plans
+├── shipped/                # Plans that have been fully implemented
+│   └── reviews/            # QA reviews of shipped features
+└── backlog/                # Plans deferred for future
+
+research/                   # GIT-TRACKED — external research (podcasts, books)
+```
+
+**Routing rules for new documents:**
+- Agent review/audit of existing feature → `docs/{feature-topic}/`
+- New feature spec → `_secret-sauce/specs/`
+- Growth/retention/exploit analysis → `_secret-sauce/analysis/`
+- Agent review of a spec or phase → `_secret-sauce/reviews/`
+- Implementation plan → `plans/` root (move to `plans/shipped/` when done)
+- External research → `research/`
 
 ## Key Files
 - `src/hooks/useGame.ts` — Zustand store (game actions, state transitions)
@@ -104,11 +143,12 @@ Spawn via Agent tool (background). Always include in the prompt:
 - `src/engine/turnarounds.ts` — Turnaround eligibility, cost, resolution, quality improvement, exit premium
 - `src/engine/ipo.ts` — IPO Pathway engine (eligibility, stock price, earnings, share-funded deals, stay-private bonus)
 - `src/engine/familyOffice.ts` — Family Office V2 engine (eligibility, FO multiplier, legacy scoring)
-- `src/data/platformRecipes.ts` — 38 integrated platform recipes (32 within-sector + 6 cross-sector)
+- `src/data/platformRecipes.ts` — 42 integrated platform recipes (34 within-sector + 8 cross-sector)
 - `src/engine/platforms.ts` — Platform eligibility, forging, bonus application
 - `src/components/screens/GameOverScreen.tsx` — Game over orchestrator (~500 lines, imports 13 child components from `src/components/gameover/`)
 - `src/components/gameover/` — 13 extracted game-over components (FEVHeroSection, CarryHeroSection, ScoreBreakdownSection, PortfolioSummary, etc.)
-- `src/data/achievementPreview.ts` — 20 achievement definitions with pure predicate check functions
+- `src/data/achievementPreview.ts` — 21 achievement definitions with pure predicate check functions (incl. `clean_sheet` for prestige unlocks)
+- `src/hooks/useUnlocks.ts` — Achievement persistence (localStorage), sector unlock gating, `getUnlockedSectorIds()`
 - `src/data/archetypeNames.ts` — Shared strategy archetype display name mapping
 - `src/components/ui/LeaderboardModal.tsx` — Tabbed leaderboard (exports filtering utils for GameOverScreen)
 - `src/hooks/useAuth.ts` — Auth Zustand store (player state, modal toggles, nudge dismissals)
@@ -170,9 +210,12 @@ Spawn via Agent tool (background). Always include in the prompt:
 - **Race conditions in async AI calls** — always check state is still current before setting narrative/storyBeats
 - **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety. Current: v37
 - **Integrated platforms**: Margin/growth bonuses are ONE-TIME mutations at forge time (clamped via `clampMargin`/`capGrowthRate`); multiple expansion + recession resistance are automatic via engine; platform sale bonus is tiered by `multipleExpansion` (0.3x for 2.0x+, 0.5x otherwise) via `getPlatformSaleBonus()`
-- **16 sectors, ~98 sub-types**: 15 standard + 1 FO-exclusive (proSports with 8 league sub-types). Overlaps resolved (no cross-sector sub-type duplication); sectors.ts is authoritative
+- **17 sectors, ~104 sub-types**: 15 standard + 1 prestige (privateCredit, gated by `clean_sheet` achievement) + 1 FO-exclusive (proSports with 8 league sub-types). Overlaps resolved (no cross-sector sub-type duplication); sectors.ts is authoritative
 - **proSports restrictions**: Pro sports teams are standalone trophy assets — blocked from mergers, tuck-ins, platform designation, and platform eligibility. Guards in `useGame.ts` (acquireTuckIn, mergeBusinesses, addToIntegratedPlatform) + `platforms.ts` (checkPlatformEligibility, checkNearEligiblePlatforms) + AllocatePhase UI filters. 200 real teams across 8 leagues (NFL/NBA/MLB/NHL/EPL/MLS/WNBA/NWSL). Women's leagues (WNBA/NWSL) allow flexible deal structures (seller notes, earn-outs). One team per league enforced via `ownedProSportsSubTypes` (league IDs).
 - **Platform thresholds scale by mode**: `INTEGRATION_THRESHOLD_MULTIPLIER` in gameConfig.ts (Easy-Std 1.0, Easy-Quick 0.7, Normal-Std 0.7, Normal-Quick 0.5)
+- **Private Credit synergy**: Owning PC businesses gives diminishing bank debt rate discount (-0.75%/-0.50%/-0.25%, cap -1.50%, floor 3%, halved during credit tightening). Applied in `AllocatePhase.tsx` via `calculateLendingSynergyDiscount()`. Does NOT apply to seller notes or existing debt
+- **Prestige sector unlocks**: `UNLOCKABLE_SECTORS` in sectors.ts gates sectors behind achievements. `getAvailableSectors()` handles runtime filtering. Challenge mode always excludes unlockable sectors. Anonymous users blocked via `requiresAccount`. Achievements persist in localStorage via `useUnlocks.ts`
+- **3-sector platform recipes**: `cross_financial_conglomerate` is the first 3-sector recipe (PC + WM + Insurance). Dissolution check in `checkPlatformDissolution()` verifies cross-sector representation
 - **Turnaround quality improvements are permanent mutations** — qualityRating changes at resolution; qualityImprovedTiers tracks cumulative tiers for exit premium
 - **Portfolio fatigue**: 4+ simultaneous turnarounds = -10ppt success rate penalty; warn in UI
 - **Turnaround durations scale by game mode**: Quick games get ~half duration (T1: 2, T2: 3, T3: 2-3 rounds vs Standard T1: 4, T2: 5, T3: 3-6)

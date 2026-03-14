@@ -107,6 +107,10 @@ import {
   PE_FUND_CONFIG,
   PE_IRR_CARRY_TIERS,
   FUND_MANAGER_CONFIG,
+  LENDING_SYNERGY_SCHEDULE,
+  LENDING_SYNERGY_MAX_REDUCTION,
+  LENDING_SYNERGY_MIN_RATE,
+  LENDING_SYNERGY_CRISIS_MULTIPLIER,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
 import {
@@ -538,6 +542,7 @@ describe('Display Proofreader', () => {
       environmental: 0.16,
       realEstate: 0.18,
       proSports: 0.20,
+      privateCredit: 0.04,
     };
 
     for (const [sectorId, expectedRate] of Object.entries(expectedCapex)) {
@@ -546,9 +551,9 @@ describe('Display Proofreader', () => {
       });
     }
 
-    it('covers all 16 sectors', () => {
-      expect(SECTOR_LIST).toHaveLength(16);
-      expect(Object.keys(expectedCapex)).toHaveLength(16);
+    it('covers all 17 sectors', () => {
+      expect(SECTOR_LIST).toHaveLength(17);
+      expect(Object.keys(expectedCapex)).toHaveLength(17);
     });
   });
 
@@ -974,6 +979,40 @@ describe('Display Proofreader', () => {
       expect(card).toContain('grow logarithmically with scale');
       expect(card).toContain('diminishing returns');
     });
+
+    // ── Private Credit Synergy Constants (Strategy A) ──
+
+    it('Lending synergy: diminishing schedule 0.75%, 0.50%, 0.25%; cap 1.50%; floor 3%; crisis 0.5x', () => {
+      expect(LENDING_SYNERGY_SCHEDULE[0]).toBe(0.0075);
+      expect(LENDING_SYNERGY_SCHEDULE[1]).toBe(0.005);
+      expect(LENDING_SYNERGY_SCHEDULE[2]).toBe(0.0025);
+      expect(LENDING_SYNERGY_MAX_REDUCTION).toBe(0.015);
+      expect(LENDING_SYNERGY_MIN_RATE).toBe(0.03);
+      expect(LENDING_SYNERGY_CRISIS_MULTIPLIER).toBe(0.5);
+    });
+
+    it('UserManualModal documents Captive Capital Advantage synergy with correct values', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Captive Capital Advantage');
+      expect(manual).toContain('-0.75%');
+      expect(manual).toContain('-0.50%');
+      expect(manual).toContain('-0.25%');
+      expect(manual).toContain('-1.50% (cap)');
+      expect(manual).toContain('3%');
+    });
+
+    it('UserManualModal platform bonus ranges include updated max (2.5x expansion, 0.65x recession)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('+1.0 to +2.5x');
+      expect(manual).toContain('0.65-0.85x');
+    });
+
+    it('UserManualModal documents prestige sectors and Clean Sheet unlock', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Prestige Sectors');
+      expect(manual).toContain('Clean Sheet');
+      expect(manual).toContain('Private Credit');
+    });
   });
 
   // ══════════════════════════════════════════════════════════════════
@@ -1138,8 +1177,8 @@ describe('Display Proofreader', () => {
   // ══════════════════════════════════════════════════════════════════
 
   describe('Sector Metadata', () => {
-    it('16 sectors defined', () => {
-      expect(SECTOR_LIST).toHaveLength(16);
+    it('17 sectors defined', () => {
+      expect(SECTOR_LIST).toHaveLength(17);
     });
 
     it('All sectors have required fields', () => {
@@ -1317,11 +1356,11 @@ describe('Display Proofreader', () => {
   // ══════════════════════════════════════════════════════════════════
 
   describe('Platform Recipe Counts', () => {
-    it('UserManualModal states 38 platform recipes (32 within + 6 cross) (Strategy B)', () => {
+    it('UserManualModal states 42 platform recipes (34 within + 8 cross) (Strategy B)', () => {
       const manual = readComponent('components/ui/UserManualModal.tsx');
-      expect(manual).toContain('38 platform recipes');
-      expect(manual).toContain('32 within');
-      expect(manual).toContain('6 cross-sector');
+      expect(manual).toContain('42 platform recipes');
+      expect(manual).toContain('34 within');
+      expect(manual).toContain('8 cross-sector');
     });
   });
 

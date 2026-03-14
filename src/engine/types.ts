@@ -16,6 +16,7 @@ export type SectorId =
   | 'distribution'
   | 'wealthManagement'
   | 'environmental'
+  | 'privateCredit'
   | 'proSports';
 
 export type SectorFocusGroup = SectorId;
@@ -741,6 +742,7 @@ export interface LeaderboardStrategy {
   sourceDealUses?: number;
   proactiveOutreachUses?: number;
   smbBrokerUses?: number;
+  earnedAchievementIds?: string[];
 }
 
 export interface LeaderboardEntry {

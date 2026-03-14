@@ -49,6 +49,7 @@ export interface AchievementDef {
   emoji: string;
   category: 'milestone' | 'feat' | 'mastery' | 'creative' | 'mode';
   check: (ctx: AchievementContext) => boolean;
+  unlocks?: string; // Content gated behind this achievement (e.g., prestige sectors)
 }
 
 export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
@@ -239,5 +240,16 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
     category: 'mode',
     check: (ctx) =>
       ctx.duration === 'quick' && ['S', 'A', 'B'].includes(ctx.score.grade),
+  },
+  {
+    id: 'clean_sheet',
+    name: 'Clean Sheet',
+    description: 'Complete a game with zero anti-patterns and earn at least a B grade.',
+    emoji: '📋',
+    category: 'mastery',
+    check: (ctx) =>
+      ctx.strategyData.antiPatterns.length === 0 &&
+      ['S', 'A', 'B'].includes(ctx.score.grade),
+    unlocks: 'Private Credit & Lending sector with 4 exclusive platform recipes and a bank debt discount synergy',
   },
 ];

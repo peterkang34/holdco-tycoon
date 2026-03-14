@@ -409,6 +409,32 @@ export const PLATFORM_RECIPES: PlatformRecipe[] = [
     description: 'Cleanup + ongoing waste management + site services.',
   },
 
+  // ── Private Credit & Lending ──
+  {
+    id: 'privatecredit_integrated',
+    name: 'Integrated Credit Platform',
+    sectorId: 'privateCredit',
+    requiredSubTypes: ['Direct Lending / Senior Debt', 'Specialty Finance / ABL', 'Mezzanine & Subordinated Debt'],
+    minSubTypes: 2,
+    baseEbitdaThreshold: 7000,
+    bonuses: { marginBoost: 0.04, growthBoost: 0.03, multipleExpansion: 1.5, recessionResistanceReduction: 0.8 },
+    integrationCostFraction: 0.22,
+    description: 'Full capital stack coverage: senior, specialty, and subordinated. One-stop for any borrower.',
+    realWorldExample: 'Golub Capital, Owl Rock (Blue Owl), Ares Credit Group',
+  },
+  {
+    id: 'privatecredit_alt_fintech',
+    name: 'Alternative Lending Fintech',
+    sectorId: 'privateCredit',
+    requiredSubTypes: ['Revenue-Based Finance', 'Equipment Leasing', 'SBA / Government-Guaranteed Lending'],
+    minSubTypes: 2,
+    baseEbitdaThreshold: 6000,
+    bonuses: { marginBoost: 0.03, growthBoost: 0.04, multipleExpansion: 1.5, recessionResistanceReduction: 0.85 },
+    integrationCostFraction: 0.20,
+    description: 'Technology-driven lending across multiple products. Shared origination, underwriting, and servicing.',
+    realWorldExample: 'LendingClub post-Radius, Clearco, Pipe',
+  },
+
   // ═══ CROSS-SECTOR PLATFORMS ═══
 
   {
@@ -487,6 +513,32 @@ export const PLATFORM_RECIPES: PlatformRecipe[] = [
     integrationCostFraction: 0.25,
     description: 'Manufacturing + distribution = margin control across the value chain.',
     realWorldExample: 'Parker Hannifin',
+  },
+  {
+    id: 'cross_alternative_capital',
+    name: 'Alternative Capital Platform',
+    sectorId: null,
+    crossSectorIds: ['privateCredit', 'wealthManagement'],
+    requiredSubTypes: ['Direct Lending / Senior Debt', 'Mezzanine & Subordinated Debt', 'Independent RIA', 'Family Office Services'],
+    minSubTypes: 2,
+    baseEbitdaThreshold: 10000,
+    bonuses: { marginBoost: 0.04, growthBoost: 0.03, multipleExpansion: 1.5, recessionResistanceReduction: 0.80 },
+    integrationCostFraction: 0.25,
+    description: 'Wealth advisory clients invest in your private credit products. Proprietary deal flow meets captive capital.',
+    realWorldExample: 'Apollo + Athene, Blue Owl Capital, Ares Management',
+  },
+  {
+    id: 'cross_financial_conglomerate',
+    name: 'Financial Services Conglomerate',
+    sectorId: null,
+    crossSectorIds: ['privateCredit', 'wealthManagement', 'insurance'],
+    requiredSubTypes: ['Direct Lending / Senior Debt', 'Specialty Finance / ABL', 'Independent RIA', 'Insurance-Based Advisory', 'P&C Agency', 'Employee Benefits Brokerage'],
+    minSubTypes: 3,
+    baseEbitdaThreshold: 15000,
+    bonuses: { marginBoost: 0.06, growthBoost: 0.04, multipleExpansion: 2.5, recessionResistanceReduction: 0.65 },
+    integrationCostFraction: 0.30,
+    description: 'The holy grail: lending, advising, and insuring under one roof. Total financial services integration.',
+    realWorldExample: 'Berkshire Hathaway, Markel Corporation, Leucadia (Jefferies)',
   },
 ];
 

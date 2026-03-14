@@ -104,6 +104,11 @@ export function AchievementBrowserModal({
                           <p className={`text-xs ${isUnlocked ? 'text-text-muted' : 'text-text-muted/60'}`}>
                             {achievement.description}
                           </p>
+                          {achievement.unlocks && (
+                            <p className={`text-[10px] mt-1 ${isUnlocked ? 'text-emerald-400/80' : 'text-amber-400/60'}`}>
+                              {isUnlocked ? '✓' : '🔒'} Unlocks: {achievement.unlocks}
+                            </p>
+                          )}
                         </div>
                         {isUnlocked && (
                           <span className="text-green-400 text-xs shrink-0 mt-0.5">✓</span>

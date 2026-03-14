@@ -37,7 +37,7 @@ import {
   EARLY_GAME_AFFORDABLE_THRESHOLD,
 } from '../data/gameConfig';
 import type { DealInflationState, GameDuration, IPOState } from './types';
-import { SECTORS, SECTOR_LIST, SECTOR_LIST_STANDARD } from '../data/sectors';
+import { SECTORS, SECTOR_LIST_STANDARD, getAvailableSectors } from '../data/sectors';
 import { getRandomBusinessName } from '../data/names';
 import { getTeamsByLeague } from '../data/proSportsTeams';
 import type { ProSportsLeague } from '../data/proSportsTeams';
@@ -1128,6 +1128,8 @@ export function generateDealPipeline(
   isFamilyOfficeMode: boolean = false,
   difficulty: 'easy' | 'normal' = 'easy',
   ownedProSportsSubTypes: string[] = [],
+  unlockedSectorIds: SectorId[] = [],
+  isChallenge: boolean = false,
 ): Deal[] {
   // Age existing deals first
   let pipeline = currentPipeline.map(deal => ({
@@ -1143,8 +1145,8 @@ export function generateDealPipeline(
 
   // Track sectors already in pipeline to ensure variety
   const sectorsInPipeline = new Set(pipeline.map(d => d.business.sectorId));
-  // FO mode includes proSports; normal mode excludes FO-exclusive sectors
-  const sectorList = isFamilyOfficeMode ? SECTOR_LIST : SECTOR_LIST_STANDARD;
+  // FO mode includes proSports; normal mode excludes FO-exclusive + unlockable (unless earned)
+  const sectorList = getAvailableSectors(isFamilyOfficeMode, unlockedSectorIds, isChallenge);
   const allSectorIds = sectorList.map(s => s.id);
 
   // Compute affordability and tier weights

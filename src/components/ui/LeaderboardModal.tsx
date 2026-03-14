@@ -5,6 +5,7 @@ import { getGradeColor, getRankColor } from '../../utils/gradeColors';
 import { Modal } from './Modal';
 import { RESTRUCTURING_FEV_PENALTY } from '../../data/gameConfig';
 import { useAuthStore } from '../../hooks/useAuth';
+import { ACHIEVEMENT_PREVIEW } from '../../data/achievementPreview';
 
 type LeaderboardTab = 'overall' | 'hard20' | 'hard10' | 'easy20' | 'easy10' | 'distributions' | 'pe';
 
@@ -306,6 +307,15 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
             {isYou && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium">You</span>}
           </p>
           <p className="text-xs text-text-muted truncate">{isPE ? (entry.fundName || entry.holdcoName) : entry.holdcoName}</p>
+          {entry.strategy?.earnedAchievementIds && entry.strategy.earnedAchievementIds.length > 0 && (
+            <p className="text-[10px] leading-tight mt-0.5">
+              {entry.strategy.earnedAchievementIds.slice(0, 6).map(id => {
+                const a = ACHIEVEMENT_PREVIEW.find(ach => ach.id === id);
+                return a ? <span key={id} title={a.name} className="mr-0.5">{a.emoji}</span> : null;
+              })}
+              {entry.strategy.earnedAchievementIds.length > 6 && <span className="text-text-muted">+{entry.strategy.earnedAchievementIds.length - 6}</span>}
+            </p>
+          )}
         </div>
       </div>
       <div className="flex items-center gap-3 sm:gap-4 md:gap-6 text-right shrink-0">

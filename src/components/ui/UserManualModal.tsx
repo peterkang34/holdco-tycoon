@@ -42,7 +42,7 @@ const SECTIONS: SectionDef[] = [
   { id: 'twenty-year', label: '20-Year Mode', shortLabel: '20-Year' },
   { id: 'fund-manager', label: 'Fund Manager Mode', shortLabel: 'PE Fund' },
   { id: 'scoring', label: 'Scoring & Leaderboard', shortLabel: 'Scoring' },
-  { id: 'sectors', label: 'The 15 Sectors', shortLabel: 'Sectors' },
+  { id: 'sectors', label: 'The 16 Sectors', shortLabel: 'Sectors' },
   { id: 'strategy', label: 'Tips & Strategy', shortLabel: 'Tips' },
   { id: 'glossary', label: 'Glossary', shortLabel: 'Glossary' },
 ];
@@ -565,7 +565,7 @@ function OperationsContent() {
         headers={['CapEx Rate', 'Sectors']}
         rows={[
           ['3%', 'Agency, Wealth Management'],
-          ['4%', 'Insurance'],
+          ['4%', 'Insurance, Private Credit'],
           ['6%', 'B2B Services'],
           ['7%', 'Education'],
           ['10%', 'SaaS, Healthcare, Auto Services'],
@@ -737,8 +737,8 @@ function PlatformsContent() {
       <SubHeading>Integrated Platforms</SubHeading>
       <P>
         Integrated platforms are forged by combining 2 or more businesses with matching sub-types
-        that fit a specific &ldquo;recipe.&rdquo; The game includes 38 platform recipes (32 within a single
-        sector + 6 cross-sector). Forging a platform applies powerful one-time bonuses:
+        that fit a specific &ldquo;recipe.&rdquo; The game includes 42 platform recipes (34 within a single
+        sector + 8 cross-sector). Forging a platform applies powerful one-time bonuses:
       </P>
 
       <DataTable
@@ -746,8 +746,8 @@ function PlatformsContent() {
         rows={[
           ['Margin Boost', '+3 to +5 ppt', 'One-time permanent increase to EBITDA margins'],
           ['Growth Boost', '+1 to +4%', 'Added to revenue growth rate (persists)'],
-          ['Multiple Expansion', '+1.0 to +2.0x', 'Premium on exit multiple for constituent businesses'],
-          ['Recession Resistance', '0.75-0.85x', 'Reduces recession sensitivity for platform members'],
+          ['Multiple Expansion', '+1.0 to +2.5x', 'Premium on exit multiple for constituent businesses'],
+          ['Recession Resistance', '0.65-0.85x', 'Reduces recession sensitivity for platform members'],
         ]}
       />
       <P>
@@ -768,7 +768,7 @@ function PlatformsContent() {
 
       <SubHeading>Integration Cost</SubHeading>
       <P>
-        Forging a platform costs 18-25% of the combined EBITDA of the constituent businesses.
+        Forging a platform costs 18-30% of the combined EBITDA of the constituent businesses.
         This is a cash outlay paid upfront, representing the organizational cost of true integration.
       </P>
 
@@ -810,6 +810,27 @@ function PlatformsContent() {
         combination. The margin and growth boosts are permanent, making platforms the strongest
         value driver in the game. You can always add more businesses after forging.
       </HighlightBox>
+
+      <SubHeading>Captive Capital Advantage (Private Credit Synergy)</SubHeading>
+      <P>
+        Owning active Private Credit businesses provides a financing synergy that reduces the bank
+        debt interest rate on <em>all</em> new acquisitions across your entire portfolio. The discount
+        follows a diminishing returns schedule:
+      </P>
+      <DataTable
+        headers={['Private Credit Businesses Owned', 'Rate Reduction', 'Cumulative']}
+        rows={[
+          ['1st', '-0.75%', '-0.75%'],
+          ['2nd', '-0.50%', '-1.25%'],
+          ['3rd+', '-0.25%', '-1.50% (cap)'],
+        ]}
+      />
+      <P>
+        The rate floor is 3% &mdash; the synergy cannot push bank debt rates below that. During credit
+        tightening events, the synergy discount is halved. The discount applies only to bank debt on new
+        deals, not to existing debt, seller notes, or earn-outs. Look for the <em>Synergy</em> label
+        next to bank debt rates in deal structures.
+      </P>
     </>
   );
 }
@@ -1133,7 +1154,7 @@ function EventsContent() {
         rows={[
           ['Very Low (0.2-0.3)', 'Healthcare (0.2), Home Services (0.3), Auto Services (0.25), Environmental (0.3)'],
           ['Low (0.35-0.5)', 'Insurance (0.35), Wealth Mgmt (0.4), SaaS (0.5)'],
-          ['Medium (0.6-0.8)', 'Real Estate (0.6), Distribution (0.65), Industrial (0.7), B2B Services (0.8), Restaurants (0.8)'],
+          ['Medium (0.6-0.8)', 'Real Estate (0.6), Distribution (0.65), Industrial (0.7), Private Credit (0.7), B2B Services (0.8), Restaurants (0.8)'],
           ['High (1.0-1.2)', 'Consumer Brands (1.0), Agency (1.2)'],
           ['Counter-Cyclical (-0.2)', 'Education (-0.2) — actually benefits from recessions'],
         ]}
@@ -1258,7 +1279,7 @@ function ScoringContent() {
 function SectorsContent() {
   return (
     <>
-      <SectionTitle>The 15 Sectors</SectionTitle>
+      <SectionTitle>The 16 Sectors</SectionTitle>
       <P>
         Each sector has unique economics that affect acquisition multiples, growth rates, margins,
         CapEx requirements, and recession vulnerability. Understanding sector characteristics is
@@ -1283,8 +1304,16 @@ function SectorsContent() {
           ['Distribution', '$1.2M-$5M', '3.5-6.5x', 'Medium (0.65)', 'Thin margins (10-18%); highest shared services benefit (1.5x)'],
           ['Wealth Management', '$1M-$4.5M', '7.0-12.0x', 'Low (0.4)', 'Highest multiples in the game; AUM-driven, recurring fees'],
           ['Environmental', '$1.2M-$5M', '4.0-7.0x', 'Very Low (0.3)', 'Essential, regulated; high CapEx but very stable cash flows'],
+          ['Private Credit', '$1.2M-$5M', '5.5-9.0x', 'Medium (0.7)', 'Prestige sector; financing synergy reduces bank debt rates on all new deals'],
         ]}
       />
+
+      <HighlightBox variant="tip">
+        <strong>Prestige Sectors:</strong> Some sectors are locked behind achievements. Private
+        Credit &amp; Lending unlocks after earning the <em>Clean Sheet</em> achievement (complete
+        a game with zero anti-patterns, B grade or better). Prestige sectors do not appear in
+        challenge mode.
+      </HighlightBox>
 
       <HighlightBox variant="tip">
         <strong>Sector Selection Strategy:</strong> High-multiple sectors (Insurance, Wealth
@@ -1319,7 +1348,7 @@ function StrategyContent() {
       <SubHeading>Platform Strategy</SubHeading>
       <BulletList items={[
         <><strong>Plan the recipe early.</strong> Check which platform recipes match the businesses in your pipeline. Working toward a specific combination is far more effective than hoping one materializes.</>,
-        <><strong>Platforms are powerful but expensive.</strong> The 18-25% integration cost is a significant cash outlay. Make sure you can afford it without over-leveraging.</>,
+        <><strong>Platforms are powerful but expensive.</strong> The 18-30% integration cost is a significant cash outlay. Make sure you can afford it without over-leveraging.</>,
         <><strong>Integrated platforms compound value.</strong> The one-time margin boost and growth boost are permanent mutations. Over a long game, these compound significantly.</>,
       ]} />
 

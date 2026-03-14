@@ -6,10 +6,42 @@ import {
   ROLLOVER_MIN_QUALITY,
   ROLLOVER_MIN_MA_TIER,
   ROLLOVER_EXCLUDED_ARCHETYPES,
+  LENDING_SYNERGY_SCHEDULE,
+  LENDING_SYNERGY_MAX_REDUCTION,
+  LENDING_SYNERGY_MIN_RATE,
+  LENDING_SYNERGY_CRISIS_MULTIPLIER,
 } from '../data/gameConfig';
 import { calculateShareFundedTerms } from './ipo';
 import { getLeagueTier } from '../data/proSportsTeams';
 import type { ProSportsLeague } from '../data/proSportsTeams';
+
+/**
+ * Calculate the lending synergy discount from owned Private Credit businesses.
+ * Uses diminishing returns: 1st biz = -75bp, 2nd = -50bp, 3rd = -25bp, 4+ = 0.
+ * Halved during credit tightening events.
+ */
+export function calculateLendingSynergyDiscount(
+  businesses: Business[],
+  isCreditTightening: boolean = false,
+): number {
+  const pcCount = businesses.filter(
+    b => b.sectorId === 'privateCredit' && (b.status === 'active' || b.status === 'integrated')
+  ).length;
+
+  if (pcCount === 0) return 0;
+
+  let discount = 0;
+  for (let i = 0; i < Math.min(pcCount, LENDING_SYNERGY_SCHEDULE.length); i++) {
+    discount += LENDING_SYNERGY_SCHEDULE[i];
+  }
+  discount = Math.min(discount, LENDING_SYNERGY_MAX_REDUCTION);
+
+  if (isCreditTightening) {
+    discount *= LENDING_SYNERGY_CRISIS_MULTIPLIER;
+  }
+
+  return discount;
+}
 
 export function generateDealStructures(
   deal: Deal,
@@ -22,6 +54,7 @@ export function generateDealStructures(
   duration: GameDuration = 'standard',
   sellerArchetype?: string,
   ipoState?: IPOState,
+  lendingSynergyDiscount: number = 0,
 ): DealStructure[] {
   const askingPrice = deal.effectivePrice;
   const structures: DealStructure[] = [];
@@ -85,12 +118,17 @@ export function generateDealStructures(
     const bankDebtAmount = askingPrice - bankDebtCash;
 
     if (playerCash >= bankDebtCash) {
+      // Apply Private Credit lending synergy discount to bank debt rate
+      const effectiveBankRate = Math.max(
+        LENDING_SYNERGY_MIN_RATE,
+        interestRate - lendingSynergyDiscount
+      );
       structures.push({
         type: 'bank_debt',
         cashRequired: bankDebtCash,
         bankDebt: {
           amount: bankDebtAmount,
-          rate: interestRate,
+          rate: effectiveBankRate,
           termRounds: bankDebtTerms,
         },
         leverage: deal.business.ebitda > 0 ? Math.round((bankDebtAmount / deal.business.ebitda) * 10) / 10 : 99.9,
@@ -130,6 +168,11 @@ export function generateDealStructures(
 
     if (playerCash >= lboCash && lboBankAmount > 0) {
       const combinedDebt = lboNoteAmount + lboBankAmount;
+      // Apply synergy discount to bank debt portion (seller note rate unaffected)
+      const effectiveLboRate = Math.max(
+        LENDING_SYNERGY_MIN_RATE,
+        interestRate - lendingSynergyDiscount
+      );
       structures.push({
         type: 'seller_note_bank_debt',
         cashRequired: lboCash,
@@ -140,7 +183,7 @@ export function generateDealStructures(
         },
         bankDebt: {
           amount: lboBankAmount,
-          rate: interestRate,
+          rate: effectiveLboRate,
           termRounds: bankDebtTerms,
         },
         leverage: deal.business.ebitda > 0 ? Math.round((combinedDebt / deal.business.ebitda) * 10) / 10 : 99.9,

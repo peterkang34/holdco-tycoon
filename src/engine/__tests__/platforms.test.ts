@@ -355,8 +355,8 @@ describe('checkPlatformEligibility', () => {
 // ── Recipe Data Integrity ──
 
 describe('Platform recipe data integrity', () => {
-  it('should have exactly 38 recipes (32 within-sector + 6 cross-sector)', () => {
-    expect(PLATFORM_RECIPES).toHaveLength(38);
+  it('should have exactly 42 recipes (34 within-sector + 8 cross-sector)', () => {
+    expect(PLATFORM_RECIPES).toHaveLength(42);
   });
 
   it('every recipe should have a unique id', () => {
@@ -445,16 +445,16 @@ describe('Platform recipe data integrity', () => {
 
   it('cross-sector recipes (sectorId: null) must have crossSectorIds defined with >= 2 sectors', () => {
     const crossSector = PLATFORM_RECIPES.filter(r => r.sectorId === null);
-    expect(crossSector).toHaveLength(6);
+    expect(crossSector).toHaveLength(8);
     for (const recipe of crossSector) {
       expect(recipe.crossSectorIds).toBeDefined();
       expect(recipe.crossSectorIds!.length).toBeGreaterThanOrEqual(2);
     }
   });
 
-  it('within-sector recipes should have 32 total', () => {
+  it('within-sector recipes should have 34 total', () => {
     const withinSector = PLATFORM_RECIPES.filter(r => r.sectorId !== null);
-    expect(withinSector).toHaveLength(32);
+    expect(withinSector).toHaveLength(34);
   });
 
   it('every recipe should have a non-empty name and description', () => {
@@ -924,5 +924,101 @@ describe('Tiered platform sale bonus', () => {
 
   it('total stacked benefit for low-tier recipes (1.0x + 0.5x = 1.5x)', () => {
     expect(1.0 + getPlatformSaleBonus(1.0)).toBe(1.5);
+  });
+});
+
+// ── 3-Sector Platform (Financial Services Conglomerate) ──
+
+describe('3-Sector Financial Services Conglomerate', () => {
+  const conglomerateRecipe = PLATFORM_RECIPES.find(r => r.id === 'cross_financial_conglomerate')!;
+
+  it('recipe exists with 3 crossSectorIds', () => {
+    expect(conglomerateRecipe).toBeDefined();
+    expect(conglomerateRecipe.crossSectorIds).toHaveLength(3);
+    expect(conglomerateRecipe.crossSectorIds).toContain('privateCredit');
+    expect(conglomerateRecipe.crossSectorIds).toContain('wealthManagement');
+    expect(conglomerateRecipe.crossSectorIds).toContain('insurance');
+  });
+
+  it('has correct thresholds: minSubTypes 3, baseEbitdaThreshold 15000, integrationCost 0.30', () => {
+    expect(conglomerateRecipe.minSubTypes).toBe(3);
+    expect(conglomerateRecipe.baseEbitdaThreshold).toBe(15000);
+    expect(conglomerateRecipe.integrationCostFraction).toBe(0.30);
+  });
+
+  it('has strongest bonuses: multipleExpansion 2.5, recessionResistance 0.65', () => {
+    expect(conglomerateRecipe.bonuses.multipleExpansion).toBe(2.5);
+    expect(conglomerateRecipe.bonuses.recessionResistanceReduction).toBe(0.65);
+  });
+
+  it('eligible when all 3 sectors represented with sufficient sub-types and EBITDA', () => {
+    const businesses: Business[] = [
+      createMockBusiness({ id: 'pc1', sectorId: 'privateCredit', subType: 'Direct Lending / Senior Debt', ebitda: 5000, status: 'active' }),
+      createMockBusiness({ id: 'wm1', sectorId: 'wealthManagement', subType: 'Independent RIA', ebitda: 5000, status: 'active' }),
+      createMockBusiness({ id: 'ins1', sectorId: 'insurance', subType: 'P&C Agency', ebitda: 5000, status: 'active' }),
+    ];
+    const eligible = checkPlatformEligibility(businesses, [], 'easy', 'standard');
+    const conglomerate = eligible.find(e => e.recipe.id === 'cross_financial_conglomerate');
+    expect(conglomerate).toBeDefined();
+  });
+
+  it('NOT eligible when missing one sector', () => {
+    const businesses: Business[] = [
+      createMockBusiness({ id: 'pc1', sectorId: 'privateCredit', subType: 'Direct Lending / Senior Debt', ebitda: 5000, status: 'active' }),
+      createMockBusiness({ id: 'wm1', sectorId: 'wealthManagement', subType: 'Independent RIA', ebitda: 5000, status: 'active' }),
+      // No insurance business
+    ];
+    const eligible = checkPlatformEligibility(businesses, [], 'easy', 'standard');
+    const conglomerate = eligible.find(e => e.recipe.id === 'cross_financial_conglomerate');
+    expect(conglomerate).toBeUndefined();
+  });
+
+  it('NOT eligible when below EBITDA threshold', () => {
+    const businesses: Business[] = [
+      createMockBusiness({ id: 'pc1', sectorId: 'privateCredit', subType: 'Direct Lending / Senior Debt', ebitda: 2000, status: 'active' }),
+      createMockBusiness({ id: 'wm1', sectorId: 'wealthManagement', subType: 'Independent RIA', ebitda: 2000, status: 'active' }),
+      createMockBusiness({ id: 'ins1', sectorId: 'insurance', subType: 'P&C Agency', ebitda: 2000, status: 'active' }),
+    ];
+    // Total EBITDA = 6000 < 15000 threshold
+    const eligible = checkPlatformEligibility(businesses, [], 'easy', 'standard');
+    const conglomerate = eligible.find(e => e.recipe.id === 'cross_financial_conglomerate');
+    expect(conglomerate).toBeUndefined();
+  });
+
+  it('dissolution: dissolves when losing all businesses from one sector', () => {
+    const conglomeratePlatform: IntegratedPlatform = {
+      id: 'plat_conglomerate',
+      recipeId: 'cross_financial_conglomerate',
+      name: 'Financial Services Conglomerate',
+      sectorIds: ['privateCredit', 'wealthManagement', 'insurance'],
+      constituentBusinessIds: ['pc1', 'wm1', 'ins1'],
+      forgedInRound: 5,
+      bonuses: conglomerateRecipe.bonuses,
+    };
+    // Insurance business sold — only PC and WM remain
+    const remaining: Business[] = [
+      createMockBusiness({ id: 'pc1', sectorId: 'privateCredit', subType: 'Direct Lending / Senior Debt', status: 'active' }),
+      createMockBusiness({ id: 'wm1', sectorId: 'wealthManagement', subType: 'Independent RIA', status: 'active' }),
+    ];
+    expect(checkPlatformDissolution(conglomeratePlatform, remaining)).toBe(true);
+  });
+
+  it('dissolution: survives when all 3 sectors still represented', () => {
+    const conglomeratePlatform: IntegratedPlatform = {
+      id: 'plat_conglomerate',
+      recipeId: 'cross_financial_conglomerate',
+      name: 'Financial Services Conglomerate',
+      sectorIds: ['privateCredit', 'wealthManagement', 'insurance'],
+      constituentBusinessIds: ['pc1', 'wm1', 'ins1', 'ins2'],
+      forgedInRound: 5,
+      bonuses: conglomerateRecipe.bonuses,
+    };
+    // One insurance sold, but another remains — all sectors still represented
+    const remaining: Business[] = [
+      createMockBusiness({ id: 'pc1', sectorId: 'privateCredit', subType: 'Direct Lending / Senior Debt', status: 'active' }),
+      createMockBusiness({ id: 'wm1', sectorId: 'wealthManagement', subType: 'Independent RIA', status: 'active' }),
+      createMockBusiness({ id: 'ins2', sectorId: 'insurance', subType: 'Employee Benefits Brokerage', status: 'active' }),
+    ];
+    expect(checkPlatformDissolution(conglomeratePlatform, remaining)).toBe(false);
   });
 });

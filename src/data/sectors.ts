@@ -490,6 +490,39 @@ export const SECTORS: Record<string, SectorDefinition> = {
     marginDriftRange: [-0.004, 0.000],
     marginVolatility: 0.01,
   },
+  privateCredit: {
+    id: 'privateCredit',
+    name: 'Private Credit & Lending',
+    emoji: '🏦',
+    color: '#2C5F7C',
+    baseEbitda: [1200, 5000],
+    acquisitionMultiple: [5.5, 9.0],
+    volatility: 0.12,
+    capexRate: 0.04,
+    organicGrowthRange: [0.01, 0.06],
+    reinvestmentEfficiency: 0.9,
+    clientConcentration: 'medium',
+    talentDependency: 'high',
+    recessionSensitivity: 0.7,
+    sharedServicesBenefit: 1.0,
+    sectorFocusGroup: ['privateCredit', 'wealthManagement', 'insurance'],
+    subTypes: [
+      'Direct Lending / Senior Debt',
+      'Specialty Finance / ABL',
+      'Equipment Leasing',
+      'Revenue-Based Finance',
+      'SBA / Government-Guaranteed Lending',
+      'Mezzanine & Subordinated Debt',
+    ],
+    // Affinity groups: 0=senior/secured lending, 1=specialty/structured lending
+    subTypeGroups: [0, 1, 1, 1, 0, 0],
+    subTypeMarginModifiers: [0, 0.02, -0.01, 0.01, -0.02, 0.04],
+    subTypeGrowthModifiers: [0, 0, -0.01, 0.03, 0, -0.02],
+    baseRevenue: [3158, 22727],   // 1200/0.38=3158, 5000/0.22=22727
+    baseMargin: [0.22, 0.38],
+    marginDriftRange: [-0.005, 0.001],
+    marginVolatility: 0.02,
+  },
   proSports: {
     id: 'proSports',
     name: 'Pro Sports Franchises',
@@ -518,13 +551,38 @@ export const SECTORS: Record<string, SectorDefinition> = {
 /** Sectors exclusive to Family Office mode */
 export const FO_EXCLUSIVE_SECTORS: SectorId[] = ['proSports'];
 
-/** Standard sector list (excludes FO-exclusive sectors) */
+/** Sectors gated behind achievement unlocks */
+export const UNLOCKABLE_SECTORS: Partial<Record<SectorId, {
+  gateAchievementId: string;
+  requiresAccount: boolean;
+}>> = {
+  privateCredit: {
+    gateAchievementId: 'clean_sheet',
+    requiresAccount: true,
+  },
+};
+
+/** Standard sector list (excludes FO-exclusive and unlockable sectors) */
 export const SECTOR_LIST_STANDARD = Object.values(SECTORS).filter(
-  s => !FO_EXCLUSIVE_SECTORS.includes(s.id)
+  s => !FO_EXCLUSIVE_SECTORS.includes(s.id) && !(s.id in UNLOCKABLE_SECTORS)
 );
 
-/** Full sector list (includes FO-exclusive sectors) */
+/** Full sector list (includes all sectors) */
 export const SECTOR_LIST = Object.values(SECTORS);
+
+/** Get available sectors based on mode, unlock state, and challenge flag */
+export function getAvailableSectors(
+  isFamilyOffice: boolean,
+  unlockedSectorIds: SectorId[] = [],
+  isChallenge: boolean = false,
+): SectorDefinition[] {
+  if (isFamilyOffice) return SECTOR_LIST;
+  if (isChallenge) return SECTOR_LIST_STANDARD;
+  const unlocked = Object.values(SECTORS).filter(
+    s => s.id in UNLOCKABLE_SECTORS && unlockedSectorIds.includes(s.id)
+  );
+  return [...SECTOR_LIST_STANDARD, ...unlocked];
+}
 
 export function getSectorById(id: string): SectorDefinition | undefined {
   return SECTORS[id];
