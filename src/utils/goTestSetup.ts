@@ -204,6 +204,7 @@ export function setupGoTest(variant: GoTestVariant): {
     hasRestructured: false,
     maxRounds,
     seed: 42,
+    isChallenge: false,
   };
 
   if (isFundManager) {

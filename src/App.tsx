@@ -117,8 +117,8 @@ function App() {
       if (result) {
         setIncomingResult(result);
       }
-    } else if (isChallenge && seed) {
-      // No URL params — reconstruct challenge context from persisted store
+    } else if (isChallenge && seed && !gameOver) {
+      // No URL params, active challenge game — reconstruct challenge context from persisted store
       setChallengeData({ seed, difficulty, duration });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -143,8 +143,8 @@ function App() {
     } else if (gameOver && currentState.familyOfficeState?.isActive && !currentState.familyOfficeState?.legacyScore) {
       // Mid-FO reload (legacy — shouldn't happen with V2, but safe fallback)
       setScreen('familyOfficeResults');
-    } else if (gameOver && isChallenge) {
-      // Challenge game over — route to GameOverScreen so scoreboard can mount and auto-submit
+    } else if (gameOver && isChallenge && challengeData) {
+      // Challenge game over WITH active challenge URL — route to GameOverScreen so scoreboard can mount and auto-submit
       setScreen('gameOver');
     } else if (gameOver) {
       // Non-challenge game over — show intro instead of trapping on dead GameOver screen.
