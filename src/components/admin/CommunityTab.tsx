@@ -55,6 +55,10 @@ export function CommunityTab({ token }: { token: string }) {
   const [repairing, setRepairing] = useState(false);
   const [repairResult, setRepairResult] = useState<string | null>(null);
 
+  // Backfill achievements state
+  const [backfilling, setBackfilling] = useState(false);
+  const [backfillResult, setBackfillResult] = useState<string | null>(null);
+
   // Merge state
   const [mergeMode, setMergeMode] = useState(false);
   const [mergeSource, setMergeSource] = useState<string | null>(null);
@@ -203,6 +207,35 @@ export function CommunityTab({ token }: { token: string }) {
             </button>
             {repairResult && (
               <span className="text-[10px] text-text-muted">{repairResult}</span>
+            )}
+            <button
+              onClick={async () => {
+                setBackfilling(true);
+                setBackfillResult(null);
+                try {
+                  const res = await fetch('/api/admin/backfill-achievements', {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                  });
+                  const json = await res.json();
+                  if (res.ok) {
+                    setBackfillResult(`Done: ${json.processed}/${json.total} players${json.failed > 0 ? ` (${json.failed} failed)` : ''}`);
+                  } else {
+                    setBackfillResult(json.error || 'Backfill failed');
+                  }
+                } catch {
+                  setBackfillResult('Network error');
+                } finally {
+                  setBackfilling(false);
+                }
+              }}
+              disabled={backfilling}
+              className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded hover:bg-emerald-500/30 transition-colors disabled:opacity-50"
+            >
+              {backfilling ? 'Backfilling...' : 'Backfill Achievements'}
+            </button>
+            {backfillResult && (
+              <span className="text-[10px] text-text-muted">{backfillResult}</span>
             )}
             <button
               onClick={() => {
