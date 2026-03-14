@@ -645,8 +645,6 @@ export function GameOverScreen({
   }, [strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions, founderEquityValue, difficulty, duration, bankruptRound, isFundManagerMode, carryWaterfallData]);
 
   // ── Derived ──
-  const gameNumber = parseInt(localStorage.getItem('holdco-game-number') ?? '0', 10);
-  const isFirstGame = gameNumber <= 1;
   const isBankruptcy = !!bankruptRound;
   const gradeTips = isFundManagerMode ? PE_GRADE_TIPS : HOLDCO_GRADE_TIPS;
 
