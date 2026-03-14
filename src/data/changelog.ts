@@ -20,7 +20,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         heading: 'Private Credit Sector (Prestige Unlock)',
         items: [
           'New prestige sector: Private Credit & Lending — 6 sub-types with unique platform recipes.',
-          'Earn the "Clean Sheet" achievement (zero anti-patterns, B+ grade) to unlock it.',
+          'Earn 11 achievements (any combination) to unlock — track your progress in the achievement browser.',
           'Owning Private Credit businesses gives a bank debt rate discount on all new deals (up to -1.50%).',
           'First-ever 3-sector platform recipe: Financial Services Conglomerate (Private Credit + Wealth Management + Insurance).',
         ],

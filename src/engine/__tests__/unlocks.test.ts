@@ -77,14 +77,23 @@ describe('Achievement Unlock Gating', () => {
       expect(getUnlockedSectorIds()).toEqual([]);
     });
 
-    it('returns privateCredit after clean_sheet earned (non-anonymous)', () => {
-      localStorageMock.setItem('holdco-tycoon-achievements', JSON.stringify(['clean_sheet']));
+    it('returns empty with fewer than 11 achievements (non-anonymous)', () => {
+      const tenAchievements = Array.from({ length: 10 }, (_, i) => `ach_${i}`);
+      localStorageMock.setItem('holdco-tycoon-achievements', JSON.stringify(tenAchievements));
+      const unlocked = getUnlockedSectorIds(false);
+      expect(unlocked).not.toContain('privateCredit');
+    });
+
+    it('returns privateCredit after earning 11+ achievements (non-anonymous)', () => {
+      const elevenAchievements = Array.from({ length: 11 }, (_, i) => `ach_${i}`);
+      localStorageMock.setItem('holdco-tycoon-achievements', JSON.stringify(elevenAchievements));
       const unlocked = getUnlockedSectorIds(false);
       expect(unlocked).toContain('privateCredit');
     });
 
-    it('returns empty for anonymous users even with clean_sheet (requiresAccount)', () => {
-      localStorageMock.setItem('holdco-tycoon-achievements', JSON.stringify(['clean_sheet']));
+    it('returns empty for anonymous users even with 11+ achievements (requiresAccount)', () => {
+      const elevenAchievements = Array.from({ length: 11 }, (_, i) => `ach_${i}`);
+      localStorageMock.setItem('holdco-tycoon-achievements', JSON.stringify(elevenAchievements));
       const unlocked = getUnlockedSectorIds(true);
       expect(unlocked).not.toContain('privateCredit');
     });
@@ -121,9 +130,9 @@ describe('Achievement Unlock Gating', () => {
   });
 
   describe('UNLOCKABLE_SECTORS data', () => {
-    it('privateCredit is gated by clean_sheet achievement', () => {
+    it('privateCredit is gated by 11 achievements', () => {
       expect(UNLOCKABLE_SECTORS.privateCredit).toBeDefined();
-      expect(UNLOCKABLE_SECTORS.privateCredit!.gateAchievementId).toBe('clean_sheet');
+      expect(UNLOCKABLE_SECTORS.privateCredit!.gateAchievementCount).toBe(11);
     });
 
     it('privateCredit sector definition exists', () => {

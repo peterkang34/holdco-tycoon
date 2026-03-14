@@ -37,10 +37,10 @@ export function isAchievementEarned(achievementId: string): boolean {
 
 /** Get sector IDs that the player has unlocked via achievements */
 export function getUnlockedSectorIds(isAnonymous: boolean = true): SectorId[] {
-  const earned = new Set(getEarnedAchievementIds());
-  return (Object.entries(UNLOCKABLE_SECTORS) as [SectorId, { gateAchievementId: string; requiresAccount: boolean }][])
+  const earnedCount = getEarnedAchievementIds().length;
+  return (Object.entries(UNLOCKABLE_SECTORS) as [SectorId, { gateAchievementCount: number; requiresAccount: boolean }][])
     .filter(([, gate]) => {
-      if (!earned.has(gate.gateAchievementId)) return false;
+      if (earnedCount < gate.gateAchievementCount) return false;
       // If sector requires account, anonymous users don't get access
       if (gate.requiresAccount && isAnonymous) return false;
       return true;

@@ -147,7 +147,7 @@ research/                   # GIT-TRACKED — external research (podcasts, books
 - `src/engine/platforms.ts` — Platform eligibility, forging, bonus application
 - `src/components/screens/GameOverScreen.tsx` — Game over orchestrator (~500 lines, imports 13 child components from `src/components/gameover/`)
 - `src/components/gameover/` — 13 extracted game-over components (FEVHeroSection, CarryHeroSection, ScoreBreakdownSection, PortfolioSummary, etc.)
-- `src/data/achievementPreview.ts` — 21 achievement definitions with pure predicate check functions (incl. `clean_sheet` for prestige unlocks)
+- `src/data/achievementPreview.ts` — 21 achievement definitions with pure predicate check functions
 - `src/hooks/useUnlocks.ts` — Achievement persistence (localStorage), sector unlock gating, `getUnlockedSectorIds()`
 - `src/data/archetypeNames.ts` — Shared strategy archetype display name mapping
 - `src/components/ui/LeaderboardModal.tsx` — Tabbed leaderboard (exports filtering utils for GameOverScreen)
@@ -210,7 +210,7 @@ research/                   # GIT-TRACKED — external research (podcasts, books
 - **Race conditions in async AI calls** — always check state is still current before setting narrative/storyBeats
 - **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety. Current: v37
 - **Integrated platforms**: Margin/growth bonuses are ONE-TIME mutations at forge time (clamped via `clampMargin`/`capGrowthRate`); multiple expansion + recession resistance are automatic via engine; platform sale bonus is tiered by `multipleExpansion` (0.3x for 2.0x+, 0.5x otherwise) via `getPlatformSaleBonus()`
-- **17 sectors, ~104 sub-types**: 15 standard + 1 prestige (privateCredit, gated by `clean_sheet` achievement) + 1 FO-exclusive (proSports with 8 league sub-types). Overlaps resolved (no cross-sector sub-type duplication); sectors.ts is authoritative
+- **17 sectors, ~104 sub-types**: 15 standard + 1 prestige (privateCredit, gated by 11+ total achievements) + 1 FO-exclusive (proSports with 8 league sub-types). Overlaps resolved (no cross-sector sub-type duplication); sectors.ts is authoritative
 - **proSports restrictions**: Pro sports teams are standalone trophy assets — blocked from mergers, tuck-ins, platform designation, and platform eligibility. Guards in `useGame.ts` (acquireTuckIn, mergeBusinesses, addToIntegratedPlatform) + `platforms.ts` (checkPlatformEligibility, checkNearEligiblePlatforms) + AllocatePhase UI filters. 200 real teams across 8 leagues (NFL/NBA/MLB/NHL/EPL/MLS/WNBA/NWSL). Women's leagues (WNBA/NWSL) allow flexible deal structures (seller notes, earn-outs). One team per league enforced via `ownedProSportsSubTypes` (league IDs).
 - **Platform thresholds scale by mode**: `INTEGRATION_THRESHOLD_MULTIPLIER` in gameConfig.ts (Easy-Std 1.0, Easy-Quick 0.7, Normal-Std 0.7, Normal-Quick 0.5)
 - **Private Credit synergy**: Owning PC businesses gives diminishing bank debt rate discount (-0.75%/-0.50%/-0.25%, cap -1.50%, floor 3%, halved during credit tightening). Applied in `AllocatePhase.tsx` via `calculateLendingSynergyDiscount()`. Does NOT apply to seller notes or existing debt

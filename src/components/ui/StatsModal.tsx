@@ -652,9 +652,6 @@ export function StatsModal() {
                     <div className="min-w-0">
                       <p className="text-sm font-bold">{a.name}</p>
                       <p className="text-xs text-text-muted">{a.description}</p>
-                      {a.unlocks && (
-                        <p className="text-[10px] text-emerald-400/80 mt-0.5">Unlocked: {a.unlocks}</p>
-                      )}
                     </div>
                     <span className="text-green-400 text-xs shrink-0 mt-0.5">✓</span>
                   </div>

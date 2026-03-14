@@ -22,7 +22,7 @@ import { createMockBusiness } from './helpers';
 import { calculateDistressLevel, getDistressRestrictions, getDistressDescription, calculateCovenantHeadroom } from '../distress';
 import { calculateHeatPremium, getMaxAcquisitions, calculateMultipleExpansion } from '../businesses';
 import { MA_SOURCING_CONFIG, SHARED_SERVICES_CONFIG } from '../../data/sharedServices';
-import { SECTORS, SECTOR_LIST } from '../../data/sectors';
+import { SECTORS, SECTOR_LIST, UNLOCKABLE_SECTORS } from '../../data/sectors';
 import {
   DIFFICULTY_CONFIG,
   DURATION_CONFIG,
@@ -1007,11 +1007,14 @@ describe('Display Proofreader', () => {
       expect(manual).toContain('0.65-0.85x');
     });
 
-    it('UserManualModal documents prestige sectors and Clean Sheet unlock', () => {
+    it('UserManualModal documents prestige sectors and achievement count unlock', () => {
       const manual = readComponent('components/ui/UserManualModal.tsx');
       expect(manual).toContain('Prestige Sectors');
-      expect(manual).toContain('Clean Sheet');
       expect(manual).toContain('Private Credit');
+      // Ensure manual's hardcoded count matches the constant in sectors.ts
+      const gate = UNLOCKABLE_SECTORS.privateCredit;
+      expect(gate).toBeDefined();
+      expect(manual).toContain(`${gate!.gateAchievementCount} achievements`);
     });
   });
 

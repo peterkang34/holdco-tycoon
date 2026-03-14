@@ -49,7 +49,6 @@ export interface AchievementDef {
   emoji: string;
   category: 'milestone' | 'feat' | 'mastery' | 'mode';
   check: (ctx: AchievementContext) => boolean;
-  unlocks?: string; // Content gated behind this achievement (e.g., prestige sectors)
 }
 
 export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
@@ -250,6 +249,5 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
     check: (ctx) =>
       ctx.strategyData.antiPatterns.length === 0 &&
       ['S', 'A', 'B'].includes(ctx.score.grade),
-    unlocks: 'Private Credit & Lending sector with 4 exclusive platform recipes and a bank debt discount synergy',
   },
 ];

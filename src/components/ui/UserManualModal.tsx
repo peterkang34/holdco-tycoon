@@ -1310,9 +1310,8 @@ function SectorsContent() {
 
       <HighlightBox variant="tip">
         <strong>Prestige Sectors:</strong> Some sectors are locked behind achievements. Private
-        Credit &amp; Lending unlocks after earning the <em>Clean Sheet</em> achievement (complete
-        a game with zero anti-patterns, B grade or better). Prestige sectors do not appear in
-        challenge mode.
+        Credit &amp; Lending unlocks after earning at least 11 achievements (any combination).
+        Prestige sectors do not appear in challenge mode.
       </HighlightBox>
 
       <HighlightBox variant="tip">

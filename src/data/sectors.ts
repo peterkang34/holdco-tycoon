@@ -553,11 +553,12 @@ export const FO_EXCLUSIVE_SECTORS: SectorId[] = ['proSports'];
 
 /** Sectors gated behind achievement unlocks */
 export const UNLOCKABLE_SECTORS: Partial<Record<SectorId, {
-  gateAchievementId: string;
+  /** Minimum total achievements required to unlock (any combination) */
+  gateAchievementCount: number;
   requiresAccount: boolean;
 }>> = {
   privateCredit: {
-    gateAchievementId: 'clean_sheet',
+    gateAchievementCount: 11,
     requiresAccount: true,
   },
 };

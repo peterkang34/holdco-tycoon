@@ -1,5 +1,6 @@
 import { Modal } from '../ui/Modal';
 import type { AchievementDef } from '../../data/achievementPreview';
+import { UNLOCKABLE_SECTORS, SECTORS } from '../../data/sectors';
 
 const CATEGORY_META: Record<string, { label: string; flavor: string }> = {
   milestone: { label: 'MILESTONES', flavor: 'The fundamentals. Every great holdco starts here.' },
@@ -104,11 +105,6 @@ export function AchievementBrowserModal({
                           <p className={`text-xs ${isUnlocked ? 'text-text-muted' : 'text-text-muted/60'}`}>
                             {achievement.description}
                           </p>
-                          {achievement.unlocks && (
-                            <p className={`text-[11px] mt-1 ${isUnlocked ? 'text-emerald-400/80' : 'text-amber-400/80'}`}>
-                              {isUnlocked ? '✓' : '🔒'} Unlocks: {achievement.unlocks}
-                            </p>
-                          )}
                         </div>
                         {isUnlocked && (
                           <span className="text-green-400 text-xs shrink-0 mt-0.5">✓</span>
@@ -118,6 +114,30 @@ export function AchievementBrowserModal({
                   );
                 })}
               </div>
+            </div>
+          );
+        })}
+
+        {/* Prestige sector unlock progress */}
+        {Object.entries(UNLOCKABLE_SECTORS).map(([sectorId, gate]) => {
+          if (!gate) return null;
+          const sector = SECTORS[sectorId as keyof typeof SECTORS];
+          if (!sector) return null;
+          const progress = earnedIds.size;
+          const needed = gate.gateAchievementCount;
+          const unlocked = progress >= needed;
+          return (
+            <div key={sectorId} className={`mt-4 p-3 rounded-lg border ${unlocked ? 'border-emerald-500/20 bg-emerald-500/5' : 'border-amber-500/10 bg-amber-500/5'}`}>
+              <div className="flex items-center gap-2">
+                <span className="text-base">{unlocked ? sector.emoji : '🔒'}</span>
+                <span className="text-xs font-bold">{unlocked ? `${sector.name} Unlocked` : 'Prestige Sector'}</span>
+                <span className={`ml-auto text-xs font-mono ${unlocked ? 'text-emerald-400' : 'text-amber-400/80'}`}>{progress}/{needed}</span>
+              </div>
+              <p className="text-[11px] text-text-muted mt-1">
+                {unlocked
+                  ? `You've unlocked ${sector.name} — available in the sector picker.`
+                  : `Earn ${needed} achievements to unlock ${sector.name}. ${needed - progress} more to go.`}
+              </p>
             </div>
           );
         })}
