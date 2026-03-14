@@ -137,6 +137,7 @@ export function GameOverScreen({
   // ── Stores & Auth ──
   const familyOfficeState = useGameStore(s => s.familyOfficeState);
   const lpSatisfactionScore = useGameStore(s => s.lpSatisfactionScore);
+  const lpDistributions = useGameStore(s => s.lpDistributions);
   const isReallyLoggedIn = useIsLoggedIn();
   // Force anonymous mode on test pages so signup CTAs are visible
   const isTestMode = window.location.hash.includes('go-test') || window.location.hash.includes('fo-test');
@@ -277,7 +278,8 @@ export function GameOverScreen({
     if (peakLeverage > 6) antiPatterns.push('over_leveraged');
     if (hasRestructured) antiPatterns.push('serial_restructurer');
     if (equityRaisesUsed >= 4) antiPatterns.push('dilution_spiral');
-    if (totalDistributions === 0 && maxRounds >= 10 && !isFundManagerMode) antiPatterns.push('no_distributions');
+    const madeDistributions = isFundManagerMode ? (lpDistributions || 0) > 0 : totalDistributions > 0;
+    if (!madeDistributions && maxRounds >= 10) antiPatterns.push('no_distributions');
     if (turnaroundsFailed >= 3) antiPatterns.push('turnaround_graveyard');
     if (totalAcquisitions >= 8 && allTimeSectorIds.length >= 5) antiPatterns.push('spray_and_pray');
 
@@ -392,13 +394,15 @@ export function GameOverScreen({
   // ── Achievement Preview (must be above submitGameCompletion so it can reference earnedAchievements) ──
   const earnedAchievements = useMemo(() => {
     const initialCapital = DIFFICULTY_CONFIG[difficulty]?.initialCash ?? 20000;
+    // PE fund mode uses lpDistributions instead of totalDistributions
+    const effectiveDistributions = isFundManagerMode ? (lpDistributions || 0) : totalDistributions;
     const ctx: AchievementContext = {
       strategyData,
       score,
       businesses,
       exitedBusinesses,
       totalDebt,
-      totalDistributions,
+      totalDistributions: effectiveDistributions,
       founderEquityValue,
       difficulty,
       duration,
@@ -409,7 +413,7 @@ export function GameOverScreen({
       initialCapital,
     };
     return ACHIEVEMENT_PREVIEW.filter(a => a.check(ctx));
-  }, [strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions, founderEquityValue, difficulty, duration, bankruptRound, isFundManagerMode, carryWaterfallData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions, lpDistributions, founderEquityValue, difficulty, duration, bankruptRound, isFundManagerMode, carryWaterfallData]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist earned achievements to localStorage for cross-game unlock gating
   useEffect(() => {
@@ -470,7 +474,8 @@ export function GameOverScreen({
         turnaroundsStarted: strategyData.turnaroundsStarted,
         turnaroundsSucceeded: strategyData.turnaroundsSucceeded,
         // Additional fields for server-side achievement backfill
-        totalDistributions: Math.round(totalDistributions),
+        // PE fund mode uses lpDistributions; holdco mode uses totalDistributions
+        totalDistributions: Math.round(isFundManagerMode ? (lpDistributions || 0) : totalDistributions),
         totalDebt: Math.round(totalDebt),
         activeCount: strategyData.activeCount,
         lpSatisfaction: isFundManagerMode ? (lpSatisfactionScore ?? undefined) : undefined,
@@ -620,7 +625,7 @@ export function GameOverScreen({
             platformsForged: strategyData.platformCount,
             totalAcquisitions: strategyData.totalAcquisitions,
             totalSells: strategyData.totalSells,
-            totalDistributions: Math.round(totalDistributions),
+            totalDistributions: Math.round(isFundManagerMode ? (lpDistributions || 0) : totalDistributions),
             totalBuybacks: Math.round(totalBuybacks),
             equityRaisesUsed,
             peakLeverage: Math.round(strategyData.peakLeverage * 10) / 10,
