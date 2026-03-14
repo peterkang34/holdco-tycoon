@@ -285,18 +285,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const currentCount = await kv.zcard(LEADERBOARD_KEY);
     const rank = ascRank !== null ? currentCount - ascRank : 1;
 
-    // --- Dual-write to Postgres (non-blocking, best-effort) ---
+    // --- Dual-write to Postgres ---
     if (playerId && supabaseAdmin) {
+      // 1. Ensure player_profile exists (create if new, never overwrite existing initials)
       try {
-        // Upsert player_profile (create on first game, update last_played_at on subsequent)
-        await supabaseAdmin.from('player_profiles').upsert({
+        // First try insert-only (ignoreDuplicates preserves existing profile)
+        const { error: insertError } = await supabaseAdmin.from('player_profiles').upsert({
           id: playerId,
           initials,
           updated_at: entryDate,
           last_played_at: entryDate,
-        }, { onConflict: 'id' });
+        }, { onConflict: 'id', ignoreDuplicates: true });
 
-        // Insert game_history row
+        // If profile already existed, just update last_played_at (never touch initials)
+        if (!insertError) {
+          await supabaseAdmin.from('player_profiles')
+            .update({ last_played_at: entryDate, updated_at: entryDate })
+            .eq('id', playerId);
+        }
+      } catch (err) {
+        console.error('player_profiles upsert failed:', err);
+      }
+
+      // 2. Insert game_history row (independent of profile upsert success)
+      try {
         await supabaseAdmin.from('game_history').insert({
           player_id: playerId,
           holdco_name: holdcoName.trim(),
@@ -330,8 +342,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           completed_at: entryDate,
         });
       } catch (err) {
-        // Non-blocking — KV is the source of truth, Postgres is secondary
-        console.error('Postgres dual-write failed:', err);
+        console.error('game_history insert failed:', err);
       }
 
       // Update pre-computed stats (non-blocking)

@@ -59,6 +59,10 @@ export function CommunityTab({ token }: { token: string }) {
   const [backfilling, setBackfilling] = useState(false);
   const [backfillResult, setBackfillResult] = useState<string | null>(null);
 
+  // KV sync state
+  const [syncing, setSyncing] = useState(false);
+  const [syncResult, setSyncResult] = useState<string | null>(null);
+
   // Merge state
   const [mergeMode, setMergeMode] = useState(false);
   const [mergeSource, setMergeSource] = useState<string | null>(null);
@@ -236,6 +240,36 @@ export function CommunityTab({ token }: { token: string }) {
             </button>
             {backfillResult && (
               <span className="text-[10px] text-text-muted">{backfillResult}</span>
+            )}
+            <button
+              onClick={async () => {
+                setSyncing(true);
+                setSyncResult(null);
+                try {
+                  const res = await fetch('/api/admin/sync-kv-history', {
+                    method: 'POST',
+                    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                  });
+                  const json = await res.json();
+                  if (res.ok) {
+                    setSyncResult(`Synced ${json.synced} entries (${json.skipped} existed, ${json.failed} failed)`);
+                    if (json.synced > 0) fetchData();
+                  } else {
+                    setSyncResult(json.error || 'Sync failed');
+                  }
+                } catch {
+                  setSyncResult('Network error');
+                } finally {
+                  setSyncing(false);
+                }
+              }}
+              disabled={syncing}
+              className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded hover:bg-blue-500/30 transition-colors disabled:opacity-50"
+            >
+              {syncing ? 'Syncing...' : 'Sync KV → History'}
+            </button>
+            {syncResult && (
+              <span className="text-[10px] text-text-muted">{syncResult}</span>
             )}
             <button
               onClick={() => {
@@ -431,7 +465,7 @@ export function CommunityTab({ token }: { token: string }) {
                   {selectedPlayerId === player.id && (
                     <tr>
                       <td colSpan={7} className="p-0">
-                        <PlayerDetailPanel detail={playerDetail} loading={detailLoading} />
+                        <PlayerDetailPanel detail={playerDetail} loading={detailLoading} token={token} />
                       </td>
                     </tr>
                   )}
@@ -474,7 +508,7 @@ export function CommunityTab({ token }: { token: string }) {
 
 // ── Player Detail Panel ──────────────────────────────────────────
 
-function PlayerDetailPanel({ detail, loading }: { detail: PlayerDetail | null; loading: boolean }) {
+function PlayerDetailPanel({ detail, loading, token }: { detail: PlayerDetail | null; loading: boolean; token: string }) {
   if (loading) {
     return (
       <div className="bg-bg-secondary p-4 border-t border-accent/20 animate-pulse text-text-muted text-xs">
@@ -494,6 +528,10 @@ function PlayerDetailPanel({ detail, loading }: { detail: PlayerDetail | null; l
   const stats = detail.stats as Record<string, unknown> | null;
   const gradeDistribution = (stats?.grade_distribution ?? {}) as Record<string, number>;
 
+  const [editingInitials, setEditingInitials] = useState(false);
+  const [newInitials, setNewInitials] = useState(detail.profile.initials as string || '');
+  const [savingInitials, setSavingInitials] = useState(false);
+
   return (
     <div className="bg-bg-secondary p-4 border-t border-accent/20">
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
@@ -504,6 +542,44 @@ function PlayerDetailPanel({ detail, loading }: { detail: PlayerDetail | null; l
             <div className="flex justify-between gap-2">
               <span className="text-text-muted">UUID</span>
               <span className="text-text-primary font-mono text-[9px] select-all truncate max-w-[180px]" title={detail.profile.id as string}>{detail.profile.id as string}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-text-muted">Initials</span>
+              {editingInitials ? (
+                <span className="flex items-center gap-1">
+                  <input
+                    type="text"
+                    value={newInitials}
+                    onChange={e => setNewInitials(e.target.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 4))}
+                    className="w-14 text-[11px] bg-bg-primary border border-border rounded px-1 py-0.5 text-text-primary font-mono text-center"
+                    autoFocus
+                  />
+                  <button
+                    onClick={async () => {
+                      if (newInitials.length < 2) return;
+                      setSavingInitials(true);
+                      try {
+                        const res = await fetch('/api/admin/update-initials', {
+                          method: 'POST',
+                          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ playerId: detail.profile.id, initials: newInitials }),
+                        });
+                        if (res.ok) setEditingInitials(false);
+                      } catch { /* ignore */ }
+                      setSavingInitials(false);
+                    }}
+                    disabled={savingInitials || newInitials.length < 2}
+                    className="text-[9px] text-accent hover:text-accent/80 disabled:opacity-50"
+                  >
+                    {savingInitials ? '...' : 'Save'}
+                  </button>
+                  <button onClick={() => setEditingInitials(false)} className="text-[9px] text-text-muted">Cancel</button>
+                </span>
+              ) : (
+                <span className="text-text-primary font-mono cursor-pointer hover:text-accent" onClick={() => { setEditingInitials(true); setNewInitials(detail.profile.initials as string || ''); }}>
+                  {detail.profile.initials as string || '??'} <span className="text-[9px] text-text-muted">edit</span>
+                </span>
+              )}
             </div>
             <div className="flex justify-between">
               <span className="text-text-muted">Provider</span>
