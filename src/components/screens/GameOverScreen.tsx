@@ -507,6 +507,15 @@ export function GameOverScreen({
     if (initials.length < 2 || hasSaved || saving) return;
     setSaving(true);
     setSaveError(false);
+
+    // Test mode: simulate successful save without hitting real API
+    if (isTestMode) {
+      setSavedEntryId('test-entry');
+      setHasSaved(true);
+      setSaving(false);
+      return;
+    }
+
     try {
       const gameScore = isFundManagerMode ? (peScore?.total ?? 0) : score.total;
       const gameGrade = isFundManagerMode ? (peScore?.grade ?? 'F') : score.grade;
