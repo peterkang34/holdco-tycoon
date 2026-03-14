@@ -1,7 +1,9 @@
 import type { SectorId } from '../engine/types';
 import { UNLOCKABLE_SECTORS } from '../data/sectors';
+import { getAccessToken } from '../lib/supabase';
 
 const ACHIEVEMENTS_KEY = 'holdco-tycoon-achievements';
+const SYNC_FLAG_KEY = 'holdco-achievements-synced';
 
 /** Get all achievement IDs earned across games (from localStorage) */
 export function getEarnedAchievementIds(): string[] {
@@ -44,4 +46,47 @@ export function getUnlockedSectorIds(isAnonymous: boolean = true): SectorId[] {
       return true;
     })
     .map(([sectorId]) => sectorId);
+}
+
+/**
+ * Sync achievements from server to localStorage.
+ * Merges server-side achievements (computed from game_history) with local ones.
+ * Call once on app load when the user is authenticated.
+ * Fire-and-forget — never blocks the UI.
+ */
+export async function syncAchievementsFromServer(): Promise<void> {
+  try {
+    const token = await getAccessToken();
+    if (!token) return;
+
+    const res = await fetch('/api/player/stats', {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!res.ok) return;
+
+    const data = await res.json();
+    const serverIds = data.earned_achievement_ids;
+    if (!Array.isArray(serverIds) || serverIds.length === 0) return;
+
+    // Merge server achievements into localStorage (additive)
+    saveEarnedAchievements(serverIds);
+    localStorage.setItem(SYNC_FLAG_KEY, Date.now().toString());
+  } catch {
+    // Silent — best effort sync
+  }
+}
+
+/**
+ * Check if achievements have been synced recently (within last hour).
+ * Used to avoid redundant API calls on every page load.
+ */
+export function needsAchievementSync(): boolean {
+  try {
+    const lastSync = localStorage.getItem(SYNC_FLAG_KEY);
+    if (!lastSync) return true;
+    const elapsed = Date.now() - parseInt(lastSync, 10);
+    return elapsed > 3600_000; // Re-sync after 1 hour
+  } catch {
+    return true;
+  }
 }

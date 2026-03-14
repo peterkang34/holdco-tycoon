@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabaseAdmin.js';
+import { computePlayerAchievements } from './achievementBackfill.js';
 
 /**
  * Fetch all game_history rows for a player, handling pagination.
@@ -53,6 +54,7 @@ export async function updatePlayerStats(playerId: string): Promise<void> {
           avg_score_by_mode: {},
           total_games_by_mode: {},
           score_trend: null,
+          earned_achievement_ids: [],
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'player_id' },
@@ -141,6 +143,9 @@ export async function updatePlayerStats(playerId: string): Promise<void> {
       scoreTrend = Math.round(((recentSum / 5) - (priorSum / priorSlice.length)) * 10) / 10;
     }
 
+    // Compute achievements across all games
+    const earnedAchievementIds = computePlayerAchievements(games);
+
     await supabaseAdmin.from('player_stats').upsert(
       {
         player_id: playerId,
@@ -154,6 +159,7 @@ export async function updatePlayerStats(playerId: string): Promise<void> {
         avg_score_by_mode: avgScoreByMode,
         total_games_by_mode: totalGamesByMode,
         score_trend: scoreTrend,
+        earned_achievement_ids: earnedAchievementIds,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'player_id' },

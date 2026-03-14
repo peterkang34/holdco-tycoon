@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
+import { computePlayerAchievements } from '../_lib/achievementBackfill.js';
 
 const EMPTY_STATS = {
   total_games: 0,
@@ -11,6 +12,7 @@ const EMPTY_STATS = {
   archetype_stats: {},
   anti_pattern_frequency: {},
   avg_score_by_mode: {},
+  earned_achievement_ids: [] as string[],
   global: null,
 };
 
@@ -43,6 +45,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           archetype_stats: cached.archetype_stats ?? {},
           anti_pattern_frequency: cached.anti_pattern_frequency ?? {},
           avg_score_by_mode: cached.avg_score_by_mode ?? {},
+          earned_achievement_ids: cached.earned_achievement_ids ?? [],
         };
       }
     }
@@ -126,6 +129,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         avgScoreByMode[key] = val.scoredCount > 0 ? Math.round((val.sum / val.scoredCount) * 10) / 10 : 0;
       }
 
+      // Compute achievements across all games
+      const earnedAchievementIds = computePlayerAchievements(games ?? []);
+
       playerStats = {
         total_games: totalGames,
         avg_score: scoredGames > 0 ? Math.round((sumScore / scoredGames) * 10) / 10 : 0,
@@ -135,6 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         archetype_stats: archetypeStats,
         anti_pattern_frequency: antiPatternFrequency,
         avg_score_by_mode: avgScoreByMode,
+        earned_achievement_ids: earnedAchievementIds,
       };
     } catch (err) {
       console.error('Stats computation failed:', err);

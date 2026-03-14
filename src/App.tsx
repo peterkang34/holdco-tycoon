@@ -19,6 +19,7 @@ import { PrivacyPolicyModal } from './components/ui/PrivacyPolicyModal';
 import { DeleteAccountModal } from './components/ui/DeleteAccountModal';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { setupGoTest, getGoTestVariant } from './utils/goTestSetup';
+import { syncAchievementsFromServer, needsAchievementSync } from './hooks/useUnlocks';
 
 type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard';
 
@@ -42,6 +43,15 @@ function App() {
 
   // Initialize anonymous Supabase auth + auth state listener (silent, no UI impact)
   useEffect(() => { initAnonymousAuth(); const unsub = initAuthListener(); return () => unsub?.(); }, []);
+
+  // Sync achievements from server on load (merges server-computed achievements into localStorage)
+  useEffect(() => {
+    // Small delay to let auth initialize first
+    const timer = setTimeout(() => {
+      if (needsAchievementSync()) syncAchievementsFromServer();
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const [screen, setScreen] = useState<Screen>('intro');
   const [isNewGame, setIsNewGame] = useState(false);
