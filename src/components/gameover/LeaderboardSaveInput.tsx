@@ -37,13 +37,13 @@ export function LeaderboardSaveInput({
         {!isLoggedIn && (
           <div className="mt-4 pt-4 border-t border-white/10">
             <p className="text-sm text-text-secondary text-center mb-3">
-              Right now your entry says "Anonymous." Create a free account to put your name on the board and start unlocking achievements.
+              Create a free account to collect achievements, track your game history, and unlock new sectors and gameplay events.
             </p>
             <button
               onClick={onSignUp}
               className="btn-primary w-full min-h-[44px] text-sm font-medium"
             >
-              Create Account — Keep Your Rank
+              Create Account (Free)
             </button>
             <p className="text-xs text-text-muted mt-2 text-center">
               Google or email. Takes 10 seconds.

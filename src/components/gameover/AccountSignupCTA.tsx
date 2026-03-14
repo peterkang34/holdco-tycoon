@@ -82,7 +82,7 @@ export function AccountSignupCTA({
     body = (
       <>
         <p className="text-sm text-text-secondary mb-3">
-          Create an account to put your name on the board. Right now it says "Anonymous."
+          Create a free account to save your rank, collect achievements, and unlock new gameplay.
         </p>
         {BENEFIT_LIST}
       </>
