@@ -251,7 +251,11 @@ export function GameOverScreen({
       : 0;
 
     const allBiz = [...businesses, ...exitedBusinesses];
-    const sectorIds = [...new Set(allBiz.map(b => b.sectorId))];
+    // Active sector IDs — used for achievement checks (sector_specialist needs single-sector active portfolio)
+    const activeBiz = businesses.filter(b => b.status === 'active');
+    const sectorIds = [...new Set(activeBiz.map(b => b.sectorId))];
+    // All-time sector IDs — used for anti-pattern checks (spray_and_pray uses total sector diversity)
+    const allTimeSectorIds = [...new Set(allBiz.map(b => b.sectorId))];
 
     const dealStructureTypes: Record<string, number> = {};
     for (const a of allActions) {
@@ -273,9 +277,9 @@ export function GameOverScreen({
     if (peakLeverage > 6) antiPatterns.push('over_leveraged');
     if (hasRestructured) antiPatterns.push('serial_restructurer');
     if (equityRaisesUsed >= 4) antiPatterns.push('dilution_spiral');
-    if (totalDistributions === 0 && maxRounds >= 10) antiPatterns.push('no_distributions');
+    if (totalDistributions === 0 && maxRounds >= 10 && !isFundManagerMode) antiPatterns.push('no_distributions');
     if (turnaroundsFailed >= 3) antiPatterns.push('turnaround_graveyard');
-    if (totalAcquisitions >= 8 && sectorIds.length >= 5) antiPatterns.push('spray_and_pray');
+    if (totalAcquisitions >= 8 && allTimeSectorIds.length >= 5) antiPatterns.push('spray_and_pray');
 
     let sophisticationScore = 0;
     if (platformCount > 0) sophisticationScore += 15;
@@ -286,11 +290,10 @@ export function GameOverScreen({
     if (totalSells >= 2) sophisticationScore += 10;
     if (totalDistributions > 0) sophisticationScore += 10;
     if (equityRaisesUsed > 0 && equityRaisesUsed <= 2) sophisticationScore += 5;
-    if (activeCount >= 3 && sectorIds.length <= 2) sophisticationScore += 10;
+    if (activeCount >= 3 && allTimeSectorIds.length <= 2) sophisticationScore += 10;
     if (score.total >= 60) sophisticationScore += 10;
     sophisticationScore = Math.min(100, sophisticationScore);
 
-    const activeBiz = businesses.filter(b => b.status === 'active');
     const endingSubTypes: Record<string, number> = {};
     for (const b of activeBiz) {
       const key = `${b.sectorId}:${b.subType}`;
@@ -466,6 +469,17 @@ export function GameOverScreen({
         peakLeverage: Math.round(strategyData.peakLeverage * 10) / 10,
         turnaroundsStarted: strategyData.turnaroundsStarted,
         turnaroundsSucceeded: strategyData.turnaroundsSucceeded,
+        // Additional fields for server-side achievement backfill
+        totalDistributions: Math.round(totalDistributions),
+        totalDebt: Math.round(totalDebt),
+        activeCount: strategyData.activeCount,
+        lpSatisfaction: isFundManagerMode ? (lpSatisfactionScore ?? undefined) : undefined,
+        smartExitMoic: (() => {
+          const best = exitedBusinesses
+            .filter(b => b.status === 'sold' && b.exitPrice != null && b.acquisitionPrice > 0)
+            .reduce((max, b) => Math.max(max, (b.exitPrice ?? 0) / b.acquisitionPrice), 0);
+          return best > 0 ? Math.round(best * 100) / 100 : undefined;
+        })(),
         earnedAchievementIds: earnedAchievements.length > 0 ? earnedAchievements.map(a => a.id) : undefined,
       },
     });
@@ -619,6 +633,16 @@ export function GameOverScreen({
             sourceDealUses: strategyData.sourceDealUses || undefined,
             proactiveOutreachUses: strategyData.proactiveOutreachUses || undefined,
             smbBrokerUses: strategyData.smbBrokerUses || undefined,
+            // Additional fields for server-side achievement backfill
+            totalDebt: Math.round(totalDebt),
+            activeCount: strategyData.activeCount,
+            lpSatisfaction: isFundManagerMode ? (lpSatisfactionScore ?? undefined) : undefined,
+            smartExitMoic: (() => {
+              const best = exitedBusinesses
+                .filter(b => b.status === 'sold' && b.exitPrice != null && b.acquisitionPrice > 0)
+                .reduce((max, b) => Math.max(max, (b.exitPrice ?? 0) / b.acquisitionPrice), 0);
+              return best > 0 ? Math.round(best * 100) / 100 : undefined;
+            })(),
             earnedAchievementIds: earnedAchievements.length > 0 ? earnedAchievements.map(a => a.id) : undefined,
           },
         }

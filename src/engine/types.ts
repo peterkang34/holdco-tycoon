@@ -742,6 +742,11 @@ export interface LeaderboardStrategy {
   sourceDealUses?: number;
   proactiveOutreachUses?: number;
   smbBrokerUses?: number;
+  // Achievement backfill fields
+  totalDebt?: number;
+  activeCount?: number;
+  lpSatisfaction?: number;
+  smartExitMoic?: number;
   earnedAchievementIds?: string[];
 }
 

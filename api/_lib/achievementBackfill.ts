@@ -57,9 +57,6 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
   // value_creation_machine: FEV >= 10x initial capital
   if (initialCapital > 0 && founderEquityValue >= initialCapital * 10) earned.push('value_creation_machine');
 
-  // the_contrarian: 3+ acquisitions and B+ grade (from top-level if businessCount >= 3)
-  if (businessCount >= 3 && ['S', 'A', 'B'].includes(grade ?? '')) earned.push('the_contrarian');
-
   // ── Achievements from score breakdown columns (works for games with score data) ──
 
   // the_compounder: Portfolio ROIC >= 12
@@ -79,13 +76,17 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
     const platformsForged = (strategy.platformsForged as number) ?? 0;
     const turnaroundsStarted = (strategy.turnaroundsStarted as number) ?? 0;
     const totalDistributions = (strategy.totalDistributions as number) ?? 0;
+    const totalDebt = (strategy.totalDebt as number) ?? -1; // -1 = not stored (legacy)
     const antiPatterns = strategy.antiPatterns as string[] | undefined;
     const dealStructureTypes = strategy.dealStructureTypes as Record<string, number> | undefined;
     const sectorIds = strategy.sectorIds as string[] | undefined;
+    const activeCount = (strategy.activeCount as number) ?? businessCount;
     const isFundManager = strategy.isFundManager === true;
     const carryEarned = (strategy.carryEarned as number) ?? 0;
+    const lpSatisfaction = (strategy.lpSatisfaction as number) ?? -1;
+    const smartExitMoic = (strategy.smartExitMoic as number) ?? -1;
 
-    // More precise first_acquisition from strategy
+    // first_acquisition from strategy (more precise)
     if (totalAcquisitions >= 1 && !earned.includes('first_acquisition')) earned.push('first_acquisition');
 
     // exit_strategist: sold at least one business
@@ -107,25 +108,35 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
     if (dealStructureTypes && Object.keys(dealStructureTypes).length >= 4) earned.push('deal_architect');
 
     // sector_specialist: 3+ active businesses all in same sector
-    if (sectorIds && sectorIds.length === 1 && businessCount >= 3) earned.push('sector_specialist');
+    // sectorIds now tracks ACTIVE sectors only (fixed in GameOverScreen)
+    if (sectorIds && sectorIds.length === 1 && activeCount >= 3) earned.push('sector_specialist');
 
-    // More precise the_contrarian from strategy
-    if (totalAcquisitions >= 3 && ['S', 'A', 'B'].includes(grade ?? '') && !earned.includes('the_contrarian')) {
-      earned.push('the_contrarian');
+    // the_contrarian: 3+ ACQUISITIONS (not active count) and B+ grade
+    if (totalAcquisitions >= 3 && ['S', 'A', 'B'].includes(grade ?? '')) {
+      if (!earned.includes('the_contrarian')) earned.push('the_contrarian');
     }
 
+    // debt_free: zero debt at game end and no bankruptcy
+    if (totalDebt === 0 && game.has_restructured !== true) earned.push('debt_free');
+
+    // smart_exit: sold a business at 3x+ MOIC
+    if (smartExitMoic >= 3) earned.push('smart_exit');
+
     // clean_sheet: zero anti-patterns + B+ grade
-    if (antiPatterns && antiPatterns.length === 0 && ['S', 'A', 'B'].includes(grade ?? '')) {
+    // antiPatterns may be undefined (omitted) when empty — treat as zero anti-patterns
+    const hasAntiPatterns = Array.isArray(antiPatterns) ? antiPatterns.length > 0 : false;
+    if (!hasAntiPatterns && ['S', 'A', 'B'].includes(grade ?? '')) {
       earned.push('clean_sheet');
     }
 
     // carry_king: $20M+ carry in PE mode
     if (isFundManager && carryEarned >= 20_000) earned.push('carry_king');
 
-    // lp_whisperer: 90%+ LP satisfaction (not stored in game_history — skip for backfill)
-    // This can only be tracked via earnedAchievementIds on new games
+    // lp_whisperer: 90%+ LP satisfaction in PE mode
+    if (isFundManager && lpSatisfaction >= 90) earned.push('lp_whisperer');
 
     // If the game already has earnedAchievementIds, include them directly
+    // (this is the definitive source — computed at game-over with full context)
     const storedIds = strategy.earnedAchievementIds as string[] | undefined;
     if (Array.isArray(storedIds)) {
       for (const id of storedIds) {

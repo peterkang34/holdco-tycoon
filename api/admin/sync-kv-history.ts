@@ -68,8 +68,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Already in game_history
       if (existingIds.has(entry.id)) { skipped++; continue; }
 
-      // Need a player ID to insert — use submittedBy or playerId
-      const playerId = entry.playerId || entry.submittedBy;
+      // Resolve player ID — try direct fields first, then fall back to initials match
+      let playerId = entry.playerId || entry.submittedBy;
+      if (!playerId && entry.initials) {
+        // Orphaned entry (no auth token at submit time) — try matching by initials
+        const { data: matchedProfiles } = await supabaseAdmin
+          .from('player_profiles')
+          .select('id')
+          .eq('initials', entry.initials)
+          .limit(2);
+        // Only link if exactly ONE player has these initials (avoid ambiguity)
+        if (matchedProfiles && matchedProfiles.length === 1) {
+          playerId = matchedProfiles[0].id;
+        }
+      }
       if (!playerId) { skipped++; continue; }
 
       try {
