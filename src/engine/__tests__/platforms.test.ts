@@ -355,8 +355,8 @@ describe('checkPlatformEligibility', () => {
 // ── Recipe Data Integrity ──
 
 describe('Platform recipe data integrity', () => {
-  it('should have exactly 42 recipes (34 within-sector + 8 cross-sector)', () => {
-    expect(PLATFORM_RECIPES).toHaveLength(42);
+  it('should have exactly 51 recipes (40 within-sector + 11 cross-sector)', () => {
+    expect(PLATFORM_RECIPES).toHaveLength(51);
   });
 
   it('every recipe should have a unique id', () => {
@@ -445,16 +445,16 @@ describe('Platform recipe data integrity', () => {
 
   it('cross-sector recipes (sectorId: null) must have crossSectorIds defined with >= 2 sectors', () => {
     const crossSector = PLATFORM_RECIPES.filter(r => r.sectorId === null);
-    expect(crossSector).toHaveLength(8);
+    expect(crossSector).toHaveLength(11);
     for (const recipe of crossSector) {
       expect(recipe.crossSectorIds).toBeDefined();
       expect(recipe.crossSectorIds!.length).toBeGreaterThanOrEqual(2);
     }
   });
 
-  it('within-sector recipes should have 34 total', () => {
+  it('within-sector recipes should have 40 total', () => {
     const withinSector = PLATFORM_RECIPES.filter(r => r.sectorId !== null);
-    expect(withinSector).toHaveLength(34);
+    expect(withinSector).toHaveLength(40);
   });
 
   it('every recipe should have a non-empty name and description', () => {

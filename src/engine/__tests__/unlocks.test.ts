@@ -77,23 +77,23 @@ describe('Achievement Unlock Gating', () => {
       expect(getUnlockedSectorIds()).toEqual([]);
     });
 
-    it('returns empty with fewer than 11 achievements (non-anonymous)', () => {
-      const tenAchievements = Array.from({ length: 10 }, (_, i) => `ach_${i}`);
-      localStorageMock.setItem('holdco-tycoon-achievements', JSON.stringify(tenAchievements));
+    it('returns empty with fewer than 16 achievements (non-anonymous)', () => {
+      const fifteenAchievements = Array.from({ length: 15 }, (_, i) => `ach_${i}`);
+      localStorageMock.setItem('holdco-tycoon-achievements', JSON.stringify(fifteenAchievements));
       const unlocked = getUnlockedSectorIds(false);
       expect(unlocked).not.toContain('privateCredit');
     });
 
-    it('returns privateCredit after earning 11+ achievements (non-anonymous)', () => {
-      const elevenAchievements = Array.from({ length: 11 }, (_, i) => `ach_${i}`);
-      localStorageMock.setItem('holdco-tycoon-achievements', JSON.stringify(elevenAchievements));
+    it('returns privateCredit after earning 16+ achievements (non-anonymous)', () => {
+      const sixteenAchievements = Array.from({ length: 16 }, (_, i) => `ach_${i}`);
+      localStorageMock.setItem('holdco-tycoon-achievements', JSON.stringify(sixteenAchievements));
       const unlocked = getUnlockedSectorIds(false);
       expect(unlocked).toContain('privateCredit');
     });
 
-    it('returns empty for anonymous users even with 11+ achievements (requiresAccount)', () => {
-      const elevenAchievements = Array.from({ length: 11 }, (_, i) => `ach_${i}`);
-      localStorageMock.setItem('holdco-tycoon-achievements', JSON.stringify(elevenAchievements));
+    it('returns empty for anonymous users even with 16+ achievements (requiresAccount)', () => {
+      const sixteenAchievements = Array.from({ length: 16 }, (_, i) => `ach_${i}`);
+      localStorageMock.setItem('holdco-tycoon-achievements', JSON.stringify(sixteenAchievements));
       const unlocked = getUnlockedSectorIds(true);
       expect(unlocked).not.toContain('privateCredit');
     });
@@ -130,9 +130,9 @@ describe('Achievement Unlock Gating', () => {
   });
 
   describe('UNLOCKABLE_SECTORS data', () => {
-    it('privateCredit is gated by 11 achievements', () => {
+    it('privateCredit is gated by 16 achievements', () => {
       expect(UNLOCKABLE_SECTORS.privateCredit).toBeDefined();
-      expect(UNLOCKABLE_SECTORS.privateCredit!.gateAchievementCount).toBe(11);
+      expect(UNLOCKABLE_SECTORS.privateCredit!.gateAchievementCount).toBe(16);
     });
 
     it('privateCredit sector definition exists', () => {

@@ -6,6 +6,7 @@ import { Modal } from './Modal';
 import { RESTRUCTURING_FEV_PENALTY } from '../../data/gameConfig';
 import { useAuthStore } from '../../hooks/useAuth';
 import { ACHIEVEMENT_PREVIEW } from '../../data/achievementPreview';
+import { ProfileModal } from './ProfileModal';
 
 type LeaderboardTab = 'overall' | 'hard20' | 'hard10' | 'easy20' | 'easy10' | 'distributions' | 'pe';
 
@@ -160,6 +161,8 @@ export function LeaderboardModal({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [activeTab, setActiveTab] = useState<LeaderboardTab>('overall');
+  const [profileId, setProfileId] = useState<string | null>(null);
+  const [showProfile, setShowProfile] = useState(false);
 
   const fetchLeaderboard = () => {
     setLoading(true);
@@ -190,6 +193,28 @@ export function LeaderboardModal({
     ? filtered.filter(e => getDisplayValue(e, activeTab) > ghostValue).length
     : -1;
 
+  const handleProfileClick = (pubId: string) => {
+    setProfileId(pubId);
+    setShowProfile(true);
+  };
+
+  const handleBackToLeaderboard = () => {
+    setShowProfile(false);
+    setProfileId(null);
+  };
+
+  // If profile modal is open, render it instead of leaderboard
+  if (showProfile) {
+    return (
+      <ProfileModal
+        isOpen={true}
+        onClose={handleBackToLeaderboard}
+        publicProfileId={profileId}
+        onBackToLeaderboard={handleBackToLeaderboard}
+      />
+    );
+  }
+
   const tabSubtitle = activeTab === 'overall'
     ? 'All runs ranked by adjusted FEV'
     : activeTab === 'distributions'
@@ -218,7 +243,7 @@ export function LeaderboardModal({
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap text-sm min-h-[36px] ${
+            className={`px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap text-sm min-h-[44px] flex items-center ${
               activeTab === tab.id
                 ? 'bg-accent text-bg-primary font-medium'
                 : 'text-text-muted hover:text-text-primary hover:bg-white/5'
@@ -266,6 +291,7 @@ export function LeaderboardModal({
                 rank={index < ghostRank || ghostRank === -1 ? index + 1 : index + 2}
                 showWealth={showWealth}
                 tab={activeTab}
+                onProfileClick={handleProfileClick}
               />
             </Fragment>
           ))}
@@ -282,7 +308,7 @@ function RankBadge({ rank }: { rank: number }) {
   return <span className={`text-base sm:text-lg font-bold tabular-nums w-10 text-center inline-block ${getRankColor(rank)}`}>#{rank}</span>;
 }
 
-function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEntry; rank: number; showWealth: boolean; tab: LeaderboardTab }) {
+function LeaderboardRow({ entry, rank, showWealth, tab, onProfileClick }: { entry: LeaderboardEntry; rank: number; showWealth: boolean; tab: LeaderboardTab; onProfileClick?: (publicProfileId: string) => void }) {
   const isPE = tab === 'pe';
   const displayValue = getDisplayValue(entry, tab);
   const displayLabel = isPE ? 'Carry' : showWealth ? 'Wealth' : 'Adj FEV';
@@ -293,9 +319,16 @@ function LeaderboardRow({ entry, rank, showWealth, tab }: { entry: LeaderboardEn
   const currentPlayerId = useAuthStore((s) => s.player?.id);
   const isYou = !!(currentPlayerId && entry.playerId && currentPlayerId === entry.playerId);
   const isVerified = entry.isVerified || !!entry.playerId;
+  const canClick = !!entry.publicProfileId && onProfileClick;
 
   return (
-    <div className={`flex items-center justify-between px-3 py-3 sm:py-3 rounded-lg ${isYou ? 'bg-accent/15 border border-accent/30' : 'bg-white/5'}`}>
+    <div
+      className={`flex items-center justify-between px-3 py-3 sm:py-3 rounded-lg ${isYou ? 'bg-accent/15 border border-accent/30' : 'bg-white/5'} ${canClick ? 'cursor-pointer hover:bg-white/[0.06] active:bg-white/[0.10] transition-colors' : ''}`}
+      onClick={canClick ? () => onProfileClick(entry.publicProfileId!) : undefined}
+      role={canClick ? 'button' : undefined}
+      tabIndex={canClick ? 0 : undefined}
+      onKeyDown={canClick ? (e) => { if (e.key === 'Enter') onProfileClick(entry.publicProfileId!); } : undefined}
+    >
       <div className="flex items-center gap-3 sm:gap-4 min-w-0 flex-1">
         <RankBadge rank={rank} />
         <div className="min-w-0">

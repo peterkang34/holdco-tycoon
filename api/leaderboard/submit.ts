@@ -197,6 +197,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           maSourcingTier: typeof s.maSourcingTier === 'number' ? s.maSourcingTier : 0,
           sharedServicesActive: typeof s.sharedServicesActive === 'number' ? s.sharedServicesActive : 0,
           rolloverEquityCount: typeof s.rolloverEquityCount === 'number' ? s.rolloverEquityCount : 0,
+          // Achievement IDs (for server-side backfill)
+          ...(Array.isArray(s.earnedAchievementIds) ? {
+            earnedAchievementIds: s.earnedAchievementIds.map((id: any) => String(id).slice(0, 50)).slice(0, 50),
+          } : {}),
           // PE Fund Manager fields (pass through for game_history)
           ...(s.isFundManager === true ? {
             isFundManager: true,
@@ -226,13 +230,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Only real (non-anonymous) accounts get playerId on leaderboard entries
     const verifiedPlayerId = playerId && !isAnonymous ? playerId : undefined;
 
+    // --- Early profile upsert + public_id lookup (needed for KV entry) ---
+    let publicProfileId: string | undefined;
+    let achievementCount: number | undefined;
+    const entryDate = new Date().toISOString();
+
+    if (playerId && supabaseAdmin) {
+      // Ensure player_profile exists (create if new, never overwrite existing initials/public_id)
+      const publicId = randomUUID().replace(/-/g, '').slice(0, 12);
+      try {
+        await supabaseAdmin.from('player_profiles').upsert({
+          id: playerId,
+          initials,
+          public_id: publicId,
+          updated_at: entryDate,
+          last_played_at: entryDate,
+        }, { onConflict: 'id', ignoreDuplicates: true });
+
+        // Always update last_played_at (never touch initials or public_id)
+        await supabaseAdmin.from('player_profiles')
+          .update({ last_played_at: entryDate, updated_at: entryDate })
+          .eq('id', playerId);
+      } catch (err) {
+        console.error('player_profiles upsert failed:', err);
+      }
+
+      // Look up the public_id (may be newly created or existing)
+      if (verifiedPlayerId) {
+        try {
+          const { data: profile } = await supabaseAdmin
+            .from('player_profiles')
+            .select('public_id')
+            .eq('id', verifiedPlayerId)
+            .single();
+          publicProfileId = profile?.public_id ?? undefined;
+        } catch { /* best effort */ }
+      }
+
+      // Achievement count from strategy data
+      if (validStrategy && Array.isArray((validStrategy as any).earnedAchievementIds)) {
+        achievementCount = (validStrategy as any).earnedAchievementIds.length;
+      }
+    }
+
     // --- Store Entry ---
     const id = randomUUID();
     const multiplier = DIFFICULTY_MULTIPLIER[validDifficulty] ?? 1.0;
     const restructuringPenalty = hasRestructured === true ? 0.80 : 1.0;
     const validFoMultiplier = typeof foMultiplier === 'number' && foMultiplier >= 1.0 && foMultiplier <= 1.5 ? foMultiplier : 1.0;
     const adjustedFEV = Math.round(validFEV * multiplier * restructuringPenalty * validFoMultiplier);
-    const entryDate = new Date().toISOString();
 
     const entry = {
       id,
@@ -268,6 +314,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...(playerId ? { submittedBy: playerId } : {}),  // Always store submitter UUID (anon + verified)
       ...(claimToken ? { claimToken } : {}),
       ...(typeof body?.completionId === 'string' ? { completionId: body.completionId.slice(0, 100) } : {}),
+      // Profile & achievement fields (Phase 3)
+      ...(publicProfileId ? { publicProfileId } : {}),
+      ...(achievementCount != null ? { achievementCount } : {}),
     };
 
     // Add to sorted set — PE entries use grossMoic × fundSize as proxy score, holdco uses adjusted FEV
@@ -285,29 +334,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const currentCount = await kv.zcard(LEADERBOARD_KEY);
     const rank = ascRank !== null ? currentCount - ascRank : 1;
 
-    // --- Dual-write to Postgres ---
+    // --- Dual-write to Postgres (game_history + stats) ---
     if (playerId && supabaseAdmin) {
-      // 1. Ensure player_profile exists (create if new, never overwrite existing initials)
-      try {
-        // First try insert-only (ignoreDuplicates preserves existing profile)
-        const { error: insertError } = await supabaseAdmin.from('player_profiles').upsert({
-          id: playerId,
-          initials,
-          updated_at: entryDate,
-          last_played_at: entryDate,
-        }, { onConflict: 'id', ignoreDuplicates: true });
-
-        // If profile already existed, just update last_played_at (never touch initials)
-        if (!insertError) {
-          await supabaseAdmin.from('player_profiles')
-            .update({ last_played_at: entryDate, updated_at: entryDate })
-            .eq('id', playerId);
-        }
-      } catch (err) {
-        console.error('player_profiles upsert failed:', err);
-      }
-
-      // 2. Insert game_history row (independent of profile upsert success)
+      // Insert game_history row
       try {
         await supabaseAdmin.from('game_history').insert({
           player_id: playerId,

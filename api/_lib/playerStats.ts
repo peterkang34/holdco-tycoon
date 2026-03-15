@@ -55,6 +55,9 @@ export async function updatePlayerStats(playerId: string): Promise<void> {
           total_games_by_mode: {},
           score_trend: null,
           earned_achievement_ids: [],
+          sector_frequency: {},
+          modes_played: [],
+          family_office_completed: false,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'player_id' },
@@ -146,6 +149,24 @@ export async function updatePlayerStats(playerId: string): Promise<void> {
     // Compute achievements across all games
     const earnedAchievementIds = computePlayerAchievements(games);
 
+    // Compute sector frequency (count of acquisitions per sector across all games)
+    const sectorFrequency: Record<string, number> = {};
+    let familyOfficeCompleted = false;
+    for (const game of games) {
+      const sectorIds = (game.strategy as any)?.sectorIds;
+      if (Array.isArray(sectorIds)) {
+        for (const sid of sectorIds) {
+          sectorFrequency[sid] = (sectorFrequency[sid] ?? 0) + 1;
+        }
+      }
+      if (game.family_office_completed === true) {
+        familyOfficeCompleted = true;
+      }
+    }
+
+    // Compute modes played
+    const modesPlayed = Object.keys(totalGamesByMode).filter(k => totalGamesByMode[k] > 0);
+
     await supabaseAdmin.from('player_stats').upsert(
       {
         player_id: playerId,
@@ -160,6 +181,9 @@ export async function updatePlayerStats(playerId: string): Promise<void> {
         total_games_by_mode: totalGamesByMode,
         score_trend: scoreTrend,
         earned_achievement_ids: earnedAchievementIds,
+        sector_frequency: sectorFrequency,
+        modes_played: modesPlayed,
+        family_office_completed: familyOfficeCompleted,
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'player_id' },

@@ -143,14 +143,15 @@ research/                   # GIT-TRACKED — external research (podcasts, books
 - `src/engine/turnarounds.ts` — Turnaround eligibility, cost, resolution, quality improvement, exit premium
 - `src/engine/ipo.ts` — IPO Pathway engine (eligibility, stock price, earnings, share-funded deals, stay-private bonus)
 - `src/engine/familyOffice.ts` — Family Office V2 engine (eligibility, FO multiplier, legacy scoring)
-- `src/data/platformRecipes.ts` — 42 integrated platform recipes (34 within-sector + 8 cross-sector)
+- `src/data/platformRecipes.ts` — 51 integrated platform recipes (40 within-sector + 11 cross-sector)
 - `src/engine/platforms.ts` — Platform eligibility, forging, bonus application
 - `src/components/screens/GameOverScreen.tsx` — Game over orchestrator (~500 lines, imports 13 child components from `src/components/gameover/`)
 - `src/components/gameover/` — 13 extracted game-over components (FEVHeroSection, CarryHeroSection, ScoreBreakdownSection, PortfolioSummary, etc.)
 - `src/data/achievementPreview.ts` — 28 achievement definitions across 5 categories (milestone/feat/mastery/creative/mode) with pure predicate check functions
 - `src/hooks/useUnlocks.ts` — Achievement persistence (localStorage), sector unlock gating, `getUnlockedSectorIds()`
 - `src/data/archetypeNames.ts` — Shared strategy archetype display name mapping
-- `src/components/ui/LeaderboardModal.tsx` — Tabbed leaderboard (exports filtering utils for GameOverScreen)
+- `src/components/ui/LeaderboardModal.tsx` — Tabbed leaderboard (exports filtering utils for GameOverScreen); clickable rows open ProfileModal for verified players
+- `src/components/ui/ProfileModal.tsx` — Player profile modal (self/other modes); self uses fetchWithAuth, other uses public-profile API; shows records, achievements, strategy, sector frequency, grade distribution, recent games
 - `src/hooks/useAuth.ts` — Auth Zustand store (player state, modal toggles, nudge dismissals)
 - `src/lib/supabase.ts` — Supabase client, anonymous auth, auth state listener, token helpers
 - `src/components/ui/AccountModal.tsx` — Google OAuth + Magic Link auth modal
@@ -210,7 +211,7 @@ research/                   # GIT-TRACKED — external research (podcasts, books
 - **Race conditions in async AI calls** — always check state is still current before setting narrative/storyBeats
 - **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety. Current: v37
 - **Integrated platforms**: Margin/growth bonuses are ONE-TIME mutations at forge time (clamped via `clampMargin`/`capGrowthRate`); multiple expansion + recession resistance are automatic via engine; platform sale bonus is tiered by `multipleExpansion` (0.3x for 2.0x+, 0.5x otherwise) via `getPlatformSaleBonus()`
-- **17 sectors, ~104 sub-types**: 15 standard + 1 prestige (privateCredit, gated by 11+ total achievements) + 1 FO-exclusive (proSports with 8 league sub-types). Overlaps resolved (no cross-sector sub-type duplication); sectors.ts is authoritative
+- **20 sectors, ~122 sub-types**: 15 standard + 4 prestige (mediaEntertainment:5, fintech:11, aerospace:11, privateCredit:16 achievements to unlock) + 1 FO-exclusive (proSports with 8 league sub-types). `UNLOCKABLE_SECTORS` in sectors.ts is authoritative. `getAvailableSectors()` handles runtime filtering including in M&A Focus dropdown
 - **proSports restrictions**: Pro sports teams are standalone trophy assets — blocked from mergers, tuck-ins, platform designation, and platform eligibility. Guards in `useGame.ts` (acquireTuckIn, mergeBusinesses, addToIntegratedPlatform) + `platforms.ts` (checkPlatformEligibility, checkNearEligiblePlatforms) + AllocatePhase UI filters. 200 real teams across 8 leagues (NFL/NBA/MLB/NHL/EPL/MLS/WNBA/NWSL). Women's leagues (WNBA/NWSL) allow flexible deal structures (seller notes, earn-outs). One team per league enforced via `ownedProSportsSubTypes` (league IDs).
 - **Platform thresholds scale by mode**: `INTEGRATION_THRESHOLD_MULTIPLIER` in gameConfig.ts (Easy-Std 1.0, Easy-Quick 0.7, Normal-Std 0.7, Normal-Quick 0.5)
 - **Private Credit synergy**: Owning PC businesses gives diminishing bank debt rate discount (-0.75%/-0.50%/-0.25%, cap -1.50%, floor 3%, halved during credit tightening). Applied in `AllocatePhase.tsx` via `calculateLendingSynergyDiscount()`. Does NOT apply to seller notes or existing debt

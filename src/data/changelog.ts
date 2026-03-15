@@ -13,6 +13,37 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 15, 2026',
+    title: 'Player Profiles & New Sectors',
+    sections: [
+      {
+        heading: 'Player Profiles',
+        items: [
+          'Click any verified player on the leaderboard to view their profile — stats, achievements, strategy, and recent games.',
+          'Your own profile is accessible too — a shareable snapshot of your career.',
+          'Achievement comparison: see which achievements other players have that you haven\'t earned yet.',
+        ],
+      },
+      {
+        heading: 'Three New Prestige Sectors',
+        items: [
+          'Media & Entertainment — digital media, podcasts, live events, film/TV, gaming, talent management. Unlock at 5 achievements.',
+          'Fintech & Payments — payment processing, B2B payments, embedded finance, RegTech, lending, wealth tech. Unlock at 11 achievements.',
+          'Aerospace & Defense — MRO, avionics, defense subsystems, aerostructures, simulation, space tech. Unlock at 11 achievements.',
+          '9 new platform recipes including cross-sector combos (Media + Agency, Fintech + Private Credit, Aerospace + Industrial).',
+          'Private Credit now unlocks at 16 achievements (was 11) — more sectors means more chances to earn them.',
+        ],
+      },
+      {
+        heading: 'M&A Focus Improvements',
+        items: [
+          'M&A Focus dropdown now includes unlocked prestige sectors — previously only standard sectors appeared.',
+          'Unlocked sectors now show up in your deal flow.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 14, 2026',
     title: 'Private Credit & Achievements',
     sections: [
@@ -20,7 +51,7 @@ export const CHANGELOG: ChangelogEntry[] = [
         heading: 'Private Credit Sector (Prestige Unlock)',
         items: [
           'New prestige sector: Private Credit & Lending — 6 sub-types with unique platform recipes.',
-          'Earn 11 achievements (any combination) to unlock — track your progress in the achievement browser.',
+          'Earn 16 achievements (any combination) to unlock — track your progress in the achievement browser.',
           'Owning Private Credit businesses gives a bank debt rate discount on all new deals (up to -1.50%).',
           'First-ever 3-sector platform recipe: Financial Services Conglomerate (Private Credit + Wealth Management + Insurance).',
         ],

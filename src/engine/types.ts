@@ -17,6 +17,9 @@ export type SectorId =
   | 'wealthManagement'
   | 'environmental'
   | 'privateCredit'
+  | 'mediaEntertainment'
+  | 'fintech'
+  | 'aerospace'
   | 'proSports';
 
 export type SectorFocusGroup = SectorId;
@@ -786,6 +789,9 @@ export interface LeaderboardEntry {
   isVerified?: boolean; // Set by GET API when playerId exists (playerId itself is stripped for privacy)
   claimToken?: string; // Secret UUID for ownership proof (stored locally, never returned by GET API)
   _submitFailed?: boolean; // Client-only: true if API submission failed (not persisted)
+  // Player profile & prestige (Phase 3)
+  publicProfileId?: string; // 12-char hex hash for profile linking
+  achievementCount?: number; // X/N earned at submission time
 }
 
 // Utility types

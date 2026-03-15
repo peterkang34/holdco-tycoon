@@ -839,7 +839,7 @@ export async function enhanceDealsWithAI(deals: Deal[]): Promise<Deal[]> {
   return [...existingDeals, ...enhancedNew];
 }
 
-export function getSectorWeightsForRound(round: number, maxRounds: number = 20): Record<SectorId, number> {
+export function getSectorWeightsForRound(round: number, maxRounds: number = 20, unlockedSectorIds: SectorId[] = []): Record<SectorId, number> {
   // Early game: cheaper sectors
   // Mid game: mixed
   // Late game: premium sectors
@@ -847,6 +847,13 @@ export function getSectorWeightsForRound(round: number, maxRounds: number = 20):
   const cheap: SectorId[] = ['agency', 'homeServices', 'b2bServices', 'education', 'autoServices'];
   const mid: SectorId[] = ['consumer', 'restaurant', 'healthcare', 'insurance', 'distribution', 'wealthManagement', 'environmental'];
   const premium: SectorId[] = ['saas', 'industrial', 'realEstate'];
+
+  // Add unlocked prestige sectors to the premium tier (they appear in deal flow once earned)
+  for (const sid of unlockedSectorIds) {
+    if (!cheap.includes(sid) && !mid.includes(sid) && !premium.includes(sid)) {
+      premium.push(sid);
+    }
+  }
 
   let cheapWeight: number, midWeight: number, premiumWeight: number;
 
@@ -876,8 +883,8 @@ export function getSectorWeightsForRound(round: number, maxRounds: number = 20):
   return weights as Record<SectorId, number>;
 }
 
-export function pickWeightedSector(round: number, maxRounds: number = 20, rng?: SeededRng): SectorId {
-  const weights = getSectorWeightsForRound(round, maxRounds);
+export function pickWeightedSector(round: number, maxRounds: number = 20, rng?: SeededRng, unlockedSectorIds: SectorId[] = []): SectorId {
+  const weights = getSectorWeightsForRound(round, maxRounds, unlockedSectorIds);
   const totalWeight = Object.values(weights).reduce((a, b) => a + b, 0);
   let random = (rng ? rng.next() : Math.random()) * totalWeight;
 
@@ -1183,7 +1190,7 @@ export function generateDealPipeline(
 
   // 1b. MA Sourcing bonus deals (Tier 1+, active)
   if (maSourcingActive && maSourcingTier >= 1 && pipeline.length < MAX_DEALS) {
-    const focusSector = maFocus?.sectorId ?? pickWeightedSector(round, maxRounds, rng);
+    const focusSector = maFocus?.sectorId ?? pickWeightedSector(round, maxRounds, rng, unlockedSectorIds);
     const sourcingOptions: DealGenerationOptions = {
       freshnessBonus: 1,
       source: 'sourced',
@@ -1276,7 +1283,7 @@ export function generateDealPipeline(
   // 4. Fill remaining slots with weighted random deals
   const targetPipelineLength = Math.min(MAX_DEALS, pipeline.length + targetNewDeals);
   while (pipeline.length < targetPipelineLength) {
-    const sectorId = pickWeightedSector(round, maxRounds, rng);
+    const sectorId = pickWeightedSector(round, maxRounds, rng, unlockedSectorIds);
     const t = pickTier();
     pipeline.push(generateDealWithSize(sectorId, round, 'any', portfolioEbitda, heatOpts, rng, t, affordResult.stretched));
 
@@ -1284,7 +1291,7 @@ export function generateDealPipeline(
 
   // Ensure at least 4 deals available
   while (pipeline.length < 4) {
-    const sectorId = pickWeightedSector(round, maxRounds, rng);
+    const sectorId = pickWeightedSector(round, maxRounds, rng, unlockedSectorIds);
     const t = pickTier();
     pipeline.push(generateDealWithSize(sectorId, round, 'any', portfolioEbitda, heatOpts, rng, t, affordResult.stretched));
 

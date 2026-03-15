@@ -24,6 +24,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           delete parsed.claimToken;
           delete parsed.submittedBy;
           // Expose a boolean flag instead of the raw playerId UUID
+          // publicProfileId is kept in the response for click-to-profile
           if (parsed.playerId) {
             parsed.isVerified = true;
             delete parsed.playerId;

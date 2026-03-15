@@ -543,6 +543,9 @@ describe('Display Proofreader', () => {
       realEstate: 0.18,
       proSports: 0.20,
       privateCredit: 0.04,
+      mediaEntertainment: 0.08,
+      fintech: 0.08,
+      aerospace: 0.14,
     };
 
     for (const [sectorId, expectedRate] of Object.entries(expectedCapex)) {
@@ -551,9 +554,9 @@ describe('Display Proofreader', () => {
       });
     }
 
-    it('covers all 17 sectors', () => {
-      expect(SECTOR_LIST).toHaveLength(17);
-      expect(Object.keys(expectedCapex)).toHaveLength(17);
+    it('covers all 20 sectors', () => {
+      expect(SECTOR_LIST).toHaveLength(20);
+      expect(Object.keys(expectedCapex)).toHaveLength(20);
     });
   });
 
@@ -1180,8 +1183,8 @@ describe('Display Proofreader', () => {
   // ══════════════════════════════════════════════════════════════════
 
   describe('Sector Metadata', () => {
-    it('17 sectors defined', () => {
-      expect(SECTOR_LIST).toHaveLength(17);
+    it('20 sectors defined', () => {
+      expect(SECTOR_LIST).toHaveLength(20);
     });
 
     it('All sectors have required fields', () => {
