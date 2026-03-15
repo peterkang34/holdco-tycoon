@@ -201,6 +201,16 @@ research/                   # GIT-TRACKED — external research (podcasts, books
 - **Key UI surfaces tested**: UserManualModal scoring table, difficulty config, deal structures, heat premiums, distress thresholds, tax rate, capex by sector, equity system, improvements, turnarounds, platforms, leaderboard, exit valuation, debt behavioral claims
 - **Run after any mechanic/UI change**: `npx vitest run src/engine/__tests__/display-proofreader.test.ts`
 
+## New Sector Rollout SOP
+When adding a new sector to `src/data/sectors.ts`:
+1. **Sub-types must be acquirable businesses** — not startup categories, creative roles, or VC verticals. Think "what would a lower-middle-market PE firm or holdco actually buy?" Examples: "HVAC Services", "IT Managed Services (MSP)", "Precision Parts / Components". Avoid: "Gaming / Interactive", "Embedded Finance / BaaS", "Talent Management / Agency".
+2. **Economics must be realistic** — base EBITDA, multiples, margins, capex, and recession sensitivity should match real-world LMM deal flow in that sector. Cross-reference with existing sectors for consistency.
+3. **Platform recipes** — within-sector recipes need 2+ sub-types that logically integrate (shared ops, cross-sell, vertical integration). Cross-sector recipes need a clear strategic thesis. Recipe `requiredSubTypes` must exactly match sub-type strings in sectors.ts.
+4. **Unlock gating** — add to `UNLOCKABLE_SECTORS` with appropriate achievement count. Update `getAvailableSectors()` if logic changes. Ensure `getUnlockedSectorIds(isAnonymous)` is called with proper arg at ALL call sites.
+5. **Tests** — update display-proofreader (sector count, capex entries), platforms.test.ts (recipe counts), unlocks.test.ts (gate thresholds).
+6. **Docs** — update CLAUDE.md sector count, UserManualModal achievement references, changelog.
+7. **Agent review** — deploy Marcus (realism check on sub-types and economics) + Reiko (balance) after implementation.
+
 ## Gotchas & Patterns
 - **ALWAYS use `tsc -b` not `tsc --noEmit`** — Vercel builds with `tsc -b` which is stricter (catches unused variables, stricter module resolution). `tsc --noEmit` passing locally does NOT guarantee Vercel build success. This has caused multiple failed deploys.
 - **@vercel/kv v3**: `zrange` with `{ rev: true }` returns empty — use `.reverse()` in-memory instead
