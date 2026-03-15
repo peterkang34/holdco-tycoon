@@ -31,6 +31,7 @@ import { capGrowthRate } from '../../engine/helpers';
 import { getSubTypeAffinity, getSizeRatioTier } from '../../engine/businesses';
 import { SECTORS } from '../../data/sectors';
 import { getUnlockedSectorIds } from '../../hooks/useUnlocks';
+import { useAuthStore } from '../../hooks/useAuth';
 import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES, MA_SOURCING_CONFIG, getMASourcingUpgradeCost, getMASourcingAnnualCost } from '../../data/sharedServices';
 import { MarketGuideModal } from '../ui/MarketGuideModal';
 import { RollUpGuideModal } from '../ui/RollUpGuideModal';
@@ -217,6 +218,7 @@ export function AllocatePhase({
   managementFeesCollected = 0,
   onDistributeToLPs,
 }: AllocatePhaseProps) {
+  const isAnonymous = useAuthStore((s) => s.player?.isAnonymous ?? true);
   const isMobile = useIsMobile();
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const swipeHintCount = useRef(parseInt(localStorage.getItem('holdco-swipe-hint-count') || '0'));
@@ -1625,7 +1627,7 @@ export function AllocatePhase({
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   >
                     <option value="">Any Sector</option>
-                    {getAvailableSectors(isFamilyOfficeMode, getUnlockedSectorIds()).map(sector => (
+                    {getAvailableSectors(isFamilyOfficeMode, getUnlockedSectorIds(isAnonymous)).map(sector => (
                       <option key={sector.id} value={sector.id}>
                         {sector.emoji} {sector.name}
                       </option>
