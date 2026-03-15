@@ -4,6 +4,7 @@ import { AchievementBrowserModal } from './AchievementBrowserModal';
 
 interface ProfileAchievementSectionProps {
   earnedAchievements: AchievementDef[];
+  newlyEarned: AchievementDef[];
   allAchievements: AchievementDef[];
   isLoggedIn: boolean;
   onSignUp: () => void;
@@ -11,15 +12,19 @@ interface ProfileAchievementSectionProps {
 
 export function ProfileAchievementSection({
   earnedAchievements,
+  newlyEarned,
   allAchievements,
   isLoggedIn,
   onSignUp,
 }: ProfileAchievementSectionProps) {
   const [showBrowser, setShowBrowser] = useState(false);
 
-  const earnedCount = earnedAchievements.length;
-  const totalCount = allAchievements.length;
   const earnedIds = new Set(earnedAchievements.map(a => a.id));
+  const totalCount = allAchievements.length;
+  const totalEarnedCount = earnedIds.size;
+
+  // Achievements not yet earned at all (across all games)
+  const unearnedAchievements = allAchievements.filter(a => !earnedIds.has(a.id));
 
   return (
     <>
@@ -30,34 +35,80 @@ export function ProfileAchievementSection({
             ACHIEVEMENTS
           </p>
           <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-white/10 text-text-secondary">
-            {earnedCount}/{totalCount}
+            {totalEarnedCount}/{totalCount}
           </span>
         </div>
 
-        {/* Earned achievements grid or empty state */}
-        {earnedCount === 0 ? (
-          <p className="text-sm text-text-muted mb-4">
-            No achievements unlocked this game. Keep playing to earn them!
-          </p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
-            {earnedAchievements.map((achievement) => (
-              <div
-                key={achievement.id}
-                className="rounded-lg p-3 bg-green-500/5 border border-green-500/10"
-              >
-                <div className="flex items-start gap-2">
-                  <span className="text-lg mt-0.5 shrink-0">
-                    {achievement.emoji}
-                  </span>
-                  <div>
-                    <p className="text-sm font-bold">{achievement.name}</p>
-                    <p className="text-xs text-text-muted">{achievement.description}</p>
+        {/* ── New This Game ── */}
+        {newlyEarned.length > 0 && (
+          <div className="mb-5">
+            <p className="text-xs font-semibold tracking-wide text-amber-400 mb-2.5 flex items-center gap-1.5">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />
+              NEW THIS GAME
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {newlyEarned.map((achievement) => (
+                <div
+                  key={achievement.id}
+                  className="rounded-lg p-3 bg-amber-500/10 border border-amber-500/20 ring-1 ring-amber-500/10"
+                >
+                  <div className="flex items-start gap-2">
+                    <span className="text-lg mt-0.5 shrink-0">
+                      {achievement.emoji}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold text-amber-100">{achievement.name}</p>
+                      <p className="text-xs text-amber-200/60">{achievement.description}</p>
+                    </div>
+                    <span className="text-amber-400 text-xs font-bold shrink-0 mt-0.5">NEW</span>
                   </div>
-                  <span className="text-green-400 text-xs shrink-0 mt-0.5">✓</span>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Empty state — no new achievements this game */}
+        {newlyEarned.length === 0 && unearnedAchievements.length > 0 && (
+          <p className="text-sm text-text-muted mb-4">
+            No new achievements this game — {totalEarnedCount} of {totalCount} earned so far.
+          </p>
+        )}
+
+        {/* Completionist state — all achievements earned */}
+        {newlyEarned.length === 0 && unearnedAchievements.length === 0 && (
+          <div className="rounded-lg p-4 bg-amber-500/5 border border-amber-500/10 mb-4">
+            <p className="text-sm font-bold text-amber-200">All {totalCount} achievements earned</p>
+            <p className="text-xs text-amber-200/60 mt-1">You've unlocked everything. True holdco tycoon.</p>
+          </div>
+        )}
+
+        {/* ── Not Yet Earned (teaser) ── */}
+        {unearnedAchievements.length > 0 && (
+          <div className="mb-4">
+            <p className="text-xs font-semibold tracking-wide text-text-muted mb-2.5">
+              UP NEXT
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+              {unearnedAchievements.slice(0, 6).map((achievement) => (
+                <div
+                  key={achievement.id}
+                  className="rounded-lg p-2.5 bg-white/[0.03] border border-white/[0.06]"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-base opacity-30 shrink-0">
+                      {achievement.emoji}
+                    </span>
+                    <p className="text-xs text-text-muted truncate">{achievement.name}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+            {unearnedAchievements.length > 6 && (
+              <p className="text-xs text-text-muted mt-2">
+                +{unearnedAchievements.length - 6} more to discover
+              </p>
+            )}
           </div>
         )}
 
@@ -70,7 +121,7 @@ export function ProfileAchievementSection({
             onClick={() => setShowBrowser(true)}
             className="text-sm text-accent hover:text-accent-secondary font-medium min-h-[44px] inline-flex items-center"
           >
-            View all {totalCount} achievements →
+            View all {totalCount} achievements &rarr;
           </button>
         </div>
 

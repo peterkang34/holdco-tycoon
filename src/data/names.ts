@@ -85,6 +85,26 @@ const SECTOR_NAME_PARTS: Record<string, NameParts> = {
     cores: ['Waste', 'Environmental', 'Disposal', 'Recycling', 'Sanitation', 'Haul', 'Green', 'Clean', 'Recovery', 'Resource', 'Eco', 'Site', 'Land', 'Water', 'Remediation', 'Container', 'Roll', 'Bin', 'Transfer', 'Collection'],
     suffixes: ['Services', 'Environmental', 'Waste Services', 'Disposal', 'Solutions', 'Industries', 'Management', 'Group', 'Inc', ''],
   },
+  privateCredit: {
+    prefixes: ['Arbor', 'Trident', 'Bain', 'Meridian', 'Granite', 'Keystone', 'Summit', 'Compass', 'Ironwood', 'Sterling', 'Pinnacle', 'Cornerstone', 'Vanguard', 'Atlas', 'Heritage', 'Bridgewater', 'Whitehall', 'Blackrock', 'Firestone', 'Greystone'],
+    cores: ['Capital', 'Credit', 'Lending', 'Finance', 'Funding', 'Partners', 'Financial', 'Asset', 'Bridge', 'Reserve', 'Trust', 'Harbor', 'Peak', 'Rock', 'Gate', 'Stone', 'Point', 'Ridge', 'Creek', 'Shore'],
+    suffixes: ['Capital', 'Credit', 'Lending', 'Finance', 'Financial', 'Partners', 'Group', 'Funding', 'Corp', ''],
+  },
+  mediaEntertainment: {
+    prefixes: ['Lionsgate', 'Crown', 'Silver', 'Beacon', 'Pacific', 'National', 'Heritage', 'Metro', 'Coastal', 'Landmark', 'Empire', 'Atlas', 'Starboard', 'Riviera', 'Capitol', 'Garrison', 'Broadview', 'Clearfield', 'Frontier', 'Patriot'],
+    cores: ['Media', 'Studio', 'Post', 'Stage', 'Screen', 'Broadcast', 'Signal', 'Vision', 'Light', 'Sound', 'Reel', 'Venue', 'Tower', 'Gate', 'Park', 'Hill', 'Bay', 'Creek', 'Field', 'Ridge'],
+    suffixes: ['Media', 'Studios', 'Broadcasting', 'Entertainment', 'Productions', 'Group', 'Communications', 'Networks', 'Inc', ''],
+  },
+  fintech: {
+    prefixes: ['Clearbridge', 'Paystone', 'Relay', 'Ledger', 'Priority', 'National', 'Central', 'Heartland', 'Greenlight', 'Bluevine', 'Sterling', 'Vantage', 'Trustmark', 'Apex', 'Pacific', 'Patriot', 'Pinnacle', 'Core', 'Allied', 'Meridian'],
+    cores: ['Pay', 'Processing', 'Systems', 'Payments', 'Financial', 'Commerce', 'Transaction', 'Solutions', 'Services', 'Bridge', 'Link', 'Gate', 'Port', 'Point', 'Source', 'Wire', 'Data', 'Logic', 'Tech', 'Ops'],
+    suffixes: ['Payments', 'Financial', 'Processing', 'Systems', 'Solutions', 'Services', 'Group', 'Corp', 'Inc', ''],
+  },
+  aerospace: {
+    prefixes: ['Ducommun', 'Heico', 'Kaman', 'Curtiss', 'Moog', 'Triumph', 'Mercury', 'Orbital', 'Vectrus', 'L3', 'Elbit', 'Raytheon', 'Cobham', 'Aerojet', 'Northstar', 'Precision', 'Summit', 'Patriot', 'Eagle', 'Guardian'],
+    cores: ['Aero', 'Systems', 'Avionics', 'Flight', 'Defense', 'Dynamics', 'Space', 'Tech', 'Craft', 'Air', 'Jet', 'Wing', 'Thrust', 'Propulsion', 'Shield', 'Sensor', 'Nav', 'Link', 'Control', 'Optics'],
+    suffixes: ['Aerospace', 'Defense', 'Systems', 'Aviation', 'Technologies', 'Industries', 'Inc', 'Corp', 'Group', ''],
+  },
   proSports: {
     prefixes: ['Austin', 'Nashville', 'Portland', 'Charlotte', 'Salt Lake', 'San Diego', 'Sacramento', 'Memphis', 'Louisville', 'Columbus', 'Jacksonville', 'Oklahoma City', 'St. Louis', 'Las Vegas', 'Richmond', 'Raleigh', 'Hartford', 'Omaha', 'Tucson', 'Norfolk'],
     cores: ['Wolves', 'Hawks', 'Titans', 'Blaze', 'Thunder', 'Vipers', 'Stallions', 'Grizzlies', 'Storm', 'Kings', 'Falcons', 'Raptors', 'Surge', 'Coyotes', 'Phoenix', 'Mustangs', 'Fury', 'Sharks', 'Lions', 'Comets'],
@@ -205,6 +225,34 @@ const SUBTYPE_SUFFIXES: Record<string, string[]> = {
   'Environmental Remediation': ['Remediation', 'Environmental', 'Restoration', 'Cleanup', 'Environmental Services'],
   'Portable Sanitation': ['Sanitation', 'Portable Services', 'Site Services', 'Restrooms', 'Sanitation Co'],
   'Industrial Waste Management': ['Industrial', 'Waste Management', 'Environmental Services', 'Hazmat', 'Industrial Waste'],
+  // Private Credit sub-types
+  'Direct Lending / Senior Debt': ['Capital', 'Credit', 'Lending', 'Senior Lending', 'Finance'],
+  'Specialty Finance / ABL': ['Finance', 'Asset Finance', 'ABL', 'Specialty Finance', 'Lending'],
+  'Equipment Leasing': ['Leasing', 'Equipment Finance', 'Lease Capital', 'Equipment Leasing', 'Asset Leasing'],
+  'Revenue-Based Finance': ['Capital', 'Finance', 'Funding', 'Growth Capital', 'Revenue Finance'],
+  'SBA / Government-Guaranteed Lending': ['SBA Lending', 'Government Lending', 'SBA Capital', 'Community Lending', 'Small Business Lending'],
+  'Mezzanine & Subordinated Debt': ['Mezzanine', 'Capital', 'Subordinated Debt', 'Mezz Capital', 'Growth Finance'],
+  // Media & Entertainment sub-types
+  'Trade Publication / B2B Media': ['Media', 'Publishing', 'Publications', 'Media Group', 'Press'],
+  'Local TV / Radio Station Group': ['Broadcasting', 'Media', 'Communications', 'Radio Group', 'TV Group'],
+  'Live Events & Venue Operator': ['Events', 'Entertainment', 'Venues', 'Live Entertainment', 'Event Group'],
+  'Film & TV Post-Production House': ['Post', 'Studios', 'Post-Production', 'VFX', 'Post House'],
+  'Out-of-Home / Billboard Operator': ['Outdoor', 'Media', 'OOH', 'Outdoor Advertising', 'Billboard'],
+  'Sports Media / Broadcasting Rights': ['Sports Media', 'Broadcasting', 'Sports', 'Media Rights', 'Sports Network'],
+  // Fintech sub-types
+  'Payment Processing / ISO': ['Payments', 'Processing', 'Payment Solutions', 'Merchant Processing', 'Pay'],
+  'B2B Payments / AP Automation': ['Payments', 'AP Solutions', 'B2B Payments', 'Payment Systems', 'Payables'],
+  'Merchant Services Provider': ['Merchant Services', 'Processing', 'Commerce', 'Payment Services', 'Merchant Solutions'],
+  'Compliance / RegTech Firm': ['Compliance', 'RegTech', 'Regulatory', 'Compliance Solutions', 'Risk & Compliance'],
+  'Specialty Lender / Loan Servicer': ['Lending', 'Loan Servicing', 'Financial', 'Loan Services', 'Servicing'],
+  'Benefits / Payroll Processor': ['Payroll', 'Benefits', 'HR Payments', 'Payroll Services', 'Benefits Processing'],
+  // Aerospace & Defense sub-types
+  'MRO / Aftermarket Parts Distributor': ['MRO', 'Aftermarket', 'Parts', 'Aviation Parts', 'Aero Parts'],
+  'Avionics Repair & Overhaul': ['Avionics', 'Repair', 'Overhaul', 'Avionics Services', 'Electronics'],
+  'Defense Electronics / Subsystems': ['Defense', 'Electronics', 'Systems', 'Defense Systems', 'Subsystems'],
+  'Aerostructures / Composites Shop': ['Aerostructures', 'Composites', 'Structures', 'Aerospace Manufacturing', 'Fabrication'],
+  'Flight Simulation & Training': ['Simulation', 'Training', 'Flight Training', 'Aviation Training', 'Sim Systems'],
+  'Satellite Ground Systems / Services': ['Space Systems', 'Satellite', 'Ground Systems', 'Space Services', 'Satcom'],
   // Pro Sports sub-types
   'Premier Football Franchise': ['', '', '', '', ''],
   'Elite Basketball Franchise': ['', '', '', '', ''],

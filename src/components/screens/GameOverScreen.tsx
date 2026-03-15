@@ -23,7 +23,7 @@ import { ChallengeComparison } from '../ui/ChallengeComparison';
 import { FeedbackModal } from '../ui/FeedbackModal';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { ACHIEVEMENT_PREVIEW, type AchievementContext } from '../../data/achievementPreview';
-import { saveEarnedAchievements } from '../../hooks/useUnlocks';
+import { saveEarnedAchievements, getEarnedAchievementIds } from '../../hooks/useUnlocks';
 import { HOLDCO_GRADE_TIPS, PE_GRADE_TIPS } from '../../data/gradeTips';
 
 import {
@@ -430,11 +430,22 @@ export function GameOverScreen({
     return ACHIEVEMENT_PREVIEW.filter(a => a.check(ctx));
   }, [strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions, lpDistributions, founderEquityValue, difficulty, duration, bankruptRound, isFundManagerMode, carryWaterfallData]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Persist earned achievements to localStorage for cross-game unlock gating
+  // Capture pre-existing achievements BEFORE saving, then persist
+  const preSaveIdsRef = useRef<Set<string> | null>(null);
+  if (preSaveIdsRef.current === null) {
+    preSaveIdsRef.current = new Set(getEarnedAchievementIds());
+  }
+
   useEffect(() => {
     if (earnedAchievements.length > 0) {
       saveEarnedAchievements(earnedAchievements.map(a => a.id));
     }
+  }, [earnedAchievements]);
+
+  // Split achievements: newly earned this game vs already had
+  const newlyEarned = useMemo(() => {
+    const preSave = preSaveIdsRef.current ?? new Set<string>();
+    return earnedAchievements.filter(a => !preSave.has(a.id));
   }, [earnedAchievements]);
 
   // ── Auto-submit Completion ──
@@ -795,6 +806,7 @@ export function GameOverScreen({
       {/* ── Section 2: Achievements + Profile (merged section) ── */}
       <ProfileAchievementSection
         earnedAchievements={earnedAchievements}
+        newlyEarned={newlyEarned}
         allAchievements={ACHIEVEMENT_PREVIEW}
         isLoggedIn={isLoggedIn}
         onSignUp={() => openAccountModal()}
