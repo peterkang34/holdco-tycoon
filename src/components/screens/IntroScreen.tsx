@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SectorId, GameDifficulty, GameDuration } from '../../engine/types';
-import { SECTOR_LIST_STANDARD, UNLOCKABLE_SECTORS, SECTORS, getAvailableSectors } from '../../data/sectors';
-import { getEarnedAchievementIds, getUnlockedSectorIds } from '../../hooks/useUnlocks';
+import { SECTOR_LIST_STANDARD, getAvailableSectors } from '../../data/sectors';
+import { getUnlockedSectorIds } from '../../hooks/useUnlocks';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { ChangelogModal } from '../ui/ChangelogModal';
 import { UserManualModal } from '../ui/UserManualModal';
@@ -538,29 +538,6 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
                 ))}
               </div>
 
-              {/* Locked prestige sectors teaser — only show if NOT already in the picker list */}
-              {(Object.entries(UNLOCKABLE_SECTORS) as [SectorId, { gateAchievementCount: number; requiresAccount: boolean }][]).map(([sectorId, gate]) => {
-                const sector = SECTORS[sectorId];
-                // Skip if already in the selectable list
-                if (sectorPickerList.some(s => s.id === sectorId)) return null;
-                const earnedCount = getEarnedAchievementIds().length;
-                const meetsCount = earnedCount >= gate.gateAchievementCount;
-                const needsAccount = meetsCount && gate.requiresAccount && isAnonymous;
-                return (
-                  <div key={sectorId} className="mb-4 p-3 rounded-lg border border-white/5 bg-white/[0.02] opacity-60">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl grayscale">{sector.emoji}</span>
-                      <span className="text-sm font-medium text-text-secondary">{sector.name}</span>
-                      <span className="ml-auto text-[10px] text-amber-400/70 font-medium">🔒 Prestige</span>
-                    </div>
-                    <p className="text-[11px] text-text-muted/60 mt-1">
-                      {needsAccount
-                        ? 'Requirements met! Sign in to unlock this sector.'
-                        : `Earn ${gate.gateAchievementCount} achievements to unlock (${earnedCount}/${gate.gateAchievementCount}).`}
-                    </p>
-                  </div>
-                );
-              })}
 
               <button
                 type="submit"
