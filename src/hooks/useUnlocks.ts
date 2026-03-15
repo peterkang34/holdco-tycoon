@@ -23,8 +23,13 @@ export function getEarnedAchievementIds(): string[] {
 export function saveEarnedAchievements(newIds: string[]): void {
   try {
     const existing = new Set(getEarnedAchievementIds());
+    const beforeCount = existing.size;
     newIds.forEach(id => existing.add(id));
     localStorage.setItem(ACHIEVEMENTS_KEY, JSON.stringify([...existing]));
+    // Notify listeners if new achievements were added
+    if (existing.size > beforeCount) {
+      window.dispatchEvent(new Event('achievements-updated'));
+    }
   } catch {
     // Silent fail for SSR/test environments without localStorage
   }
@@ -71,6 +76,9 @@ export async function syncAchievementsFromServer(): Promise<void> {
     // Merge server achievements into localStorage (additive)
     saveEarnedAchievements(serverIds);
     localStorage.setItem(SYNC_FLAG_KEY, Date.now().toString());
+
+    // Notify same-tab listeners that achievements changed
+    window.dispatchEvent(new Event('achievements-updated'));
   } catch {
     // Silent — best effort sync
   }

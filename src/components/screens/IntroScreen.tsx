@@ -76,9 +76,17 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
 
   // Compute available sectors (includes unlocked prestige sectors for non-challenge)
   const isAnonymous = useAuthStore((s) => s.player?.isAnonymous ?? true);
+  const [achievementTick, setAchievementTick] = useState(0);
+  useEffect(() => {
+    const handler = () => setAchievementTick(t => t + 1);
+    window.addEventListener('achievements-updated', handler);
+    return () => window.removeEventListener('achievements-updated', handler);
+  }, []);
   const sectorPickerList = isChallenge
     ? SECTOR_LIST_STANDARD
     : getAvailableSectors(false, getUnlockedSectorIds(isAnonymous), false);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- achievementTick triggers re-render to refresh sector list
+  void achievementTick;
 
   // Sync challenge settings when challengeData arrives
   useEffect(() => {
