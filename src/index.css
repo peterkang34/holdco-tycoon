@@ -50,6 +50,12 @@
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+
+  /* Native dropdown options render with OS background (white) — force dark text */
+  option {
+    background-color: #1a1f2e;
+    color: #ffffff;
+  }
 }
 
 @layer components {
