@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import type { AchievementDef } from '../../data/achievementPreview';
 import { AchievementBrowserModal } from './AchievementBrowserModal';
+import { getEarnedAchievementIds } from '../../hooks/useUnlocks';
 
 interface ProfileAchievementSectionProps {
   earnedAchievements: AchievementDef[];
@@ -19,12 +20,19 @@ export function ProfileAchievementSection({
 }: ProfileAchievementSectionProps) {
   const [showBrowser, setShowBrowser] = useState(false);
 
-  const earnedIds = new Set(earnedAchievements.map(a => a.id));
+  // All achievements earned across ALL games (localStorage, already merged with server)
+  const allEarnedIds = useMemo(() => {
+    // Include current game's earned achievements to catch just-saved ones
+    const fromStorage = new Set(getEarnedAchievementIds());
+    for (const a of earnedAchievements) fromStorage.add(a.id);
+    return fromStorage;
+  }, [earnedAchievements]);
+
   const totalCount = allAchievements.length;
-  const totalEarnedCount = earnedIds.size;
+  const totalEarnedCount = allEarnedIds.size;
 
   // Achievements not yet earned at all (across all games)
-  const unearnedAchievements = allAchievements.filter(a => !earnedIds.has(a.id));
+  const unearnedAchievements = allAchievements.filter(a => !allEarnedIds.has(a.id));
 
   return (
     <>
@@ -160,7 +168,7 @@ export function ProfileAchievementSection({
         isOpen={showBrowser}
         onClose={() => setShowBrowser(false)}
         allAchievements={allAchievements}
-        earnedIds={earnedIds}
+        earnedIds={allEarnedIds}
         isLoggedIn={isLoggedIn}
         onSignUp={onSignUp}
       />
