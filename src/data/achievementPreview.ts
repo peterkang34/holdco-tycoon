@@ -13,7 +13,9 @@ export interface AchievementContext {
     dealStructureTypes: Record<string, number>;
     rolloverEquityCount: number;
     activeCount: number;
+    peakActiveCount: number;
     platformCount: number;
+    platformsForged: number;
     archetype: string;
     antiPatterns: string[];
     sophisticationScore: number;
@@ -69,10 +71,10 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
   {
     id: 'portfolio_builder',
     name: 'Portfolio Builder',
-    description: 'Hold 5 or more active businesses simultaneously.',
+    description: 'Hold 5 or more active businesses at any point during the game.',
     emoji: '🏢',
     category: 'milestone',
-    check: (ctx) => ctx.strategyData.activeCount >= 5,
+    check: (ctx) => ctx.strategyData.peakActiveCount >= 5,
   },
   {
     id: 'exit_strategist',
@@ -85,10 +87,10 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
   {
     id: 'platform_architect',
     name: 'Platform Architect',
-    description: 'Build at least one platform with integrated bolt-ons.',
+    description: 'Forge at least one integrated platform.',
     emoji: '🏗️',
     category: 'milestone',
-    check: (ctx) => ctx.strategyData.platformCount >= 1,
+    check: (ctx) => ctx.strategyData.platformsForged >= 1,
   },
   {
     id: 'debt_free',
@@ -130,15 +132,15 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
   {
     id: 'roll_up_machine',
     name: 'Roll-Up Machine',
-    description: 'Build 3 or more platforms.',
+    description: 'Forge 3 or more integrated platforms in a single game.',
     emoji: '🌀',
     category: 'feat',
-    check: (ctx) => ctx.strategyData.platformCount >= 3,
+    check: (ctx) => ctx.strategyData.platformsForged >= 3,
   },
   {
     id: 'sector_specialist',
     name: 'Sector Specialist',
-    description: 'Own 3+ active businesses all in the same sector.',
+    description: 'End the game with 3+ active businesses all in the same sector.',
     emoji: '🎯',
     category: 'feat',
     check: (ctx) =>

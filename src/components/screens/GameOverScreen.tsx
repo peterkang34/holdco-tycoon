@@ -271,7 +271,9 @@ export function GameOverScreen({
     ).length;
 
     const activeCount = businesses.filter(b => b.status === 'active').length;
+    const peakActiveCount = Math.max(activeCount, ...state.roundHistory.map(r => r.businessCount));
     const platformCount = integratedPlatforms.length;
+    const platformsForged = allActions.filter(a => a.type === 'forge_integrated_platform').length;
     const archetype = computeArchetype(activeCount, platformCount, totalAcquisitions, totalSells, turnaroundsStarted, totalDistributions, equityRaisesUsed);
 
     const antiPatterns: string[] = [];
@@ -334,7 +336,7 @@ export function GameOverScreen({
     return {
       totalAcquisitions, totalSells, turnaroundsStarted, turnaroundsSucceeded, turnaroundsFailed,
       peakLeverage, peakDistressLevel, sectorIds, dealStructureTypes, rolloverEquityCount,
-      activeCount, platformCount, archetype, antiPatterns, sophisticationScore,
+      activeCount, peakActiveCount, platformCount, platformsForged, archetype, antiPatterns, sophisticationScore,
       endingSubTypes, avgEndingEbitda, endingConstruction,
       maSourcingTier: state.maSourcing.tier,
       sourceDealUses, proactiveOutreachUses, smbBrokerUses,
@@ -374,7 +376,7 @@ export function GameOverScreen({
       peakLeverage: Math.round(strategyData.peakLeverage * 10) / 10,
       hasRestructured,
       peakDistressLevel: strategyData.peakDistressLevel,
-      platformsForged: strategyData.platformCount,
+      platformsForged: strategyData.platformsForged,
       turnaroundsStarted: strategyData.turnaroundsStarted,
       turnaroundsSucceeded: strategyData.turnaroundsSucceeded,
       turnaroundsFailed: strategyData.turnaroundsFailed,
@@ -492,7 +494,7 @@ export function GameOverScreen({
             },
         sectorIds: strategyData.sectorIds,
         dealStructureTypes: strategyData.dealStructureTypes,
-        platformsForged: strategyData.platformCount,
+        platformsForged: strategyData.platformsForged,
         totalAcquisitions: strategyData.totalAcquisitions,
         totalSells: strategyData.totalSells,
         antiPatterns: strategyData.antiPatterns.length > 0 ? strategyData.antiPatterns : undefined,
@@ -504,6 +506,7 @@ export function GameOverScreen({
         totalDistributions: Math.round(isFundManagerMode ? (lpDistributions || 0) : totalDistributions),
         totalDebt: Math.round(totalDebt),
         activeCount: strategyData.activeCount,
+        peakActiveCount: strategyData.peakActiveCount,
         sharedServicesActive: strategyData.sharedServicesActive,
         recessionAcquisitionCount: strategyData.recessionAcquisitionCount > 0 ? strategyData.recessionAcquisitionCount : undefined,
         isBankrupt: !!bankruptRound,
@@ -652,7 +655,7 @@ export function GameOverScreen({
             antiPatterns: strategyData.antiPatterns.length > 0 ? strategyData.antiPatterns : undefined,
             sectorIds: strategyData.sectorIds,
             dealStructureTypes: strategyData.dealStructureTypes,
-            platformsForged: strategyData.platformCount,
+            platformsForged: strategyData.platformsForged,
             totalAcquisitions: strategyData.totalAcquisitions,
             totalSells: strategyData.totalSells,
             totalDistributions: Math.round(isFundManagerMode ? (lpDistributions || 0) : totalDistributions),
@@ -671,6 +674,7 @@ export function GameOverScreen({
             // Additional fields for server-side achievement backfill
             totalDebt: Math.round(totalDebt),
             activeCount: strategyData.activeCount,
+            peakActiveCount: strategyData.peakActiveCount,
             recessionAcquisitionCount: strategyData.recessionAcquisitionCount > 0 ? strategyData.recessionAcquisitionCount : undefined,
             isBankrupt: !!bankruptRound,
             sellerNotesTotal: Math.round(businesses.reduce((sum, b) => sum + (b.sellerNoteBalance ?? 0), 0)),

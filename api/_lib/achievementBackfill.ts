@@ -86,6 +86,7 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
     const dealStructureTypes = strategy.dealStructureTypes as Record<string, number> | undefined;
     const sectorIds = strategy.sectorIds as string[] | undefined;
     const activeCount = (strategy.activeCount as number) ?? businessCount;
+    const peakActiveCount = (strategy.peakActiveCount as number) ?? businessCount;
     const isFundManager = strategy.isFundManager === true;
     const carryEarned = (strategy.carryEarned as number) ?? 0;
     const lpSatisfaction = (strategy.lpSatisfaction as number) ?? -1;
@@ -99,6 +100,9 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
 
     // first_acquisition from strategy (more precise)
     if (totalAcquisitions >= 1 && !earned.includes('first_acquisition')) earned.push('first_acquisition');
+
+    // portfolio_builder: peak active count (more precise than end-state businessCount)
+    if (peakActiveCount >= 5 && !earned.includes('portfolio_builder')) earned.push('portfolio_builder');
 
     // exit_strategist: sold at least one business
     if (totalSells >= 1) earned.push('exit_strategist');

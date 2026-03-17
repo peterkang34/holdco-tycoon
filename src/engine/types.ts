@@ -748,6 +748,7 @@ export interface LeaderboardStrategy {
   // Achievement backfill fields
   totalDebt?: number;
   activeCount?: number;
+  peakActiveCount?: number;
   lpSatisfaction?: number;
   smartExitMoic?: number;
   isBankrupt?: boolean;

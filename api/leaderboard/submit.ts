@@ -200,6 +200,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           // Additional fields for server-side achievement backfill
           ...(typeof s.totalDebt === 'number' ? { totalDebt: Math.round(s.totalDebt) } : {}),
           ...(typeof s.activeCount === 'number' ? { activeCount: Math.max(0, Math.min(30, Math.round(s.activeCount))) } : {}),
+          ...(typeof s.peakActiveCount === 'number' ? { peakActiveCount: Math.max(0, Math.min(30, Math.round(s.peakActiveCount))) } : {}),
           ...(typeof s.recessionAcquisitionCount === 'number' && s.recessionAcquisitionCount > 0 ? { recessionAcquisitionCount: Math.round(s.recessionAcquisitionCount) } : {}),
           ...(typeof s.lpSatisfaction === 'number' ? { lpSatisfaction: Math.max(0, Math.min(100, Math.round(s.lpSatisfaction))) } : {}),
           ...(typeof s.smartExitMoic === 'number' ? { smartExitMoic: Math.round(s.smartExitMoic * 100) / 100 } : {}),
