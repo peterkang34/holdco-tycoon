@@ -156,8 +156,12 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
     // diversification_play: 6+ active sectors
     if (sectorIds && sectorIds.length >= 6) earned.push('diversification_play');
 
-    // no_leverage: zero peak leverage + C+ grade
-    if (peakLeverage === 0 && game.has_restructured !== true && ['S', 'A', 'B', 'C'].includes(grade ?? '')) {
+    // no_leverage: never used a leveraged deal structure + C+ grade
+    const leverageDeals = dealStructureTypes
+      ? (dealStructureTypes['bank_debt'] ?? 0) + (dealStructureTypes['seller_note'] ?? 0) +
+        (dealStructureTypes['seller_note_bank_debt'] ?? 0) + (dealStructureTypes['rollover_equity'] ?? 0)
+      : (peakLeverage === 0 ? 0 : 1); // fallback for legacy games without dealStructureTypes
+    if (leverageDeals === 0 && game.has_restructured !== true && ['S', 'A', 'B', 'C'].includes(grade ?? '')) {
       earned.push('no_leverage');
     }
 
