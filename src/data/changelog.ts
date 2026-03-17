@@ -13,6 +13,27 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 16, 2026',
+    title: 'Achievement & Sector Polish',
+    sections: [
+      {
+        heading: 'Achievement Fixes',
+        items: [
+          'Fixed 6 server-side achievement evaluation bugs — No Leverage, Debt Free, Recession Buyer, and Diversification Play now track correctly across all games.',
+          'Locked achievements in My Stats now show their description so you know what to aim for.',
+        ],
+      },
+      {
+        heading: 'Prestige Sector Polish',
+        items: [
+          'Replaced real company names in Aerospace, Private Credit, Fintech, and Media name generators with original fictional names.',
+          'Renamed "Revenue-Based Finance" to "Factoring / Merchant Cash Advance" — more realistic for LMM deal flow.',
+          'Renamed "Sports Media / Broadcasting Rights" to "Regional Sports Network / Content" — better reflects acquirable businesses at LMM scale.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 15, 2026',
     title: 'Player Profiles & New Sectors',
     sections: [

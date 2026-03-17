@@ -86,22 +86,22 @@ const SECTOR_NAME_PARTS: Record<string, NameParts> = {
     suffixes: ['Services', 'Environmental', 'Waste Services', 'Disposal', 'Solutions', 'Industries', 'Management', 'Group', 'Inc', ''],
   },
   privateCredit: {
-    prefixes: ['Arbor', 'Trident', 'Bain', 'Meridian', 'Granite', 'Keystone', 'Summit', 'Compass', 'Ironwood', 'Sterling', 'Pinnacle', 'Cornerstone', 'Vanguard', 'Atlas', 'Heritage', 'Bridgewater', 'Whitehall', 'Blackrock', 'Firestone', 'Greystone'],
+    prefixes: ['Arbor', 'Trident', 'Redwood', 'Meridian', 'Granite', 'Keystone', 'Summit', 'Compass', 'Ironwood', 'Sterling', 'Pinnacle', 'Cornerstone', 'Lakeshore', 'Atlas', 'Heritage', 'Ridgeline', 'Whitehall', 'Ashton', 'Firestone', 'Greystone'],
     cores: ['Capital', 'Credit', 'Lending', 'Finance', 'Funding', 'Partners', 'Financial', 'Asset', 'Bridge', 'Reserve', 'Trust', 'Harbor', 'Peak', 'Rock', 'Gate', 'Stone', 'Point', 'Ridge', 'Creek', 'Shore'],
     suffixes: ['Capital', 'Credit', 'Lending', 'Finance', 'Financial', 'Partners', 'Group', 'Funding', 'Corp', ''],
   },
   mediaEntertainment: {
-    prefixes: ['Lionsgate', 'Crown', 'Silver', 'Beacon', 'Pacific', 'National', 'Heritage', 'Metro', 'Coastal', 'Landmark', 'Empire', 'Atlas', 'Starboard', 'Riviera', 'Capitol', 'Garrison', 'Broadview', 'Clearfield', 'Frontier', 'Patriot'],
+    prefixes: ['Ridgeline', 'Crown', 'Silver', 'Beacon', 'Pacific', 'National', 'Heritage', 'Metro', 'Coastal', 'Landmark', 'Highgate', 'Atlas', 'Starboard', 'Riviera', 'Capitol', 'Garrison', 'Broadview', 'Clearfield', 'Frontier', 'Patriot'],
     cores: ['Media', 'Studio', 'Post', 'Stage', 'Screen', 'Broadcast', 'Signal', 'Vision', 'Light', 'Sound', 'Reel', 'Venue', 'Tower', 'Gate', 'Park', 'Hill', 'Bay', 'Creek', 'Field', 'Ridge'],
     suffixes: ['Media', 'Studios', 'Broadcasting', 'Entertainment', 'Productions', 'Group', 'Communications', 'Networks', 'Inc', ''],
   },
   fintech: {
-    prefixes: ['Clearbridge', 'Paystone', 'Relay', 'Ledger', 'Priority', 'National', 'Central', 'Heartland', 'Greenlight', 'Bluevine', 'Sterling', 'Vantage', 'Trustmark', 'Apex', 'Pacific', 'Patriot', 'Pinnacle', 'Core', 'Allied', 'Meridian'],
+    prefixes: ['Clearbridge', 'Paystone', 'Relay', 'Ledger', 'Priority', 'National', 'Central', 'Heartland', 'Irongate', 'Hawthorne', 'Sterling', 'Vantage', 'Trustmark', 'Apex', 'Pacific', 'Patriot', 'Pinnacle', 'Core', 'Allied', 'Meridian'],
     cores: ['Pay', 'Processing', 'Systems', 'Payments', 'Financial', 'Commerce', 'Transaction', 'Solutions', 'Services', 'Bridge', 'Link', 'Gate', 'Port', 'Point', 'Source', 'Wire', 'Data', 'Logic', 'Tech', 'Ops'],
     suffixes: ['Payments', 'Financial', 'Processing', 'Systems', 'Solutions', 'Services', 'Group', 'Corp', 'Inc', ''],
   },
   aerospace: {
-    prefixes: ['Ducommun', 'Heico', 'Kaman', 'Curtiss', 'Moog', 'Triumph', 'Mercury', 'Orbital', 'Vectrus', 'L3', 'Elbit', 'Raytheon', 'Cobham', 'Aerojet', 'Northstar', 'Precision', 'Summit', 'Patriot', 'Eagle', 'Guardian'],
+    prefixes: ['Sentinel', 'Falcon', 'Meridian', 'Sierra', 'Centurion', 'Paladin', 'Horizon', 'Orbital', 'Keystone', 'Ironclad', 'Northpoint', 'Redstone', 'Valkyrie', 'Aegis', 'Northstar', 'Precision', 'Summit', 'Patriot', 'Eagle', 'Guardian'],
     cores: ['Aero', 'Systems', 'Avionics', 'Flight', 'Defense', 'Dynamics', 'Space', 'Tech', 'Craft', 'Air', 'Jet', 'Wing', 'Thrust', 'Propulsion', 'Shield', 'Sensor', 'Nav', 'Link', 'Control', 'Optics'],
     suffixes: ['Aerospace', 'Defense', 'Systems', 'Aviation', 'Technologies', 'Industries', 'Inc', 'Corp', 'Group', ''],
   },
@@ -229,7 +229,7 @@ const SUBTYPE_SUFFIXES: Record<string, string[]> = {
   'Direct Lending / Senior Debt': ['Capital', 'Credit', 'Lending', 'Senior Lending', 'Finance'],
   'Specialty Finance / ABL': ['Finance', 'Asset Finance', 'ABL', 'Specialty Finance', 'Lending'],
   'Equipment Leasing': ['Leasing', 'Equipment Finance', 'Lease Capital', 'Equipment Leasing', 'Asset Leasing'],
-  'Revenue-Based Finance': ['Capital', 'Finance', 'Funding', 'Growth Capital', 'Revenue Finance'],
+  'Factoring / Merchant Cash Advance': ['Capital', 'Finance', 'Funding', 'Factoring', 'Merchant Finance'],
   'SBA / Government-Guaranteed Lending': ['SBA Lending', 'Government Lending', 'SBA Capital', 'Community Lending', 'Small Business Lending'],
   'Mezzanine & Subordinated Debt': ['Mezzanine', 'Capital', 'Subordinated Debt', 'Mezz Capital', 'Growth Finance'],
   // Media & Entertainment sub-types
@@ -238,7 +238,7 @@ const SUBTYPE_SUFFIXES: Record<string, string[]> = {
   'Live Events & Venue Operator': ['Events', 'Entertainment', 'Venues', 'Live Entertainment', 'Event Group'],
   'Film & TV Post-Production House': ['Post', 'Studios', 'Post-Production', 'VFX', 'Post House'],
   'Out-of-Home / Billboard Operator': ['Outdoor', 'Media', 'OOH', 'Outdoor Advertising', 'Billboard'],
-  'Sports Media / Broadcasting Rights': ['Sports Media', 'Broadcasting', 'Sports', 'Media Rights', 'Sports Network'],
+  'Regional Sports Network / Content': ['Sports Media', 'Broadcasting', 'Sports', 'Sports Content', 'Sports Network'],
   // Fintech sub-types
   'Payment Processing / ISO': ['Payments', 'Processing', 'Payment Solutions', 'Merchant Processing', 'Pay'],
   'B2B Payments / AP Automation': ['Payments', 'AP Solutions', 'B2B Payments', 'Payment Systems', 'Payables'],

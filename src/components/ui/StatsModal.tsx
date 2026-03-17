@@ -657,11 +657,14 @@ export function StatsModal() {
                   </div>
                 ))}
                 {unearnedAchievements.length > 0 && (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 mt-2">
+                  <div className="space-y-1.5 mt-2">
                     {unearnedAchievements.map(a => (
-                      <div key={a.id} className="flex items-center gap-1.5 bg-white/[0.02] border border-white/5 rounded-lg p-2" title={a.description}>
-                        <span className="text-sm opacity-40 grayscale shrink-0">{a.emoji}</span>
-                        <p className="text-[11px] text-text-muted/60 truncate">{a.name}</p>
+                      <div key={a.id} className="flex items-start gap-2 bg-white/[0.02] border border-white/5 rounded-lg p-2.5 opacity-50">
+                        <span className="text-base shrink-0 grayscale">{a.emoji}</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-bold">{a.name}</p>
+                          <p className="text-xs text-text-muted">{a.description}</p>
+                        </div>
                       </div>
                     ))}
                   </div>

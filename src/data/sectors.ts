@@ -510,7 +510,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
       'Direct Lending / Senior Debt',
       'Specialty Finance / ABL',
       'Equipment Leasing',
-      'Revenue-Based Finance',
+      'Factoring / Merchant Cash Advance',
       'SBA / Government-Guaranteed Lending',
       'Mezzanine & Subordinated Debt',
     ],
@@ -545,7 +545,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
       'Live Events & Venue Operator',
       'Film & TV Post-Production House',
       'Out-of-Home / Billboard Operator',
-      'Sports Media / Broadcasting Rights',
+      'Regional Sports Network / Content',
     ],
     // Affinity groups: 0=content/digital, 1=live/production
     subTypeGroups: [0, 0, 1, 1, 0, 1],
