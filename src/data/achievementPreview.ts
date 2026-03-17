@@ -283,7 +283,7 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
   {
     id: 'no_leverage',
     name: 'No Leverage',
-    description: 'Never use a leveraged deal structure (bank debt or seller notes) and earn a C grade or better.',
+    description: 'Only use all-cash or earn-out deal structures and earn a C grade or better.',
     emoji: '🪶',
     category: 'creative',
     check: (ctx) => {

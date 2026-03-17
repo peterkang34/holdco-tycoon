@@ -506,6 +506,8 @@ export function GameOverScreen({
         activeCount: strategyData.activeCount,
         sharedServicesActive: strategyData.sharedServicesActive,
         recessionAcquisitionCount: strategyData.recessionAcquisitionCount > 0 ? strategyData.recessionAcquisitionCount : undefined,
+        isBankrupt: !!bankruptRound,
+        sellerNotesTotal: Math.round(businesses.reduce((sum, b) => sum + (b.sellerNoteBalance ?? 0), 0)),
         lpSatisfaction: isFundManagerMode ? (lpSatisfactionScore ?? undefined) : undefined,
         smartExitMoic: (() => {
           const best = exitedBusinesses
@@ -669,6 +671,9 @@ export function GameOverScreen({
             // Additional fields for server-side achievement backfill
             totalDebt: Math.round(totalDebt),
             activeCount: strategyData.activeCount,
+            recessionAcquisitionCount: strategyData.recessionAcquisitionCount > 0 ? strategyData.recessionAcquisitionCount : undefined,
+            isBankrupt: !!bankruptRound,
+            sellerNotesTotal: Math.round(businesses.reduce((sum, b) => sum + (b.sellerNoteBalance ?? 0), 0)),
             lpSatisfaction: isFundManagerMode ? (lpSatisfactionScore ?? undefined) : undefined,
             smartExitMoic: (() => {
               const best = exitedBusinesses

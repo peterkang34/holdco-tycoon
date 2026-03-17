@@ -94,6 +94,8 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
     const sophisticationScore = (strategy.sophisticationScore as number) ?? -1;
     const sharedServicesActive = (strategy.sharedServicesActive as number) ?? -1;
     const recessionAcquisitionCount = (strategy.recessionAcquisitionCount as number) ?? -1;
+    const isBankrupt = strategy.isBankrupt === true;
+    const sellerNotesTotal = (strategy.sellerNotesTotal as number) ?? -1;
 
     // first_acquisition from strategy (more precise)
     if (totalAcquisitions >= 1 && !earned.includes('first_acquisition')) earned.push('first_acquisition');
@@ -124,8 +126,9 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
       if (!earned.includes('the_contrarian')) earned.push('the_contrarian');
     }
 
-    // debt_free: zero debt at game end and no bankruptcy (totalDebt excludes seller notes, so this is approximate)
-    if (totalDebt === 0 && game.has_restructured !== true) earned.push('debt_free');
+    // debt_free: zero debt + zero seller notes at game end, no bankruptcy
+    const sellerNotesZero = sellerNotesTotal >= 0 ? sellerNotesTotal === 0 : true; // default true for legacy games
+    if (totalDebt === 0 && !isBankrupt && sellerNotesZero) earned.push('debt_free');
 
     // smart_exit: sold a business at 3x+ MOIC
     if (smartExitMoic >= 3) earned.push('smart_exit');
@@ -153,20 +156,20 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
       earned.push('the_minimalist');
     }
 
-    // diversification_play: 6+ active sectors
-    if (sectorIds && sectorIds.length >= 6) earned.push('diversification_play');
+    // diversification_play: 6+ active sectors + B grade
+    if (sectorIds && sectorIds.length >= 6 && ['S', 'A', 'B'].includes(grade ?? '')) earned.push('diversification_play');
 
     // no_leverage: never used a leveraged deal structure + C+ grade
     const leverageDeals = dealStructureTypes
       ? (dealStructureTypes['bank_debt'] ?? 0) + (dealStructureTypes['seller_note'] ?? 0) +
         (dealStructureTypes['seller_note_bank_debt'] ?? 0) + (dealStructureTypes['rollover_equity'] ?? 0)
       : (peakLeverage === 0 ? 0 : 1); // fallback for legacy games without dealStructureTypes
-    if (leverageDeals === 0 && game.has_restructured !== true && ['S', 'A', 'B', 'C'].includes(grade ?? '')) {
+    if (leverageDeals === 0 && !isBankrupt && ['S', 'A', 'B', 'C'].includes(grade ?? '')) {
       earned.push('no_leverage');
     }
 
-    // recession_buyer: 3+ acquisitions during recessions + B grade
-    if (recessionAcquisitionCount >= 3 && ['S', 'A', 'B'].includes(grade ?? '')) {
+    // recession_buyer: 2+ acquisitions during recessions + B grade
+    if (recessionAcquisitionCount >= 2 && ['S', 'A', 'B'].includes(grade ?? '')) {
       earned.push('recession_buyer');
     }
 

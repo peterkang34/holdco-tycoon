@@ -197,6 +197,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           maSourcingTier: typeof s.maSourcingTier === 'number' ? s.maSourcingTier : 0,
           sharedServicesActive: typeof s.sharedServicesActive === 'number' ? s.sharedServicesActive : 0,
           rolloverEquityCount: typeof s.rolloverEquityCount === 'number' ? s.rolloverEquityCount : 0,
+          // Additional fields for server-side achievement backfill
+          ...(typeof s.totalDebt === 'number' ? { totalDebt: Math.round(s.totalDebt) } : {}),
+          ...(typeof s.activeCount === 'number' ? { activeCount: Math.max(0, Math.min(30, Math.round(s.activeCount))) } : {}),
+          ...(typeof s.recessionAcquisitionCount === 'number' && s.recessionAcquisitionCount > 0 ? { recessionAcquisitionCount: Math.round(s.recessionAcquisitionCount) } : {}),
+          ...(typeof s.lpSatisfaction === 'number' ? { lpSatisfaction: Math.max(0, Math.min(100, Math.round(s.lpSatisfaction))) } : {}),
+          ...(typeof s.smartExitMoic === 'number' ? { smartExitMoic: Math.round(s.smartExitMoic * 100) / 100 } : {}),
+          ...(typeof s.isBankrupt === 'boolean' && s.isBankrupt ? { isBankrupt: true } : {}),
+          ...(typeof s.sellerNotesTotal === 'number' ? { sellerNotesTotal: Math.round(s.sellerNotesTotal) } : {}),
           // Achievement IDs (for server-side backfill)
           ...(Array.isArray(s.earnedAchievementIds) ? {
             earnedAchievementIds: s.earnedAchievementIds.map((id: any) => String(id).slice(0, 50)).slice(0, 50),

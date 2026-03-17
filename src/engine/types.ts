@@ -750,6 +750,8 @@ export interface LeaderboardStrategy {
   activeCount?: number;
   lpSatisfaction?: number;
   smartExitMoic?: number;
+  isBankrupt?: boolean;
+  sellerNotesTotal?: number;
   earnedAchievementIds?: string[];
   // Phase 2B additions
   recessionAcquisitionCount?: number;
