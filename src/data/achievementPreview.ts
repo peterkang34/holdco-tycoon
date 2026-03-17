@@ -283,13 +283,16 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
   {
     id: 'no_leverage',
     name: 'No Leverage',
-    description: 'Complete a game without ever using leverage and earn a C grade or better.',
+    description: 'Never use a leveraged deal structure (bank debt or seller notes) and earn a C grade or better.',
     emoji: '🪶',
     category: 'creative',
-    check: (ctx) =>
-      ctx.strategyData.peakLeverage === 0 &&
-      !ctx.bankruptRound &&
-      ['S', 'A', 'B', 'C'].includes(ctx.score.grade),
+    check: (ctx) => {
+      const ds = ctx.strategyData.dealStructureTypes;
+      const usedLeverage = (ds['bank_debt'] || 0) + (ds['seller_note'] || 0) + (ds['seller_note_bank_debt'] || 0) + (ds['rollover_equity'] || 0) > 0;
+      return !usedLeverage &&
+        !ctx.bankruptRound &&
+        ['S', 'A', 'B', 'C'].includes(ctx.score.grade);
+    },
   },
 
   // ── Mode-Specific ──
