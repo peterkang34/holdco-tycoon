@@ -17,6 +17,10 @@ import { generateDealStructures } from '../../deals';
 import { getEligiblePrograms, calculateTurnaroundCost } from '../../turnarounds';
 import type { PlaytestCoverage, FeatureKey } from './coverage';
 
+// Improvement types as arrays for deterministic iteration
+const STABILIZATION_LIST = ['fix_underperformance', 'management_professionalization', 'operating_playbook'];
+const GROWTH_LIST = ['pricing_model', 'digital_transformation', 'service_expansion', 'recurring_revenue_conversion'];
+
 // ── Strategy Interface ──
 
 export interface AllocateDecisions {
@@ -42,6 +46,8 @@ export interface AllocateDecisions {
   sharedServicesToUnlock: string[];
   /** Forge integrated platforms */
   forgePlatforms: boolean;
+  /** Operational improvements: [businessId, improvementType] */
+  improvements: { businessId: string; improvementType: string }[];
   /** Whether to sell any businesses */
   businessesToSell: string[];
 }
@@ -108,6 +114,7 @@ function defaultDecisions(): AllocateDecisions {
     upgradeMASourcing: false,
     sharedServicesToUnlock: [],
     forgePlatforms: false,
+    improvements: [],
     businessesToSell: [],
   };
 }
@@ -120,7 +127,7 @@ export const AggressiveAcquirer: PlaytestStrategy = {
   expectedFeatures: [
     'acquisition_cash', 'acquisition_leveraged', 'acquisition_seller_note',
     'acquisition_earnout', 'collect_phase', 'event_phase', 'allocate_phase',
-    'end_round', 'scoring_completed', 'margin_drift',
+    'end_round', 'scoring_completed', 'margin_drift', 'complexity_cost_triggered',
   ],
 
   decideAllocations(state: GameState, deals: Deal[], _coverage: PlaytestCoverage): AllocateDecisions {
@@ -184,7 +191,7 @@ export const PlatformBuilder: PlaytestStrategy = {
     'platform_designation', 'tuck_in', 'forge_platform',
     'shared_service_unlocked', 'ma_sourcing_upgraded', 'integration_drag',
     'collect_phase', 'event_phase', 'allocate_phase', 'end_round',
-    'scoring_completed', 'margin_drift',
+    'scoring_completed', 'margin_drift', 'operational_improvement',
   ],
 
   decideAllocations(state: GameState, deals: Deal[], _coverage: PlaytestCoverage): AllocateDecisions {
@@ -220,6 +227,38 @@ export const PlatformBuilder: PlaytestStrategy = {
       decisions.upgradeMASourcing = true;
     }
 
+    // Stabilization on Q1/Q2 businesses to unblock platform forging (Q3+ required)
+    for (const b of active) {
+      if (b.qualityRating <= 2) {
+        for (const impType of STABILIZATION_LIST) {
+          if (!b.improvements.some(i => i.type === impType)) {
+            const absEbitda = Math.abs(b.ebitda) || 1;
+            const estCost = Math.max(200, Math.round(absEbitda * 0.15));
+            if (state.cash > estCost + 2000) {
+              decisions.improvements.push({ businessId: b.id, improvementType: impType });
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Growth improvements on Q3+ businesses for EBITDA build toward platform threshold
+    for (const b of active) {
+      if (b.qualityRating >= 3) {
+        for (const impType of GROWTH_LIST) {
+          if (!b.improvements.some(i => i.type === impType)) {
+            const absEbitda = Math.abs(b.ebitda) || 1;
+            const estCost = Math.max(200, Math.round(absEbitda * 0.15));
+            if (state.cash > estCost + 2000) {
+              decisions.improvements.push({ businessId: b.id, improvementType: impType });
+              break;
+            }
+          }
+        }
+      }
+    }
+
     // Buy businesses in the focus sector, prefer as tuck-ins
     const platform = active.find(b => b.isPlatform && b.sectorId === bestSector);
     for (const deal of deals.slice(0, 3)) {
@@ -231,6 +270,26 @@ export const PlatformBuilder: PlaytestStrategy = {
         decisions.tuckIns.push({ deal, platformId: platform.id });
       } else {
         decisions.acquisitions.push({ deal, structurePreference: structs[0].type });
+      }
+    }
+
+    // Unlock turnaround tiers for quality improvement (helps Q1/Q2 reach Q3+ for platforms)
+    if (state.turnaroundTier < 2 && active.length >= 2 && state.cash > 2000) {
+      decisions.unlockTurnaroundTier = true;
+    }
+
+    // Start turnarounds on Q1/Q2 businesses to bring them into platform territory
+    if (state.turnaroundTier > 0) {
+      for (const b of active) {
+        if (b.qualityRating <= 2) {
+          const programs = getEligiblePrograms(b, state.turnaroundTier, state.activeTurnarounds);
+          if (programs.length > 0) {
+            const cost = calculateTurnaroundCost(programs[0], b);
+            if (state.cash > cost + 2000) {
+              decisions.turnarounds.push({ businessId: b.id, programId: programs[0].id });
+            }
+          }
+        }
       }
     }
 
@@ -259,7 +318,7 @@ export const ValueInvestor: PlaytestStrategy = {
     'distribution', 'buyback', 'acquisition_cash',
     'quality_improvement', 'scoring_completed',
     'collect_phase', 'event_phase', 'allocate_phase', 'end_round',
-    'margin_drift',
+    'margin_drift', 'operational_improvement',
   ],
 
   decideAllocations(state: GameState, deals: Deal[], _coverage: PlaytestCoverage): AllocateDecisions {
@@ -279,13 +338,41 @@ export const ValueInvestor: PlaytestStrategy = {
       }
     }
 
-    // Distribute cash to shareholders when flush
-    if (state.cash > 10000 && active.length >= 2) {
+    // Apply growth improvements on Q3+ businesses (core value creation)
+    for (const b of active) {
+      if (b.qualityRating >= 3) {
+        for (const impType of GROWTH_LIST) {
+          if (!b.improvements.some(i => i.type === impType)) {
+            const absEbitda = Math.abs(b.ebitda) || 1;
+            const estCost = Math.max(200, Math.round(absEbitda * 0.15));
+            if (state.cash > estCost + 3000) {
+              decisions.improvements.push({ businessId: b.id, improvementType: impType });
+              break;
+            }
+          }
+        }
+      } else if (b.qualityRating <= 2) {
+        // Stabilization for degraded businesses
+        for (const impType of STABILIZATION_LIST) {
+          if (!b.improvements.some(i => i.type === impType)) {
+            const absEbitda = Math.abs(b.ebitda) || 1;
+            const estCost = Math.max(200, Math.round(absEbitda * 0.15));
+            if (state.cash > estCost + 3000) {
+              decisions.improvements.push({ businessId: b.id, improvementType: impType });
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Distribute cash to shareholders when flush (lower threshold for earlier trigger)
+    if (state.cash > 6000 && active.length >= 2 && state.round >= 3) {
       decisions.distributionAmount = Math.round(state.cash * 0.3);
     }
 
-    // Do buybacks when equity is undervalued
-    if (state.cash > 8000 && state.equityRaisesUsed > 0 && state.round > 5) {
+    // Do buybacks when equity is undervalued (lower threshold for earlier trigger)
+    if (state.cash > 5000 && state.equityRaisesUsed > 0 && state.round > 3) {
       decisions.doBuyback = true;
     }
 
@@ -323,6 +410,8 @@ export const TurnaroundArtist: PlaytestStrategy = {
     'acquisition_cash', 'acquisition_leveraged',
     'collect_phase', 'event_phase', 'allocate_phase', 'end_round',
     'scoring_completed', 'margin_drift', 'quality_improvement',
+    'operational_improvement', 'stabilization_improvement',
+    'ceiling_mastery_bonus', 'turnaround_exit_premium',
   ],
 
   decideAllocations(state: GameState, deals: Deal[], _coverage: PlaytestCoverage): AllocateDecisions {
@@ -334,16 +423,63 @@ export const TurnaroundArtist: PlaytestStrategy = {
       decisions.unlockTurnaroundTier = true;
     }
 
-    // Buy cheap/low-quality businesses to turnaround
+    // Buy cheap Q1/Q2 businesses to turnaround (tighter filter than before)
     for (const deal of deals.slice(0, 3)) {
       if (state.cash < 2000) break;
       if (active.length >= 8) break;
-      // Prefer lower quality for turnaround opportunities
-      if (deal.business.qualityRating > 3) continue;
+      // Only target Q1/Q2 — true turnaround candidates
+      if (deal.business.qualityRating > 2) continue;
 
       const structs = getAffordableStructures(deal, state);
       if (structs.length > 0) {
         decisions.acquisitions.push({ deal, structurePreference: structs[0].type });
+      }
+    }
+
+    // Also buy Q3 deals if portfolio is small (need volume for shared services)
+    if (active.length < 3) {
+      for (const deal of deals.slice(0, 3)) {
+        if (state.cash < 2000) break;
+        if (deal.business.qualityRating > 3) continue;
+        // Skip if already in acquisitions
+        if (decisions.acquisitions.some(a => a.deal.id === deal.id)) continue;
+        const structs = getAffordableStructures(deal, state);
+        if (structs.length > 0) {
+          decisions.acquisitions.push({ deal, structurePreference: structs[0].type });
+          break;
+        }
+      }
+    }
+
+    // Apply stabilization improvements on Q1/Q2 businesses
+    for (const b of active) {
+      if (b.qualityRating <= 2) {
+        for (const impType of STABILIZATION_LIST) {
+          if (!b.improvements.some(i => i.type === impType)) {
+            const absEbitda = Math.abs(b.ebitda) || 1;
+            const estCost = Math.max(200, Math.round(absEbitda * 0.15));
+            if (state.cash > estCost + 1000) {
+              decisions.improvements.push({ businessId: b.id, improvementType: impType });
+              break; // One improvement per business per round
+            }
+          }
+        }
+      }
+    }
+
+    // Apply growth improvements on Q3+ businesses
+    for (const b of active) {
+      if (b.qualityRating >= 3) {
+        for (const impType of GROWTH_LIST) {
+          if (!b.improvements.some(i => i.type === impType)) {
+            const absEbitda = Math.abs(b.ebitda) || 1;
+            const estCost = Math.max(200, Math.round(absEbitda * 0.15));
+            if (state.cash > estCost + 1000) {
+              decisions.improvements.push({ businessId: b.id, improvementType: impType });
+              break;
+            }
+          }
+        }
       }
     }
 
@@ -363,6 +499,16 @@ export const TurnaroundArtist: PlaytestStrategy = {
       }
     }
 
+    // Sell turnaround-improved businesses (Q3+ with tiers improved) for exit premium
+    if (state.round >= 6) {
+      for (const b of active) {
+        if ((b.qualityImprovedTiers ?? 0) >= 2 && b.qualityRating >= 3 && state.round - b.acquisitionRound >= 3) {
+          decisions.businessesToSell.push(b.id);
+          break; // One per round
+        }
+      }
+    }
+
     // Shared services for operational improvement
     if (active.length >= 3) {
       for (const svc of state.sharedServices) {
@@ -371,6 +517,21 @@ export const TurnaroundArtist: PlaytestStrategy = {
           break;
         }
       }
+    }
+
+    // Designate largest Q3+ business as platform (turnaround-improved businesses become platforms)
+    const platforms = active.filter(b => b.isPlatform);
+    if (platforms.length === 0 && active.length >= 2) {
+      const q3Plus = active.filter(b => b.qualityRating >= 3);
+      if (q3Plus.length > 0) {
+        const biggest = [...q3Plus].sort((a, b) => b.ebitda - a.ebitda)[0];
+        decisions.platformDesignations.push(biggest.id);
+      }
+    }
+
+    // Forge integrated platforms when eligible
+    if (active.length >= 3) {
+      decisions.forgePlatforms = true;
     }
 
     return decisions;
@@ -469,7 +630,7 @@ export const FamilyOfficeEndgame: PlaytestStrategy = {
     'distribution', 'acquisition_cash',
     'quality_improvement', 'shared_service_unlocked',
     'collect_phase', 'event_phase', 'allocate_phase', 'end_round',
-    'scoring_completed', 'margin_drift',
+    'scoring_completed', 'margin_drift', 'operational_improvement',
   ],
 
   decideAllocations(state: GameState, deals: Deal[], _coverage: PlaytestCoverage): AllocateDecisions {
@@ -498,6 +659,33 @@ export const FamilyOfficeEndgame: PlaytestStrategy = {
       const structs = getAffordableStructures(deal, state, 'all_cash');
       if (structs.length > 0) {
         decisions.acquisitions.push({ deal, structurePreference: 'all_cash' });
+      }
+    }
+
+    // Improvements: stabilization on Q1/Q2, growth on Q3+
+    for (const b of active) {
+      if (b.qualityRating <= 2) {
+        for (const impType of STABILIZATION_LIST) {
+          if (!b.improvements.some(i => i.type === impType)) {
+            const absEbitda = Math.abs(b.ebitda) || 1;
+            const estCost = Math.max(200, Math.round(absEbitda * 0.15));
+            if (state.cash > estCost + 3000) {
+              decisions.improvements.push({ businessId: b.id, improvementType: impType });
+              break;
+            }
+          }
+        }
+      } else if (b.qualityRating >= 3) {
+        for (const impType of GROWTH_LIST) {
+          if (!b.improvements.some(i => i.type === impType)) {
+            const absEbitda = Math.abs(b.ebitda) || 1;
+            const estCost = Math.max(200, Math.round(absEbitda * 0.15));
+            if (state.cash > estCost + 3000) {
+              decisions.improvements.push({ businessId: b.id, improvementType: impType });
+              break;
+            }
+          }
+        }
       }
     }
 
@@ -546,6 +734,116 @@ export const FamilyOfficeEndgame: PlaytestStrategy = {
   },
 };
 
+// ── Strategy 7: PE Fund Manager ──
+
+export const PEFundManager: PlaytestStrategy = {
+  name: 'PEFundManager',
+  requires20yr: false,
+  expectedFeatures: [
+    'fund_mode_started', 'management_fee_deducted', 'lp_distribution',
+    'forced_liquidation', 'carry_earned', 'pe_scoring_completed',
+    'acquisition_cash', 'acquisition_leveraged',
+    'collect_phase', 'event_phase', 'allocate_phase', 'end_round',
+    'scoring_completed', 'margin_drift', 'operational_improvement',
+  ],
+
+  decideAllocations(state: GameState, deals: Deal[], _coverage: PlaytestCoverage): AllocateDecisions {
+    const decisions = defaultDecisions();
+    const active = getActiveBusinesses(state);
+
+    // PE Fund: deploy capital aggressively in first 5 years (investment period)
+    const isInvestmentPeriod = state.round <= 5;
+
+    // Upgrade MA sourcing early (fund starts at tier 1)
+    if (state.maSourcing.tier < 2 && state.cash > 5000) {
+      decisions.upgradeMASourcing = true;
+    }
+
+    // Shared services when portfolio is large enough
+    if (active.length >= 3) {
+      for (const svc of state.sharedServices) {
+        if (!svc.active && state.cash > svc.unlockCost + 5000) {
+          decisions.sharedServicesToUnlock.push(svc.type);
+          break;
+        }
+      }
+    }
+
+    // Acquire during investment period
+    if (isInvestmentPeriod && active.length < 8) {
+      for (const deal of deals.slice(0, 3)) {
+        if (state.cash < 5000) break;
+        const structurePrefs = ['bank_debt', 'seller_note_bank_debt', 'all_cash'];
+        for (const pref of structurePrefs) {
+          const structs = getAffordableStructures(deal, state, pref);
+          if (structs.length > 0) {
+            decisions.acquisitions.push({ deal, structurePreference: pref });
+            break;
+          }
+        }
+      }
+    }
+
+    // Apply improvements to build value
+    for (const b of active) {
+      if (b.qualityRating >= 3) {
+        for (const impType of GROWTH_LIST) {
+          if (!b.improvements.some(i => i.type === impType)) {
+            const absEbitda = Math.abs(b.ebitda) || 1;
+            const estCost = Math.max(200, Math.round(absEbitda * 0.15));
+            if (state.cash > estCost + 5000) {
+              decisions.improvements.push({ businessId: b.id, improvementType: impType });
+              break;
+            }
+          }
+        }
+      } else {
+        for (const impType of STABILIZATION_LIST) {
+          if (!b.improvements.some(i => i.type === impType)) {
+            const absEbitda = Math.abs(b.ebitda) || 1;
+            const estCost = Math.max(200, Math.round(absEbitda * 0.15));
+            if (state.cash > estCost + 5000) {
+              decisions.improvements.push({ businessId: b.id, improvementType: impType });
+              break;
+            }
+          }
+        }
+      }
+    }
+
+    // Sell mature businesses in harvest period (years 6-9) for LP distributions
+    if (!isInvestmentPeriod && state.round < 10) {
+      for (const b of active) {
+        if (state.round - b.acquisitionRound >= 3 && b.qualityRating >= 3) {
+          decisions.businessesToSell.push(b.id);
+          break; // One per round
+        }
+      }
+    }
+
+    // Designate platforms for value creation
+    if (active.filter(b => b.isPlatform).length === 0 && active.length >= 1) {
+      const biggest = [...active].sort((a, b) => b.ebitda - a.ebitda)[0];
+      decisions.platformDesignations.push(biggest.id);
+    }
+
+    // Forge when eligible
+    if (active.length >= 3) {
+      decisions.forgePlatforms = true;
+    }
+
+    return decisions;
+  },
+
+  decideEvent(_state: GameState, event: GameEvent): EventDecision | null {
+    if (event.choices && event.choices.length > 0) {
+      const idx = event.choices.findIndex(c => c.variant === 'positive');
+      return { choiceIndex: idx >= 0 ? idx : 0 };
+    }
+    return null;
+  },
+};
+
 // ── Exports ──
 
 export const ALL_STRATEGIES: PlaytestStrategy[] = [
@@ -556,6 +854,9 @@ export const ALL_STRATEGIES: PlaytestStrategy[] = [
   IPOPathway,
   FamilyOfficeEndgame,
 ];
+
+/** PE Fund Manager is separate — it requires isFundManagerMode in the simulator */
+export const PE_FUND_STRATEGY = PEFundManager;
 
 export function getStrategiesForMode(duration: 'quick' | 'standard'): PlaytestStrategy[] {
   if (duration === 'quick') {

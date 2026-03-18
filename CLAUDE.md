@@ -73,7 +73,7 @@ Spawn via Agent tool (background). Always include in the prompt:
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
 - **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v38`
-- **Tests**: Vitest in `src/engine/__tests__/` — ~1560 tests across 34 suites (incl. display-proofreader + playtest system + synergy + unlocks); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
+- **Tests**: Vitest in `src/engine/__tests__/` — ~1569 tests across 34 suites (incl. display-proofreader + playtest system + synergy + unlocks); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
 - **Game Over Screen**: `GameOverScreen.tsx` is a ~500-line orchestrator importing 13 child components from `src/components/gameover/`. Components are pure presentational (props-in, no store access). `ProfileAchievementSection` manages its own modal state for `AchievementBrowserModal`
 - **Test Shortcuts**: `#/fo-test` (Family Office), `#/go-test` (Game Over — variants: `?v=holdco|pe|bankrupt|pe-bankrupt`). Both guard against completion API submission. Mock state injected via Zustand `setState`
 - **All monetary values in thousands** (1000 = $1M)

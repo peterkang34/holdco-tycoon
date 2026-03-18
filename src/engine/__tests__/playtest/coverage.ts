@@ -63,10 +63,12 @@ export const FEATURE_REGISTRY = {
   succession_choice: 'succession_choice',
   legacy_scored: 'legacy_scored',
 
-  // Turnarounds (3)
+  // Turnarounds (5)
   turnaround_started: 'turnaround_started',
   turnaround_resolved: 'turnaround_resolved',
   turnaround_fatigue: 'turnaround_fatigue',
+  ceiling_mastery_bonus: 'ceiling_mastery_bonus',
+  turnaround_exit_premium: 'turnaround_exit_premium',
 
   // Shared Services (2)
   shared_service_unlocked: 'shared_service_unlocked',
@@ -82,6 +84,11 @@ export const FEATURE_REGISTRY = {
   covenant_breach: 'covenant_breach',
   restructuring: 'restructuring',
   emergency_equity: 'emergency_equity',
+
+  // Operational Improvements (3)
+  operational_improvement: 'operational_improvement',
+  stabilization_improvement: 'stabilization_improvement',
+  growth_improvement_gated: 'growth_improvement_gated',
 
   // Simulation (4)
   margin_drift: 'margin_drift',

@@ -15,6 +15,7 @@ import type {
   QualityRating,
   RoundHistoryEntry,
   ActiveTurnaround,
+  OperationalImprovementType,
 } from '../../types';
 
 // Engine functions
@@ -45,7 +46,7 @@ import {
   calculateIntegrationGrowthPenalty,
 } from '../../businesses';
 import { generateDealStructures, executeDealStructure, calculateLendingSynergyDiscount } from '../../deals';
-import { calculateFinalScore, calculateEnterpriseValue, calculateFounderEquityValue } from '../../scoring';
+import { calculateFinalScore, calculateEnterpriseValue, calculateFounderEquityValue, calculatePEFundScore } from '../../scoring';
 import { getDistressRestrictions } from '../../distress';
 import { createRngStreams } from '../../rng';
 import { resolveTurnaround, calculateTurnaroundCost, getTurnaroundDuration } from '../../turnarounds';
@@ -53,12 +54,19 @@ import { checkPlatformEligibility, calculateIntegrationCost, forgePlatform } fro
 import { processEarningsResult, calculateStockPrice } from '../../ipo';
 
 // Data imports
-import { DIFFICULTY_CONFIG, DURATION_CONFIG, EARNOUT_EXPIRATION_YEARS, COVENANT_BREACH_ROUNDS_THRESHOLD, KEY_MAN_SUCCESSION_ROUNDS, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, MIN_FOUNDER_OWNERSHIP } from '../../../data/gameConfig';
+import {
+  DIFFICULTY_CONFIG, DURATION_CONFIG, EARNOUT_EXPIRATION_YEARS, COVENANT_BREACH_ROUNDS_THRESHOLD,
+  KEY_MAN_SUCCESSION_ROUNDS, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN,
+  MIN_FOUNDER_OWNERSHIP, TURNAROUND_CEILING_BONUS, IMPROVEMENT_COST_FLOOR,
+  STABILIZATION_TYPES, GROWTH_TYPES, STABILIZATION_EFFICACY_MULTIPLIER, QUALITY_IMPROVEMENT_MULTIPLIER,
+  PE_FUND_CONFIG, FUND_MANAGER_CONFIG,
+} from '../../../data/gameConfig';
+import { getQualityImprovementChance } from '../../turnarounds';
 import { initializeSharedServices, getMASourcingAnnualCost } from '../../../data/sharedServices';
 import { getTurnaroundTierAnnualCost, getProgramById, getQualityCeiling } from '../../../data/turnaroundPrograms';
 import { SECTORS } from '../../../data/sectors';
 import { resetUsedNames } from '../../../data/names';
-import { clampMargin } from '../../helpers';
+import { clampMargin, capGrowthRate } from '../../helpers';
 
 // Playtest types
 import type { PlaytestStrategy } from './strategies';
@@ -133,11 +141,92 @@ function initializeGameState(config: {
   difficulty: GameDifficulty;
   duration: GameDuration;
   startingSector?: SectorId;
+  isFundManagerMode?: boolean;
 }): GameState {
   resetBusinessIdCounter();
   resetUsedNames();
 
-  const { seed, difficulty, duration, startingSector = 'agency' } = config;
+  const { seed, difficulty, duration, startingSector = 'agency', isFundManagerMode = false } = config;
+
+  // PE Fund Mode: separate initialization path
+  if (isFundManagerMode) {
+    const maxRounds = DURATION_CONFIG.quick.rounds; // PE fund is always 10yr
+    const state: GameState = {
+      holdcoName: 'Playtest PE Fund',
+      seed,
+      difficulty: 'easy', // PE fund uses easy difficulty base
+      duration: 'quick',
+      maxRounds,
+      round: 1,
+      phase: 'collect' as GamePhase,
+      gameOver: false,
+      businesses: [],
+      exitedBusinesses: [],
+      cash: PE_FUND_CONFIG.fundSize, // $100M
+      totalDebt: 0,
+      holdcoLoanBalance: 0,
+      holdcoLoanRate: 0,
+      holdcoLoanRoundsRemaining: 0,
+      interestRate: STARTING_INTEREST_RATE,
+      sharesOutstanding: FUND_MANAGER_CONFIG.totalShares,
+      founderShares: 1, // GP needs > 0 for invariant checks
+      initialRaiseAmount: PE_FUND_CONFIG.fundSize,
+      initialOwnershipPct: 0,
+      totalInvestedCapital: 0,
+      totalDistributions: 0,
+      totalBuybacks: 0,
+      totalExitProceeds: 0,
+      equityRaisesUsed: 0,
+      lastEquityRaiseRound: 0,
+      lastBuybackRound: 0,
+      sharedServices: initializeSharedServices(),
+      dealPipeline: [],
+      passedDealIds: [],
+      maFocus: { sectorId: null, sizePreference: 'any', subType: null },
+      maSourcing: { tier: PE_FUND_CONFIG.startingMaSourcingTier, active: true, unlockedRound: 0, lastUpgradeRound: 0 },
+      currentEvent: null,
+      pendingProSportsEvent: null,
+      eventHistory: [],
+      creditTighteningRoundsRemaining: 0,
+      inflationRoundsRemaining: 0,
+      metricsHistory: [],
+      roundHistory: [],
+      actionsThisRound: [],
+      debtPaymentThisRound: 0,
+      cashBeforeDebtPayments: 0,
+      holdcoDebtStartRound: 0,
+      requiresRestructuring: false,
+      covenantBreachRounds: 0,
+      hasRestructured: false,
+      acquisitionsThisRound: 0,
+      maxAcquisitionsPerRound: 3,
+      lastAcquisitionResult: null,
+      lastIntegrationOutcome: null,
+      exitMultiplePenalty: 0,
+      integratedPlatforms: [],
+      turnaroundTier: 0 as any,
+      activeTurnarounds: [],
+      founderDistributionsReceived: 0,
+      isChallenge: false,
+      dealInflationState: { crisisResetRoundsRemaining: 0 },
+      ipoState: null,
+      familyOfficeState: null,
+      // PE Fund Mode fields
+      isFundManagerMode: true,
+      fundName: 'Playtest Capital Partners',
+      fundSize: PE_FUND_CONFIG.fundSize,
+      managementFeesCollected: 0,
+      lpSatisfactionScore: PE_FUND_CONFIG.lpSatisfactionStart,
+      lpDistributions: 0,
+      totalCapitalDeployed: 0,
+    };
+    return {
+      ...state,
+      metrics: calculateMetrics(state),
+      focusBonus: null,
+    } as GameState;
+  }
+
   const diffConfig = DIFFICULTY_CONFIG[difficulty];
   const durConfig = DURATION_CONFIG[duration];
   const maxRounds = durConfig.rounds;
@@ -385,6 +474,13 @@ function simulateCollectToEvent(state: GameState, coverage: PlaytestCoverage): G
 
   newCash = newCash + opcoDebtAdjustment;
 
+  // PE Fund Mode: management fee deduction
+  if (state.isFundManagerMode) {
+    const mgmtFee = PE_FUND_CONFIG.annualManagementFee;
+    newCash -= mgmtFee;
+    coverage.record('management_fee_deducted', state.round);
+  }
+
   // Negative cash handling
   let requiresRestructuring = state.requiresRestructuring;
   let gameOverFromNegativeCash = false;
@@ -513,20 +609,46 @@ function simulateCollectToEvent(state: GameState, coverage: PlaytestCoverage): G
     businessesAfterTurnarounds = businessesAfterTurnarounds.map(b => {
       if (b.id !== ta.businessId) return b;
       const newEbitda = Math.round(b.ebitda * result.ebitdaMultiplier);
+
+      // Failure branch: only apply EBITDA damage, no quality changes (matches useGame.ts)
+      if (result.result === 'failure') {
+        return {
+          ...b,
+          ebitda: newEbitda,
+          peakEbitda: Math.max(b.peakEbitda, newEbitda),
+        };
+      }
+
       const ceiling = getQualityCeiling(b.sectorId);
       const newQuality = Math.min(result.targetQuality, ceiling) as QualityRating;
+      const actualTiersGained = Math.max(0, newQuality - b.qualityRating);
+
+      // Ceiling mastery bonus: one-time bonus when turnaround reaches sector ceiling
+      const reachedCeiling = newQuality === ceiling && actualTiersGained > 0 && !b.ceilingMasteryBonus;
+
       return {
         ...b,
         qualityRating: newQuality,
         ebitda: newEbitda,
         peakEbitda: Math.max(b.peakEbitda, newEbitda),
-        qualityImprovedTiers: (b.qualityImprovedTiers ?? 0) + Math.max(0, result.qualityChange),
+        qualityImprovedTiers: (b.qualityImprovedTiers ?? 0) + actualTiersGained,
+        ...(reachedCeiling && {
+          ceilingMasteryBonus: true,
+          ebitdaMargin: clampMargin(b.ebitdaMargin + TURNAROUND_CEILING_BONUS.marginBoost),
+          organicGrowthRate: capGrowthRate(b.organicGrowthRate + TURNAROUND_CEILING_BONUS.growthBoost),
+          revenueGrowthRate: capGrowthRate(b.revenueGrowthRate + TURNAROUND_CEILING_BONUS.growthBoost),
+        }),
       };
     });
 
     coverage.record('turnaround_resolved', state.round);
     if (result.qualityChange > 0) {
       coverage.record('quality_improvement', state.round);
+    }
+    // Check if ceiling mastery was just awarded
+    const updatedBiz = businessesAfterTurnarounds.find(b2 => b2.id === ta.businessId);
+    if (updatedBiz?.ceilingMasteryBonus && !biz?.ceilingMasteryBonus) {
+      coverage.record('ceiling_mastery_bonus', state.round);
     }
   }
 
@@ -900,6 +1022,104 @@ function simulateAllocatePhase(
     }
   }
 
+  // Execute operational improvements
+  for (const imp of decisions.improvements) {
+    const biz = gameState.businesses.find(b => b.id === imp.businessId && b.status === 'active');
+    if (!biz) continue;
+
+    // Prevent applying same improvement twice
+    if (biz.improvements.some(i => i.type === imp.improvementType)) continue;
+
+    // Growth improvements gated behind Q3+
+    if (GROWTH_TYPES.has(imp.improvementType) && biz.qualityRating < 3) {
+      coverage.record('growth_improvement_gated', state.round);
+      continue;
+    }
+
+    // Calculate cost (simplified — matches useGame.ts switch)
+    const absEbitda = Math.abs(biz.ebitda) || 1;
+    let cost: number;
+    let marginBoost = 0;
+    let revenueBoost = 0;
+    let growthBoost = 0;
+    const impStreams = createRngStreams(state.seed, state.round);
+
+    switch (imp.improvementType) {
+      case 'operating_playbook': cost = Math.round(absEbitda * 0.15); marginBoost = 0.03; break;
+      case 'pricing_model': cost = Math.round(absEbitda * 0.10); marginBoost = 0.02; revenueBoost = 0.01; growthBoost = 0.01; break;
+      case 'service_expansion': cost = Math.round(absEbitda * 0.20); revenueBoost = 0.08 + impStreams.market.fork(imp.businessId + '_improve').next() * 0.04; marginBoost = -0.01; break;
+      case 'fix_underperformance': cost = Math.round(absEbitda * 0.12); marginBoost = 0.04; break;
+      case 'recurring_revenue_conversion': cost = Math.round(absEbitda * 0.25); marginBoost = -0.02; growthBoost = 0.03; break;
+      case 'management_professionalization': cost = Math.round(absEbitda * 0.18); marginBoost = 0.01; growthBoost = 0.01; break;
+      case 'digital_transformation': cost = Math.round(absEbitda * 0.22); revenueBoost = 0.03; marginBoost = biz.ebitdaMargin > 0.30 ? 0.01 : 0.02; growthBoost = 0.02; break;
+      default: continue;
+    }
+
+    cost = Math.max(IMPROVEMENT_COST_FLOOR, cost);
+    if (gameState.cash < cost) continue;
+
+    // Apply efficacy multipliers
+    const isStabilization = STABILIZATION_TYPES.has(imp.improvementType);
+    const qualityMult = (isStabilization && biz.qualityRating <= 2)
+      ? STABILIZATION_EFFICACY_MULTIPLIER[biz.qualityRating as 1|2|3|4|5] ?? 1.0
+      : QUALITY_IMPROVEMENT_MULTIPLIER[biz.qualityRating as 1|2|3|4|5] ?? 1.0;
+    if (marginBoost > 0) marginBoost *= qualityMult;
+    if (revenueBoost > 0) revenueBoost *= qualityMult;
+    if (growthBoost > 0) growthBoost *= qualityMult;
+
+    // Apply improvement to business
+    gameState = {
+      ...gameState,
+      cash: gameState.cash - cost,
+      businesses: gameState.businesses.map(b => {
+        if (b.id !== imp.businessId) return b;
+        const newRevenue = Math.round(b.revenue * (1 + revenueBoost));
+        const newMargin = clampMargin(b.ebitdaMargin + marginBoost);
+        const newEbitda = Math.round(newRevenue * newMargin);
+        return {
+          ...b,
+          revenue: newRevenue,
+          ebitdaMargin: newMargin,
+          ebitda: newEbitda,
+          peakEbitda: Math.max(b.peakEbitda, newEbitda),
+          peakRevenue: Math.max(b.peakRevenue, newRevenue),
+          organicGrowthRate: capGrowthRate(b.organicGrowthRate + growthBoost),
+          revenueGrowthRate: capGrowthRate(b.revenueGrowthRate + growthBoost),
+          totalAcquisitionCost: b.totalAcquisitionCost + cost,
+          improvements: [...b.improvements, { type: imp.improvementType as OperationalImprovementType, appliedRound: state.round, effect: 0 }],
+        };
+      }),
+    };
+
+    coverage.record('operational_improvement', state.round);
+    if (isStabilization && biz.qualityRating <= 2) {
+      coverage.record('stabilization_improvement', state.round);
+    }
+
+    // Quality improvement roll (skip for Q1/Q2 stabilization — must use turnaround system)
+    const skipQualityRoll = isStabilization && biz.qualityRating <= 2;
+    if (!skipQualityRoll) {
+      const updatedBiz = gameState.businesses.find(b => b.id === imp.businessId);
+      if (updatedBiz) {
+        const ceiling = getQualityCeiling(updatedBiz.sectorId);
+        if (updatedBiz.qualityRating < ceiling) {
+          const chance = getQualityImprovementChance(gameState.turnaroundTier);
+          const qualStreams = createRngStreams(state.seed, state.round);
+          if (qualStreams.market.fork(imp.businessId + '_quality_' + imp.improvementType).next() < chance) {
+            const newQuality = Math.min(updatedBiz.qualityRating + 1, ceiling) as QualityRating;
+            gameState = {
+              ...gameState,
+              businesses: gameState.businesses.map(b =>
+                b.id === imp.businessId ? { ...b, qualityRating: newQuality } : b
+              ),
+            };
+            coverage.record('quality_improvement', state.round);
+          }
+        }
+      }
+    }
+  }
+
   // Forge integrated platforms
   if (decisions.forgePlatforms) {
     const eligible = checkPlatformEligibility(
@@ -1027,11 +1247,63 @@ function simulateAllocatePhase(
       ],
     };
     gameState.totalDebt = computeTotalDebt(gameState.businesses, gameState.holdcoLoanBalance);
+
+    // Track turnaround exit premium coverage
+    if ((biz.qualityImprovedTiers ?? 0) >= 1) {
+      coverage.record('turnaround_exit_premium', state.round);
+    }
   }
 
   // Track SMB broker usage
   if (gameState.actionsThisRound.some(a => a.type === 'smb_broker')) {
     coverage.record('smb_broker_used', state.round);
+  }
+
+  // PE Fund Mode: LP distributions + LPAC + fund mode tracking
+  if (gameState.isFundManagerMode) {
+    coverage.record('fund_mode_started', state.round);
+
+    // LP distribution: distribute excess cash above deployment needs
+    const deployed = gameState.totalCapitalDeployed ?? 0;
+    const minDeployForDist = PE_FUND_CONFIG.minDeploymentForDistribution;
+    if (deployed >= minDeployForDist && gameState.cash > PE_FUND_CONFIG.minDistribution * 2) {
+      const distAmount = Math.round(gameState.cash * 0.3);
+      if (distAmount >= PE_FUND_CONFIG.minDistribution) {
+        gameState = {
+          ...gameState,
+          cash: gameState.cash - distAmount,
+          lpDistributions: (gameState.lpDistributions ?? 0) + distAmount,
+        };
+        coverage.record('lp_distribution', state.round);
+      }
+    }
+
+    // LPAC gate: check if any acquisition exceeded concentration limit
+    const activeAfter = gameState.businesses.filter(b => b.status === 'active');
+    const fundSize = gameState.fundSize ?? PE_FUND_CONFIG.fundSize;
+    const maxConcentration = fundSize * PE_FUND_CONFIG.maxConcentration;
+    for (const b of activeAfter) {
+      if (b.acquisitionPrice > maxConcentration) {
+        coverage.record('lpac_triggered', state.round);
+        const satisfaction = gameState.lpSatisfactionScore ?? 50;
+        if (satisfaction >= PE_FUND_CONFIG.lpacAutoApproveThreshold) {
+          coverage.record('lpac_approved', state.round);
+        } else {
+          coverage.record('lpac_denied', state.round);
+        }
+        break;
+      }
+    }
+
+    // Track capital deployed
+    const newDeployed = activeAfter.reduce((sum, b) => sum + b.acquisitionPrice, 0);
+    gameState = { ...gameState, totalCapitalDeployed: newDeployed };
+
+    // Update management fees collected
+    gameState = {
+      ...gameState,
+      managementFeesCollected: (gameState.managementFeesCollected ?? 0) + PE_FUND_CONFIG.annualManagementFee,
+    };
   }
 
   return {
@@ -1200,6 +1472,47 @@ function simulateEndRound(state: GameState, coverage: PlaytestCoverage): GameSta
       exitMultiplePenalty: 0,
     } as GameState;
   } else {
+    // PE Fund Mode: forced liquidation — sell all businesses at 0.90x discount
+    if (state.isFundManagerMode) {
+      let liquidationCash = state.cash;
+      const liquidatedBiz = updatedBusinesses.map(b => {
+        if (b.status !== 'active') return b;
+        const valuation = calculateExitValuation(b, state.round);
+        const discountedProceeds = Math.round(valuation.netProceeds * PE_FUND_CONFIG.forcedLiquidationDiscount);
+        liquidationCash += Math.max(0, discountedProceeds);
+        return { ...b, status: 'sold' as const, exitPrice: discountedProceeds, exitRound: state.round };
+      });
+      coverage.record('forced_liquidation', state.round);
+
+      // Calculate carry
+      const totalReturned = (state.lpDistributions ?? 0) + liquidationCash;
+      const hurdleReturn = PE_FUND_CONFIG.hurdleReturn;
+      const carryEarned = totalReturned > hurdleReturn
+        ? Math.round((totalReturned - hurdleReturn) * PE_FUND_CONFIG.carryRate)
+        : 0;
+      if (carryEarned > 0) {
+        coverage.record('carry_earned', state.round);
+      }
+      coverage.record('pe_scoring_completed', state.round);
+
+      return {
+        ...state,
+        businesses: liquidatedBiz,
+        cash: liquidationCash,
+        round: newRound,
+        metricsHistory: [...state.metricsHistory, historyEntry],
+        roundHistory: [...(state.roundHistory ?? []), roundHistoryEntry],
+        gameOver: true,
+        totalDebt: 0,
+        holdcoLoanBalance: 0,
+        phase: 'collect' as GamePhase,
+        currentEvent: null,
+        metrics: calculateMetrics({ ...state, businesses: liquidatedBiz, cash: liquidationCash }),
+        lpDistributions: (state.lpDistributions ?? 0),
+        totalExitProceeds: state.totalExitProceeds + liquidationCash - state.cash,
+      } as GameState;
+    }
+
     // Game over — run final collection
     const finalState = runFinalCollection({ ...state, businesses: updatedBusinesses });
     const gameOverDebt = computeTotalDebt(finalState.businesses, finalState.holdcoLoanBalance);
@@ -1241,14 +1554,15 @@ export interface PlaytestConfig {
   duration: GameDuration;
   strategy: PlaytestStrategy;
   startingSector?: SectorId;
+  isFundManagerMode?: boolean;
 }
 
 export function runPlaytest(config: PlaytestConfig): PlaytestResult & { coverage: PlaytestCoverage } {
-  const { seed, difficulty, duration, strategy, startingSector } = config;
+  const { seed, difficulty, duration, strategy, startingSector, isFundManagerMode } = config;
   const coverage = new PlaytestCoverage();
-  const maxRounds = DURATION_CONFIG[duration].rounds;
+  const maxRounds = isFundManagerMode ? DURATION_CONFIG.quick.rounds : DURATION_CONFIG[duration].rounds;
 
-  let state = initializeGameState({ seed, difficulty, duration, startingSector });
+  let state = initializeGameState({ seed, difficulty, duration, startingSector, isFundManagerMode });
 
   for (let round = 1; round <= maxRounds; round++) {
     if (state.gameOver) break;
@@ -1273,6 +1587,21 @@ export function runPlaytest(config: PlaytestConfig): PlaytestResult & { coverage
   }
 
   // Compute final score
+  if (isFundManagerMode) {
+    // PE Fund Mode uses separate scoring
+    const peScore = calculatePEFundScore(state);
+    coverage.record('scoring_completed', state.round - 1);
+    return {
+      finalState: state,
+      score: { total: peScore.total, grade: peScore.grade } as any,
+      enterpriseValue: 0,
+      founderEquityValue: 0,
+      roundsCompleted: state.metricsHistory.length,
+      bankrupted: !!state.bankruptRound,
+      coverage,
+    };
+  }
+
   const score = calculateFinalScore(state);
   const enterpriseValue = calculateEnterpriseValue(state);
   const founderEquityValue = calculateFounderEquityValue(state);

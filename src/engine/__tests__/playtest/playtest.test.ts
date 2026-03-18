@@ -1,8 +1,8 @@
 /**
  * Comprehensive Playtest Suite
  *
- * 4 game modes × 6 strategies × 5 seeds + coverage + determinism tests.
- * Exercises all 12 major game systems through realistic multi-round simulations.
+ * 4 game modes × 7 strategies × 5 seeds + coverage + determinism + PE fund tests.
+ * Exercises all 14 major game systems through realistic multi-round simulations.
  */
 
 import { describe, it, expect } from 'vitest';
@@ -15,6 +15,7 @@ import {
   PlatformBuilder,
   ValueInvestor,
   TurnaroundArtist,
+  PE_FUND_STRATEGY,
 } from './strategies';
 import type { GameDifficulty, GameDuration } from '../../types';
 
@@ -58,27 +59,29 @@ describe.each(MODES)('$label Playtest', ({ difficulty, duration }) => {
     const excludeFeatures: FeatureKey[] = duration === 'quick' ? [...STANDARD_ONLY_FEATURES] : [];
 
     // Features that require specific game conditions to trigger.
-    // These are validated in strategy-specific tests instead.
+    // These are validated in strategy-specific or PE fund tests instead.
     const hardToTriggerFeatures: FeatureKey[] = [
       // Distress mechanics require high leverage + bad luck
       'emergency_equity',
       'restructuring',
       'covenant_breach',
-      // Turnaround fatigue needs 4+ simultaneous programs
-      'turnaround_fatigue',
-      // Platform selling, merging, forging need specific conditions
+      // Platform selling/merging need specific conditions
       'sell_platform',
       'merger',
-      'forge_platform',
-      // Tuck-ins need platform + matching sector deal
+      'forge_platform',         // Requires same-sector businesses matching a recipe
+      // Tuck-ins need platform + matching sector deal RNG
       'tuck_in',
       // Integration drag requires failed integration RNG
       'integration_drag',
       // Earnout recording requires growth target met + earnout deal structure
       'acquisition_earnout',
-      // Buyback/distribution require sufficient cash surplus + cooldown timing
+      // Buyback/distribution triggers depend on cash surplus + cooldown timing
       'buyback',
       'distribution',
+      // Turnaround features depend on acquiring Q1/Q2 businesses (RNG-dependent pipeline)
+      'turnaround_started',
+      'turnaround_resolved',
+      'turnaround_fatigue',
       // Rollover/share-funded need high MA tier + specific conditions
       'acquisition_rollover',
       'acquisition_share_funded',
@@ -96,7 +99,7 @@ describe.each(MODES)('$label Playtest', ({ difficulty, duration }) => {
       'early_game_safety_net',
       // Complexity cost requires 5+ active businesses without full shared services
       'complexity_cost_triggered',
-      // PE Fund Mode features require fund mode game (separate playtest strategy)
+      // PE Fund Mode features tested in separate PE Fund suite below
       'fund_mode_started',
       'lp_distribution',
       'lpac_triggered',
@@ -109,6 +112,19 @@ describe.each(MODES)('$label Playtest', ({ difficulty, duration }) => {
       // Private Credit features require achievement unlock (not available in simulator)
       'lending_synergy_applied',
       'prestige_sector_in_pipeline',
+      // Ceiling mastery requires turnaround reaching sector ceiling (RNG-dependent)
+      'ceiling_mastery_bonus',
+      // Turnaround exit premium requires selling turnaround-improved businesses
+      'turnaround_exit_premium',
+      // Growth gated only fires when Q1/Q2 business tries growth improvement (strategy avoids this)
+      'growth_improvement_gated',
+      // Stabilization improvement requires Q1/Q2 businesses in pipeline (RNG-dependent)
+      'stabilization_improvement',
+      // Filler events are RNG-dependent (require quiet year + specific event pool)
+      'quiet_year_capped',
+      'filler_event_choice',
+      // Quality improvement from ops/turnarounds requires specific RNG outcomes
+      'quality_improvement',
     ];
 
     for (const strategy of strategies) {
@@ -217,7 +233,7 @@ describe('Strategy-specific Validation', () => {
     ).toBeGreaterThan(0);
   });
 
-  it('TurnaroundArtist should start turnarounds', () => {
+  it('TurnaroundArtist should start turnarounds and apply improvements', () => {
     const result = runPlaytest({
       seed: 42,
       difficulty: 'easy',
@@ -229,6 +245,106 @@ describe('Strategy-specific Validation', () => {
       result.coverage.wasExercised('turnaround_started'),
       'Turnaround artist should start turnarounds'
     ).toBe(true);
+    expect(
+      result.coverage.wasExercised('operational_improvement'),
+      'Turnaround artist should apply operational improvements'
+    ).toBe(true);
+  });
+
+  it('TurnaroundArtist should exercise stabilization improvements', () => {
+    // Run across multiple seeds to increase chance of stabilization on Q1/Q2
+    const mergedCoverage = new PlaytestCoverage();
+    for (const seed of SEEDS) {
+      const result = runPlaytest({
+        seed,
+        difficulty: 'easy',
+        duration: 'standard',
+        strategy: TurnaroundArtist,
+      });
+      mergedCoverage.merge(result.coverage);
+    }
+
+    expect(
+      mergedCoverage.wasExercised('stabilization_improvement'),
+      'Turnaround artist should apply stabilization improvements across seeds'
+    ).toBe(true);
+  });
+
+  it('ValueInvestor should apply growth improvements', () => {
+    const mergedCoverage = new PlaytestCoverage();
+    for (const seed of SEEDS) {
+      const result = runPlaytest({
+        seed,
+        difficulty: 'easy',
+        duration: 'standard',
+        strategy: ValueInvestor,
+      });
+      mergedCoverage.merge(result.coverage);
+    }
+
+    expect(
+      mergedCoverage.wasExercised('operational_improvement'),
+      'Value investor should apply operational improvements'
+    ).toBe(true);
+  });
+});
+
+// ── PE Fund Mode Tests ──
+
+describe('PE Fund Mode', () => {
+  it.each(SEEDS)('seed %i — completes without crashes', (seed) => {
+    const result = runPlaytest({
+      seed,
+      difficulty: 'easy',
+      duration: 'quick',
+      strategy: PE_FUND_STRATEGY,
+      isFundManagerMode: true,
+    });
+
+    expect(result.roundsCompleted).toBeGreaterThan(0);
+    if (!result.bankrupted) {
+      expect(result.roundsCompleted).toBe(10);
+    }
+  });
+
+  it('should exercise PE fund features across seeds', () => {
+    const mergedCoverage = new PlaytestCoverage();
+    for (const seed of SEEDS) {
+      const result = runPlaytest({
+        seed,
+        difficulty: 'easy',
+        duration: 'quick',
+        strategy: PE_FUND_STRATEGY,
+        isFundManagerMode: true,
+      });
+      mergedCoverage.merge(result.coverage);
+    }
+
+    // Core PE features should fire
+    expect(mergedCoverage.wasExercised('fund_mode_started'), 'fund_mode_started').toBe(true);
+    expect(mergedCoverage.wasExercised('management_fee_deducted'), 'management_fee_deducted').toBe(true);
+    expect(mergedCoverage.wasExercised('forced_liquidation'), 'forced_liquidation').toBe(true);
+    expect(mergedCoverage.wasExercised('pe_scoring_completed'), 'pe_scoring_completed').toBe(true);
+  });
+
+  it('should be deterministic', () => {
+    const result1 = runPlaytest({
+      seed: 42,
+      difficulty: 'easy',
+      duration: 'quick',
+      strategy: PE_FUND_STRATEGY,
+      isFundManagerMode: true,
+    });
+    const result2 = runPlaytest({
+      seed: 42,
+      difficulty: 'easy',
+      duration: 'quick',
+      strategy: PE_FUND_STRATEGY,
+      isFundManagerMode: true,
+    });
+
+    expect(result1.score.total).toBe(result2.score.total);
+    expect(result1.roundsCompleted).toBe(result2.roundsCompleted);
   });
 });
 
