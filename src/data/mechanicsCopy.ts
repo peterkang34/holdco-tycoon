@@ -122,6 +122,35 @@ export const LENDING_SYNERGY_LABELS = {
   summaryShort: 'Bank debt discount',
 } as const;
 
+// ── Turnaround System ──
+
+export const TURNAROUND_LABELS = {
+  stabilizationPhase: {
+    name: 'Stabilization Phase',
+    behavior: 'Q1/Q2 businesses are in stabilization — only stabilization improvements (Fix Underperformance, Management Professionalization, Operating Playbook) are available. Growth improvements require Q3+ quality via a turnaround program.',
+  },
+  growthGate: {
+    name: 'Growth Improvement Gate',
+    behavior: 'Growth improvements (Service Expansion, Digital Transformation, Recurring Revenue Conversion, Pricing Model) are locked until the business reaches Q3+ quality through a turnaround program.',
+  },
+  ceilingMastery: {
+    name: 'Ceiling Mastery Bonus',
+    behavior: 'Businesses that reach their sector quality ceiling via turnaround earn a one-time bonus: +2ppt margin, +1% growth, and 110% improvement efficacy.',
+  },
+  failureDamage: {
+    name: 'Turnaround Failure',
+    behavior: 'Failed turnarounds cause EBITDA damage: T1 -8%, T2 -12%, T3 -15%. Higher stakes reward investing in stabilization improvements to reduce failure risk.',
+  },
+  exitPremium: {
+    name: 'Turnaround Exit Premium',
+    behavior: '+0.15x exit multiple per quality tier improved via turnaround. Only tracks turnaround-sourced quality changes — ops improvements do not count.',
+  },
+  platformQualityGate: {
+    name: 'Platform Quality Gate',
+    behavior: 'Only Q3+ businesses can be forged into integrated platforms. Stabilize businesses via turnaround before platform integration.',
+  },
+} as const;
+
 export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   pattern: RegExp;
   reason: string;
@@ -148,4 +177,7 @@ export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   { pattern: /permanent ownership reduction/i, reason: 'Share dilution is reversible via buybacks. Removed "permanent" in v33.' },
   { pattern: /max 1 per round/i, reason: 'Share-funded deal cap removed. Unlimited per round now.', allow: ['changelog.ts'] },
   { pattern: /prior ownership doesn.t mechanically affect/i, reason: 'Ownership history now affects improvement efficacy. Changed in v35.' },
+  { pattern: /flat.*\+0\.25x.*exit.*premium/i, reason: 'Turnaround exit premium is now +0.15x per tier (scaling), not flat +0.25x. Changed in v38.' },
+  { pattern: /failure.*damage.*3.6%|3.6%.*failure.*damage/i, reason: 'Turnaround failure damage increased to 8-15% in v38.' },
+  { pattern: /T2.*\$?450K|T3.*\$?700K/i, reason: 'Turnaround tier annual costs reduced: T2=$300K, T3=$500K. Changed in v38.', allow: ['changelog.ts'] },
 ];

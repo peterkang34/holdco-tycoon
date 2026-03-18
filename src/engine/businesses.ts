@@ -246,7 +246,11 @@ export function generateBusiness(
 
   // Calculate acquisition multiple
   let multiple = randomInRange(sector.acquisitionMultiple, rng);
-  multiple += (quality - 3) * 0.35;
+  // Asymmetric quality discount: steeper for Q1/Q2 (distressed), standard for Q4/Q5
+  const qualityMultipleAdj = quality <= 2
+    ? (quality - 3) * 0.80   // Q1: -1.60x, Q2: -0.80x
+    : (quality - 3) * 0.35;  // Q3: 0, Q4: +0.35x, Q5: +0.70x
+  multiple += qualityMultipleAdj;
   // Competitive position affects pricing
   if (dueDiligence.competitivePosition === 'leader') multiple += 0.3;
   else if (dueDiligence.competitivePosition === 'commoditized') multiple -= 0.3;

@@ -1475,12 +1475,15 @@ export function AllocatePhase({
               <div className="card bg-white/5 border border-white/10 mb-6">
                 <h3 className="font-bold text-text-secondary mb-1">Platforms in Progress</h3>
                 <p className="text-sm text-text-muted mb-4">
-                  You have the right business mix — grow your sector EBITDA to unlock these integrations.
+                  You have the right business mix — {nearEligibleRecipes.some(r => r.qualityBlockers.length > 0 && r.sectorEbitda >= r.scaledThreshold)
+                    ? 'stabilize Q1/Q2 businesses and grow sector EBITDA to unlock these integrations.'
+                    : 'grow your sector EBITDA to unlock these integrations.'}
                 </p>
                 <div className="space-y-3">
-                  {nearEligibleRecipes.map(({ recipe, matchingBusinesses, sectorEbitda, scaledThreshold }) => {
+                  {nearEligibleRecipes.map(({ recipe, matchingBusinesses, sectorEbitda, scaledThreshold, qualityBlockers }) => {
                     const progress = Math.min(sectorEbitda / scaledThreshold, 0.99);
                     const progressPct = Math.round(progress * 100);
+                    const ebitdaMet = sectorEbitda >= scaledThreshold;
                     const sectorEmojis = recipe.sectorId
                       ? SECTORS[recipe.sectorId]?.emoji ?? ''
                       : (recipe.crossSectorIds ?? []).map(sid => SECTORS[sid]?.emoji).filter(Boolean).join(' ');
@@ -1494,21 +1497,30 @@ export function AllocatePhase({
                         <p className="text-xs text-text-muted mb-1">Matching businesses:</p>
                         <div className="flex flex-wrap gap-1 mb-3">
                           {matchingBusinesses.map(b => (
-                            <span key={b.id} className="text-xs bg-white/10 px-2 py-1 rounded truncate max-w-full inline-block">
-                              {SECTORS[b.sectorId].emoji} {b.name} ({b.subType})
+                            <span key={b.id} className={`text-xs px-2 py-1 rounded truncate max-w-full inline-block ${b.qualityRating < 3 ? 'bg-amber-500/20 text-amber-400' : 'bg-white/10'}`}>
+                              {SECTORS[b.sectorId].emoji} {b.name} ({b.subType}){b.qualityRating < 3 ? ` · Q${b.qualityRating}` : ''}
                             </span>
                           ))}
                         </div>
-                        <div className="text-xs text-text-muted mb-1">
-                          Sector EBITDA: <span className="font-mono text-text-secondary">{formatMoney(sectorEbitda)}</span> / <span className="font-mono">{formatMoney(scaledThreshold)}</span> required
-                        </div>
-                        <div className="w-full bg-white/10 rounded-full h-2 mt-1">
-                          <div
-                            className="bg-purple-500/60 h-2 rounded-full transition-all duration-300"
-                            style={{ width: `${progressPct}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-text-muted mt-1 text-right font-mono">{progressPct}%</p>
+                        {qualityBlockers.length > 0 && (
+                          <div className="text-xs text-amber-400 mb-2">
+                            Platform requires Q3+ quality — {qualityBlockers.map(b => b.name).join(', ')} {qualityBlockers.length === 1 ? 'is' : 'are'} Q{Math.min(...qualityBlockers.map(b => b.qualityRating))}
+                          </div>
+                        )}
+                        {!ebitdaMet && (
+                          <>
+                            <div className="text-xs text-text-muted mb-1">
+                              Sector EBITDA: <span className="font-mono text-text-secondary">{formatMoney(sectorEbitda)}</span> / <span className="font-mono">{formatMoney(scaledThreshold)}</span> required
+                            </div>
+                            <div className="w-full bg-white/10 rounded-full h-2 mt-1">
+                              <div
+                                className="bg-purple-500/60 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${progressPct}%` }}
+                              />
+                            </div>
+                            <p className="text-xs text-text-muted mt-1 text-right font-mono">{progressPct}%</p>
+                          </>
+                        )}
                       </div>
                     );
                   })}

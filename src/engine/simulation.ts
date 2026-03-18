@@ -1951,7 +1951,7 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
             businessId: b.id, businessName: b.name, metric: 'margin',
             before: b.ebitdaMargin, after: newMargin, delta: newMargin - b.ebitdaMargin,
           });
-          return { ...b, qualityRating: newQuality, ebitdaMargin: newMargin, ebitda: newEbitda };
+          return { ...b, qualityRating: newQuality, ebitdaMargin: newMargin, ebitda: newEbitda, qualityImprovedTiers: 0 };
         });
       }
       break;
@@ -1970,7 +1970,7 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
             businessId: b.id, businessName: b.name, metric: 'margin',
             before: b.ebitdaMargin, after: newMargin, delta: newMargin - b.ebitdaMargin,
           });
-          return { ...b, qualityRating: newQuality, ebitdaMargin: newMargin, ebitda: newEbitda };
+          return { ...b, qualityRating: newQuality, ebitdaMargin: newMargin, ebitda: newEbitda, qualityImprovedTiers: 0 };
         });
       }
       break;
@@ -2019,7 +2019,7 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
             before: b.ebitda, after: floored.ebitda, delta: floored.ebitda - b.ebitda,
             deltaPercent: b.ebitda > 0 ? (floored.ebitda - b.ebitda) / b.ebitda : 0,
           });
-          return { ...b, qualityRating: newQuality, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
+          return { ...b, qualityRating: newQuality, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda, qualityImprovedTiers: 0 };
         });
       }
       break;
@@ -2097,7 +2097,7 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
           const rawEbitda = Math.round(newRevenue * b.ebitdaMargin);
           const floored = applyEbitdaFloor(rawEbitda, newRevenue, b.ebitdaMargin, b.acquisitionEbitda);
           impacts.push({ businessId: b.id, businessName: b.name, metric: 'revenue', before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: -0.15 });
-          return { ...b, qualityRating: newQuality, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
+          return { ...b, qualityRating: newQuality, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda, qualityImprovedTiers: 0 };
         });
       }
       break;

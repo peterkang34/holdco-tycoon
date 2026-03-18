@@ -860,8 +860,8 @@ function TurnaroundsContent() {
         headers={['Tier', 'Name', 'Unlock Cost', 'Annual Cost', 'Required Businesses']}
         rows={[
           ['T1', 'Portfolio Operations', '$600K', '$250K/yr', '2+'],
-          ['T2', 'Transformation Office', '$1M', '$450K/yr', '3+'],
-          ['T3', 'Interim Management', '$1.4M', '$700K/yr', '4+'],
+          ['T2', 'Transformation Office', '$1M', '$300K/yr', '3+'],
+          ['T3', 'Interim Management', '$1.4M', '$500K/yr', '4+'],
         ]}
       />
       <P>
@@ -874,20 +874,20 @@ function TurnaroundsContent() {
       <DataTable
         headers={['Program', 'Tier', 'From', 'To', 'Duration (Std/Quick)', 'Success', 'Partial', 'Fail']}
         rows={[
-          ['Operational Cleanup', '1', 'Q1', 'Q2', '4yr / 2yr', '65%', '30%', '5%'],
-          ['Performance Acceleration', '1', 'Q2', 'Q3', '4yr / 2yr', '60%', '35%', '5%'],
-          ['Full Restructuring', '2', 'Q1', 'Q3', '5yr / 3yr', '68%', '24%', '8%'],
-          ['Strategic Repositioning', '2', 'Q2', 'Q4', '5yr / 3yr', '65%', '25%', '10%'],
-          ['Enterprise Turnaround', '3', 'Q1', 'Q4', '6yr / 3yr', '73%', '15%', '12%'],
-          ['Total Transformation', '3', 'Q2', 'Q5', '6yr / 3yr', '70%', '20%', '10%'],
-          ['100-Day Blitz', '3', 'Q1', 'Q4', '3yr / 2yr', '63%', '22%', '15%'],
+          ['Operational Cleanup', '1', 'Q1', 'Q2', '3yr / 2yr', '75%', '20%', '5%'],
+          ['Performance Acceleration', '1', 'Q2', 'Q3', '3yr / 2yr', '72%', '23%', '5%'],
+          ['Full Restructuring', '2', 'Q1', 'Q3', '4yr / 3yr', '76%', '17%', '7%'],
+          ['Strategic Repositioning', '2', 'Q2', 'Q4', '4yr / 3yr', '73%', '18%', '9%'],
+          ['Enterprise Turnaround', '3', 'Q1', 'Q4', '5yr / 3yr', '80%', '10%', '10%'],
+          ['Total Transformation', '3', 'Q2', 'Q5', '5yr / 3yr', '78%', '13%', '9%'],
+          ['100-Day Blitz', '3', 'Q1', 'Q4', '3yr / 2yr', '70%', '17%', '13%'],
         ]}
       />
       <P>
         On <strong>success</strong>, the business reaches the target quality and gets an
         EBITDA boost (7-15%). On <strong>partial success</strong>, quality improves by 1 tier
         (instead of the full target) with a smaller boost. On <strong>failure</strong>, quality
-        stays the same and EBITDA takes a hit (3-6%).
+        stays the same and EBITDA takes a hit (8-15%).
       </P>
 
       <SubHeading>Costs</SubHeading>
@@ -905,9 +905,28 @@ function TurnaroundsContent() {
 
       <SubHeading>Exit Premium</SubHeading>
       <P>
-        Businesses that have improved by <strong>2 or more quality tiers</strong> (cumulative
-        across all turnarounds and improvements) receive a <strong>+0.25x exit multiple
-        premium</strong> at sale time, rewarding your transformation effort.
+        Businesses that have improved quality through turnaround programs earn a scaling
+        exit premium: <strong>+0.15x per quality tier improved</strong> (starting at 1 tier).
+        A Q1-to-Q4 transformation earns +0.45x at exit. Only turnaround-sourced quality
+        changes count — operational improvement quality rolls do not contribute.
+      </P>
+
+      <SubHeading>Stabilization vs Growth</SubHeading>
+      <P>
+        Improvements are split into two categories. <strong>Stabilization</strong> improvements
+        (Fix Underperformance, Professionalize Management, Operating Playbook) are available at
+        any quality — they ARE the turnaround work. <strong>Growth</strong> improvements
+        (Service Expansion, Digital Transformation, Recurring Revenue, Pricing Model) require
+        Q3+ quality. Stabilizing a business before investing in growth mirrors real PE operating
+        playbooks.
+      </P>
+
+      <SubHeading>Ceiling Mastery Bonus</SubHeading>
+      <P>
+        Businesses that reach their sector&apos;s quality ceiling via turnaround earn a one-time
+        <strong> ceiling mastery bonus</strong>: +2ppt margin, +1% growth, and 110% improvement efficacy. A Q3 restaurant
+        that got there via turnaround from Q1 is a well-oiled machine — the operator has optimized
+        everything within the sector&apos;s natural constraints.
       </P>
 
       <SubHeading>Quality Ceilings by Sector</SubHeading>
@@ -1036,7 +1055,7 @@ function SellingContent() {
         <><strong>Size Tier Premium:</strong> Larger EBITDA businesses attract larger buyer pools and higher multiples</>,
         <><strong>Platform Premium:</strong> Logarithmic curve based on platform scale (~+1.0x at Scale 5, continues growing for larger platforms)</>,
         <><strong>Integrated Platform Premium:</strong> +1.0 to +2.0x for businesses in forged platforms</>,
-        <><strong>Turnaround Premium:</strong> +0.25x for businesses improved 2+ quality tiers</>,
+        <><strong>Turnaround Premium:</strong> +0.15x per quality tier improved via turnaround (e.g., Q1→Q4 = +0.45x). Only tracks turnaround-sourced changes</>,
         <><strong>Competitive Position Premium:</strong> +0.2x for market leaders (competitive position rated &quot;leader&quot; in due diligence)</>,
         <><strong>Market Conditions:</strong> +0.5x during bull markets, -0.5x during recessions</>,
       ]} />
@@ -1355,7 +1374,7 @@ function StrategyContent() {
       <BulletList items={[
         <><strong>Turnarounds are high-risk, high-reward.</strong> A successful Q1→Q4 turnaround transforms a struggling business into a strong performer. But a failure wastes years and money.</>,
         <><strong>Never run 4+ turnarounds simultaneously.</strong> The -10ppt fatigue penalty significantly reduces your odds. Stagger them across rounds.</>,
-        <><strong>Target the exit premium.</strong> Improving a business by 2+ quality tiers earns +0.25x on exit. Buy Q1-Q2 businesses cheaply, improve them, and sell at a premium.</>,
+        <><strong>Target the exit premium.</strong> Each quality tier improved via turnaround earns +0.15x on exit. Buy Q1-Q2 businesses cheaply, turnaround to Q4+, and sell at a significant premium.</>,
       ]} />
 
       <SubHeading>Timing &amp; Exit</SubHeading>

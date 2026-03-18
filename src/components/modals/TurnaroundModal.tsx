@@ -13,8 +13,9 @@ import {
   calculateTurnaroundCost,
   getTurnaroundDuration,
 } from '../../engine/turnarounds';
-import { TURNAROUND_FATIGUE_THRESHOLD } from '../../data/gameConfig';
+import { TURNAROUND_FATIGUE_THRESHOLD, TURNAROUND_CEILING_BONUS } from '../../data/gameConfig';
 import { TURNAROUND_TIER_CONFIG } from '../../data/turnaroundPrograms';
+import { getQualityCeiling } from '../../data/turnaroundPrograms';
 
 interface TurnaroundModalProps {
   business: Business;
@@ -41,6 +42,8 @@ export function TurnaroundModal({
   const tierName = turnaroundTier === 0
     ? 'No Tier'
     : TURNAROUND_TIER_CONFIG[turnaroundTier as 1 | 2 | 3].name;
+  const qualityCeiling = getQualityCeiling(business.sectorId);
+  const hasCeilingBonus = business.ceilingMasteryBonus === true;
 
   return (
     <Modal
@@ -72,6 +75,13 @@ export function TurnaroundModal({
           <p className="text-2xl font-bold font-mono text-amber-400">{tierName}</p>
         </div>
       </div>
+
+      {/* Ceiling Mastery Indicator */}
+      {hasCeilingBonus && (
+        <div className="bg-accent/10 border border-accent/30 rounded-lg p-3 mb-4 text-sm text-accent">
+          This business has earned the Ceiling Mastery Bonus (+{(TURNAROUND_CEILING_BONUS.marginBoost * 100).toFixed(0)}ppt margin, +{(TURNAROUND_CEILING_BONUS.growthBoost * 100).toFixed(0)}% growth, {(TURNAROUND_CEILING_BONUS.improvementEfficacy * 100).toFixed(0)}% improvement efficacy).
+        </div>
+      )}
 
       {/* How Turnarounds Work */}
       <div className="bg-amber-500/5 border border-amber-500/20 rounded-lg p-4 mb-6">
@@ -153,6 +163,24 @@ export function TurnaroundModal({
                     <span className="text-text-muted">Failure EBITDA Damage</span>
                     <span className="font-mono text-red-400">-{(prog.ebitdaDamageOnFailure * 100).toFixed(0)}%</span>
                   </div>
+                </div>
+
+                {/* ROI Estimate */}
+                <div className="bg-white/5 rounded-lg p-2 mb-3">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-text-muted">Total Cost (upfront + {programDuration}yr annual)</span>
+                    <span className="font-mono">{formatMoney(upfrontCost + prog.annualCost * programDuration)}</span>
+                  </div>
+                  <div className="flex justify-between text-xs mt-1">
+                    <span className="text-text-muted">Quality Target</span>
+                    <span className="font-mono">Q{prog.sourceQuality} → Q{Math.min(prog.targetQuality, qualityCeiling)}</span>
+                  </div>
+                  {prog.targetQuality >= qualityCeiling && !hasCeilingBonus && (
+                    <div className="flex justify-between text-xs mt-1">
+                      <span className="text-text-muted">Ceiling Mastery Bonus</span>
+                      <span className="font-mono text-accent">+{(TURNAROUND_CEILING_BONUS.marginBoost * 100).toFixed(0)}ppt margin, +{(TURNAROUND_CEILING_BONUS.growthBoost * 100).toFixed(0)}% growth</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Fatigue Warning */}

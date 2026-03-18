@@ -40,8 +40,8 @@ export function checkPlatformEligibility(
 ): { recipe: PlatformRecipe; eligibleBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number }[] {
   const activeBusinesses = businesses.filter(b => b.status === 'active' || b.status === 'integrated');
   const alreadyForgedIds = new Set(existingPlatforms.map(p => p.recipeId));
-  // Exclude businesses already part of a platform, and pro sports (ineligible for platforms)
-  const availableBusinesses = activeBusinesses.filter(b => !b.integratedPlatformId && b.sectorId !== 'proSports');
+  // Exclude businesses already part of a platform, pro sports, and Q1/Q2 (must stabilize before platform integration)
+  const availableBusinesses = activeBusinesses.filter(b => !b.integratedPlatformId && b.sectorId !== 'proSports' && b.qualityRating >= 3);
 
   const eligible: { recipe: PlatformRecipe; eligibleBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number }[] = [];
 
@@ -119,19 +119,20 @@ export function checkNearEligiblePlatforms(
   existingPlatforms: IntegratedPlatform[],
   difficulty: GameDifficulty,
   duration: GameDuration
-): { recipe: PlatformRecipe; matchingBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number }[] {
+): { recipe: PlatformRecipe; matchingBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number; qualityBlockers: Business[] }[] {
   const activeBusinesses = businesses.filter(b => b.status === 'active' || b.status === 'integrated');
   const alreadyForgedIds = new Set(existingPlatforms.map(p => p.recipeId));
   // Exclude businesses already part of a platform, and pro sports (ineligible for platforms)
+  // NOTE: Do NOT filter by quality here — we want to show Q1/Q2 businesses as quality blockers
   const availableBusinesses = activeBusinesses.filter(b => !b.integratedPlatformId && b.sectorId !== 'proSports');
 
-  const nearEligible: { recipe: PlatformRecipe; matchingBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number }[] = [];
+  const nearEligible: { recipe: PlatformRecipe; matchingBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number; qualityBlockers: Business[] }[] = [];
 
   for (const recipe of PLATFORM_RECIPES) {
     // Skip already forged
     if (alreadyForgedIds.has(recipe.id)) continue;
 
-    // Find businesses that match this recipe's required sub-types
+    // Find businesses that match this recipe's required sub-types (including Q1/Q2)
     let matchingBusinesses: Business[];
 
     if (recipe.sectorId) {
@@ -169,15 +170,20 @@ export function checkNearEligiblePlatforms(
         .reduce((sum, b) => sum + b.ebitda, 0);
     }
 
-    // EBITDA threshold must NOT be met (inverted from checkPlatformEligibility)
     const scaledThreshold = getScaledThreshold(recipe.baseEbitdaThreshold, difficulty, duration);
-    if (sectorEbitda >= scaledThreshold) continue; // Already fully eligible — skip
+    const qualityBlockers = matchingBusinesses.filter(b => b.qualityRating < 3);
+    const ebitdaMet = sectorEbitda >= scaledThreshold;
+    const qualityMet = qualityBlockers.length === 0;
+
+    // Near-eligible if sub-types match but EBITDA or quality (or both) isn't met
+    if (ebitdaMet && qualityMet) continue; // Already fully eligible — skip
 
     nearEligible.push({
       recipe,
       matchingBusinesses,
       sectorEbitda,
       scaledThreshold,
+      qualityBlockers,
     });
   }
 
@@ -282,6 +288,7 @@ export function getEligibleBusinessesForExistingPlatform(
   return businesses.filter(b => {
     if (b.status !== 'active') return false;
     if (b.integratedPlatformId) return false;
+    if (b.qualityRating < 3) return false; // Q3+ required to join platforms
     if (!recipe.requiredSubTypes.includes(b.subType)) return false;
     if (recipe.sectorId) return b.sectorId === recipe.sectorId;
     if (recipe.crossSectorIds) return recipe.crossSectorIds.includes(b.sectorId);

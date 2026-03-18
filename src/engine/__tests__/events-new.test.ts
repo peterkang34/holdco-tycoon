@@ -148,17 +148,17 @@ describe('Key-Man Risk Event', () => {
     expect(KEY_MAN_GOLDEN_HANDCUFFS_RESTORE_CHANCE).toBe(0.55);
   });
 
-  it('golden handcuffs: should not alter qualityImprovedTiers', () => {
-    // qualityImprovedTiers is write-once-upward — key-man quality changes shouldn't affect it
+  it('golden handcuffs: quality drop resets qualityImprovedTiers', () => {
+    // qualityImprovedTiers resets on quality drop events to prevent exit premium inflation
     const business = makeBusiness({ qualityRating: 4, qualityImprovedTiers: 2 });
 
-    // After key-man drops quality to 3, qualityImprovedTiers stays at 2
-    const afterDrop = { ...business, qualityRating: 3 as QualityRating };
-    expect(afterDrop.qualityImprovedTiers).toBe(2);
+    // After key-man drops quality to 3, qualityImprovedTiers resets to 0
+    const afterDrop = { ...business, qualityRating: 3 as QualityRating, qualityImprovedTiers: 0 };
+    expect(afterDrop.qualityImprovedTiers).toBe(0);
 
-    // After golden handcuffs restores quality to 4, qualityImprovedTiers still 2
+    // After golden handcuffs restores quality to 4, qualityImprovedTiers still 0 (needs fresh turnaround)
     const afterRestore = { ...afterDrop, qualityRating: 4 as QualityRating };
-    expect(afterRestore.qualityImprovedTiers).toBe(2);
+    expect(afterRestore.qualityImprovedTiers).toBe(0);
   });
 
   it('succession plan: should restore quality after KEY_MAN_SUCCESSION_ROUNDS', () => {

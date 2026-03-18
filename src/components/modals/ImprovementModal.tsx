@@ -5,7 +5,7 @@ import {
   formatMoney,
 } from '../../engine/types';
 import { SECTORS } from '../../data/sectors';
-import { IMPROVEMENT_COST_FLOOR } from '../../data/gameConfig';
+import { IMPROVEMENT_COST_FLOOR, STABILIZATION_TYPES, GROWTH_TYPES } from '../../data/gameConfig';
 import { Modal } from '../ui/Modal';
 
 // Per-type improvement exit premiums (matches simulation.ts)
@@ -320,13 +320,27 @@ export function ImprovementModal({
           </div>
         )}
 
-        <h4 className="font-bold mb-4">Choose Improvement</h4>
+        {/* Stabilization Phase banner for Q1/Q2 businesses */}
+        {business.qualityRating <= 2 && !isProSports && (
+          <div className="bg-warning/10 border border-warning/30 rounded-lg p-4 mb-6">
+            <p className="font-bold text-sm text-warning mb-1">Stabilization Phase — Q{business.qualityRating} Business</p>
+            <p className="text-xs text-text-secondary">
+              This business needs stabilization before growth investments can take hold.
+              Stabilization improvements are available now. Growth improvements unlock at Q3+.
+              To improve quality, start a <strong>Turnaround Program</strong> from the business card in your Portfolio tab.
+            </p>
+          </div>
+        )}
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {improvements.map((improvement) => {
+        {(() => {
+          const stabilizationImprovements = improvements.filter(i => STABILIZATION_TYPES.has(i.type));
+          const growthImprovements = improvements.filter(i => GROWTH_TYPES.has(i.type));
+          const isLowQuality = business.qualityRating <= 2 && !isProSports;
+
+          const renderImprovementCard = (improvement: typeof improvements[0], growthLocked: boolean) => {
             const cost = Math.max(IMPROVEMENT_COST_FLOOR, Math.round((Math.abs(business.ebitda) || 1) * improvement.costPercent));
             const canAfford = cash >= cost;
-            const disabled = !improvement.available || !canAfford;
+            const disabled = growthLocked || !improvement.available || !canAfford;
 
             // ROI calculations
             const avgBoost = (improvement.ebitdaBoostMin + improvement.ebitdaBoostMax) / 2;
@@ -347,13 +361,20 @@ export function ImprovementModal({
             return (
               <div
                 key={improvement.type}
-                className={`card ${disabled ? 'opacity-50' : 'cursor-pointer hover:border-accent'}`}
+                className={`card ${disabled ? 'opacity-50' : 'cursor-pointer hover:border-accent'} ${growthLocked ? 'relative' : ''}`}
                 onClick={() => {
                   if (!disabled) {
                     onImprove(business.id, improvement.type);
                   }
                 }}
               >
+                {growthLocked && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-bg-primary/60 rounded-lg z-10">
+                    <span className="text-xs text-text-muted bg-bg-secondary px-3 py-1.5 rounded-full border border-white/10">
+                      Requires Q3+ quality
+                    </span>
+                  </div>
+                )}
                 <h5 className="font-bold mb-2">{improvement.name}</h5>
                 <p className="text-sm text-text-secondary mb-3">{improvement.description}</p>
 
@@ -403,7 +424,9 @@ export function ImprovementModal({
                   className={`w-full col-span-2 mt-2 text-sm ${disabled ? 'btn-secondary opacity-50 cursor-not-allowed' : 'btn-primary'}`}
                   disabled={disabled}
                 >
-                  {!improvement.available
+                  {growthLocked
+                    ? 'Requires Q3+'
+                    : !improvement.available
                     ? improvement.unavailableReason || 'Not Available'
                     : !canAfford
                     ? 'Not Enough Cash'
@@ -411,8 +434,45 @@ export function ImprovementModal({
                 </button>
               </div>
             );
-          })}
-        </div>
+          };
+
+          // Pro Sports uses flat layout (all improvements available regardless of quality)
+          if (isProSports) {
+            return (
+              <>
+                <h4 className="font-bold mb-4">Choose Improvement</h4>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {improvements.map(imp => renderImprovementCard(imp, false))}
+                </div>
+              </>
+            );
+          }
+
+          return (
+            <>
+              {/* Stabilization Section */}
+              <h4 className="font-bold mb-2">
+                Stabilization
+                <span className="text-xs font-normal text-text-muted ml-2">Available at any quality</span>
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                {stabilizationImprovements.map(imp => renderImprovementCard(imp, false))}
+              </div>
+
+              {/* Growth Section */}
+              <h4 className="font-bold mb-2">
+                Growth
+                {isLowQuality
+                  ? <span className="text-xs font-normal text-warning ml-2">Requires Q3+ quality</span>
+                  : <span className="text-xs font-normal text-text-muted ml-2">Requires stable operational foundation</span>
+                }
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {growthImprovements.map(imp => renderImprovementCard(imp, isLowQuality))}
+              </div>
+            </>
+          );
+        })()}
 
         <div className="hidden md:block mt-6 p-4 bg-white/5 rounded-lg text-sm text-text-muted">
           <p className="font-medium text-text-secondary mb-1">Operational Improvement Tip</p>

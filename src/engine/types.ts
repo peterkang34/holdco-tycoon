@@ -148,7 +148,8 @@ export interface Business {
 
   integratedPlatformId?: string; // ID of the integrated platform this business belongs to
 
-  qualityImprovedTiers?: number; // tracks total quality improvement for exit premium
+  qualityImprovedTiers?: number; // tracks total quality improvement (turnaround-sourced only) for exit premium
+  ceilingMasteryBonus?: boolean; // true if business received ceiling mastery bonus from turnaround
   rolloverEquityPct: number; // 0-1 — seller's retained equity share (0 = no rollover)
 
   // Event-driven tracking
@@ -689,7 +690,8 @@ export type GameActionType =
   | 'turnaround_resolved'
   | 'ipo'
   | 'smb_broker'
-  | 'distribute_to_lps';
+  | 'distribute_to_lps'
+  | 'event_choice';
 
 export interface GameAction {
   type: GameActionType;

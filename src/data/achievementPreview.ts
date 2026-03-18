@@ -297,6 +297,40 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
     },
   },
 
+  // ── Turnaround ──
+  {
+    id: 'ceiling_master',
+    name: 'Ceiling Master',
+    description: 'Turnaround a business to its sector quality ceiling.',
+    emoji: '🏔️',
+    category: 'feat',
+    check: (ctx) =>
+      [...ctx.businesses, ...ctx.exitedBusinesses].some(b => b.ceilingMasteryBonus === true),
+  },
+  {
+    id: 'distressed_investor',
+    name: 'Distressed Investor',
+    description: 'Buy 3+ Q1 businesses and finish with a B grade or better.',
+    emoji: '🦅',
+    category: 'feat',
+    check: (ctx) => {
+      // Estimate original acquisition quality: current quality minus turnaround-sourced tiers
+      const q1Acquisitions = [...ctx.businesses, ...ctx.exitedBusinesses].filter(
+        b => b.acquisitionPrice > 0 &&
+          (b.qualityRating - (b.qualityImprovedTiers ?? 0)) <= 1
+      ).length;
+      return q1Acquisitions >= 3 && ['S', 'A', 'B'].includes(ctx.score.grade);
+    },
+  },
+  {
+    id: 'turnaround_master',
+    name: 'Turnaround Master',
+    description: 'Successfully complete 3 or more turnaround programs.',
+    emoji: '🏆',
+    category: 'mastery',
+    check: (ctx) => ctx.strategyData.turnaroundsSucceeded >= 3,
+  },
+
   // ── Mode-Specific ──
   {
     id: 'carry_king',

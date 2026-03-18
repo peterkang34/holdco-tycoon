@@ -27,7 +27,7 @@ export const TURNAROUND_TIER_CONFIG: Record<1 | 2 | 3, TurnaroundTierConfig> = {
   2: {
     name: 'Transformation Office',
     unlockCost: 1000,
-    annualCost: 450,
+    annualCost: 300,
     requiredOpcos: 3,
     description: 'Full transformation team with cross-functional expertise',
     effects: [
@@ -38,7 +38,7 @@ export const TURNAROUND_TIER_CONFIG: Record<1 | 2 | 3, TurnaroundTierConfig> = {
   3: {
     name: 'Interim Management',
     unlockCost: 1400,
-    annualCost: 700,
+    annualCost: 500,
     requiredOpcos: 4,
     description: 'Deploy interim C-suite operators into struggling businesses',
     effects: [
@@ -53,21 +53,21 @@ export const TURNAROUND_TIER_CONFIG: Record<1 | 2 | 3, TurnaroundTierConfig> = {
 // upfrontCostFraction is fraction of business EBITDA; annualCost in $k
 
 export const TURNAROUND_PROGRAMS: TurnaroundProgram[] = [
-  // Tier 1
+  // Tier 1 — reduced durations (-1 standard), increased success rates
   {
     id: 't1_plan_a',
     displayName: 'Operational Cleanup',
     tierId: 1,
     sourceQuality: 1,
     targetQuality: 2,
-    durationStandard: 4,
+    durationStandard: 3,   // was 4
     durationQuick: 2,
-    successRate: 0.65,
-    partialRate: 0.30,
+    successRate: 0.75,     // was 0.65
+    partialRate: 0.20,     // was 0.30
     failureRate: 0.05,
     ebitdaBoostOnSuccess: 0.07,
     ebitdaBoostOnPartial: 0.03,
-    ebitdaDamageOnFailure: 0.04,
+    ebitdaDamageOnFailure: 0.08, // was 0.04 — increased failure damage
     upfrontCostFraction: 0.10,
     annualCost: 50,
   },
@@ -77,33 +77,33 @@ export const TURNAROUND_PROGRAMS: TurnaroundProgram[] = [
     tierId: 1,
     sourceQuality: 2,
     targetQuality: 3,
-    durationStandard: 4,
+    durationStandard: 3,   // was 4
     durationQuick: 2,
-    successRate: 0.60,
-    partialRate: 0.35,
+    successRate: 0.72,     // was 0.60
+    partialRate: 0.23,     // was 0.35
     failureRate: 0.05,
     ebitdaBoostOnSuccess: 0.05,
     ebitdaBoostOnPartial: 0.02,
-    ebitdaDamageOnFailure: 0.03,
+    ebitdaDamageOnFailure: 0.08, // was 0.03 — increased failure damage
     upfrontCostFraction: 0.12,
     annualCost: 75,
   },
 
-  // Tier 2
+  // Tier 2 — reduced durations, increased success rates, reduced annual costs
   {
     id: 't2_plan_a',
     displayName: 'Full Restructuring',
     tierId: 2,
     sourceQuality: 1,
     targetQuality: 3,
-    durationStandard: 5,
+    durationStandard: 4,   // was 5
     durationQuick: 3,
-    successRate: 0.68,
-    partialRate: 0.24,
-    failureRate: 0.08,
+    successRate: 0.76,     // was 0.68
+    partialRate: 0.17,     // was 0.24
+    failureRate: 0.07,     // was 0.08
     ebitdaBoostOnSuccess: 0.11,
     ebitdaBoostOnPartial: 0.05,
-    ebitdaDamageOnFailure: 0.05,
+    ebitdaDamageOnFailure: 0.12, // was 0.05 — increased failure damage
     upfrontCostFraction: 0.14,
     annualCost: 100,
   },
@@ -113,33 +113,33 @@ export const TURNAROUND_PROGRAMS: TurnaroundProgram[] = [
     tierId: 2,
     sourceQuality: 2,
     targetQuality: 4,
-    durationStandard: 5,
+    durationStandard: 4,   // was 5
     durationQuick: 3,
-    successRate: 0.65,
-    partialRate: 0.25,
-    failureRate: 0.10,
+    successRate: 0.73,     // was 0.65
+    partialRate: 0.18,     // was 0.25
+    failureRate: 0.09,     // was 0.10
     ebitdaBoostOnSuccess: 0.09,
     ebitdaBoostOnPartial: 0.04,
-    ebitdaDamageOnFailure: 0.04,
+    ebitdaDamageOnFailure: 0.12, // was 0.04 — increased failure damage
     upfrontCostFraction: 0.16,
     annualCost: 125,
   },
 
-  // Tier 3
+  // Tier 3 — reduced durations, increased success rates, reduced annual costs
   {
     id: 't3_plan_a',
     displayName: 'Enterprise Turnaround',
     tierId: 3,
     sourceQuality: 1,
     targetQuality: 4,
-    durationStandard: 6,
+    durationStandard: 5,   // was 6
     durationQuick: 3,
-    successRate: 0.73,
-    partialRate: 0.15,
-    failureRate: 0.12,
+    successRate: 0.80,     // was 0.73
+    partialRate: 0.10,     // was 0.15
+    failureRate: 0.10,     // was 0.12
     ebitdaBoostOnSuccess: 0.15,
     ebitdaBoostOnPartial: 0.07,
-    ebitdaDamageOnFailure: 0.06,
+    ebitdaDamageOnFailure: 0.15, // was 0.06 — increased failure damage
     upfrontCostFraction: 0.18,
     annualCost: 150,
   },
@@ -149,14 +149,14 @@ export const TURNAROUND_PROGRAMS: TurnaroundProgram[] = [
     tierId: 3,
     sourceQuality: 2,
     targetQuality: 5,
-    durationStandard: 6,
+    durationStandard: 5,   // was 6
     durationQuick: 3,
-    successRate: 0.70,
-    partialRate: 0.20,
-    failureRate: 0.10,
+    successRate: 0.78,     // was 0.70
+    partialRate: 0.13,     // was 0.20
+    failureRate: 0.09,     // was 0.10
     ebitdaBoostOnSuccess: 0.13,
     ebitdaBoostOnPartial: 0.06,
-    ebitdaDamageOnFailure: 0.06,
+    ebitdaDamageOnFailure: 0.15, // was 0.06 — increased failure damage
     upfrontCostFraction: 0.20,
     annualCost: 200,
   },
@@ -166,14 +166,14 @@ export const TURNAROUND_PROGRAMS: TurnaroundProgram[] = [
     tierId: 3,
     sourceQuality: 1,
     targetQuality: 4,
-    durationStandard: 3,
+    durationStandard: 3,   // stays 3
     durationQuick: 2,
-    successRate: 0.63, // T3 Plan A (0.73) minus 10ppt
-    partialRate: 0.22, // adjusted to sum to 1.0
-    failureRate: 0.15,
+    successRate: 0.70,     // was 0.63
+    partialRate: 0.17,     // was 0.22
+    failureRate: 0.13,     // was 0.15
     ebitdaBoostOnSuccess: 0.15,
     ebitdaBoostOnPartial: 0.07,
-    ebitdaDamageOnFailure: 0.06,
+    ebitdaDamageOnFailure: 0.15, // was 0.06 — increased failure damage
     upfrontCostFraction: 0.27, // 1.5x of T3 Plan A (0.18)
     annualCost: 150,
   },

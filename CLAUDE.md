@@ -72,8 +72,8 @@ Spawn via Agent tool (background). Always include in the prompt:
 
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
-- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v37`
-- **Tests**: Vitest in `src/engine/__tests__/` — ~1553 tests across 34 suites (incl. display-proofreader + playtest system + synergy + unlocks); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
+- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v38`
+- **Tests**: Vitest in `src/engine/__tests__/` — ~1560 tests across 34 suites (incl. display-proofreader + playtest system + synergy + unlocks); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
 - **Game Over Screen**: `GameOverScreen.tsx` is a ~500-line orchestrator importing 13 child components from `src/components/gameover/`. Components are pure presentational (props-in, no store access). `ProfileAchievementSection` manages its own modal state for `AchievementBrowserModal`
 - **Test Shortcuts**: `#/fo-test` (Family Office), `#/go-test` (Game Over — variants: `?v=holdco|pe|bankrupt|pe-bankrupt`). Both guard against completion API submission. Mock state injected via Zustand `setState`
 - **All monetary values in thousands** (1000 = $1M)
@@ -127,7 +127,7 @@ research/                   # GIT-TRACKED — external research (podcasts, books
 
 ## Key Files
 - `src/hooks/useGame.ts` — Zustand store (game actions, state transitions)
-- `src/hooks/migrations.ts` — Save migration logic (current: v37)
+- `src/hooks/migrations.ts` — Save migration logic (current: v38)
 - `src/data/lpCommentary.ts` — LP character quotes (Edna/Chip) for PE Fund Mode
 - `src/engine/affordability.ts` — 7-tier affordability engine (calculateAffordability, getAffordabilityWeights, pickWeightedTier, generateTrophyEbitda)
 - `src/hooks/chronicleContext.ts` — AI chronicle context builder
@@ -147,7 +147,7 @@ research/                   # GIT-TRACKED — external research (podcasts, books
 - `src/engine/platforms.ts` — Platform eligibility, forging, bonus application
 - `src/components/screens/GameOverScreen.tsx` — Game over orchestrator (~500 lines, imports 13 child components from `src/components/gameover/`)
 - `src/components/gameover/` — 13 extracted game-over components (FEVHeroSection, CarryHeroSection, ScoreBreakdownSection, PortfolioSummary, etc.)
-- `src/data/achievementPreview.ts` — 28 achievement definitions across 5 categories (milestone/feat/mastery/creative/mode) with pure predicate check functions
+- `src/data/achievementPreview.ts` — 31 achievement definitions across 5 categories (milestone/feat/mastery/creative/mode) with pure predicate check functions
 - `src/hooks/useUnlocks.ts` — Achievement persistence (localStorage), sector unlock gating, `getUnlockedSectorIds()`
 - `src/data/archetypeNames.ts` — Shared strategy archetype display name mapping
 - `src/components/ui/LeaderboardModal.tsx` — Tabbed leaderboard (exports filtering utils for GameOverScreen); clickable rows open ProfileModal for verified players
@@ -219,7 +219,7 @@ When adding a new sector to `src/data/sectors.ts`:
 - **CollectPhase needs ALL businesses** (not just activeBusinesses) — `calculateIntegratedDebtService` filters internally
 - **Earn-out display must cap at available cash** — store uses `Math.min(earnoutRemaining, available)`, display must match
 - **Race conditions in async AI calls** — always check state is still current before setting narrative/storyBeats
-- **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety. Current: v37
+- **Save migrations**: Always back-fill new fields with sensible defaults; use `sharesOutstanding || 1` for division safety. Current: v38
 - **Integrated platforms**: Margin/growth bonuses are ONE-TIME mutations at forge time (clamped via `clampMargin`/`capGrowthRate`); multiple expansion + recession resistance are automatic via engine; platform sale bonus is tiered by `multipleExpansion` (0.3x for 2.0x+, 0.5x otherwise) via `getPlatformSaleBonus()`
 - **20 sectors, ~122 sub-types**: 15 standard + 4 prestige (mediaEntertainment:5, fintech:11, aerospace:11, privateCredit:16 achievements to unlock) + 1 FO-exclusive (proSports with 8 league sub-types). `UNLOCKABLE_SECTORS` in sectors.ts is authoritative. `getAvailableSectors()` handles runtime filtering including in M&A Focus dropdown
 - **proSports restrictions**: Pro sports teams are standalone trophy assets — blocked from mergers, tuck-ins, platform designation, and platform eligibility. Guards in `useGame.ts` (acquireTuckIn, mergeBusinesses, addToIntegratedPlatform) + `platforms.ts` (checkPlatformEligibility, checkNearEligiblePlatforms) + AllocatePhase UI filters. 200 real teams across 8 leagues (NFL/NBA/MLB/NHL/EPL/MLS/WNBA/NWSL). Women's leagues (WNBA/NWSL) allow flexible deal structures (seller notes, earn-outs). One team per league enforced via `ownedProSportsSubTypes` (league IDs).
@@ -227,9 +227,14 @@ When adding a new sector to `src/data/sectors.ts`:
 - **Private Credit synergy**: Owning PC businesses gives diminishing bank debt rate discount (-0.75%/-0.50%/-0.25%, cap -1.50%, floor 3%, halved during credit tightening). Applied in `AllocatePhase.tsx` via `calculateLendingSynergyDiscount()`. Does NOT apply to seller notes or existing debt
 - **Prestige sector unlocks**: `UNLOCKABLE_SECTORS` in sectors.ts gates sectors behind achievements. `getAvailableSectors()` handles runtime filtering. Challenge mode always excludes unlockable sectors. Anonymous users blocked via `requiresAccount`. Achievements persist in localStorage via `useUnlocks.ts`
 - **3-sector platform recipes**: `cross_financial_conglomerate` is the first 3-sector recipe (PC + WM + Insurance). Dissolution check in `checkPlatformDissolution()` verifies cross-sector representation
-- **Turnaround quality improvements are permanent mutations** — qualityRating changes at resolution; qualityImprovedTiers tracks cumulative tiers for exit premium
+- **Turnaround quality improvements are permanent mutations** — qualityRating changes at resolution; qualityImprovedTiers tracks ONLY turnaround-sourced quality changes (not ops quality rolls); resets to 0 on quality drop events (succession, seller deception, key-man, cyber breach)
+- **Stabilization vs Growth split**: 3 stabilization improvements (fix_underperformance, management_professionalization, operating_playbook) available at any quality; 4 growth improvements gated behind Q3+. Q1/Q2 stabilization improvements skip quality rolls and use relaxed efficacy (0.85x Q1, 0.90x Q2). Config in `STABILIZATION_TYPES`, `GROWTH_TYPES`, `STABILIZATION_EFFICACY_MULTIPLIER` in gameConfig.ts
+- **Asymmetric quality acquisition discount**: Q1/Q2 use `(quality - 3) * 0.80` (steep discount), Q4/Q5 use `(quality - 3) * 0.35` (unchanged). In businesses.ts deal generation
+- **Ceiling mastery bonus**: One-time +2ppt margin, +1% growth when business reaches sector ceiling via turnaround. Tracked via `ceilingMasteryBonus: boolean` on Business. Double-dip guard prevents re-earning
+- **Platform forging requires Q3+**: All constituent businesses must be Q3+ at forge time. Post-forge quality drops do NOT dissolve platforms. Near-eligible shows quality blockers
+- **Turnaround exit premium is scaling**: +0.15x per tier improved via turnaround (min 1 tier). `TURNAROUND_EXIT_PREMIUM_PER_TIER` in gameConfig.ts
 - **Portfolio fatigue**: 4+ simultaneous turnarounds = -10ppt success rate penalty; warn in UI
-- **Turnaround durations scale by game mode**: Quick games get ~half duration (T1: 2, T2: 3, T3: 2-3 rounds vs Standard T1: 4, T2: 5, T3: 3-6)
+- **Turnaround durations scale by game mode**: Quick games get ~half duration (T1: 2, T2: 3, T3: 2-3 rounds vs Standard T1: 3, T2: 4, T3: 3-5)
 - **Equity raises**: Private → escalating dilution (`EQUITY_DILUTION_STEP` 10%/raise, `EQUITY_DILUTION_FLOOR` 10%). Public → stock price + -1% sentiment/issuance (`EQUITY_ISSUANCE_SENTIMENT_PENALTY`). Both have 2-round cooldown
 - **Emergency equity raises**: flat 50% discount, NO escalating discount, but DO trigger cooldown
 - **Portfolio valuation uses quality-adjusted multiples**: `midpoint + (quality - 3) × 0.40`, floored at sector min — matches deal generation factor

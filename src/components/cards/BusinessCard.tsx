@@ -228,7 +228,13 @@ export const BusinessCard = memo(function BusinessCard({
             {(business.qualityImprovedTiers ?? 0) > 0 && (
               <p className="text-xs text-accent mt-1 font-normal">Improved {business.qualityImprovedTiers} tier{(business.qualityImprovedTiers ?? 0) > 1 ? 's' : ''} via turnaround.</p>
             )}
+            {business.ceilingMasteryBonus && (
+              <p className="text-xs text-accent mt-1 font-normal">Ceiling mastery: +2ppt margin, +1% growth</p>
+            )}
           </Tooltip>
+          {business.qualityRating <= 2 && (
+            <span className="text-[10px] bg-warning/15 text-warning px-1.5 py-0.5 rounded">Stabilization</span>
+          )}
           {integratedPlatformName && (
             <Tooltip
               trigger={<span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-1 rounded truncate max-w-[140px]">{integratedPlatformName}</span>}

@@ -973,6 +973,60 @@ function migrateV36ToV37(): void {
 }
 
 /**
+ * v37 → v38: Turnaround System Overhaul
+ * Backfill ceilingMasteryBonus on all businesses. Defensive backfill qualityImprovedTiers.
+ */
+function migrateV37ToV38(): void {
+  const v37Key = 'holdco-tycoon-save-v37';
+  const v38Key = 'holdco-tycoon-save-v38';
+  if (localStorage.getItem(v38Key)) return;
+  try {
+    const raw = localStorage.getItem(v37Key);
+    if (!raw) return;
+    const v37Data = JSON.parse(raw);
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const patchBusiness = (b: any) => ({
+      ...b,
+      ceilingMasteryBonus: b.ceilingMasteryBonus ?? false,
+      qualityImprovedTiers: b.qualityImprovedTiers ?? 0,
+    });
+
+    if (Array.isArray(v37Data.state?.businesses)) {
+      v37Data.state.businesses = v37Data.state.businesses.map(patchBusiness);
+    }
+    if (Array.isArray(v37Data.state?.exitedBusinesses)) {
+      v37Data.state.exitedBusinesses = v37Data.state.exitedBusinesses.map(patchBusiness);
+    }
+    if (Array.isArray(v37Data.state?.dealPipeline)) {
+      v37Data.state.dealPipeline = v37Data.state.dealPipeline.map(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (d: any) => d.business ? { ...d, business: patchBusiness(d.business) } : d
+      );
+    }
+
+    // Patch FO snapshot if present
+    if (v37Data.state?.familyOfficeState?.mainGameSnapshot) {
+      try {
+        const snapshot = JSON.parse(v37Data.state.familyOfficeState.mainGameSnapshot);
+        if (Array.isArray(snapshot.businesses)) {
+          snapshot.businesses = snapshot.businesses.map(patchBusiness);
+        }
+        if (Array.isArray(snapshot.exitedBusinesses)) {
+          snapshot.exitedBusinesses = snapshot.exitedBusinesses.map(patchBusiness);
+        }
+        v37Data.state.familyOfficeState.mainGameSnapshot = JSON.stringify(snapshot);
+      } catch { /* ignore parse failures */ }
+    }
+
+    localStorage.setItem(v38Key, JSON.stringify(v37Data));
+    localStorage.removeItem(v37Key);
+  } catch (e) {
+    console.error('v37→v38 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -1005,4 +1059,5 @@ export function runAllMigrations(): void {
   migrateV34ToV35();
   migrateV35ToV36();
   migrateV36ToV37();
+  migrateV37ToV38();
 }

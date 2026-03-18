@@ -110,6 +110,7 @@ import {
   FILLER_REPUTATION_HEAT_REDUCTION,
   PE_FUND_CONFIG,
   FUND_MANAGER_CONFIG,
+  TURNAROUND_CEILING_BONUS,
 } from '../data/gameConfig';
 
 /**
@@ -170,6 +171,14 @@ function computeTotalDebt(businesses: Business[], holdcoLoanBalance: number): nu
   return holdcoLoanBalance + businesses
     .filter(b => b.status === 'active' || b.status === 'integrated')
     .reduce((sum, b) => sum + b.bankDebtBalance, 0);
+}
+
+/** Remove active turnarounds for sold businesses. */
+function cleanupTurnaroundsForSoldBusinesses(
+  activeTurnarounds: ActiveTurnaround[],
+  soldIds: Set<string>,
+): ActiveTurnaround[] {
+  return activeTurnarounds.filter(t => !soldIds.has(t.businessId));
 }
 
 /**
@@ -285,7 +294,7 @@ const FOUNDER_OWNERSHIP = 0.80;
 const STARTING_SHARES = 1000;
 const FOUNDER_SHARES = 800;
 const STARTING_INTEREST_RATE = 0.07;
-import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EQUITY_ISSUANCE_SENTIMENT_PENALTY, IMPROVEMENT_COST_FLOOR, QUALITY_IMPROVEMENT_MULTIPLIER, MIN_FOUNDER_OWNERSHIP, MIN_PUBLIC_FOUNDER_OWNERSHIP, getOwnershipImprovementModifier } from '../data/gameConfig';
+import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EQUITY_ISSUANCE_SENTIMENT_PENALTY, IMPROVEMENT_COST_FLOOR, QUALITY_IMPROVEMENT_MULTIPLIER, STABILIZATION_EFFICACY_MULTIPLIER, STABILIZATION_TYPES, GROWTH_TYPES, MIN_FOUNDER_OWNERSHIP, MIN_PUBLIC_FOUNDER_OWNERSHIP, getOwnershipImprovementModifier } from '../data/gameConfig';
 import { calculateStockPrice } from '../engine/ipo';
 import { clampMargin, capGrowthRate, applyEbitdaFloor } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
@@ -1043,18 +1052,41 @@ export const useGameStore = create<GameStore>()(
           resolvedTurnarounds[i] = { ...ta, status: newStatus };
 
           // Update business quality and EBITDA
-          const qualityTiersImproved = result.qualityChange;
+          const ceiling = getQualityCeiling(biz.sectorId);
           businessesAfterTurnarounds = businessesAfterTurnarounds.map(b => {
             if (b.id !== ta.businessId) return b;
             const newEbitda = Math.round(b.ebitda * result.ebitdaMultiplier);
-            const ceiling = getQualityCeiling(b.sectorId);
+
+            if (result.result === 'failure') {
+              // Failure: apply EBITDA damage only, no quality change
+              return {
+                ...b,
+                ebitda: newEbitda,
+                peakEbitda: Math.max(b.peakEbitda, newEbitda),
+              };
+            }
+
+            // Success or partial: apply quality change
             const newQuality = Math.min(result.targetQuality, ceiling) as QualityRating;
+            const actualTiersGained = Math.max(0, newQuality - b.qualityRating);
+
+            // Ceiling mastery bonus: business reached sector ceiling via turnaround
+            const reachedCeiling = newQuality === ceiling && actualTiersGained > 0 && !b.ceilingMasteryBonus;
+            const ceilingMarginBoost = reachedCeiling ? TURNAROUND_CEILING_BONUS.marginBoost : 0;
+            const ceilingGrowthBoost = reachedCeiling ? TURNAROUND_CEILING_BONUS.growthBoost : 0;
+
             return {
               ...b,
               qualityRating: newQuality,
               ebitda: newEbitda,
               peakEbitda: Math.max(b.peakEbitda, newEbitda),
-              qualityImprovedTiers: (b.qualityImprovedTiers ?? 0) + Math.max(0, qualityTiersImproved),
+              qualityImprovedTiers: (b.qualityImprovedTiers ?? 0) + actualTiersGained,
+              ...(reachedCeiling && {
+                ceilingMasteryBonus: true,
+                ebitdaMargin: clampMargin(b.ebitdaMargin + ceilingMarginBoost),
+                organicGrowthRate: capGrowthRate(b.organicGrowthRate + ceilingGrowthBoost),
+                revenueGrowthRate: capGrowthRate(b.revenueGrowthRate + ceilingGrowthBoost),
+              }),
             };
           });
 
@@ -1072,7 +1104,7 @@ export const useGameStore = create<GameStore>()(
           turnaroundActions.push({
             type: 'turnaround_resolved' as const,
             round: state.round,
-            details: { businessId: ta.businessId, businessName: bizName, programId: ta.programId, outcome: result.result, newQuality: displayQuality, qualityTiersImproved },
+            details: { businessId: ta.businessId, businessName: bizName, programId: ta.programId, outcome: result.result, newQuality: displayQuality, qualityTiersImproved: result.qualityChange },
           });
         }
 
@@ -1939,7 +1971,7 @@ export const useGameStore = create<GameStore>()(
             status: 'integrated', isPlatform: false, platformScale: 0, boltOnIds: [],
             parentPlatformId: targetPlatformId, integrationOutcome: outcomeSF, synergiesRealized: synergiesSF,
             totalAcquisitionCost: deal.effectivePrice, cashEquityInvested: 0, acquisitionSizeTierPremium: deal.business.acquisitionSizeTierPremium ?? 0,
-            rolloverEquityPct: 0, integratedPlatformId: platform.integratedPlatformId,
+            rolloverEquityPct: 0, integratedPlatformId: deal.business.qualityRating >= 3 ? platform.integratedPlatformId : undefined,
             priorOwnershipCount: deal.business.priorOwnershipCount ?? 0,
           };
           const restructuringCostSF = outcomeSF === 'failure' ? Math.round(Math.abs(deal.business.ebitda) * INTEGRATION_RESTRUCTURING_PCT) : 0;
@@ -1964,7 +1996,7 @@ export const useGameStore = create<GameStore>()(
           const tuckInBusinessesSF = [...updatedBusinessesSF, boltOnBusinessSF];
           const newTotalDebtSF = computeTotalDebt(tuckInBusinessesSF, state.holdcoLoanBalance);
           const tuckInCashSF = Math.max(0, state.cash - restructuringCostSF);
-          const updatedIntegratedPlatformsSF = platform.integratedPlatformId
+          const updatedIntegratedPlatformsSF = (platform.integratedPlatformId && deal.business.qualityRating >= 3)
             ? state.integratedPlatforms.map(ip => ip.id === platform.integratedPlatformId ? { ...ip, constituentBusinessIds: [...ip.constituentBusinessIds, boltOnIdSF] } : ip)
             : state.integratedPlatforms;
           set({
@@ -2321,6 +2353,8 @@ export const useGameStore = create<GameStore>()(
           wasMerged: true,
           mergerBalanceRatio: mergerBalanceRatio,
           priorOwnershipCount: Math.max(biz1.priorOwnershipCount ?? 0, biz2.priorOwnershipCount ?? 0),
+          qualityImprovedTiers: Math.max(biz1.qualityImprovedTiers ?? 0, biz2.qualityImprovedTiers ?? 0),
+          ceilingMasteryBonus: biz1.ceilingMasteryBonus || biz2.ceilingMasteryBonus,
         };
 
         // Remove old businesses, add merged one, and update bolt-on parent references
@@ -2475,6 +2509,15 @@ export const useGameStore = create<GameStore>()(
         // M-3: Prevent applying the same improvement type twice to the same business
         if (business.improvements.some(i => i.type === improvementType)) return;
 
+        // Growth improvements gated behind Q3+ quality
+        if (GROWTH_TYPES.has(improvementType) && business.qualityRating < 3) {
+          useToastStore.getState().addToast({
+            message: 'This business needs to reach Q3 quality before growth investments can take hold. Apply stabilization improvements or complete a turnaround program first.',
+            type: 'warning',
+          });
+          return;
+        }
+
         // Calculate cost and revenue/margin effects based on improvement type
         let cost: number;
         let marginBoost = 0;    // ppt change to margin
@@ -2533,7 +2576,11 @@ export const useGameStore = create<GameStore>()(
         }
 
         // Quality multiplier: higher quality businesses get more from improvements
-        const qualityMult = QUALITY_IMPROVEMENT_MULTIPLIER[business.qualityRating as 1|2|3|4|5] ?? 1.0;
+        // Stabilization improvements use relaxed efficacy on Q1/Q2 (they ARE the turnaround)
+        const isStabilization = STABILIZATION_TYPES.has(improvementType);
+        const qualityMult = (isStabilization && business.qualityRating <= 2)
+          ? STABILIZATION_EFFICACY_MULTIPLIER[business.qualityRating as 1|2|3|4|5] ?? 1.0
+          : QUALITY_IMPROVEMENT_MULTIPLIER[business.qualityRating as 1|2|3|4|5] ?? 1.0;
         // Ownership modifier: founder-owned businesses have more low-hanging fruit
         const ownershipMult = getOwnershipImprovementModifier(business.priorOwnershipCount ?? 0);
         const combinedMult = qualityMult * ownershipMult;
@@ -2583,19 +2630,21 @@ export const useGameStore = create<GameStore>()(
         });
 
         // Roll for quality improvement from operational improvement
+        // No quality rolls for Q1/Q2 businesses receiving stabilization — must use turnaround system
         const improvedBusiness = updatedBusinesses.find(b => b.id === businessId);
-        if (improvedBusiness) {
+        const skipQualityRoll = isStabilization && business.qualityRating <= 2;
+        if (improvedBusiness && !skipQualityRoll) {
           const ceiling = getQualityCeiling(improvedBusiness.sectorId);
           if (improvedBusiness.qualityRating < ceiling) {
             const chance = getQualityImprovementChance(state.turnaroundTier);
             const qualStreams = createRngStreams(state.seed, state.round);
-            if (qualStreams.market.fork(businessId + '_quality').next() < chance) {
+            if (qualStreams.market.fork(businessId + '_quality_' + improvementType).next() < chance) {
               const newQuality = Math.min(improvedBusiness.qualityRating + 1, ceiling) as QualityRating;
               const idx = updatedBusinesses.findIndex(b => b.id === businessId);
               updatedBusinesses[idx] = {
                 ...improvedBusiness,
                 qualityRating: newQuality,
-                qualityImprovedTiers: (improvedBusiness.qualityImprovedTiers ?? 0) + 1,
+                // Note: qualityImprovedTiers NOT incremented from ops quality rolls — only turnaround-sourced
               };
               const addToast = useToastStore.getState().addToast;
               addToast({ message: `Quality improved! ${improvedBusiness.name} is now Q${newQuality}`, type: 'success' });
@@ -3053,6 +3102,10 @@ export const useGameStore = create<GameStore>()(
         // Recompute totalDebt after sale (sold business bank debt removed)
         const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
 
+        // Clean up turnarounds for sold businesses
+        const soldIdsForTurnarounds = new Set([businessId, ...boltOnIds]);
+        const updatedTurnarounds = cleanupTurnaroundsForSoldBusinesses(state.activeTurnarounds, soldIdsForTurnarounds);
+
         const sellState = {
           ...state,
           cash: state.cash + playerProceeds,
@@ -3061,6 +3114,7 @@ export const useGameStore = create<GameStore>()(
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
           integratedPlatforms: updatedPlatforms,
+          activeTurnarounds: updatedTurnarounds,
         };
         set({
           ...sellState,
@@ -3102,18 +3156,42 @@ export const useGameStore = create<GameStore>()(
         const rolloverPctOffer = business.rolloverEquityPct || 0;
         const playerProceedsOffer = rolloverPctOffer > 0 ? Math.round(netProceeds * (1 - rolloverPctOffer)) : netProceeds;
 
-        const updatedBusinesses = state.businesses.map(b => {
+        let updatedBusinesses = state.businesses.map(b => {
           if (b.id === event.affectedBusinessId) return { ...b, status: 'sold' as const, exitPrice: event.offerAmount, exitRound: state.round, earnoutRemaining: 0 };
           if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 };
           return b;
         });
         const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
 
+        // Platform dissolution check: if sold business was part of an integrated platform
+        let updatedPlatforms = state.integratedPlatforms;
+        if (business.integratedPlatformId) {
+          const platform = state.integratedPlatforms.find(p => p.id === business.integratedPlatformId);
+          if (platform) {
+            if (checkPlatformDissolution(platform, updatedBusinesses)) {
+              updatedPlatforms = updatedPlatforms.filter(p => p.id !== platform.id);
+              updatedBusinesses = updatedBusinesses.map(b =>
+                b.integratedPlatformId === platform.id ? { ...b, integratedPlatformId: undefined } : b
+              );
+            } else {
+              updatedPlatforms = updatedPlatforms.map(p =>
+                p.id === platform.id
+                  ? { ...p, constituentBusinessIds: p.constituentBusinessIds.filter(id => id !== business.id) }
+                  : p
+              );
+            }
+          }
+        }
+
         // Auto-deactivate shared services if opco count drops below minimum
         const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
         const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
           ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
           : state.sharedServices;
+
+        // Clean up turnarounds for sold businesses
+        const soldIdsOffer = new Set([event.affectedBusinessId!, ...boltOnIds]);
+        const updatedTurnaroundsOffer = cleanupTurnaroundsForSoldBusinesses(state.activeTurnarounds, soldIdsOffer);
 
         // Collect bolt-on businesses for exitedBusinesses
         const exitedBoltOns = state.businesses
@@ -3127,6 +3205,8 @@ export const useGameStore = create<GameStore>()(
           totalExitProceeds: state.totalExitProceeds + playerProceedsOffer,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
+          integratedPlatforms: updatedPlatforms,
+          activeTurnarounds: updatedTurnaroundsOffer,
         };
         set({
           ...acceptState,
@@ -3257,7 +3337,7 @@ export const useGameStore = create<GameStore>()(
             const marginDelta = -0.015; // -1.5ppt per quality tier
             const newMargin = clampMargin(b.ebitdaMargin + marginDelta);
             const newEbitda = Math.round(b.revenue * newMargin);
-            return { ...b, qualityRating: newQuality, ebitdaMargin: newMargin, ebitda: newEbitda };
+            return { ...b, qualityRating: newQuality, ebitdaMargin: newMargin, ebitda: newEbitda, qualityImprovedTiers: 0 };
           });
         } else {
           // CEO stays but resentful: -2% growth penalty
@@ -3603,6 +3683,10 @@ export const useGameStore = create<GameStore>()(
             return b;
           }),
           currentEvent: null,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'event_choice' as GameActionType, round: state.round, details: { eventType: 'portfolio_seller_deception', choice: 'turnaround', businessId: event.affectedBusinessId, cost, restored } },
+          ],
         };
         set({ ...newState, metrics: calculateMetrics(newState) });
         const addToast = useToastStore.getState().addToast;
@@ -3659,6 +3743,9 @@ export const useGameStore = create<GameStore>()(
         const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
           ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
           : state.sharedServices;
+        // Clean up turnarounds for sold businesses
+        const soldIdsFireSale = new Set([event.affectedBusinessId!, ...boltOnIds]);
+        const updatedTurnaroundsFireSale = cleanupTurnaroundsForSoldBusinesses(state.activeTurnarounds, soldIdsFireSale);
         // Collect bolt-on businesses for exitedBusinesses
         const exitedBoltOns = state.businesses
           .filter(b => boltOnIds.has(b.id))
@@ -3676,7 +3763,12 @@ export const useGameStore = create<GameStore>()(
           totalDebt: computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance),
           integratedPlatforms: updatedPlatforms,
           sharedServices: updatedServices,
+          activeTurnarounds: updatedTurnaroundsFireSale,
           currentEvent: null,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'event_choice' as GameActionType, round: state.round, details: { eventType: 'portfolio_seller_deception', choice: 'fire_sale', businessId: event.affectedBusinessId, fireSalePrice, netProceeds: playerProceeds } },
+          ],
         };
         set({ ...newState, metrics: calculateMetrics(newState) });
         useToastStore.getState().addToast({ message: `Fire-sold ${business.name} for ${formatMoney(playerProceeds)} net proceeds`, type: 'warning' });
@@ -3687,7 +3779,14 @@ export const useGameStore = create<GameStore>()(
         const event = state.currentEvent;
         if (!event || event.type !== 'portfolio_seller_deception' || !event.affectedBusinessId) return;
         // No additional action — damage already applied in applyEventEffects
-        const newState = { ...state, currentEvent: null };
+        const newState = {
+          ...state,
+          currentEvent: null,
+          actionsThisRound: [
+            ...state.actionsThisRound,
+            { type: 'event_choice' as GameActionType, round: state.round, details: { eventType: 'portfolio_seller_deception', choice: 'absorb', businessId: event.affectedBusinessId } },
+          ],
+        };
         set({ ...newState, metrics: calculateMetrics(newState) });
         useToastStore.getState().addToast({ message: 'Absorbed the hit — revenue and quality stay dropped', type: 'warning' });
       },
@@ -3858,11 +3957,45 @@ export const useGameStore = create<GameStore>()(
         // Remove business (and handle bolt-ons if platform)
         const boltOnIds = business.boltOnIds || [];
         const removedIds = new Set([business.id, ...boltOnIds]);
+        let updatedBusinessesSucc = state.businesses.filter(b => !removedIds.has(b.id));
+
+        // Platform dissolution check: if sold business was part of an integrated platform
+        let updatedPlatformsSucc = state.integratedPlatforms;
+        if (business.integratedPlatformId) {
+          const platform = state.integratedPlatforms.find(p => p.id === business.integratedPlatformId);
+          if (platform) {
+            if (checkPlatformDissolution(platform, updatedBusinessesSucc)) {
+              updatedPlatformsSucc = updatedPlatformsSucc.filter(p => p.id !== platform.id);
+              updatedBusinessesSucc = updatedBusinessesSucc.map(b =>
+                b.integratedPlatformId === platform.id ? { ...b, integratedPlatformId: undefined } : b
+              );
+            } else {
+              updatedPlatformsSucc = updatedPlatformsSucc.map(p =>
+                p.id === platform.id
+                  ? { ...p, constituentBusinessIds: p.constituentBusinessIds.filter(id => id !== business.id) }
+                  : p
+              );
+            }
+          }
+        }
+
+        // Auto-deactivate shared services if opco count drops below minimum
+        const activeOpcoCountSucc = updatedBusinessesSucc.filter(b => b.status === 'active').length;
+        const updatedServicesSucc = activeOpcoCountSucc < MIN_OPCOS_FOR_SHARED_SERVICES
+          ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
+          : state.sharedServices;
+
+        // Clean up turnarounds for sold businesses
+        const updatedTurnaroundsSucc = cleanupTurnaroundsForSoldBusinesses(state.activeTurnarounds, removedIds);
+
         const newState = {
           ...state,
           cash: state.cash + playerProceeds,
           totalExitProceeds: state.totalExitProceeds + playerProceeds,
-          businesses: state.businesses.filter(b => !removedIds.has(b.id)),
+          businesses: updatedBusinessesSucc,
+          integratedPlatforms: updatedPlatformsSucc,
+          sharedServices: updatedServicesSucc,
+          activeTurnarounds: updatedTurnaroundsSucc,
           exitedBusinesses: [
             ...state.exitedBusinesses,
             ...state.businesses.filter(b => removedIds.has(b.id)).map(b => ({
@@ -3913,18 +4046,42 @@ export const useGameStore = create<GameStore>()(
         const rolloverPctDistress = business.rolloverEquityPct || 0;
         const playerProceedsDistress = rolloverPctDistress > 0 ? Math.round(netProceeds * (1 - rolloverPctDistress)) : netProceeds;
 
-        const updatedBusinesses = state.businesses.map(b => {
+        let updatedBusinesses = state.businesses.map(b => {
           if (b.id === businessId) return { ...b, status: 'sold' as const, exitPrice, exitRound: state.round, earnoutRemaining: 0 };
           if (boltOnIds.has(b.id)) return { ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 };
           return b;
         });
         const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
 
+        // Platform dissolution check: if sold business was part of an integrated platform
+        let updatedPlatformsDistress = state.integratedPlatforms;
+        if (business.integratedPlatformId) {
+          const platform = state.integratedPlatforms.find(p => p.id === business.integratedPlatformId);
+          if (platform) {
+            if (checkPlatformDissolution(platform, updatedBusinesses)) {
+              updatedPlatformsDistress = updatedPlatformsDistress.filter(p => p.id !== platform.id);
+              updatedBusinesses = updatedBusinesses.map(b =>
+                b.integratedPlatformId === platform.id ? { ...b, integratedPlatformId: undefined } : b
+              );
+            } else {
+              updatedPlatformsDistress = updatedPlatformsDistress.map(p =>
+                p.id === platform.id
+                  ? { ...p, constituentBusinessIds: p.constituentBusinessIds.filter(id => id !== businessId) }
+                  : p
+              );
+            }
+          }
+        }
+
         // Auto-deactivate shared services if opco count drops below minimum
         const activeOpcoCount = updatedBusinesses.filter(b => b.status === 'active').length;
         const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
           ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
           : state.sharedServices;
+
+        // Clean up turnarounds for sold businesses
+        const soldIdsDistress = new Set([businessId, ...boltOnIds]);
+        const updatedTurnaroundsDistress = cleanupTurnaroundsForSoldBusinesses(state.activeTurnarounds, soldIdsDistress);
 
         // Collect bolt-on businesses for exitedBusinesses
         const exitedBoltOns = state.businesses
@@ -3938,6 +4095,8 @@ export const useGameStore = create<GameStore>()(
           totalExitProceeds: state.totalExitProceeds + playerProceedsDistress,
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
+          integratedPlatforms: updatedPlatformsDistress,
+          activeTurnarounds: updatedTurnaroundsDistress,
         };
         set({
           ...distressState,
@@ -4736,6 +4895,9 @@ export const useGameStore = create<GameStore>()(
         const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
           ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
           : state.sharedServices;
+        // Clean up turnarounds for sold businesses
+        const soldIdsDivest = new Set([targetId, ...boltOnIds]);
+        const updatedTurnaroundsDivest = cleanupTurnaroundsForSoldBusinesses(state.activeTurnarounds, soldIdsDivest);
         const exitedBoltOns = state.businesses
           .filter(b => boltOnIds.has(b.id))
           .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 }));
@@ -4752,6 +4914,7 @@ export const useGameStore = create<GameStore>()(
           totalDebt: computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance),
           integratedPlatforms: updatedPlatforms,
           sharedServices: updatedServices,
+          activeTurnarounds: updatedTurnaroundsDivest,
           currentEvent: null,
         };
         set({ ...newState, metrics: calculateMetrics(newState) });
@@ -4812,6 +4975,9 @@ export const useGameStore = create<GameStore>()(
           const updatedServices = activeOpcoCount < MIN_OPCOS_FOR_SHARED_SERVICES
             ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
             : state.sharedServices;
+          // Clean up turnarounds for sold businesses
+          const soldIdsFight = new Set([targetId!, ...boltOnIds]);
+          const updatedTurnaroundsFight = cleanupTurnaroundsForSoldBusinesses(state.activeTurnarounds, soldIdsFight);
           const exitedBoltOns = state.businesses
             .filter(b => boltOnIds.has(b.id))
             .map(b => ({ ...b, status: 'sold' as const, exitPrice: 0, exitRound: state.round, earnoutRemaining: 0 }));
@@ -4828,6 +4994,7 @@ export const useGameStore = create<GameStore>()(
             totalDebt: computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance),
             integratedPlatforms: updatedPlatforms,
             sharedServices: updatedServices,
+            activeTurnarounds: updatedTurnaroundsFight,
             currentEvent: null,
           };
           set({ ...newState, metrics: calculateMetrics(newState) });
@@ -4915,6 +5082,9 @@ export const useGameStore = create<GameStore>()(
 
         const selectedBusinesses = state.businesses.filter(b => businessIds.includes(b.id));
         if (selectedBusinesses.length === 0) return;
+
+        // Q3+ quality gate — all constituents must be stabilized before platform integration
+        if (selectedBusinesses.some(b => b.qualityRating < 3)) return;
 
         const integrationCost = calculateIntegrationCost(recipe, selectedBusinesses);
         if (state.cash < integrationCost) return;
@@ -5115,6 +5285,9 @@ export const useGameStore = create<GameStore>()(
           ? state.sharedServices.map(s => s.active ? { ...s, active: false } : s)
           : state.sharedServices;
 
+        // Clean up turnarounds for sold businesses
+        const updatedTurnaroundsPlatSale = cleanupTurnaroundsForSoldBusinesses(state.activeTurnarounds, allSoldIds);
+
         // Collect exited businesses
         const exitedEntries = state.businesses
           .filter(b => allSoldIds.has(b.id))
@@ -5129,6 +5302,7 @@ export const useGameStore = create<GameStore>()(
           businesses: updatedBusinesses,
           sharedServices: updatedServices,
           integratedPlatforms: updatedPlatforms,
+          activeTurnarounds: updatedTurnaroundsPlatSale,
         };
         set({
           ...sellState,
@@ -5423,7 +5597,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v37', // v37: PE Fund Manager Mode
+      name: 'holdco-tycoon-save-v38', // v38: Turnaround System Overhaul
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

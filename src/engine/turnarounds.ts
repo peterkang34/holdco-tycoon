@@ -22,7 +22,7 @@ import {
 import {
   TURNAROUND_FATIGUE_THRESHOLD,
   TURNAROUND_FATIGUE_PENALTY,
-  TURNAROUND_EXIT_PREMIUM,
+  TURNAROUND_EXIT_PREMIUM_PER_TIER,
   TURNAROUND_EXIT_PREMIUM_MIN_TIERS,
   BASE_QUALITY_IMPROVEMENT_CHANCE,
   QUALITY_IMPROVEMENT_TIER_BONUS,
@@ -168,11 +168,11 @@ export function getQualityImprovementChance(turnaroundTier: TurnaroundTier): num
 
 // ── Exit Premium ──
 
-/** Calculate turnaround exit premium for a business */
+/** Calculate turnaround exit premium for a business — scales per tier improved */
 export function getTurnaroundExitPremium(business: Business): number {
   const tiersImproved = business.qualityImprovedTiers ?? 0;
   if (tiersImproved >= TURNAROUND_EXIT_PREMIUM_MIN_TIERS) {
-    return TURNAROUND_EXIT_PREMIUM;
+    return tiersImproved * TURNAROUND_EXIT_PREMIUM_PER_TIER;
   }
   return 0;
 }

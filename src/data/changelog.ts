@@ -13,6 +13,39 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 17, 2026',
+    title: 'Turnaround System Overhaul',
+    sections: [
+      {
+        heading: 'Turnarounds Are Real Now',
+        items: [
+          'Turnarounds are now a genuine strategic alternative to buying higher-quality businesses — asymmetric acquisition discounts make Q1/Q2 businesses significantly cheaper.',
+          'Improvements split into Stabilization (available at any quality) and Growth (requires Q3+). Stabilize before you grow — just like real PE.',
+          'Scaling exit premium: +0.15x per quality tier improved via turnaround (was flat +0.25x at 2+ tiers). A Q1→Q4 transformation now earns +0.45x.',
+          'Ceiling mastery bonus: businesses that reach their sector quality ceiling via turnaround earn +2ppt margin and +1% growth.',
+        ],
+      },
+      {
+        heading: 'Better Programs',
+        items: [
+          'Success rates increased across all programs (70-80% range). Risk lives in the capital commitment, not the dice roll.',
+          'Standard mode durations reduced by 1 round each (T1: 3yr, T2: 4yr, T3: 5yr). More post-turnaround upside time.',
+          'Failure damage increased (8-15%) — failed turnarounds hurt more, but succeed more often.',
+          'Tier annual costs reduced: T2 $300K (was $450K), T3 $500K (was $700K).',
+        ],
+      },
+      {
+        heading: 'Bug Fixes',
+        items: [
+          'Fixed turnaround cleanup on all sale paths — selling a business mid-turnaround now properly removes the active turnaround.',
+          'Fixed platform dissolution missing on several sale paths (unsolicited offer accept, distressed sale, succession sell).',
+          'Quality drop events now properly reset turnaround exit premium tracking.',
+          'Seller deception choices now logged in action history.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 16, 2026',
     title: 'Achievement & Sector Polish',
     sections: [

@@ -102,15 +102,42 @@ export const PLATFORM_SALE_BONUS = 0.5;
 
 export const TURNAROUND_FATIGUE_THRESHOLD = 4;   // 4+ simultaneous turnarounds = penalty
 export const TURNAROUND_FATIGUE_PENALTY = 0.10;  // -10ppt to all success rates
-export const TURNAROUND_EXIT_PREMIUM = 0.25;     // +0.25x exit multiple
-export const TURNAROUND_EXIT_PREMIUM_MIN_TIERS = 2; // need 2+ quality tiers improved
+export const TURNAROUND_EXIT_PREMIUM_PER_TIER = 0.15; // +0.15x per quality tier improved via turnaround
+export const TURNAROUND_EXIT_PREMIUM_MIN_TIERS = 1;  // need 1+ quality tiers improved
+
+// Ceiling mastery bonus — awarded when turnaround reaches sector quality ceiling
+export const TURNAROUND_CEILING_BONUS = {
+  marginBoost: 0.02,           // +2ppt margin
+  growthBoost: 0.01,           // +1% growth
+  improvementEfficacy: 1.1,    // 110% improvement efficacy
+};
 
 // ── Improvement Constants ──
 
 export const IMPROVEMENT_COST_FLOOR = 200; // $200K minimum improvement cost
 
+// Stabilization improvements — available at any quality, including during turnaround
+export const STABILIZATION_TYPES: ReadonlySet<string> = new Set([
+  'fix_underperformance',
+  'management_professionalization',
+  'operating_playbook',
+]);
+
+// Growth improvements — gated behind Q3+ quality
+export const GROWTH_TYPES: ReadonlySet<string> = new Set([
+  'service_expansion',
+  'digital_transformation',
+  'recurring_revenue_conversion',
+  'pricing_model',
+]);
+
 export const QUALITY_IMPROVEMENT_MULTIPLIER: Record<1 | 2 | 3 | 4 | 5, number> = {
   1: 0.6, 2: 0.8, 3: 1.0, 4: 1.1, 5: 1.2,
+};
+
+// Relaxed efficacy for stabilization improvements on low-quality businesses
+export const STABILIZATION_EFFICACY_MULTIPLIER: Record<1 | 2 | 3 | 4 | 5, number> = {
+  1: 0.85, 2: 0.90, 3: 1.0, 4: 1.1, 5: 1.2,
 };
 
 export const BASE_QUALITY_IMPROVEMENT_CHANCE = 0.30; // 30% base chance on op improvement

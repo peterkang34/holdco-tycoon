@@ -33,7 +33,7 @@ import {
   PLATFORM_SALE_BONUS, getPlatformSaleBonus,
   TURNAROUND_FATIGUE_THRESHOLD,
   TURNAROUND_FATIGUE_PENALTY,
-  TURNAROUND_EXIT_PREMIUM,
+  TURNAROUND_EXIT_PREMIUM_PER_TIER,
   TURNAROUND_EXIT_PREMIUM_MIN_TIERS,
   RESTRUCTURING_FEV_PENALTY,
   COVENANT_BREACH_ROUNDS_THRESHOLD,
@@ -700,15 +700,15 @@ describe('Display Proofreader', () => {
       expect(modal).toContain('prog.ebitdaDamageOnFailure');
     });
 
-    it('Scaled failure rates: T1=5%, T2A=8%, T2B=10%, T3A=12%, T3B=10%, T3Quick=15%', () => {
+    it('Scaled failure rates: T1=5%, T2A=7%, T2B=9%, T3A=10%, T3B=9%, T3Quick=13%', () => {
       const byId = (id: string) => TURNAROUND_PROGRAMS.find(p => p.id === id)!;
       expect(byId('t1_plan_a').failureRate).toBe(0.05);
       expect(byId('t1_plan_b').failureRate).toBe(0.05);
-      expect(byId('t2_plan_a').failureRate).toBe(0.08);
-      expect(byId('t2_plan_b').failureRate).toBe(0.10);
-      expect(byId('t3_plan_a').failureRate).toBe(0.12);
-      expect(byId('t3_plan_b').failureRate).toBe(0.10);
-      expect(byId('t3_quick').failureRate).toBe(0.15);
+      expect(byId('t2_plan_a').failureRate).toBe(0.07);
+      expect(byId('t2_plan_b').failureRate).toBe(0.09);
+      expect(byId('t3_plan_a').failureRate).toBe(0.10);
+      expect(byId('t3_plan_b').failureRate).toBe(0.09);
+      expect(byId('t3_quick').failureRate).toBe(0.13);
     });
 
     it('Fatigue threshold = 4 simultaneous turnarounds', () => {
@@ -730,9 +730,9 @@ describe('Display Proofreader', () => {
       expect(allocate).toContain('10ppt');
     });
 
-    it('Exit premium = 0.25x for 2+ tiers improved', () => {
-      expect(TURNAROUND_EXIT_PREMIUM).toBe(0.25);
-      expect(TURNAROUND_EXIT_PREMIUM_MIN_TIERS).toBe(2);
+    it('Exit premium = 0.15x per tier improved (min 1 tier)', () => {
+      expect(TURNAROUND_EXIT_PREMIUM_PER_TIER).toBe(0.15);
+      expect(TURNAROUND_EXIT_PREMIUM_MIN_TIERS).toBe(1);
     });
 
     it('Quality ceilings: agency=3, restaurant=3, saas/industrial/healthcare/wealthMgmt=4, default=5', () => {
@@ -796,8 +796,8 @@ describe('Display Proofreader', () => {
 
     it('Tier annual costs match config', () => {
       expect(TURNAROUND_TIER_CONFIG[1].annualCost).toBe(250);
-      expect(TURNAROUND_TIER_CONFIG[2].annualCost).toBe(450);
-      expect(TURNAROUND_TIER_CONFIG[3].annualCost).toBe(700);
+      expect(TURNAROUND_TIER_CONFIG[2].annualCost).toBe(300);
+      expect(TURNAROUND_TIER_CONFIG[3].annualCost).toBe(500);
       // Strategy B: AllocatePhase displays tier annual cost via getTurnaroundTierAnnualCost
       const allocate = readComponent('components/phases/AllocatePhase.tsx');
       expect(allocate).toContain('getTurnaroundTierAnnualCost');
@@ -826,17 +826,17 @@ describe('Display Proofreader', () => {
       expect(card).toContain('roundsLeft');
     });
 
-    it('Standard durations: T1=4, T2=5, T3=3-6', () => {
+    it('Standard durations: T1=3, T2=4, T3=3-5', () => {
       const t1 = TURNAROUND_PROGRAMS.filter(p => p.tierId === 1);
-      for (const p of t1) expect(p.durationStandard).toBe(4);
+      for (const p of t1) expect(p.durationStandard).toBe(3);
 
       const t2 = TURNAROUND_PROGRAMS.filter(p => p.tierId === 2);
-      for (const p of t2) expect(p.durationStandard).toBe(5);
+      for (const p of t2) expect(p.durationStandard).toBe(4);
 
       const t3 = TURNAROUND_PROGRAMS.filter(p => p.tierId === 3);
       for (const p of t3) {
         expect(p.durationStandard).toBeGreaterThanOrEqual(3);
-        expect(p.durationStandard).toBeLessThanOrEqual(6);
+        expect(p.durationStandard).toBeLessThanOrEqual(5);
       }
       // Strategy B: TurnaroundModal computes duration via getTurnaroundDuration and shows it
       const modal = readComponent('components/modals/TurnaroundModal.tsx');

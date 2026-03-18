@@ -19,7 +19,7 @@ import {
 import {
   TURNAROUND_FATIGUE_THRESHOLD,
   TURNAROUND_FATIGUE_PENALTY,
-  TURNAROUND_EXIT_PREMIUM,
+  TURNAROUND_EXIT_PREMIUM_PER_TIER,
   TURNAROUND_EXIT_PREMIUM_MIN_TIERS,
   BASE_QUALITY_IMPROVEMENT_CHANCE,
   QUALITY_IMPROVEMENT_TIER_BONUS,
@@ -272,7 +272,7 @@ describe('calculateTurnaroundCost', () => {
 describe('getTurnaroundDuration', () => {
   it('returns standard duration for standard mode', () => {
     const program = getProgramById('t1_plan_a')!;
-    expect(getTurnaroundDuration(program, 'standard')).toBe(4);
+    expect(getTurnaroundDuration(program, 'standard')).toBe(3);
   });
 
   it('returns quick duration for quick mode', () => {
@@ -281,12 +281,12 @@ describe('getTurnaroundDuration', () => {
   });
 
   it('standard durations match program definitions', () => {
-    expect(getTurnaroundDuration(getProgramById('t1_plan_a')!, 'standard')).toBe(4);
-    expect(getTurnaroundDuration(getProgramById('t1_plan_b')!, 'standard')).toBe(4);
-    expect(getTurnaroundDuration(getProgramById('t2_plan_a')!, 'standard')).toBe(5);
-    expect(getTurnaroundDuration(getProgramById('t2_plan_b')!, 'standard')).toBe(5);
-    expect(getTurnaroundDuration(getProgramById('t3_plan_a')!, 'standard')).toBe(6);
-    expect(getTurnaroundDuration(getProgramById('t3_plan_b')!, 'standard')).toBe(6);
+    expect(getTurnaroundDuration(getProgramById('t1_plan_a')!, 'standard')).toBe(3);
+    expect(getTurnaroundDuration(getProgramById('t1_plan_b')!, 'standard')).toBe(3);
+    expect(getTurnaroundDuration(getProgramById('t2_plan_a')!, 'standard')).toBe(4);
+    expect(getTurnaroundDuration(getProgramById('t2_plan_b')!, 'standard')).toBe(4);
+    expect(getTurnaroundDuration(getProgramById('t3_plan_a')!, 'standard')).toBe(5);
+    expect(getTurnaroundDuration(getProgramById('t3_plan_b')!, 'standard')).toBe(5);
     expect(getTurnaroundDuration(getProgramById('t3_quick')!, 'standard')).toBe(3);
   });
 
@@ -349,8 +349,8 @@ describe('resolveTurnaround', () => {
   });
 
   it('multi-tier program partial gives only +1 tier', () => {
-    const t2a = getProgramById('t2_plan_a')!; // Q1→Q3, successRate=0.68
-    const outcome = resolveTurnaround(t2a, 0, 0.75); // > 0.68, < 0.68+0.27
+    const t2a = getProgramById('t2_plan_a')!; // Q1→Q3, successRate=0.76
+    const outcome = resolveTurnaround(t2a, 0, 0.80); // > 0.76, < 0.76+0.17
     expect(outcome.result).toBe('partial');
     expect(outcome.qualityChange).toBe(1); // only +1, not +2
     expect(outcome.targetQuality).toBe(2); // Q1 + 1 = Q2
@@ -370,16 +370,16 @@ describe('Portfolio fatigue', () => {
 
   it('reduces success rate by 10ppt with 4+ active turnarounds', () => {
     const program = getProgramById('t1_plan_a')!;
-    // successRate = 0.65, with fatigue: 0.65 - 0.10 = 0.55
-    // Roll 0.57 would normally be success, but with fatigue it's partial
-    const outcome = resolveTurnaround(program, 4, 0.57);
+    // successRate = 0.75, with fatigue: 0.75 - 0.10 = 0.65
+    // Roll 0.67 would normally be success, but with fatigue it's partial
+    const outcome = resolveTurnaround(program, 4, 0.67);
     expect(outcome.result).toBe('partial');
   });
 
   it('success still possible with fatigue for low rolls', () => {
     const program = getProgramById('t1_plan_a')!;
-    // With fatigue: successRate = 0.55, roll 0.40 < 0.55
-    const outcome = resolveTurnaround(program, 5, 0.40);
+    // With fatigue: successRate = 0.65, roll 0.50 < 0.65
+    const outcome = resolveTurnaround(program, 5, 0.50);
     expect(outcome.result).toBe('success');
   });
 
@@ -395,19 +395,19 @@ describe('Portfolio fatigue', () => {
 // ── Turnaround Exit Premium ──
 
 describe('getTurnaroundExitPremium', () => {
-  it('returns +0.25x for business with 2+ quality tiers improved', () => {
+  it('returns +0.30x for business with 2 quality tiers improved (per-tier scaling)', () => {
     const biz = createMockBusiness({ qualityImprovedTiers: 2 });
-    expect(getTurnaroundExitPremium(biz)).toBe(0.25);
+    expect(getTurnaroundExitPremium(biz)).toBe(0.30);
   });
 
-  it('returns +0.25x for business with 3 quality tiers improved', () => {
+  it('returns +0.45x for business with 3 quality tiers improved', () => {
     const biz = createMockBusiness({ qualityImprovedTiers: 3 });
-    expect(getTurnaroundExitPremium(biz)).toBe(0.25);
+    expect(getTurnaroundExitPremium(biz)).toBeCloseTo(0.45);
   });
 
-  it('returns 0 for business with only 1 quality tier improved', () => {
+  it('returns +0.15x for business with 1 quality tier improved', () => {
     const biz = createMockBusiness({ qualityImprovedTiers: 1 });
-    expect(getTurnaroundExitPremium(biz)).toBe(0);
+    expect(getTurnaroundExitPremium(biz)).toBe(0.15);
   });
 
   it('returns 0 for business with 0 quality tiers improved', () => {
@@ -421,12 +421,12 @@ describe('getTurnaroundExitPremium', () => {
     expect(getTurnaroundExitPremium(biz)).toBe(0);
   });
 
-  it('exit premium constant is 0.25', () => {
-    expect(TURNAROUND_EXIT_PREMIUM).toBe(0.25);
+  it('exit premium per-tier constant is 0.15', () => {
+    expect(TURNAROUND_EXIT_PREMIUM_PER_TIER).toBe(0.15);
   });
 
-  it('minimum tiers for premium is 2', () => {
-    expect(TURNAROUND_EXIT_PREMIUM_MIN_TIERS).toBe(2);
+  it('minimum tiers for premium is 1', () => {
+    expect(TURNAROUND_EXIT_PREMIUM_MIN_TIERS).toBe(1);
   });
 });
 
@@ -531,12 +531,12 @@ describe('getTurnaroundTierAnnualCost', () => {
     expect(getTurnaroundTierAnnualCost(1)).toBe(250);
   });
 
-  it('T2 annual cost is 450K', () => {
-    expect(getTurnaroundTierAnnualCost(2)).toBe(450);
+  it('T2 annual cost is 300K', () => {
+    expect(getTurnaroundTierAnnualCost(2)).toBe(300);
   });
 
-  it('T3 annual cost is 700K', () => {
-    expect(getTurnaroundTierAnnualCost(3)).toBe(700);
+  it('T3 annual cost is 500K', () => {
+    expect(getTurnaroundTierAnnualCost(3)).toBe(500);
   });
 });
 

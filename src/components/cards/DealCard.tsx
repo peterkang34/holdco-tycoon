@@ -393,7 +393,7 @@ export const DealCard = memo(function DealCard({ deal, onSelect, disabled, unaff
                 {qualityRating >= 4 ? 'easier success' : qualityRating <= 2 ? 'higher failure risk' : 'standard odds'}
               </span></p>
               {qualityRating >= 3 && <p className="text-accent">Eligible for earn-out deals</p>}
-              {qualityRating <= 2 && <p className="text-danger">Larger tuck-in discounts available</p>}
+              {qualityRating <= 2 && <p className="text-warning">Turnaround candidate — steep acquisition discount</p>}
             </div>
             <p className="text-[10px] text-text-muted mt-1.5 pt-1.5 border-t border-white/10">
               Affects exit valuation, bolt-on integration, and deal heat.
