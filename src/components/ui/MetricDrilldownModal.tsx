@@ -854,15 +854,20 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
     const preTaxFcf = activeBusinesses.reduce(
       (sum, b) => sum + calculateAnnualFcf(b, ssBenefits.capexReduction, ssBenefits.cashConversionBonus), 0
     );
-    const cashConversion = totalEbitda > 0 ? preTaxFcf / totalEbitda : 0;
+    const postTaxFcf = preTaxFcf - taxBreakdown.taxAmount;
+    const cashConversion = totalEbitda > 0 ? postTaxFcf / totalEbitda : 0;
+    const preTaxConversion = totalEbitda > 0 ? preTaxFcf / totalEbitda : 0;
 
     return (
       <>
-        <SectionHeader title="Cash Conversion" formula="Pre-Tax FCF ÷ EBITDA" />
+        <SectionHeader title="Cash Conversion (After Tax)" formula="Post-Tax FCF ÷ EBITDA" />
         <div className="bg-white/5 rounded-lg p-3 mb-4 text-center">
           <p className="text-3xl font-bold font-mono">{formatPercent(cashConversion)}</p>
           <p className="text-xs text-text-muted mt-1">
-            {formatMoney(preTaxFcf)} pre-tax FCF ÷ {formatMoney(totalEbitda)} EBITDA
+            {formatMoney(postTaxFcf)} post-tax FCF ÷ {formatMoney(totalEbitda)} EBITDA
+          </p>
+          <p className="text-xs text-text-muted mt-1">
+            Pre-tax: {formatPercent(preTaxConversion)} ({formatMoney(preTaxFcf)} FCF before {formatMoney(taxBreakdown.taxAmount)} tax)
           </p>
         </div>
 
@@ -884,7 +889,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
         />
 
         <p className="text-xs text-text-muted mt-3 italic">
-          Benchmark: 80%+ is excellent. Low-capex sectors (agencies, consulting) naturally convert better.
+          After-tax benchmark: 60%+ is good, 70%+ is excellent. Per-business rows show pre-tax conversion (before portfolio-level tax).
           {ssBenefits.capexReduction > 0 && ` Procurement shared service reducing capex by ${(ssBenefits.capexReduction * 100).toFixed(0)}%.`}
           {ssBenefits.cashConversionBonus > 0 && ` Finance & reporting adding +${(ssBenefits.cashConversionBonus * 100).toFixed(0)}% conversion bonus.`}
         </p>
