@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { formatMoney } from '../../engine/types';
+import { VideoModal } from './VideoModal';
 
 interface InstructionsModalProps {
   holdcoName: string;
@@ -14,6 +15,7 @@ interface InstructionsModalProps {
 
 export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, firstBusinessName, firstBusinessPrice, startingCash, maxRounds = 20, onClose }: InstructionsModalProps) {
   const [page, setPage] = useState(0);
+  const [showVideo, setShowVideo] = useState(false);
 
   const pages = [
     {
@@ -69,6 +71,14 @@ export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, 
             Your mission: <strong className="text-accent">maximize Founder Equity Value over {maxRounds} years</strong> through
             smart acquisitions, operational improvements, and disciplined capital allocation.
           </p>
+
+          <button
+            type="button"
+            onClick={() => setShowVideo(true)}
+            className="w-full p-3 rounded-lg border border-white/10 bg-white/5 hover:border-accent/40 hover:bg-accent/5 transition-all text-sm text-text-secondary flex items-center justify-center gap-2"
+          >
+            <span>▶</span> Watch a Playthrough (5 min)
+          </button>
         </>
       ),
     },
@@ -309,6 +319,7 @@ export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, 
           )}
         </div>
       </div>
+      <VideoModal isOpen={showVideo} onClose={() => setShowVideo(false)} />
     </div>
   );
 }

@@ -14,6 +14,7 @@ import { buildChallengeUrl, shareChallenge, encodeChallengeParams, generateToken
 import { trackChallengeCreate, trackChallengeShare } from '../../services/telemetry';
 import { useIsLoggedIn } from '../../hooks/useAuth';
 import { useAuthStore } from '../../hooks/useAuth';
+import { VideoModal } from '../ui/VideoModal';
 
 const BEST_GRADE_KEY = 'holdco-tycoon-best-grade';
 const GRADE_ORDER = ['F', 'D', 'C', 'B', 'A', 'S'] as const;
@@ -73,6 +74,7 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
   const [createdChallengeSeed, setCreatedChallengeSeed] = useState<number | null>(null);
   const [showHurdleTooltip, setShowHurdleTooltip] = useState(false);
   const [showCarryTooltip, setShowCarryTooltip] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
 
   // Compute available sectors (includes unlocked prestige sectors for non-challenge)
   const isAnonymous = useAuthStore((s) => s.player?.isAnonymous ?? true);
@@ -695,6 +697,13 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
             >
               💬 Feedback
             </button>
+            <span className="text-text-muted/40">·</span>
+            <button
+              onClick={() => setShowVideo(true)}
+              className="text-sm text-text-muted hover:text-accent transition-colors"
+            >
+              ▶ Watch Video
+            </button>
           </div>
         </div>
 
@@ -725,6 +734,7 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
         onClose={() => setShowFeedback(false)}
         context={{ screen: 'intro' }}
       />
+      <VideoModal isOpen={showVideo} onClose={() => setShowVideo(false)} />
     </div>
   );
 }

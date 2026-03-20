@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Modal } from './Modal';
 import { trackFeatureUsed } from '../../services/telemetry';
+import { VideoModal } from './VideoModal';
 
 type ManualSection =
   | 'getting-started'
@@ -120,9 +121,20 @@ function DataTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
 // --- Section content renderers ---
 
 function GettingStartedContent() {
+  const [showVideo, setShowVideo] = useState(false);
   return (
     <>
       <SectionTitle>Getting Started</SectionTitle>
+
+      <button
+        type="button"
+        onClick={() => setShowVideo(true)}
+        className="w-full mb-4 p-3 rounded-lg border border-white/10 bg-white/5 hover:border-accent/40 hover:bg-accent/5 transition-all text-sm text-text-secondary flex items-center justify-center gap-2"
+      >
+        <span>▶</span> Watch a Playthrough (5 min)
+      </button>
+      <VideoModal isOpen={showVideo} onClose={() => setShowVideo(false)} />
+
       <P>
         Welcome to Holdco Tycoon. You play as the CEO of a newly formed holding company.
         Your goal is to acquire, operate, and grow a portfolio of small businesses over a

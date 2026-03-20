@@ -31,12 +31,14 @@ import { hasSeenNudge, dismissNudge } from '../../hooks/useNudges';
 import { MIN_OPCOS_FOR_SHARED_SERVICES } from '../../data/sharedServices';
 import { buildChallengeUrl, copyToClipboard } from '../../utils/challenge';
 import { AccountBadge } from '../ui/AccountBadge';
+import { VideoModal } from '../ui/VideoModal';
 
 // ── Mobile Nav Overflow Menu ──────────────────────────────────────
-function NavOverflowMenu({ hasReports, onReports, onManual, onFeedback, onTutorial, onReset }: {
+function NavOverflowMenu({ hasReports, onReports, onManual, onVideo, onFeedback, onTutorial, onReset }: {
   hasReports: boolean;
   onReports: () => void;
   onManual: () => void;
+  onVideo: () => void;
   onFeedback: () => void;
   onTutorial: () => void;
   onReset: () => void;
@@ -83,6 +85,7 @@ function NavOverflowMenu({ hasReports, onReports, onManual, onFeedback, onTutori
         >
           {hasReports && item('Annual Reports', '📊', onReports)}
           {item('How to Play', '📖', onManual)}
+          {item('Watch Video', '▶', onVideo)}
           {item('Send Feedback', '💬', onFeedback)}
           {item('Tutorial', '?', onTutorial)}
           <div className="border-t border-white/10 my-0.5" />
@@ -125,6 +128,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   const [copiedLink, setCopiedLink] = useState(false);
   const [showFOTutorial, setShowFOTutorial] = useState(false);
   const [showFMTutorial, setShowFMTutorial] = useState(false);
+  const [showVideo, setShowVideo] = useState(false);
 
   const {
     holdcoName,
@@ -1228,6 +1232,13 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
               📖
             </button>
             <button
+              onClick={() => setShowVideo(true)}
+              className="hidden sm:flex text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] items-center justify-center rounded hover:bg-white/5"
+              title="Watch Video"
+            >
+              ▶
+            </button>
+            <button
               onClick={() => setShowInstructions(true)}
               className="hidden sm:flex text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] items-center justify-center rounded hover:bg-white/5"
               title="View Tutorial"
@@ -1246,6 +1257,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
               hasReports={!!roundHistory && roundHistory.length > 0}
               onReports={() => setShowAnnualReports(true)}
               onManual={() => setShowManual(true)}
+              onVideo={() => setShowVideo(true)}
               onFeedback={() => setShowFeedback(true)}
               onTutorial={() => setShowInstructions(true)}
               onReset={() => setShowResetConfirm(true)}
@@ -1404,6 +1416,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       {showManual && (
         <UserManualModal onClose={() => setShowManual(false)} />
       )}
+
+      {/* Video Modal */}
+      <VideoModal isOpen={showVideo} onClose={() => setShowVideo(false)} />
 
       {/* Feedback Modal */}
       <FeedbackModal
