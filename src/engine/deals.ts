@@ -317,8 +317,11 @@ export function getStructureDescription(structure: DealStructure): string {
     }
     case 'rollover_equity': {
       const rolloverPct = Math.round((structure.rolloverEquityPct ?? 0) * 100);
-      const totalPrice = structure.cashRequired + (structure.sellerNote?.amount ?? 0) + Math.round((structure.cashRequired + (structure.sellerNote?.amount ?? 0)) * (structure.rolloverEquityPct ?? 0) / (1 - (structure.rolloverEquityPct ?? 0)));
-      const cashPct = Math.round((structure.cashRequired / totalPrice) * 100);
+      // Total price = buyer's outlay / (1 - rollover%) since rollover is seller equity reinvested
+      const buyerOutlay = structure.cashRequired + (structure.sellerNote?.amount ?? 0);
+      const effectiveRolloverPct = structure.rolloverEquityPct ?? 0;
+      const totalPrice = effectiveRolloverPct < 1 ? Math.round(buyerOutlay / (1 - effectiveRolloverPct)) : buyerOutlay;
+      const cashPct = totalPrice > 0 ? Math.round((structure.cashRequired / totalPrice) * 100) : 0;
       return `Seller rolls over ${rolloverPct}% as equity, reducing your cash outlay to ${cashPct}% of price. Seller stays aligned post-close — growth and margin bonuses. At exit, seller receives ${rolloverPct}% of net proceeds.`;
     }
     case 'share_funded': {

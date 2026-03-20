@@ -196,7 +196,7 @@ export function ScoreboardScreen({ challengeParams, onPlayChallenge, onPlayAgain
                   </tr>
                 </thead>
                 <tbody>
-                  <ScoreboardRow label="FEV" values={results.map(e => formatMoney(e.fev))} highlight />
+                  <ScoreboardRow label="Founder Equity Value" values={results.map(e => formatMoney(e.fev))} highlight />
                   <ScoreboardRow label="Total Return" values={results.map(e => formatMoney(e.fev + e.totalDistributions))} />
                   <ScoreboardRow label="Score" values={results.map(e => `${e.score}/100`)} />
                   <ScoreboardRow label="Grade" values={results.map(e => e.grade)} colorFn={(v) => getGradeColor(v as 'S' | 'A' | 'B' | 'C' | 'D' | 'F')} />

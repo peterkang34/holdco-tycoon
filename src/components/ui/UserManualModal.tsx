@@ -996,7 +996,7 @@ function SharedServicesContent() {
       <DataTable
         headers={['Tier', 'Name', 'Upgrade Cost', 'Annual Cost', 'Min Businesses', 'Key Benefits']}
         rows={[
-          ['1', 'Deal Sourcing Team', '$800K', '$350K/yr', '2+', '+2 focus-sector deals, Source Deals costs $300K (was $500K), acquisition capacity: 3/year'],
+          ['1', 'Deal Sourcing Team', '$800K', '$350K/yr', '2+', '+2 sourced deals in focus sector, Source Deals costs $300K (was $500K), sourced deals last 3 rounds (was 2), acquisition capacity: 3/year'],
           ['2', 'Industry Specialists', '$1.2M', '$550K/yr', '3+', 'Sub-type targeting, quality floor of 2, sourced deals get -1 heat tier (less competition), acquisition capacity: 4/year'],
           ['3', 'Proprietary Network', '$1.5M', '$800K/yr', '4+', '2 off-market deals (15% discount), quality floor of 3, Proactive Outreach ($400K for 2 targeted deals), acquisition capacity: 4/year'],
         ]}

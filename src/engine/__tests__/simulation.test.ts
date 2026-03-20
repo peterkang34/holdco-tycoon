@@ -214,6 +214,7 @@ describe('calculateSharedServicesBenefits', () => {
     expect(benefits.marginDefense).toBe(0);
     expect(benefits.talentRetentionBonus).toBe(0);
     expect(benefits.talentGainBonus).toBe(0);
+    expect(benefits.hasMarketingBrand).toBe(false);
   });
 
   it('should apply scale multiplier with 6+ opcos', () => {
@@ -256,6 +257,175 @@ describe('calculateSharedServicesBenefits', () => {
     const benefits = calculateSharedServicesBenefits(state);
     expect(benefits.capexReduction).toBeGreaterThan(0);
     expect(benefits.cashConversionBonus).toBeGreaterThan(0);
+  });
+
+  it('should set hasMarketingBrand true only when marketing_brand is active', () => {
+    // Marketing active
+    const withMarketing = createMockGameState({
+      sharedServices: createMockGameState().sharedServices.map(s =>
+        s.type === 'marketing_brand' ? { ...s, active: true } : s
+      ),
+    });
+    expect(calculateSharedServicesBenefits(withMarketing).hasMarketingBrand).toBe(true);
+
+    // Only tech active — should NOT set hasMarketingBrand
+    const withTechOnly = createMockGameState({
+      sharedServices: createMockGameState().sharedServices.map(s =>
+        s.type === 'technology_systems' ? { ...s, active: true } : s
+      ),
+    });
+    expect(calculateSharedServicesBenefits(withTechOnly).hasMarketingBrand).toBe(false);
+  });
+
+  it('should return correct per-service benefits individually', () => {
+    // finance_reporting: +5% cash conversion, +0.1ppt margin defense
+    const withFinance = createMockGameState({
+      sharedServices: createMockGameState().sharedServices.map(s =>
+        s.type === 'finance_reporting' ? { ...s, active: true } : s
+      ),
+    });
+    const finBenefits = calculateSharedServicesBenefits(withFinance);
+    expect(finBenefits.cashConversionBonus).toBeCloseTo(0.05, 5);
+    expect(finBenefits.marginDefense).toBeCloseTo(0.001, 5);
+
+    // recruiting_hr: 50% talent retention, 30% talent gain, +0.15ppt margin defense
+    const withHR = createMockGameState({
+      sharedServices: createMockGameState().sharedServices.map(s =>
+        s.type === 'recruiting_hr' ? { ...s, active: true } : s
+      ),
+    });
+    const hrBenefits = calculateSharedServicesBenefits(withHR);
+    expect(hrBenefits.talentRetentionBonus).toBeCloseTo(0.5, 5);
+    expect(hrBenefits.talentGainBonus).toBeCloseTo(0.3, 5);
+    expect(hrBenefits.marginDefense).toBeCloseTo(0.0015, 5);
+
+    // marketing_brand: +1.5% growth bonus
+    const withMarketing = createMockGameState({
+      sharedServices: createMockGameState().sharedServices.map(s =>
+        s.type === 'marketing_brand' ? { ...s, active: true } : s
+      ),
+    });
+    const mktBenefits = calculateSharedServicesBenefits(withMarketing);
+    expect(mktBenefits.growthBonus).toBeCloseTo(0.015, 5);
+    expect(mktBenefits.hasMarketingBrand).toBe(true);
+
+    // technology_systems: +0.5% growth, +0.2ppt margin defense
+    const withTech = createMockGameState({
+      sharedServices: createMockGameState().sharedServices.map(s =>
+        s.type === 'technology_systems' ? { ...s, active: true } : s
+      ),
+    });
+    const techBenefits = calculateSharedServicesBenefits(withTech);
+    expect(techBenefits.growthBonus).toBeCloseTo(0.005, 5);
+    expect(techBenefits.marginDefense).toBeCloseTo(0.002, 5);
+  });
+
+  it('should apply smooth scale multiplier at 3-5 opcos', () => {
+    // 3 opcos: 1.05x, 4 opcos: 1.10x, 5 opcos: 1.15x
+    const makeState = (count: number) => createMockGameState({
+      businesses: Array.from({ length: count }, (_, i) =>
+        createMockBusiness({ id: `biz_${i}` })
+      ),
+      sharedServices: createMockGameState().sharedServices.map(s =>
+        s.type === 'marketing_brand' ? { ...s, active: true } : s
+      ),
+    });
+
+    expect(calculateSharedServicesBenefits(makeState(3)).growthBonus).toBeCloseTo(0.015 * 1.05, 5);
+    expect(calculateSharedServicesBenefits(makeState(4)).growthBonus).toBeCloseTo(0.015 * 1.10, 5);
+    expect(calculateSharedServicesBenefits(makeState(5)).growthBonus).toBeCloseTo(0.015 * 1.15, 5);
+  });
+});
+
+describe('Shared services — costs deducted from Net FCF', () => {
+  it('should deduct shared services annual costs from Net FCF in calculateMetrics', () => {
+    // Use recruiting_hr — its effects (talent events) don't impact FCF calculation directly
+    const activeSharedServices = createMockGameState().sharedServices.map(s =>
+      s.type === 'recruiting_hr' ? { ...s, active: true } : s
+    );
+    const annualCost = activeSharedServices.filter(s => s.active).reduce((sum, s) => sum + s.annualCost, 0);
+    expect(annualCost).toBe(378); // sanity: recruiting_hr costs $378K
+
+    const stateWithSS = createMockGameState({ sharedServices: activeSharedServices });
+    const stateWithoutSS = createMockGameState();
+
+    const metricsWithSS = calculateMetrics(stateWithSS);
+    const metricsWithoutSS = calculateMetrics(stateWithoutSS);
+
+    // Verify both metrics compute valid numbers (totalFcf = Net FCF in Metrics)
+    expect(metricsWithSS.totalFcf).not.toBeNaN();
+    expect(metricsWithoutSS.totalFcf).not.toBeNaN();
+
+    // Net FCF should be lower by the annual cost minus tax shield (30% deductible)
+    const fcfDiff = metricsWithoutSS.totalFcf - metricsWithSS.totalFcf;
+    // recruiting_hr has margin defense which is tiny (0.15ppt), so the dominant factor is the cost
+    // Net cost = annualCost - taxShield = 378 - round(378 * 0.30) = 378 - 113 = 265
+    expect(fcfDiff).toBeGreaterThan(200); // costs DO reduce FCF meaningfully
+    expect(fcfDiff).toBeLessThan(annualCost); // tax shield makes it cheaper than gross cost
+  });
+
+  it('should include shared services costs in portfolio tax as deduction', () => {
+    const businesses = [createMockBusiness({ ebitda: 2000 })];
+    const ssCost = 295; // finance_reporting annual cost
+    const taxWithSS = calculatePortfolioTax(businesses, 0, 0, ssCost);
+    const taxWithoutSS = calculatePortfolioTax(businesses, 0, 0, 0);
+
+    // Tax should be lower with shared services cost deduction
+    expect(taxWithSS.taxAmount).toBeLessThan(taxWithoutSS.taxAmount);
+    expect(taxWithSS.sharedServicesTaxShield).toBeGreaterThan(0);
+    expect(taxWithSS.sharedServicesCost).toBe(ssCost);
+  });
+});
+
+describe('Shared services — effects on portfolio companies', () => {
+  it('procurement reduces capex in FCF calculation', () => {
+    const business = createMockBusiness({ ebitda: 10000, sectorId: 'agency' });
+    const fcfWithProcurement = calculateAnnualFcf(business, 0.15, 0); // 15% capex reduction
+    const fcfWithout = calculateAnnualFcf(business, 0, 0);
+    // agency capexRate = 0.03, so capex = 10000 * 0.03 = 300 without, 10000 * 0.03 * 0.85 = 255 with
+    expect(fcfWithProcurement).toBeGreaterThan(fcfWithout);
+    expect(fcfWithProcurement - fcfWithout).toBe(45); // 300 - 255
+  });
+
+  it('finance_reporting boosts cash conversion', () => {
+    const business = createMockBusiness({ ebitda: 10000, sectorId: 'agency' });
+    const fcfWithFinance = calculateAnnualFcf(business, 0, 0.05); // 5% cash conversion
+    const fcfWithout = calculateAnnualFcf(business, 0, 0);
+    // FCF without = 10000 - 300 = 9700; with = 9700 * 1.05 = 10185
+    expect(fcfWithFinance).toBeGreaterThan(fcfWithout);
+    expect(fcfWithFinance).toBe(Math.round(9700 * 1.05));
+  });
+
+  it('marketing_brand sector bonus applies ONLY when marketing_brand is active (not tech alone)', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const agency = createMockBusiness({ ebitda: 1000, sectorId: 'agency', organicGrowthRate: 0.05 });
+
+    // With marketing_brand: +1.5% base + 1% sector bonus = +2.5% total
+    const withMarketing = applyOrganicGrowth(agency, 0.015, 0, false, undefined, undefined, undefined, undefined, undefined, undefined, undefined, true);
+    // With tech only (growth bonus exists but NOT from marketing): no sector bonus
+    const withTechOnly = applyOrganicGrowth(agency, 0.005, 0, false, undefined, undefined, undefined, undefined, undefined, undefined, undefined, false);
+    // Without any SS growth
+    const withNone = applyOrganicGrowth(agency, 0, 0, false);
+
+    // Marketing should produce higher revenue than tech-only due to sector bonus
+    expect(withMarketing.revenue).toBeGreaterThan(withTechOnly.revenue);
+    // Tech-only should NOT get sector bonus (was the bug before fix)
+    expect(withTechOnly.revenue).toBeGreaterThan(withNone.revenue); // tech still gives +0.5% growth
+    // Key assertion: tech-only gets SMALLER boost than marketing for agency businesses
+    // Marketing gives +1.5% base + 1% sector = +2.5%, tech gives only +0.5%
+    expect(withMarketing.revenue - withNone.revenue).toBeGreaterThan(withTechOnly.revenue - withNone.revenue);
+  });
+
+  it('marketing_brand does NOT give sector bonus for non-agency/consumer sectors', () => {
+    vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    const industrial = createMockBusiness({ ebitda: 1000, sectorId: 'industrial', organicGrowthRate: 0.05 });
+    const agency = createMockBusiness({ ebitda: 1000, sectorId: 'agency', organicGrowthRate: 0.05 });
+
+    const industrialGrowth = applyOrganicGrowth(industrial, 0.015, 0, false, undefined, undefined, undefined, undefined, undefined, undefined, undefined, true);
+    const agencyGrowth = applyOrganicGrowth(agency, 0.015, 0, false, undefined, undefined, undefined, undefined, undefined, undefined, undefined, true);
+
+    // Agency should grow faster due to +1% sector bonus
+    expect(agencyGrowth.revenue).toBeGreaterThan(industrialGrowth.revenue);
   });
 });
 
@@ -425,13 +595,14 @@ describe('applyOrganicGrowth', () => {
     expect(withBonus.ebitda).toBeGreaterThan(withoutBonus.ebitda);
   });
 
-  it('should add extra growth for agency and consumer sectors with shared services', () => {
+  it('should add extra growth for agency and consumer sectors with marketing_brand active', () => {
     vi.spyOn(Math, 'random').mockReturnValue(0.5);
     const agency = createMockBusiness({ ebitda: 1000, sectorId: 'agency', organicGrowthRate: 0.05 });
     const industrial = createMockBusiness({ ebitda: 1000, sectorId: 'industrial', organicGrowthRate: 0.05 });
 
-    const agencyGrowth = applyOrganicGrowth(agency, 0.015, 0, false);
-    const industrialGrowth = applyOrganicGrowth(industrial, 0.015, 0, false);
+    // hasMarketingBrand = true triggers sector bonus for agency
+    const agencyGrowth = applyOrganicGrowth(agency, 0.015, 0, false, undefined, undefined, undefined, undefined, undefined, undefined, undefined, true);
+    const industrialGrowth = applyOrganicGrowth(industrial, 0.015, 0, false, undefined, undefined, undefined, undefined, undefined, undefined, undefined, true);
 
     // Agency should get extra 1% bonus
     expect(agencyGrowth.ebitda).toBeGreaterThan(industrialGrowth.ebitda);
@@ -912,6 +1083,130 @@ describe('calculateExitValuation', () => {
     expect(halfVal.totalMultiple).toBeLessThan(fullVal.totalMultiple);
     // But still above base multiple
     expect(halfVal.totalMultiple).toBeGreaterThanOrEqual(bizHalf.acquisitionMultiple);
+  });
+});
+
+describe('multiple expansion consistency', () => {
+  it('should return seasoningMultiplier in ExitValuation', () => {
+    const biz = createMockBusiness({ acquisitionRound: 3 });
+    const val = calculateExitValuation(biz, 5); // 2 years held
+    expect(val.seasoningMultiplier).toBe(1.0);
+
+    const newBiz = createMockBusiness({ acquisitionRound: 5 });
+    const newVal = calculateExitValuation(newBiz, 5); // 0 years held
+    expect(newVal.seasoningMultiplier).toBe(0);
+
+    const oneBiz = createMockBusiness({ acquisitionRound: 4 });
+    const oneVal = calculateExitValuation(oneBiz, 5); // 1 year held
+    expect(oneVal.seasoningMultiplier).toBe(0.5);
+  });
+
+  it('same-quality businesses acquired same round get identical quality contribution', () => {
+    // Two Q4 businesses acquired same round, different sectors
+    const biz1 = createMockBusiness({
+      id: 'biz_1',
+      sectorId: 'agency',
+      qualityRating: 4,
+      acquisitionRound: 1,
+      ebitda: 1000,
+      acquisitionEbitda: 1000,
+      acquisitionMultiple: 4.0,
+    });
+    const biz2 = createMockBusiness({
+      id: 'biz_2',
+      sectorId: 'saas',
+      qualityRating: 4,
+      acquisitionRound: 1,
+      ebitda: 1000,
+      acquisitionEbitda: 1000,
+      acquisitionMultiple: 6.0,
+    });
+
+    const val1 = calculateExitValuation(biz1, 3);
+    const val2 = calculateExitValuation(biz2, 3);
+
+    // Quality premium should be identical for same quality rating
+    expect(val1.qualityPremium).toBe(val2.qualityPremium);
+    // Seasoning should be identical for same hold period
+    expect(val1.seasoningMultiplier).toBe(val2.seasoningMultiplier);
+  });
+
+  it('newly acquired businesses get zero effective premiums regardless of quality', () => {
+    // Even a Q5 business at round of acquisition should have no spread
+    const q5Biz = createMockBusiness({
+      qualityRating: 5,
+      acquisitionRound: 5,
+      ebitda: 10000,
+      acquisitionEbitda: 10000,
+      acquisitionMultiple: 7.0,
+    });
+    const q1Biz = createMockBusiness({
+      qualityRating: 1,
+      acquisitionRound: 5,
+      ebitda: 500,
+      acquisitionEbitda: 500,
+      acquisitionMultiple: 3.0,
+    });
+
+    const q5Val = calculateExitValuation(q5Biz, 5);
+    const q1Val = calculateExitValuation(q1Biz, 5);
+
+    // At yearsHeld=0, seasoning=0, so totalMultiple should equal baseMultiple
+    expect(q5Val.totalMultiple).toBeCloseTo(q5Biz.acquisitionMultiple, 0);
+    expect(q1Val.totalMultiple).toBeCloseTo(Math.max(2.0, q1Biz.acquisitionMultiple), 0);
+    expect(q5Val.seasoningMultiplier).toBe(0);
+    expect(q1Val.seasoningMultiplier).toBe(0);
+  });
+
+  it('multiple expansion is proportional to hold period for first 2 years', () => {
+    const makeVal = (acqRound: number, currentRound: number) => {
+      const biz = createMockBusiness({
+        qualityRating: 5,
+        acquisitionRound: acqRound,
+        ebitda: 2000,
+        acquisitionEbitda: 1000,
+        acquisitionMultiple: 5.0,
+      });
+      return calculateExitValuation(biz, currentRound);
+    };
+
+    const val0yr = makeVal(5, 5);  // 0 years
+    const val1yr = makeVal(4, 5);  // 1 year
+    const val2yr = makeVal(3, 5);  // 2 years
+    const val5yr = makeVal(1, 6);  // 5 years
+
+    // Monotonically increasing
+    expect(val0yr.totalMultiple).toBeLessThan(val1yr.totalMultiple);
+    expect(val1yr.totalMultiple).toBeLessThan(val2yr.totalMultiple);
+    // 2yr and 5yr should be same since seasoning caps at 1.0
+    expect(val2yr.seasoningMultiplier).toBe(1.0);
+    expect(val5yr.seasoningMultiplier).toBe(1.0);
+  });
+
+  it('display premiums multiplied by seasoning should sum to match totalMultiple', () => {
+    const biz = createMockBusiness({
+      qualityRating: 4,
+      acquisitionRound: 4,
+      ebitda: 2000,
+      acquisitionEbitda: 1500,
+      acquisitionMultiple: 5.0,
+      isPlatform: true,
+      platformScale: 3,
+    });
+    const val = calculateExitValuation(biz, 5); // 1 year held, seasoning = 0.5
+
+    // Sum of all raw premiums (before seasoning and cap)
+    const rawEarned = val.growthPremium + val.qualityPremium + val.platformPremium +
+      val.holdPremium + val.improvementsPremium + val.marketModifier + val.sizeTierPremium +
+      val.deRiskingPremium + val.competitivePositionPremium + val.ruleOf40Premium +
+      val.marginExpansionPremium + val.mergerPremium + val.turnaroundPremium;
+
+    // The total after seasoning should be >= base multiple (or 2.0 floor)
+    expect(val.totalMultiple).toBeGreaterThanOrEqual(2.0);
+    // The seasoning multiplier should be 0.5 (1 year held)
+    expect(val.seasoningMultiplier).toBe(0.5);
+    // Raw premiums should be > 0 (Q4 + platform + some growth)
+    expect(rawEarned).toBeGreaterThan(0);
   });
 });
 

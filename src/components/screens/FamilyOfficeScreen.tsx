@@ -60,7 +60,7 @@ export function FamilyOfficeScreen({ onComplete, isTestMode }: FamilyOfficeScree
             <span className="font-mono">{formatMoney(ls.foStartingCash)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-text-muted">Ending FEV</span>
+            <span className="text-text-muted">Ending FEV <span className="text-[10px]">(Founder Equity Value)</span></span>
             <span className="font-mono">{formatMoney(ls.foFEV)}</span>
           </div>
           <div className="border-t border-white/10 pt-2 flex justify-between text-sm font-bold">

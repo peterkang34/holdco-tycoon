@@ -1282,7 +1282,7 @@ describe('Display Proofreader', () => {
     });
 
     it('sharedServices tier 2 effects mention acquisition capacity 4', () => {
-      expect(MA_SOURCING_CONFIG[2].effects).toContain('Acquisition capacity: 4/year (was 3)');
+      expect(MA_SOURCING_CONFIG[2].effects).toContain('Acquisition capacity: 4/year (was 2)');
     });
 
     it('UserManual mentions baseline 2 acquisitions per year', () => {

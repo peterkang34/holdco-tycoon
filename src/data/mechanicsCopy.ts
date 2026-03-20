@@ -84,6 +84,31 @@ export const COMPLEXITY_COST_LABELS = {
   tip: 'As your portfolio grows past the complexity threshold, coordination costs mount. Each active shared service offsets ~33% of the cost. Maximum compression: 4ppt of total revenue.',
 } as const;
 
+// ── Founder Equity Value (FEV) ──
+
+export const FEV_LABELS = {
+  fullName: 'Founder Equity Value',
+  abbreviation: 'FEV',
+  definition:
+    'Founder Equity Value (FEV) is the dollar value of YOUR personal stake in the holdco. ' +
+    'It represents what you would receive if the company were sold today.',
+  formula: 'FEV = Enterprise Value × Your Ownership %',
+  formulaDetail:
+    'Enterprise Value = (Portfolio EBITDA × Blended Exit Multiple) + Cash − All Debt − Rollover Claims',
+  whyItMatters:
+    'FEV is the primary ranking metric because it captures both value creation AND capital structure decisions. ' +
+    'Growing EV is not enough — diluting your ownership through excessive equity raises reduces FEV. ' +
+    'The best operators grow EV while protecting or increasing their ownership stake.',
+  adjustedExplainer:
+    'Adjusted FEV applies modifiers for fair cross-mode comparison: ' +
+    'difficulty multiplier (Hard 1.35×, Easy 0.90×), restructuring penalty (−20%), ' +
+    'and Family Office bonus (up to 1.5×).',
+  scoreLabel: 'Value Creation (FEV / Capital)',
+  scoreExplainer:
+    'Measures how many times you multiplied your initial capital raise into FEV. ' +
+    'Target: 10× for a 20-year game, 5× for a 10-year game.',
+} as const;
+
 // ── PE Fund Manager Mode ──
 
 export const PE_FUND_LABELS = {
@@ -180,4 +205,6 @@ export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   { pattern: /flat.*\+0\.25x.*exit.*premium/i, reason: 'Turnaround exit premium is now +0.15x per tier (scaling), not flat +0.25x. Changed in v38.' },
   { pattern: /failure.*damage.*3.6%|3.6%.*failure.*damage/i, reason: 'Turnaround failure damage increased to 8-15% in v38.' },
   { pattern: /T2.*\$?450K|T3.*\$?700K/i, reason: 'Turnaround tier annual costs reduced: T2=$300K, T3=$500K. Changed in v38.', allow: ['changelog.ts'] },
+  { pattern: /Focus deals last 3 rounds/i, reason: 'Changed to "Sourced deals last 3 rounds" — freshness bonus applies to M&A infrastructure sourced deals, not M&A focus deals.' },
+  { pattern: /\+2 focus-sector deals per round/i, reason: 'Changed to "+2 sourced deals per round in focus sector" for clarity — these are M&A infrastructure bonus deals.' },
 ];

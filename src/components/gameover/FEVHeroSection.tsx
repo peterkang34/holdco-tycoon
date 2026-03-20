@@ -3,8 +3,9 @@ import { formatMoney, formatMultiple } from '../../engine/types';
 import type { GameDifficulty, GameDuration } from '../../engine/types';
 import { useGameStore } from '../../hooks/useGame';
 import { calculatePublicCompanyBonus } from '../../engine/ipo';
-import { EV_WATERFALL_LABELS } from '../../data/mechanicsCopy';
+import { EV_WATERFALL_LABELS, FEV_LABELS } from '../../data/mechanicsCopy';
 import { ARCHETYPE_DISPLAY_NAMES } from '../../data/archetypeNames';
+import { Tooltip } from '../ui/Tooltip';
 
 interface FamilyOfficeLegacy {
   grade: string;
@@ -89,7 +90,16 @@ export function FEVHeroSection({
       <div className={`card mb-4 bg-gradient-to-r ${hasRestructured ? 'from-red-900/20 to-orange-900/20 border-red-500/30' : foMultiplier > 1.0 ? 'from-amber-500/10 to-yellow-500/10 border-amber-500/30' : 'from-accent/20 to-accent-secondary/20 border-accent/30'}`}>
         <div className="text-center">
           <p className="text-text-muted text-sm mb-1">
-            Founder Equity Value
+            <Tooltip
+              trigger={<span className="underline decoration-dotted decoration-text-muted/50 cursor-help">{FEV_LABELS.fullName} (FEV)</span>}
+              align="left"
+              width="w-72 sm:w-80"
+            >
+              <p className="font-bold text-text-primary mb-1.5">{FEV_LABELS.fullName}</p>
+              <p className="mb-1.5">{FEV_LABELS.definition}</p>
+              <p className="font-mono text-[11px] bg-white/5 rounded px-2 py-1 mb-1.5">{FEV_LABELS.formula}</p>
+              <p className="text-text-muted">{FEV_LABELS.whyItMatters}</p>
+            </Tooltip>
             {hasRestructured && (
               <span className="ml-2 text-[10px] px-1.5 py-0.5 rounded bg-red-900/30 border border-red-500/50 text-red-400" title="Your FEV has been reduced by 20% due to financial restructuring.">
                 -20% Restructuring
@@ -137,7 +147,7 @@ export function FEVHeroSection({
         aria-expanded={showBreakdown}
       >
         <span className={`transition-transform ${showBreakdown ? 'rotate-90' : ''}`}>▶</span>
-        {showBreakdown ? 'Hide' : 'Show'} FEV Breakdown
+        {showBreakdown ? 'Hide' : 'Show'} FEV / EV Breakdown
       </button>
 
       {showBreakdown && (
@@ -182,7 +192,7 @@ export function FEVHeroSection({
               <span className="font-mono"></span>
             </div>
             <div className="flex justify-between text-sm font-bold text-accent">
-              <span>= Raw FEV</span>
+              <span>= Raw FEV <span className="font-normal text-text-muted text-xs">(Founder Equity Value)</span></span>
               <span className="font-mono">{formatMoney(founderEquityValue)}</span>
             </div>
             <div className="flex justify-between text-sm">

@@ -567,22 +567,55 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   }, [issueEquity, founderShares, sharesOutstanding, addToast]);
 
   const handleBuyback = useCallback((amount: number) => {
+    const prevShares = sharesOutstanding;
     buybackShares(amount);
-    addToast({
-      message: `Repurchased shares for ${formatMoney(amount)}`,
-      detail: 'Ownership increased',
-      type: 'success',
-    });
-  }, [buybackShares, addToast]);
+    // Check if buyback actually succeeded (sharesOutstanding would decrease)
+    const newState = useGameStore.getState();
+    const newShares = newState.sharesOutstanding;
+    if (newShares === prevShares) {
+      // Diagnose rejection reason
+      const freshMetrics = calculateMetrics(newState);
+      let detail: string;
+      if (freshMetrics.intrinsicValuePerShare <= 0) {
+        detail = 'Portfolio equity is negative — pay down debt first';
+      } else if (newState.sharesOutstanding <= newState.founderShares) {
+        detail = 'No outside shares available to buy back';
+      } else {
+        detail = 'Buyback could not be completed at this time';
+      }
+      addToast({
+        message: 'Buyback blocked',
+        detail,
+        type: 'warning',
+      });
+    } else {
+      const newOwnership = founderShares / newShares;
+      addToast({
+        message: `Repurchased shares for ${formatMoney(amount)}`,
+        detail: `Ownership: ${(newOwnership * 100).toFixed(1)}%`,
+        type: 'success',
+      });
+    }
+  }, [buybackShares, founderShares, sharesOutstanding, addToast]);
 
   const handleDistribute = useCallback((amount: number) => {
+    const prevCash = cash;
     distributeToOwners(amount);
-    addToast({
-      message: `Distributed ${formatMoney(amount)}`,
-      detail: 'Cash returned to shareholders',
-      type: 'success',
-    });
-  }, [distributeToOwners, addToast]);
+    const newCash = useGameStore.getState().cash;
+    if (newCash === prevCash) {
+      addToast({
+        message: 'Distribution blocked',
+        detail: 'Cannot distribute at this time — check debt covenants',
+        type: 'warning',
+      });
+    } else {
+      addToast({
+        message: `Distributed ${formatMoney(amount)}`,
+        detail: 'Cash returned to shareholders',
+        type: 'success',
+      });
+    }
+  }, [distributeToOwners, cash, addToast]);
 
   const handleSell = useCallback((businessId: string) => {
     const biz = businesses.find(b => b.id === businessId);

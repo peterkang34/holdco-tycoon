@@ -16,7 +16,7 @@ export const HOLDCO_GRADE_TIPS: GradeTip[] = [
     label: 'Value Creation',
     max: 20,
     tipThreshold: 14,
-    tip: 'Grow your FEV/capital ratio toward 5x (Quick) or 10x (Full Game). Compound through quality acquisitions and margin expansion rather than hoarding cash.',
+    tip: 'Grow your Founder Equity Value (FEV) relative to initial capital toward 5x (Quick) or 10x (Full Game). Compound through quality acquisitions and margin expansion rather than hoarding cash.',
   },
   {
     dimension: 'fcfShareGrowth',

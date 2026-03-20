@@ -830,6 +830,7 @@ export interface ExitValuation {
   marginExpansionPremium: number;
   buyerPoolTier: BuyerPoolTier;
   totalMultiple: number;
+  seasoningMultiplier: number; // 0-1: ramps from 0% to 100% over 2 years of ownership
   exitPrice: number;
   netProceeds: number; // after debt payoff
   ebitdaGrowth: number;

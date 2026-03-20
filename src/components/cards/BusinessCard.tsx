@@ -371,7 +371,7 @@ export const BusinessCard = memo(function BusinessCard({
               }
               width="w-56"
             >
-              <p className="text-sm text-text-secondary font-normal">The gap between your entry and current exit multiple. Growing this spread through operations, scale, and time is the core of value creation.</p>
+              <p className="text-sm text-text-secondary font-normal">The gap between your entry and current exit multiple. Growing this spread through operations, scale, and time is the core of value creation. Premiums ramp up over the first 2 years as you prove the business under your ownership.</p>
             </Tooltip>
             <Tooltip
               trigger={
@@ -499,7 +499,12 @@ export const BusinessCard = memo(function BusinessCard({
               </span>
             </div>
 
-            {showValuation && (
+            {showValuation && (() => {
+              const s = exitValuation.seasoningMultiplier;
+              // Helper to display a premium row with seasoning applied
+              const seasonedVal = (raw: number) => raw * s;
+              const fmtPremium = (val: number) => `${val >= 0 ? '+' : ''}${val.toFixed(1)}x`;
+              return (
               <div className="mt-3 pt-3 border-t border-white/10 space-y-1.5">
                 <p className="text-text-muted font-medium mb-2">Multiple Build-Up:</p>
                 <div className="flex justify-between">
@@ -512,7 +517,7 @@ export const BusinessCard = memo(function BusinessCard({
                       EBITDA Growth ({exitValuation.ebitdaGrowth >= 0 ? '+' : ''}{(exitValuation.ebitdaGrowth * 100).toFixed(0)}%)
                     </span>
                     <span className={`font-mono ${exitValuation.growthPremium >= 0 ? 'text-accent' : 'text-danger'}`}>
-                      {exitValuation.growthPremium >= 0 ? '+' : ''}{exitValuation.growthPremium.toFixed(1)}x
+                      {fmtPremium(seasonedVal(exitValuation.growthPremium))}
                     </span>
                   </div>
                 )}
@@ -522,7 +527,7 @@ export const BusinessCard = memo(function BusinessCard({
                       Quality Rating ({business.qualityRating}/5)
                     </span>
                     <span className={`font-mono ${exitValuation.qualityPremium >= 0 ? 'text-accent' : 'text-danger'}`}>
-                      {exitValuation.qualityPremium >= 0 ? '+' : ''}{exitValuation.qualityPremium.toFixed(1)}x
+                      {fmtPremium(seasonedVal(exitValuation.qualityPremium))}
                     </span>
                   </div>
                 )}
@@ -535,43 +540,75 @@ export const BusinessCard = memo(function BusinessCard({
                        exitValuation.buyerPoolTier === 'institutional_pe' ? 'Institutional PE Buyers' :
                        'Large PE Buyers'}
                     </span>
-                    <span className="font-mono">+{exitValuation.sizeTierPremium.toFixed(1)}x</span>
+                    <span className="font-mono">{fmtPremium(seasonedVal(exitValuation.sizeTierPremium))}</span>
                   </div>
                 )}
                 {exitValuation.deRiskingPremium > 0 && (
                   <div className="flex justify-between text-accent">
                     <span>De-risking Factors</span>
-                    <span className="font-mono">+{exitValuation.deRiskingPremium.toFixed(1)}x</span>
+                    <span className="font-mono">{fmtPremium(seasonedVal(exitValuation.deRiskingPremium))}</span>
                   </div>
                 )}
                 {exitValuation.competitivePositionPremium > 0 && (
                   <div className="flex justify-between text-accent">
                     <span>Competitive Position (Leader)</span>
-                    <span className="font-mono">+{exitValuation.competitivePositionPremium.toFixed(1)}x</span>
+                    <span className="font-mono">{fmtPremium(seasonedVal(exitValuation.competitivePositionPremium))}</span>
                   </div>
                 )}
                 {exitValuation.platformPremium > 0 && (
                   <div className="flex justify-between text-accent">
                     <span>Platform Scale ({platformScale})</span>
-                    <span className="font-mono">+{exitValuation.platformPremium.toFixed(1)}x</span>
+                    <span className="font-mono">{fmtPremium(seasonedVal(exitValuation.platformPremium))}</span>
                   </div>
                 )}
                 {exitValuation.holdPremium > 0 && (
                   <div className="flex justify-between text-accent">
                     <span>Hold Period ({exitValuation.yearsHeld}y)</span>
-                    <span className="font-mono">+{exitValuation.holdPremium.toFixed(1)}x</span>
+                    <span className="font-mono">{fmtPremium(seasonedVal(exitValuation.holdPremium))}</span>
                   </div>
                 )}
                 {exitValuation.improvementsPremium > 0 && (
                   <div className="flex justify-between text-accent">
                     <span>Improvements ({business.improvements.length})</span>
-                    <span className="font-mono">+{exitValuation.improvementsPremium.toFixed(1)}x</span>
+                    <span className="font-mono">{fmtPremium(seasonedVal(exitValuation.improvementsPremium))}</span>
+                  </div>
+                )}
+                {exitValuation.ruleOf40Premium !== 0 && (
+                  <div className="flex justify-between">
+                    <span className={exitValuation.ruleOf40Premium >= 0 ? 'text-accent' : 'text-danger'}>
+                      Rule of 40
+                    </span>
+                    <span className={`font-mono ${exitValuation.ruleOf40Premium >= 0 ? 'text-accent' : 'text-danger'}`}>
+                      {fmtPremium(seasonedVal(exitValuation.ruleOf40Premium))}
+                    </span>
+                  </div>
+                )}
+                {exitValuation.marginExpansionPremium !== 0 && (
+                  <div className="flex justify-between">
+                    <span className={exitValuation.marginExpansionPremium >= 0 ? 'text-accent' : 'text-danger'}>
+                      Margin {exitValuation.marginExpansionPremium >= 0 ? 'Expansion' : 'Compression'}
+                    </span>
+                    <span className={`font-mono ${exitValuation.marginExpansionPremium >= 0 ? 'text-accent' : 'text-danger'}`}>
+                      {fmtPremium(seasonedVal(exitValuation.marginExpansionPremium))}
+                    </span>
+                  </div>
+                )}
+                {exitValuation.mergerPremium > 0 && (
+                  <div className="flex justify-between text-accent">
+                    <span>Merger Premium</span>
+                    <span className="font-mono">{fmtPremium(seasonedVal(exitValuation.mergerPremium))}</span>
+                  </div>
+                )}
+                {exitValuation.turnaroundPremium > 0 && (
+                  <div className="flex justify-between text-amber-400">
+                    <span>Turnaround Premium</span>
+                    <span className="font-mono">{fmtPremium(seasonedVal(exitValuation.turnaroundPremium))}</span>
                   </div>
                 )}
                 {exitValuation.integratedPlatformPremium > 0 && (
                   <div className="flex justify-between">
                     <span className="text-purple-400">Integrated Platform</span>
-                    <span className="font-mono text-purple-400">+{exitValuation.integratedPlatformPremium.toFixed(1)}x</span>
+                    <span className="font-mono text-purple-400">{fmtPremium(seasonedVal(exitValuation.integratedPlatformPremium))}</span>
                   </div>
                 )}
                 {exitValuation.marketModifier !== 0 && (
@@ -580,9 +617,22 @@ export const BusinessCard = memo(function BusinessCard({
                       Market Conditions
                     </span>
                     <span className={`font-mono ${exitValuation.marketModifier >= 0 ? 'text-accent' : 'text-danger'}`}>
-                      {exitValuation.marketModifier >= 0 ? '+' : ''}{exitValuation.marketModifier.toFixed(1)}x
+                      {fmtPremium(seasonedVal(exitValuation.marketModifier))}
                     </span>
                   </div>
+                )}
+                {s < 1.0 && (
+                  <Tooltip
+                    trigger={
+                      <div className="flex justify-between text-yellow-500/80 text-[10px] py-0.5">
+                        <span>Seasoning ({Math.round(s * 100)}% of full premiums)</span>
+                        <span className="font-mono">{exitValuation.yearsHeld < 1 ? 'New acquisition' : '1yr held'}</span>
+                      </div>
+                    }
+                    width="w-56"
+                  >
+                    <p className="text-sm text-text-secondary font-normal">Buyers discount recently acquired businesses. Premiums ramp from 0% to 100% over the first 2 years of ownership as you prove the business under your management.</p>
+                  </Tooltip>
                 )}
                 <div className="flex justify-between pt-2 border-t border-white/10 font-bold">
                   <span>Exit Multiple</span>
@@ -614,7 +664,8 @@ export const BusinessCard = memo(function BusinessCard({
                   </p>
                 )}
               </div>
-            )}
+              );
+            })()}
           </div>
 
           {(onSell || onImprove || onDesignatePlatform || onStartTurnaround) && (

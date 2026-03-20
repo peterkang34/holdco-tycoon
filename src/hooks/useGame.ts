@@ -1336,6 +1336,7 @@ export const useGameStore = create<GameStore>()(
             state.maxRounds,
             roundStreams.simulation,
             state.duration,
+            sharedBenefits.hasMarketingBrand,
           );
         });
 
@@ -3364,9 +3365,10 @@ export const useGameStore = create<GameStore>()(
         // Parse dilution from choice label
         const dilutionMatch = event.choices?.[0]?.label.match(/(\d+)/);
         const dilution = dilutionMatch ? parseInt(dilutionMatch[1]) : 25;
+        const newTotalShares = state.sharesOutstanding + dilution;
         const grantState = {
           ...state,
-          sharesOutstanding: state.sharesOutstanding + dilution,
+          sharesOutstanding: newTotalShares,
           businesses: state.businesses.map(b => {
             if (b.id !== event.affectedBusinessId) return b;
             const newMargin = clampMargin(b.ebitdaMargin + 0.01);
@@ -3381,6 +3383,14 @@ export const useGameStore = create<GameStore>()(
           }),
           currentEvent: null,
         };
+        // Sync IPO state if public — keep ipoState.sharesOutstanding consistent
+        if (grantState.ipoState?.isPublic) {
+          grantState.ipoState = {
+            ...grantState.ipoState,
+            sharesOutstanding: newTotalShares,
+          };
+          grantState.ipoState.stockPrice = calculateStockPrice(grantState);
+        }
         set({
           ...grantState,
           metrics: calculateMetrics(grantState),

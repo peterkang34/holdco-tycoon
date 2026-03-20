@@ -79,9 +79,9 @@ export const MA_SOURCING_CONFIG: Record<1 | 2 | 3, MASourcingTierConfig> = {
     requiredOpcos: 2,
     description: 'Extra acquisition capacity and dedicated deal sourcing',
     effects: [
-      '+2 focus-sector deals per round',
+      '+2 sourced deals per round in focus sector',
       'Source Deals costs $300k (was $500k)',
-      'Focus deals last 3 rounds (was 2)',
+      'Sourced deals last 3 rounds (was 2)',
       'Acquisition capacity: 3/year (was 2)',
     ],
   },
@@ -92,10 +92,14 @@ export const MA_SOURCING_CONFIG: Record<1 | 2 | 3, MASourcingTierConfig> = {
     requiredOpcos: 3,
     description: 'More acquisition capacity and sector-specific deal targeting',
     effects: [
+      '+2 sourced deals per round in focus sector',
       'Sub-type targeting unlocked',
       '1-2 sub-type matched deals per round',
       'Quality floor of 2 on sourced deals',
-      'Acquisition capacity: 4/year (was 3)',
+      'Sourced deals get -1 heat tier (less competition)',
+      'Sourced deals last 3 rounds (was 2)',
+      'Source Deals costs $300k (was $500k)',
+      'Acquisition capacity: 4/year (was 2)',
     ],
   },
   3: {
@@ -105,10 +109,15 @@ export const MA_SOURCING_CONFIG: Record<1 | 2 | 3, MASourcingTierConfig> = {
     requiredOpcos: 4,
     description: 'Off-market deal access, proactive outreach, and max acquisition capacity',
     effects: [
+      '+2 sourced deals per round in focus sector',
       '2 off-market deals per round (15% discount)',
       '2-3 sub-type matched deals per round',
       'Quality floor of 3 on sourced deals',
+      'Sourced deals get -1 heat tier (less competition)',
+      'Sourced deals last 3 rounds (was 2)',
+      'Source Deals costs $300k (was $500k)',
       'Proactive Outreach: $400k for 2 targeted deals',
+      'Acquisition capacity: 4/year (was 2)',
     ],
   },
 };

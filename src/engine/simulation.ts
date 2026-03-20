@@ -109,6 +109,7 @@ import {
   COMPLEXITY_MAX_MARGIN_COMPRESSION,
   COMPLEXITY_COST_EXPONENT,
   COMPLEXITY_COST_EXPONENT_QUICK,
+  PE_FUND_CONFIG,
 } from '../data/gameConfig';
 import { getPlatformMultipleExpansion, getPlatformRecessionModifier } from './platforms';
 import { getTurnaroundExitPremium } from './turnarounds';
@@ -277,6 +278,7 @@ export function calculateExitValuation(
     marginExpansionPremium,
     buyerPoolTier,
     totalMultiple,
+    seasoningMultiplier,
     exitPrice,
     netProceeds,
     ebitdaGrowth,
@@ -529,6 +531,7 @@ export function calculateSharedServicesBenefits(state: GameState): {
   talentRetentionBonus: number;
   talentGainBonus: number;
   marginDefense: number; // ppt offset to margin drift from shared services
+  hasMarketingBrand: boolean; // agency/consumer sector bonus only when marketing_brand is active
 } {
   const activeServices = state.sharedServices.filter(s => s.active);
   const opcoCount = state.businesses.filter(b => b.status === 'active').length;
@@ -569,6 +572,8 @@ export function calculateSharedServicesBenefits(state: GameState): {
     }
   }
 
+  const hasMarketingBrand = activeServices.some(s => s.type === 'marketing_brand');
+
   return {
     capexReduction,
     cashConversionBonus,
@@ -576,6 +581,7 @@ export function calculateSharedServicesBenefits(state: GameState): {
     talentRetentionBonus,
     talentGainBonus,
     marginDefense,
+    hasMarketingBrand,
   };
 }
 
@@ -654,6 +660,7 @@ export function applyOrganicGrowth(
   maxRounds?: number, // 20 or 10 — scales margin drift start
   rng?: SeededRng,
   duration?: GameDuration, // For integration drag decay rate
+  hasMarketingBrand?: boolean, // Sector-specific bonus only when marketing_brand is active
 ): Business {
   const sector = SECTORS[business.sectorId];
 
@@ -671,10 +678,11 @@ export function applyOrganicGrowth(
   // Shared services bonus (revenue portion)
   revenueGrowth += sharedServicesGrowthBonus;
 
-  // Sector-specific shared services bonus
+  // Sector-specific Marketing & Brand bonus — agencies and consumer brands
+  // get an extra +1% growth on top of the base +1.5% (total +2.5% as advertised)
   if (
     (business.sectorId === 'agency' || business.sectorId === 'consumer') &&
-    sharedServicesGrowthBonus > 0
+    hasMarketingBrand
   ) {
     revenueGrowth += 0.01;
   }
@@ -2181,7 +2189,9 @@ export function calculateMetrics(state: GameState): Metrics {
   const maSourcingCost = state.maSourcing?.active
     ? getMASourcingAnnualCost(state.maSourcing.tier)
     : 0;
-  const totalDeductibleCosts = sharedServicesCost + maSourcingCost;
+  // PE Fund management fee (tax-deductible — matches waterfall in useGame.ts)
+  const managementFee = state.isFundManagerMode ? PE_FUND_CONFIG.annualManagementFee : 0;
+  const totalDeductibleCosts = sharedServicesCost + maSourcingCost + managementFee;
 
   // Holdco loan
   const holdcoLoanBalance = state.holdcoLoanBalance ?? 0;
@@ -2267,11 +2277,21 @@ export function calculateMetrics(state: GameState): Metrics {
     }, 0);
   const turnaroundCost = turnaroundTierCost + turnaroundProgramCosts;
 
+  // Portfolio complexity cost (matches waterfall in useGame.ts)
+  const complexityCost = calculateComplexityCost(
+    state.businesses,
+    state.sharedServices,
+    totalRevenue,
+    state.duration,
+    state.integratedPlatforms,
+  );
+
   // Net FCF matching CollectPhase waterfall:
   // totalFcf (EBITDA - CapEx - Tax) - holdco P&I - opco debt service - earnouts
-  // - shared services - MA sourcing - turnaround costs
+  // - shared services - MA sourcing - turnaround costs - complexity cost - management fee
   const netFcf = totalFcf - holdcoLoanPI - opcoSellerNoteService - opcoBankDebtService
-    - earnoutPayments - sharedServicesCost - maSourcingCost - turnaroundCost;
+    - earnoutPayments - sharedServicesCost - maSourcingCost - turnaroundCost
+    - complexityCost.netCost - managementFee;
 
   // Portfolio value (full exit valuation engine — aligns buyback/equity pricing with FEV)
   const portfolioValue = activeBusinesses.reduce((sum, b) => {

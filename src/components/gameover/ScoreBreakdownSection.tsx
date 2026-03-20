@@ -1,4 +1,5 @@
 import { ScoreBar } from './ScoreBar';
+import { FEV_LABELS } from '../../data/mechanicsCopy';
 
 // Grade thresholds (from scoring.ts / gameConfig.ts)
 const HOLDCO_GRADE_THRESHOLDS: Record<string, number> = {
@@ -83,7 +84,7 @@ export function ScoreBreakdownSection({
   const { nextGrade, pointsNeeded, isMax } = getNextGradeInfo(activeScore.total, thresholds);
 
   // Build dimension list with tips
-  const dimensions: Array<{ key: string; label: string; value: number; max: number }> = isFundManagerMode
+  const dimensions: Array<{ key: string; label: string; value: number; max: number; subtitle?: string }> = isFundManagerMode
     ? [
         { key: 'returnGeneration', label: 'Return Generation (Net IRR)', value: (peScore as PEScore).returnGeneration, max: 25 },
         { key: 'capitalEfficiency', label: 'Capital Efficiency (Gross MOIC)', value: (peScore as PEScore).capitalEfficiency, max: 20 },
@@ -93,7 +94,7 @@ export function ScoreBreakdownSection({
         { key: 'lpSatisfaction', label: 'LP Satisfaction', value: (peScore as PEScore).lpSatisfaction, max: 10 },
       ]
     : [
-        { key: 'valueCreation', label: 'Value Creation (FEV / Capital)', value: (score as HoldcoScore).valueCreation, max: 20 },
+        { key: 'valueCreation', label: `Value Creation (${FEV_LABELS.fullName} / Capital)`, value: (score as HoldcoScore).valueCreation, max: 20, subtitle: FEV_LABELS.scoreExplainer },
         { key: 'fcfShareGrowth', label: 'FCF/Share Growth', value: (score as HoldcoScore).fcfShareGrowth, max: 20 },
         { key: 'portfolioRoic', label: 'Portfolio ROIC', value: (score as HoldcoScore).portfolioRoic, max: 15 },
         { key: 'capitalDeployment', label: 'Capital Deployment (MOIC + ROIIC)', value: (score as HoldcoScore).capitalDeployment, max: 15 },
@@ -123,6 +124,7 @@ export function ScoreBreakdownSection({
             value={dim.value}
             max={dim.max}
             tip={showTip ? tipData.tip : undefined}
+            subtitle={dim.subtitle}
           />
         );
       })}

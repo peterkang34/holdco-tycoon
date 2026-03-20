@@ -88,6 +88,7 @@ export function GameOverLeaderboard({
             const displayValue = getDisplayValue(entry, activeTab);
             const isPE = activeTab === 'pe';
             const displayLabel = isPE ? 'Carry' : showWealth ? 'Wealth' : (entry.founderEquityValue ? 'FEV' : 'EV');
+            const displayTitle = isPE ? 'Carried Interest earned' : showWealth ? 'Founder Personal Wealth' : (entry.founderEquityValue ? 'Founder Equity Value — your personal stake in the holdco' : 'Enterprise Value');
             const isYou = !!(currentPlayerId && entry.playerId && currentPlayerId === entry.playerId);
             const isVerified = entry.isVerified || !!entry.playerId;
             return (
@@ -116,7 +117,7 @@ export function GameOverLeaderboard({
                 </div>
                 <div className="flex items-center gap-4 sm:gap-6 text-right shrink-0">
                   <div className="min-w-[4.5rem]">
-                    <p className="text-xs text-text-muted">{displayLabel}</p>
+                    <p className="text-xs text-text-muted" title={displayTitle}>{displayLabel}</p>
                     <p className="font-mono tabular-nums font-bold text-accent">
                       {formatMoney(displayValue)}
                       {!isPE && entry.hasRestructured && <span className="text-red-400 text-[10px] ml-1" title="Restructured — 20% FEV penalty">(R)</span>}

@@ -1353,6 +1353,7 @@ function simulateEndRound(state: GameState, coverage: PlaytestCoverage): GameSta
       state.maxRounds,
       roundStreams.simulation,
       state.duration,
+      sharedBenefits.hasMarketingBrand,
     );
     // Track margin drift
     if (updated.ebitdaMargin !== b.ebitdaMargin) {
