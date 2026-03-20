@@ -13,6 +13,8 @@ declare global {
         element: HTMLElement | string,
         config: {
           videoId: string;
+          width?: string | number;
+          height?: string | number;
           playerVars?: Record<string, string | number>;
           events?: {
             onReady?: (event: { target: YTPlayer }) => void;
@@ -51,17 +53,23 @@ function ensureYTApi(): Promise<void> {
   });
 }
 
+let idCounter = 0;
+
 export function YouTubeEmbed({ videoId, className = '' }: YouTubeEmbedProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
+  const idRef = useRef(`yt-player-${++idCounter}`);
 
   useEffect(() => {
     let cancelled = false;
 
     ensureYTApi().then(() => {
-      if (cancelled || !containerRef.current) return;
-      playerRef.current = new window.YT.Player(containerRef.current, {
+      if (cancelled) return;
+      const el = document.getElementById(idRef.current);
+      if (!el) return;
+      playerRef.current = new window.YT.Player(idRef.current, {
         videoId,
+        width: '100%',
+        height: '100%',
         playerVars: {
           enablejsapi: 1,
           rel: 0,
@@ -91,8 +99,8 @@ export function YouTubeEmbed({ videoId, className = '' }: YouTubeEmbedProps) {
   }, [videoId]);
 
   return (
-    <div className={`relative w-full ${className}`} style={{ paddingBottom: '56.25%' }}>
-      <div ref={containerRef} className="absolute inset-0" />
+    <div className={`relative w-full ${className}`} style={{ aspectRatio: '16/9' }}>
+      <div id={idRef.current} className="absolute inset-0 w-full h-full" />
     </div>
   );
 }
