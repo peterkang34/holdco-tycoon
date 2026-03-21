@@ -2206,10 +2206,11 @@ export function AllocatePhase({
                 <p className="text-sm text-text-muted">Your fund closes this year. Distribute cash now to lock in DPI timing, or leave it for the terminal liquidation.</p>
               </div>
             )}
-            {/* Debt Summary */}
+            {/* Debt Summary — includes integrated (tuck-in) businesses for complete picture */}
             {(() => {
-              const opcoSellerNotes = businesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
-              const opcoBankDebt = businesses.reduce((sum, b) => sum + b.bankDebtBalance, 0);
+              const debtBusinesses = allBusinesses.filter(b => b.status === 'active' || b.status === 'integrated');
+              const opcoSellerNotes = debtBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+              const opcoBankDebt = debtBusinesses.reduce((sum, b) => sum + b.bankDebtBalance, 0);
               const totalAllDebt = holdcoLoanBalance + opcoBankDebt + opcoSellerNotes;
               return (
                 <div className="card bg-white/5">

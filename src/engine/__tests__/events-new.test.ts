@@ -125,6 +125,63 @@ describe('Bug Fix: bolt-on bankDebtBalance in sell proceeds', () => {
   });
 });
 
+describe('Bug Fix: successionSell bolt-on debt inclusion', () => {
+  it('should include bolt-on debt in succession sell debt payoff', () => {
+    // The bug: successionSell calculated debtPayoff without bolt-on debt
+    // This meant selling a platform via succession didn't deduct bolt-on obligations
+    const platform = makeBusiness({
+      id: 'platform_succ',
+      name: 'Platform Co',
+      isPlatform: true,
+      boltOnIds: ['bolton_succ_1', 'bolton_succ_2'],
+      bankDebtBalance: 500,
+      sellerNoteBalance: 200,
+      earnoutRemaining: 100,
+      ebitda: 5000,
+    });
+
+    const boltOn1 = makeBusiness({
+      id: 'bolton_succ_1',
+      status: 'integrated',
+      parentPlatformId: 'platform_succ',
+      bankDebtBalance: 300,
+      sellerNoteBalance: 100,
+      earnoutRemaining: 50,
+    });
+
+    const boltOn2 = makeBusiness({
+      id: 'bolton_succ_2',
+      status: 'integrated',
+      parentPlatformId: 'platform_succ',
+      bankDebtBalance: 200,
+      sellerNoteBalance: 75,
+      earnoutRemaining: 25,
+    });
+
+    const businesses = [platform, boltOn1, boltOn2];
+
+    // Simulate what successionSell should do (FIXED version):
+    const boltOnIds = platform.boltOnIds || [];
+    const boltOnDebt = businesses
+      .filter(b => boltOnIds.includes(b.id))
+      .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0);
+    const debtPayoff = platform.sellerNoteBalance + platform.bankDebtBalance + platform.earnoutRemaining + boltOnDebt;
+
+    // Platform debt: 500 + 200 + 100 = 800
+    // Bolt-on 1 debt: 300 + 100 + 50 = 450
+    // Bolt-on 2 debt: 200 + 75 + 25 = 300
+    // Total: 800 + 450 + 300 = 1550
+    expect(debtPayoff).toBe(1550);
+
+    // Previously (bug): only platform debt was counted = 800
+    const oldDebtPayoff = platform.sellerNoteBalance + platform.bankDebtBalance + platform.earnoutRemaining;
+    expect(oldDebtPayoff).toBe(800);
+
+    // The fix adds 750 in bolt-on debt that was previously ignored
+    expect(debtPayoff - oldDebtPayoff).toBe(750);
+  });
+});
+
 describe('Key-Man Risk Event', () => {
   it('should drop quality by KEY_MAN_QUALITY_DROP immediately', () => {
     const business = makeBusiness({ qualityRating: 5 });

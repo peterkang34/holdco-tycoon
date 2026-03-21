@@ -574,6 +574,10 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
         return sum + b.ebitda * valuation.totalMultiple;
       }, 0);
 
+      // Total debt matching calculateEnterpriseValue: state.totalDebt (holdco + bank) + seller notes
+      const opcoSellerNotesPE = activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+      const totalDebtPE = state.totalDebt + opcoSellerNotesPE;
+
       return (
         <>
           <SectionHeader title="Gross MOIC" formula="(NAV + LP Distributions) ÷ Committed Capital" />
@@ -595,7 +599,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
           <div className="bg-white/5 rounded-lg p-3 space-y-0 mb-4">
             <WaterfallRow label="Portfolio Value" value={Math.round(portfolioValuePE)} />
             <WaterfallRow label="Cash" value={state.cash} />
-            <WaterfallRow label="Total Debt" value={state.totalDebt} isSubtract />
+            <WaterfallRow label="Total Debt" value={totalDebtPE} isSubtract />
             <WaterfallRow label="NAV" value={Math.round(nav)} isTotal />
           </div>
 
@@ -1039,6 +1043,10 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
       return sum + b.ebitda * valuation.totalMultiple;
     }, 0);
 
+    // Total debt matching calculateEnterpriseValue: state.totalDebt (holdco + bank) + seller notes
+    const opcoSellerNotesNav = activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+    const totalDebtNav = state.totalDebt + opcoSellerNotesNav;
+
     return (
       <>
         <SectionHeader title="Fund NAV" formula="Portfolio Value + Cash − Total Debt" />
@@ -1053,7 +1061,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
         <div className="bg-white/5 rounded-lg p-3 space-y-0 mb-4">
           <WaterfallRow label="Portfolio Value" value={Math.round(portfolioValue)} />
           <WaterfallRow label="Cash" value={state.cash} />
-          <WaterfallRow label="Total Debt" value={state.totalDebt} isSubtract />
+          <WaterfallRow label="Total Debt" value={totalDebtNav} isSubtract />
           <WaterfallRow label="NAV" value={Math.round(nav)} isTotal />
         </div>
 

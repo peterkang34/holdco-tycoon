@@ -3957,15 +3957,18 @@ export const useGameStore = create<GameStore>()(
         const valuation = calculateExitValuation(business, state.round, undefined, undefined, state.integratedPlatforms);
         const fairValue = Math.round(business.ebitda * valuation.totalMultiple);
         const sellPrice = Math.round(fairValue * (1 - SUCCESSION_SELL_DISCOUNT));
-        // Pay off all business debt
-        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining;
+        // Remove business (and handle bolt-ons if platform)
+        const boltOnIds = business.boltOnIds || [];
+        // Include bolt-on debt + earn-out obligations in total debt payoff
+        const boltOnDebt = state.businesses
+          .filter(b => boltOnIds.includes(b.id))
+          .reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance + b.earnoutRemaining, 0);
+        const debtPayoff = business.sellerNoteBalance + business.bankDebtBalance + business.earnoutRemaining + boltOnDebt;
         const netProceeds = Math.max(0, sellPrice - debtPayoff);
         // Apply rollover equity split if applicable
         const playerProceeds = business.rolloverEquityPct > 0
           ? Math.round(netProceeds * (1 - business.rolloverEquityPct))
           : netProceeds;
-        // Remove business (and handle bolt-ons if platform)
-        const boltOnIds = business.boltOnIds || [];
         const removedIds = new Set([business.id, ...boltOnIds]);
         let updatedBusinessesSucc = state.businesses.filter(b => !removedIds.has(b.id));
 

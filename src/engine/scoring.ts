@@ -970,7 +970,9 @@ export function calculatePEFundScore(state: GameState): PEScoreBreakdown {
   // Portfolio-level net debt / EBITDA
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
   const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
-  const totalDebt = state.totalDebt + activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance + b.bankDebtBalance, 0);
+  // state.totalDebt already includes holdco loan + per-business bank debt — only add seller notes
+  const allDebtBusinesses = state.businesses.filter(b => b.status === 'active' || b.status === 'integrated');
+  const totalDebt = state.totalDebt + allDebtBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
   const netDebt = totalDebt - state.cash;
   const netDebtToEbitda = totalEbitda > 0
     ? netDebt / totalEbitda

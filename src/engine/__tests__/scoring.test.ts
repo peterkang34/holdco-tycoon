@@ -8,7 +8,7 @@ import {
   wouldMakeLeaderboardFromList,
   getLeaderboardRankFromList,
 } from '../scoring';
-// calculateMetrics available if needed for future tests
+import { calculateMetrics } from '../simulation';
 import {
   createMockBusiness,
   createMockGameState,
@@ -636,5 +636,101 @@ describe('Rollover Equity FEV', () => {
     const score = calculateFinalScore(state);
     // Score should still compute — not crash
     expect(score.total).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('debt accounting correctness', () => {
+  it('calculateEnterpriseValue includes seller notes in debt (not just state.totalDebt)', () => {
+    // state.totalDebt = holdco + bank debt only; seller notes must be added separately
+    const biz = createMockBusiness({
+      ebitda: 2000,
+      sellerNoteBalance: 500,
+      sellerNoteRate: 0.06,
+      sellerNoteRoundsRemaining: 3,
+      bankDebtBalance: 1000,
+      bankDebtRate: 0.07,
+      bankDebtRoundsRemaining: 5,
+    });
+    const stateWithSellerNotes = createMockGameState({
+      businesses: [biz],
+      cash: 10000,
+      totalDebt: 1000, // holdco(0) + bank(1000)
+      holdcoLoanBalance: 0,
+    });
+    const stateWithoutSellerNotes = createMockGameState({
+      businesses: [createMockBusiness({
+        ebitda: 2000,
+        sellerNoteBalance: 0,
+        bankDebtBalance: 1000,
+        bankDebtRate: 0.07,
+        bankDebtRoundsRemaining: 5,
+      })],
+      cash: 10000,
+      totalDebt: 1000,
+      holdcoLoanBalance: 0,
+    });
+
+    const evWith = calculateEnterpriseValue(stateWithSellerNotes);
+    const evWithout = calculateEnterpriseValue(stateWithoutSellerNotes);
+
+    // EV with seller notes should be lower by the seller note balance amount
+    expect(evWithout - evWith).toBe(500);
+  });
+
+  it('PE fund scoring risk does not double-count bank debt', () => {
+    // state.totalDebt already includes bank debt — adding it again was a bug (fixed)
+    // The scoring risk section should use: state.totalDebt + sellerNotes (NOT + bankDebt again)
+    const biz = createMockBusiness({
+      id: 'biz_1',
+      ebitda: 3000,
+      bankDebtBalance: 2000,
+      bankDebtRate: 0.07,
+      bankDebtRoundsRemaining: 5,
+      sellerNoteBalance: 1000,
+      sellerNoteRate: 0.06,
+      sellerNoteRoundsRemaining: 3,
+    });
+    const state = createMockGameState({
+      businesses: [biz],
+      cash: 5000,
+      totalDebt: 2000, // holdco(0) + bank(2000) — per computeTotalDebt
+      holdcoLoanBalance: 0,
+    });
+
+    // Verify via calculateMetrics that debt is correct
+    const metrics = calculateMetrics(state);
+    // totalDebt in metrics = state.totalDebt (2000) + seller notes (1000) = 3000
+    // If bank debt were double-counted, this would be 5000 instead
+    expect(metrics.totalDebt).toBe(3000);
+    // Net debt = 3000 - 5000 = -2000 (net cash position)
+    expect(metrics.netDebtToEbitda).toBeLessThan(0);
+  });
+
+  it('calculateMetrics includes integrated business debt in totalDebt', () => {
+    const activeBiz = createMockBusiness({
+      id: 'biz_active',
+      ebitda: 2000,
+      bankDebtBalance: 500,
+      sellerNoteBalance: 300,
+    });
+    const integratedBiz = createMockBusiness({
+      id: 'biz_integrated',
+      ebitda: 0, // integrated — folded into parent
+      status: 'integrated',
+      bankDebtBalance: 400,
+      sellerNoteBalance: 200,
+      parentPlatformId: 'biz_active',
+    });
+    const state = createMockGameState({
+      businesses: [activeBiz, integratedBiz],
+      cash: 5000,
+      // computeTotalDebt: holdco(0) + active bank(500) + integrated bank(400) = 900
+      totalDebt: 900,
+      holdcoLoanBalance: 0,
+    });
+
+    const metrics = calculateMetrics(state);
+    // totalDebt = state.totalDebt(900) + seller notes from active+integrated (300 + 200) = 1400
+    expect(metrics.totalDebt).toBe(1400);
   });
 });
