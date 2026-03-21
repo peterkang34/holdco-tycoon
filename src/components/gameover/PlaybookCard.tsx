@@ -21,7 +21,7 @@ export function PlaybookCard({ playbook, isLoggedIn, onView, onSignUp }: Playboo
   const heroValue = thesis.isFundManager ? thesis.carryEarned ?? 0 : thesis.fev;
   const heroLabel = thesis.isFundManager ? 'Carry Earned' : 'FEV';
   const isBankrupt = thesis.isBankrupt;
-  const title = isBankrupt ? 'Post-Mortem' : thesis.isFundManager ? "GP's Playbook" : "Operator's Playbook";
+  const title = isBankrupt ? 'Post-Mortem' : thesis.isFundManager ? 'Fund Strategy Debrief' : 'Strategy Debrief';
 
   return (
     <div className="bg-white/[0.04] border border-white/10 rounded-xl p-5 sm:p-6">

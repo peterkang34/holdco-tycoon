@@ -41,7 +41,7 @@ interface FEVHeroSectionProps {
   cash: number;
   totalDebt: number;
   initialOwnershipPct: number;
-  /** When provided, renders a side-by-side "FEV Breakdown / Operator's Playbook" CTA pair */
+  /** When provided, renders a side-by-side "FEV Breakdown / Strategy Debrief" CTA pair */
   onViewPlaybook?: () => void;
   hasPlaybook?: boolean;
 }
@@ -165,7 +165,7 @@ export function FEVHeroSection({
             className="min-h-[48px] text-sm bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 transition-colors rounded-lg flex items-center justify-center gap-1.5"
           >
             <span className="text-xs">📋</span>
-            Operator's Playbook
+            Strategy Debrief
           </button>
         </div>
       ) : (

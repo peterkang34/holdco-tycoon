@@ -25,8 +25,8 @@ export function OperatorPlaybook({ isOpen, onClose, playbook }: OperatorPlaybook
   const title = isBankrupt
     ? `${thesis.holdcoName} — Post-Mortem`
     : isPE
-      ? `${thesis.fundName ?? thesis.holdcoName} — GP's Playbook`
-      : `${thesis.holdcoName} — Operator's Playbook`;
+      ? `${thesis.fundName ?? thesis.holdcoName} — Fund Strategy Debrief`
+      : `${thesis.holdcoName} — Strategy Debrief`;
 
   const subtitle = getArchetypeDisplayName(thesis.archetype);
 

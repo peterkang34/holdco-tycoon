@@ -177,7 +177,7 @@ export function StrategyLibraryModal() {
         ) : sorted.length === 0 ? (
           <div className="text-center text-text-muted py-12 text-sm">
             {playbooks.length === 0
-              ? "Complete a game to generate your first Operator's Playbook."
+              ? 'Complete a game to generate your first Strategy Debrief.'
               : 'No playbooks match these filters.'}
           </div>
         ) : (

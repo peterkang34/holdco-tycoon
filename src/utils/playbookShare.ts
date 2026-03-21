@@ -58,7 +58,7 @@ export async function sharePlaybook(shareId: string, playbook: PlaybookData): Pr
   if ('share' in navigator) {
     try {
       await navigator.share({
-        title: `${playbook.thesis.holdcoName} — Operator's Playbook`,
+        title: `${playbook.thesis.holdcoName} — Strategy Debrief`,
         text: summary,
         url,
       });

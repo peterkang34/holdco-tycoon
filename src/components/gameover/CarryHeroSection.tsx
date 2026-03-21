@@ -72,7 +72,7 @@ export function CarryHeroSection({
           className="w-full min-h-[48px] text-sm bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 transition-colors rounded-lg flex items-center justify-center gap-1.5"
         >
           <span className="text-xs">📋</span>
-          GP's Playbook
+          Fund Strategy Debrief
         </button>
       )}
     </div>
