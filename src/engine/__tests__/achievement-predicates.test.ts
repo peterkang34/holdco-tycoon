@@ -100,6 +100,7 @@ function createCtx(overrides: Partial<AchievementContext> = {}): AchievementCont
     carryEarned: overrides.carryEarned,
     lpSatisfaction: overrides.lpSatisfaction,
     initialCapital: overrides.initialCapital ?? 5000,
+    endingCashConversion: overrides.endingCashConversion ?? 0,
   };
 }
 
