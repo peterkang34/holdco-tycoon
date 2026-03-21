@@ -14,6 +14,35 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'March 21, 2026',
+    title: 'Growth & Retention Update',
+    sections: [
+      {
+        heading: 'Achievements & Progression',
+        items: [
+          '2 new achievements: Trophy Hunter (acquire a $75M+ EBITDA business) and Cash Flow King (end the game with 70%+ cash conversion).',
+          'Achievement browser now has category filters and rarity labels (common, uncommon, rare, epic).',
+          'Achievements that contribute toward sector unlocks now show unlock hints.',
+        ],
+      },
+      {
+        heading: 'Prestige Titles',
+        items: [
+          'New 7-tier prestige title system based on games played, average score, achievements earned, and grades. From Rookie Allocator to Legendary Allocator.',
+          'Your prestige title is displayed on your profile and visible to other players on the leaderboard.',
+        ],
+      },
+      {
+        heading: 'Progression UX',
+        items: [
+          'Locked sectors now appear below the sector picker on the start screen, showing your progress toward unlocking them.',
+          'Locked platform recipes appear in the forge section, showing which sectors and sub-types are needed.',
+          'New celebration modal when you create an account — shows your achievement history, prestige title, and unlocked sectors.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 21, 2026',
     title: 'Oil Shock Market Event',
     sections: [
       {

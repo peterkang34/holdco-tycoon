@@ -152,7 +152,9 @@ research/                   # GIT-TRACKED — external research (podcasts, books
 - `src/engine/platforms.ts` — Platform eligibility, forging, bonus application
 - `src/components/screens/GameOverScreen.tsx` — Game over orchestrator (~500 lines, imports 13 child components from `src/components/gameover/`)
 - `src/components/gameover/` — 13 extracted game-over components (FEVHeroSection, CarryHeroSection, ScoreBreakdownSection, PortfolioSummary, etc.)
-- `src/data/achievementPreview.ts` — 31 achievement definitions across 5 categories (milestone/feat/mastery/creative/mode) with pure predicate check functions
+- `src/data/achievementPreview.ts` — 33 achievement definitions across 5 categories (milestone/feat/mastery/creative/mode) with pure predicate check functions, rarity field, unlock hints
+- `src/data/prestigeTitles.ts` — 7-tier prestige title ladder (Rookie→Legendary Allocator) with compute function
+- `src/components/ui/CelebrationModal.tsx` — Animated overlay on anonymous→authenticated upgrade (staggered achievement reveals, prestige title, unlocked sectors)
 - `src/hooks/useUnlocks.ts` — Achievement persistence (localStorage), sector unlock gating, `getUnlockedSectorIds()`
 - `src/data/archetypeNames.ts` — Shared strategy archetype display name mapping
 - `src/components/ui/LeaderboardModal.tsx` — Tabbed leaderboard (exports filtering utils for GameOverScreen); clickable rows open ProfileModal for verified players
