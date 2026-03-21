@@ -19,7 +19,7 @@ const PRESTIGE_TIERS = [
 const GRADE_RANK: Record<string, number> = { S: 6, A: 5, B: 4, C: 3, D: 2, F: 1 };
 
 function computePrestige(stats: { totalGames: number; avgScore: number; achievementCount: number; bestGrade: string; sGradeCount: number }) {
-  let result = PRESTIGE_TIERS[0];
+  let result: (typeof PRESTIGE_TIERS)[number] = PRESTIGE_TIERS[0];
   for (const tier of PRESTIGE_TIERS) {
     if (stats.totalGames < tier.minGames) break;
     if ('minAvgScore' in tier && tier.minAvgScore != null && stats.avgScore < tier.minAvgScore) break;
