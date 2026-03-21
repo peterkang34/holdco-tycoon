@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { SectorId, GameDifficulty, GameDuration } from '../../engine/types';
-import { SECTOR_LIST_STANDARD, getAvailableSectors } from '../../data/sectors';
-import { getUnlockedSectorIds } from '../../hooks/useUnlocks';
+import { SECTOR_LIST_STANDARD, SECTORS, UNLOCKABLE_SECTORS, getAvailableSectors } from '../../data/sectors';
+import { getUnlockedSectorIds, getEarnedAchievementIds } from '../../hooks/useUnlocks';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { ChangelogModal } from '../ui/ChangelogModal';
 import { UserManualModal } from '../ui/UserManualModal';
@@ -75,6 +75,7 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
   const [showHurdleTooltip, setShowHurdleTooltip] = useState(false);
   const [showCarryTooltip, setShowCarryTooltip] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
+  const [showLockedSectors, setShowLockedSectors] = useState(false);
 
   // Compute available sectors (includes unlocked prestige sectors for non-challenge)
   const isAnonymous = useAuthStore((s) => s.player?.isAnonymous ?? true);
@@ -89,6 +90,13 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
     : getAvailableSectors(false, getUnlockedSectorIds(isAnonymous), false);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars -- achievementTick triggers re-render to refresh sector list
   void achievementTick;
+
+  // Compute locked prestige sectors (not available yet)
+  const lockedSectors = isChallenge ? [] : Object.entries(UNLOCKABLE_SECTORS)
+    .filter(([id]) => !sectorPickerList.some(s => s.id === id))
+    .map(([id, gate]) => ({ sector: SECTORS[id as keyof typeof SECTORS], gate, id }))
+    .filter((s): s is { sector: NonNullable<typeof s.sector>; gate: typeof s.gate; id: string } => s.sector != null);
+  const earnedCount = getEarnedAchievementIds().length;
 
   // Sync challenge settings when challengeData arrives
   useEffect(() => {
@@ -548,6 +556,39 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
                 ))}
               </div>
 
+              {/* Locked prestige sectors */}
+              {lockedSectors.length > 0 && (
+                <div className="mb-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className="flex-1 h-px bg-white/10" />
+                    <span className="text-[10px] tracking-widest text-text-muted font-bold">UNLOCKABLE SECTORS</span>
+                    <div className="flex-1 h-px bg-white/10" />
+                  </div>
+                  {/* Mobile collapse toggle */}
+                  <button
+                    onClick={() => setShowLockedSectors(!showLockedSectors)}
+                    className="sm:hidden text-xs text-text-muted mb-2 min-h-[36px] inline-flex items-center"
+                  >
+                    {showLockedSectors ? 'Hide' : 'Show'} locked sectors ({lockedSectors.length})
+                  </button>
+                  <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 ${showLockedSectors ? 'grid' : 'hidden sm:grid'}`}>
+                    {lockedSectors.map(({ sector, gate, id }) => (
+                      <div
+                        key={id}
+                        className="p-3 rounded-lg border border-white/5 bg-white/[0.02] opacity-60 cursor-default"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl grayscale opacity-50">🔒</span>
+                          <span className="text-sm font-medium text-text-muted">{sector.name}</span>
+                        </div>
+                        <p className="text-[10px] text-text-muted/60 mt-1">
+                          Earn {gate.gateAchievementCount} achievements to unlock ({earnedCount}/{gate.gateAchievementCount})
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <button
                 type="submit"

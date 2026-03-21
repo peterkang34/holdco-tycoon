@@ -428,6 +428,7 @@ export function GameOverScreen({
       carryEarned: carryWaterfallData?.carry,
       lpSatisfaction: lpSatisfactionScore ?? undefined,
       initialCapital,
+      endingCashConversion: metrics.cashConversion,
     };
     return ACHIEVEMENT_PREVIEW.filter(a => a.check(ctx));
   }, [strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions, lpDistributions, founderEquityValue, difficulty, duration, bankruptRound, isFundManagerMode, carryWaterfallData]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -518,6 +519,7 @@ export function GameOverScreen({
             .reduce((max, b) => Math.max(max, (b.exitPrice ?? 0) / b.acquisitionPrice), 0);
           return best > 0 ? Math.round(best * 100) / 100 : undefined;
         })(),
+        endingCashConversion: Math.round(metrics.cashConversion * 1000) / 1000,
         earnedAchievementIds: earnedAchievements.length > 0 ? earnedAchievements.map(a => a.id) : undefined,
       },
     });

@@ -113,8 +113,8 @@ function getAchievement(id: string) {
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe('Achievement Predicates', () => {
-  it('should have 31 achievement definitions', () => {
-    expect(ACHIEVEMENT_PREVIEW.length).toBe(31);
+  it('should have 33 achievement definitions', () => {
+    expect(ACHIEVEMENT_PREVIEW.length).toBe(33);
   });
 
   // ── Milestones ──
@@ -660,6 +660,43 @@ describe('Achievement Predicates', () => {
     });
     it('fails with C grade', () => {
       expect(ach.check(createCtx({ duration: 'quick', score: { grade: 'C' } } as any))).toBe(false);
+    });
+  });
+
+  // ── New Phase 2 Achievements ──
+
+  describe('trophy_hunter', () => {
+    const ach = getAchievement('trophy_hunter');
+    it('triggers when any business has acquisitionEbitda >= 75000', () => {
+      const biz = createBusiness({ acquisitionEbitda: 75000 });
+      expect(ach.check(createCtx({ businesses: [biz] }))).toBe(true);
+    });
+    it('triggers for exited businesses too', () => {
+      const biz = createBusiness({ acquisitionEbitda: 80000, status: 'sold' as any });
+      expect(ach.check(createCtx({ exitedBusinesses: [biz] }))).toBe(true);
+    });
+    it('fails when no business reaches threshold', () => {
+      const biz = createBusiness({ acquisitionEbitda: 74999 });
+      expect(ach.check(createCtx({ businesses: [biz] }))).toBe(false);
+    });
+    it('fails with no businesses', () => {
+      expect(ach.check(createCtx())).toBe(false);
+    });
+  });
+
+  describe('cash_flow_king', () => {
+    const ach = getAchievement('cash_flow_king');
+    it('triggers with 70%+ cash conversion', () => {
+      expect(ach.check(createCtx({ endingCashConversion: 0.70 }))).toBe(true);
+    });
+    it('triggers with higher conversion', () => {
+      expect(ach.check(createCtx({ endingCashConversion: 0.95 }))).toBe(true);
+    });
+    it('fails below 70%', () => {
+      expect(ach.check(createCtx({ endingCashConversion: 0.69 }))).toBe(false);
+    });
+    it('fails with 0 conversion', () => {
+      expect(ach.check(createCtx({ endingCashConversion: 0 }))).toBe(false);
     });
   });
 });

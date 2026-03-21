@@ -4,6 +4,34 @@ import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { getClientIp } from '../_lib/rateLimit.js';
 
 const PUBLIC_ID_REGEX = /^[0-9a-f]{12}$/;
+
+// Inline prestige computation (mirrors src/data/prestigeTitles.ts)
+const PRESTIGE_TIERS = [
+  { tier: 0, title: null, minGames: 0 },
+  { tier: 1, title: 'Rookie Allocator', minGames: 3 },
+  { tier: 2, title: 'Rising Allocator', minGames: 10, minAvgScore: 45 },
+  { tier: 3, title: 'Skilled Allocator', minGames: 25, minAvgScore: 55, requiresGrade: 'A' },
+  { tier: 4, title: 'Expert Allocator', minGames: 50, minAvgScore: 65, minAchievements: 16 },
+  { tier: 5, title: 'Master Allocator', minGames: 75, minAvgScore: 70, minAchievements: 24 },
+  { tier: 6, title: 'Legendary Allocator', minGames: 100, minAvgScore: 75, minAchievements: 30, requiresSGrades: 3 },
+] as const;
+
+const GRADE_RANK: Record<string, number> = { S: 6, A: 5, B: 4, C: 3, D: 2, F: 1 };
+
+function computePrestige(stats: { totalGames: number; avgScore: number; achievementCount: number; bestGrade: string; sGradeCount: number }) {
+  let result = PRESTIGE_TIERS[0];
+  for (const tier of PRESTIGE_TIERS) {
+    if (stats.totalGames < tier.minGames) break;
+    if ('minAvgScore' in tier && tier.minAvgScore != null && stats.avgScore < tier.minAvgScore) break;
+    if ('minAchievements' in tier && tier.minAchievements != null && stats.achievementCount < tier.minAchievements) break;
+    if ('requiresGrade' in tier && tier.requiresGrade != null) {
+      if ((GRADE_RANK[stats.bestGrade] ?? 0) < (GRADE_RANK[tier.requiresGrade] ?? 0)) break;
+    }
+    if ('requiresSGrades' in tier && tier.requiresSGrades != null && stats.sGradeCount < tier.requiresSGrades) break;
+    result = tier;
+  }
+  return { tier: result.tier, title: result.title };
+}
 const RATE_LIMIT_SECONDS = 60;
 const RATE_LIMIT_MAX = 30;
 
@@ -153,6 +181,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Mode badges
       modesPlayed,
       familyOfficeCompleted: stats?.family_office_completed ?? false,
+
+      // Prestige
+      ...(() => {
+        const bestGrade = Object.keys(gradeDistribution).reduce((best, g) =>
+          (GRADE_RANK[g] ?? 0) > (GRADE_RANK[best] ?? 0) ? g : best, 'F');
+        const sGradeCount = (gradeDistribution as Record<string, number>)['S'] ?? 0;
+        const prestige = computePrestige({
+          totalGames,
+          avgScore: stats?.avg_score ?? 0,
+          achievementCount: earnedAchievementIds.length,
+          bestGrade,
+          sGradeCount,
+        });
+        return { prestigeTier: prestige.tier, prestigeTitle: prestige.title };
+      })(),
     };
 
     res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');

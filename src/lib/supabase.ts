@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { useAuthStore, type Player } from '../hooks/useAuth';
 import { useToastStore } from '../hooks/useToast';
+import { syncAchievementsFromServer, getEarnedAchievementIds } from '../hooks/useUnlocks';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -48,10 +49,10 @@ export async function initAnonymousAuth(): Promise<void> {
  * where submittedBy matches the current user's UUID.
  * Shows a toast if games were linked.
  */
-async function fireAutoLink(): Promise<void> {
+async function fireAutoLink(): Promise<number> {
   try {
     const token = await getAccessToken();
-    if (!token) return;
+    if (!token) return 0;
 
     const res = await fetch('/api/player/auto-link', {
       method: 'POST',
@@ -59,7 +60,7 @@ async function fireAutoLink(): Promise<void> {
       body: JSON.stringify({}),
     });
 
-    if (!res.ok) return;
+    if (!res.ok) return 0;
     const data = await res.json();
     if (data.linked > 0) {
       useToastStore.getState().addToast({
@@ -67,7 +68,8 @@ async function fireAutoLink(): Promise<void> {
         type: 'success',
       });
     }
-  } catch { /* silent — best effort */ }
+    return data.linked ?? 0;
+  } catch { return 0; }
 }
 
 /**
@@ -110,8 +112,15 @@ export function initAuthListener(): (() => void) | undefined {
       // USER_UPDATED fires for in-session upgrades (e.g. updateUser with email)
       // SIGNED_IN fires after email verification redirect or OAuth link
       if ((event === 'USER_UPDATED' || event === 'SIGNED_IN') && wasAnonymous && !isAnonymous) {
-        // Fire auto-link (server-side submittedBy matching) — runs alongside claim modal
-        fireAutoLink();
+        // Fire auto-link then trigger celebration modal
+        (async () => {
+          const gamesLinked = await fireAutoLink();
+          await syncAchievementsFromServer();
+          const achievementCount = getEarnedAchievementIds().length;
+          if (achievementCount > 0 || gamesLinked > 0) {
+            store.openCelebrationModal({ achievementCount, gamesLinked });
+          }
+        })();
 
         // Check localStorage for claimable leaderboard entries
         try {

@@ -17,6 +17,7 @@ import { StatsModal } from './components/ui/StatsModal';
 import { ClaimGamesModal } from './components/ui/ClaimGamesModal';
 import { PrivacyPolicyModal } from './components/ui/PrivacyPolicyModal';
 import { DeleteAccountModal } from './components/ui/DeleteAccountModal';
+import { CelebrationModal } from './components/ui/CelebrationModal';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { setupGoTest, getGoTestVariant } from './utils/goTestSetup';
 import { syncAchievementsFromServer } from './hooks/useUnlocks';
@@ -446,6 +447,7 @@ function App() {
       <ClaimGamesModal />
       <PrivacyPolicyModal />
       <DeleteAccountModal />
+      <CelebrationModal />
     </div>
   );
 }

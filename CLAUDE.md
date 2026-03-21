@@ -198,6 +198,49 @@ research/                   # GIT-TRACKED — external research (podcasts, books
 ### Phase 3: COMMIT & DEPLOY
 13. Stage specific files, commit, push, `npx vercel --prod`
 
+## Feature Planning — Test Coverage Protocol (MANDATORY)
+
+Every new feature plan MUST include a **Test Coverage** section before implementation begins. This is not optional — test coverage is designed during planning, not bolted on after.
+
+### The 6 Test Layers
+
+Each plan must include a concrete checklist addressing all 6 layers. Each item should name the specific test file and describe what assertion to add — no vague "add tests."
+
+| # | Layer | Test File | What to Check |
+|---|-------|-----------|---------------|
+| 1 | **Display Proofreader** | `display-proofreader.test.ts` | Any new UI copy, tooltips, or mechanic descriptions? Update `mechanicsCopy.ts`? Add old patterns to `BANNED_COPY_PATTERNS`? |
+| 2 | **Coverage Tripwires** | `coverage-tripwires.test.ts` | New exports, types, events, achievements, recipes, or sectors? Pre-write the tests rather than waiting for tripwires to catch them |
+| 3 | **Switch Exhaustiveness** | `switch-exhaustiveness.test.ts` | New enum values or union type variants that need UI handlers? |
+| 4 | **Drilldown Parity** | `drilldown-parity.test.ts` | New calculations shown in UI that need parity tests against engine output? Extract to `drilldownComputations.ts`? |
+| 5 | **Playtest Coverage** | `playtest/coverage.ts` + `playtest.test.ts` | New feature registry key needed? Does the simulator need updates to exercise the mechanic? Update a strategy or the hard-to-trigger list? |
+| 6 | **Component Display Parity** | (relevant component test) | New component states or inputs that need render validation? |
+
+### Template for Plans
+
+```markdown
+## Test Coverage
+
+### Display Proofreader
+- [ ] (specific assertion or "N/A — no new UI copy")
+
+### Coverage Tripwires
+- [ ] (specific new export/type to cover or "N/A")
+
+### Switch Exhaustiveness
+- [ ] (specific new variant to handle or "N/A")
+
+### Drilldown Parity
+- [ ] (specific calculation to validate or "N/A")
+
+### Playtest Coverage
+- [ ] (specific FEATURE_REGISTRY key + simulator update or "N/A")
+
+### Component Display Parity
+- [ ] (specific component state to validate or "N/A")
+```
+
+**Why this exists:** These six layers caught bugs that single-pass testing missed. Tripwires fire when new code lacks coverage, proofreader catches copy/constant drift, drilldown parity catches engine-UI divergence, and playtesting with parallel agents catches emergent exploits. Planning them upfront prevents the "ship then scramble" pattern.
+
 ## Display Proofreader (MANDATORY)
 - **`display-proofreader.test.ts`** — 330 tests that validate UI copy matches engine constants
 - **When changing ANY game mechanic**: ALWAYS update UserManualModal.tsx to reflect the change (user rule: manual must ALWAYS be updated automatically)

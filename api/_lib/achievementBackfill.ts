@@ -177,6 +177,13 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
       earned.push('recession_buyer');
     }
 
+    // trophy_hunter: acquired a business with $75M+ EBITDA
+    // Only detectable from client-side earnedAchievementIds (business-level data not in strategy JSON)
+
+    // cash_flow_king: 70%+ cash conversion at game end
+    const endingCashConversion = (strategy.endingCashConversion as number) ?? -1;
+    if (endingCashConversion >= 0.70) earned.push('cash_flow_king');
+
     // If the game already has earnedAchievementIds, include them directly
     // (this is the definitive source — computed at game-over with full context)
     const storedIds = strategy.earnedAchievementIds as string[] | undefined;

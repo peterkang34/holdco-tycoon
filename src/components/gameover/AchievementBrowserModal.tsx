@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { Modal } from '../ui/Modal';
-import type { AchievementDef } from '../../data/achievementPreview';
+import type { AchievementDef, AchievementRarity } from '../../data/achievementPreview';
 import { UNLOCKABLE_SECTORS, SECTORS } from '../../data/sectors';
 
 const CATEGORY_META: Record<string, { label: string; flavor: string }> = {
@@ -11,6 +12,13 @@ const CATEGORY_META: Record<string, { label: string; flavor: string }> = {
 };
 
 const CATEGORY_ORDER = ['milestone', 'feat', 'mastery', 'creative', 'mode'];
+
+const RARITY_COLORS: Record<AchievementRarity, string> = {
+  common: 'text-zinc-500',
+  uncommon: 'text-green-500/70',
+  rare: 'text-blue-400/70',
+  epic: 'text-purple-400/70',
+};
 
 interface AchievementBrowserModalProps {
   isOpen: boolean;
@@ -29,6 +37,7 @@ export function AchievementBrowserModal({
   isLoggedIn,
   onSignUp,
 }: AchievementBrowserModalProps) {
+  const [filter, setFilter] = useState<string>('all');
   const earnedCount = earnedIds.size;
   const totalCount = allAchievements.length;
 
@@ -47,9 +56,43 @@ export function AchievementBrowserModal({
     </div>
   );
 
+  const categoriesToShow = filter === 'all' ? CATEGORY_ORDER : [filter];
+
   return (
     <Modal isOpen={isOpen} onClose={onClose} header={header}>
       <div className="space-y-6">
+        {/* Category filter strip */}
+        <div className="flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-hide">
+          <button
+            onClick={() => setFilter('all')}
+            className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+              filter === 'all'
+                ? 'bg-accent/20 text-accent border border-accent/30'
+                : 'bg-white/5 text-text-muted border border-white/10 hover:border-white/20'
+            }`}
+          >
+            All
+          </button>
+          {CATEGORY_ORDER.map(cat => {
+            const meta = CATEGORY_META[cat];
+            const catCount = allAchievements.filter(a => a.category === cat).length;
+            const catEarned = allAchievements.filter(a => a.category === cat && earnedIds.has(a.id)).length;
+            return (
+              <button
+                key={cat}
+                onClick={() => setFilter(cat)}
+                className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
+                  filter === cat
+                    ? 'bg-accent/20 text-accent border border-accent/30'
+                    : 'bg-white/5 text-text-muted border border-white/10 hover:border-white/20'
+                }`}
+              >
+                {meta.label} {catEarned}/{catCount}
+              </button>
+            );
+          })}
+        </div>
+
         {/* Signup CTA for anonymous users */}
         {!isLoggedIn && (
           <div className="rounded-xl p-4 bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/20">
@@ -68,7 +111,7 @@ export function AchievementBrowserModal({
           </div>
         )}
 
-        {CATEGORY_ORDER.map((category) => {
+        {categoriesToShow.map((category) => {
           const meta = CATEGORY_META[category];
           const items = allAchievements.filter((a) => a.category === category);
           const categoryEarned = items.filter((a) => earnedIds.has(a.id)).length;
@@ -99,13 +142,23 @@ export function AchievementBrowserModal({
                         <span className={`text-lg mt-0.5 shrink-0 ${isUnlocked ? '' : 'opacity-40 grayscale'}`}>
                           {achievement.emoji}
                         </span>
-                        <div>
+                        <div className="flex-1 min-w-0">
                           <p className={`text-sm font-bold ${isUnlocked ? '' : 'text-text-secondary'}`}>
                             {achievement.name}
                           </p>
                           <p className={`text-xs ${isUnlocked ? 'text-text-muted' : 'text-text-muted/60'}`}>
                             {achievement.description}
                           </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-[10px] uppercase tracking-wider font-medium ${RARITY_COLORS[achievement.rarity]}`}>
+                              {achievement.rarity}
+                            </span>
+                            {achievement.unlockHint && (
+                              <span className="text-[10px] text-amber-400/60">
+                                {achievement.unlockHint}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         {isUnlocked && (
                           <span className="text-green-400 text-xs shrink-0 mt-0.5">✓</span>

@@ -21,6 +21,8 @@ interface AuthState {
   showClaimModal: boolean;
   showPrivacyModal: boolean;
   showDeleteModal: boolean;
+  showCelebrationModal: boolean;
+  celebrationData: { achievementCount: number; gamesLinked: number } | null;
 
   // Actions
   setPlayer: (player: Player | null) => void;
@@ -36,6 +38,8 @@ interface AuthState {
   openDeleteModal: () => void;
   closeDeleteModal: () => void;
   incrementNudgeDismissals: () => void;
+  openCelebrationModal: (data: { achievementCount: number; gamesLinked: number }) => void;
+  closeCelebrationModal: () => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -49,6 +53,8 @@ export const useAuthStore = create<AuthState>()(
       showClaimModal: false,
       showPrivacyModal: false,
       showDeleteModal: false,
+      showCelebrationModal: false,
+      celebrationData: null,
 
       setPlayer: (player) => set({ player }),
       signOut: () => set({ player: null }),
@@ -62,6 +68,8 @@ export const useAuthStore = create<AuthState>()(
       closePrivacyModal: () => set({ showPrivacyModal: false }),
       openDeleteModal: () => set({ showDeleteModal: true }),
       closeDeleteModal: () => set({ showDeleteModal: false }),
+      openCelebrationModal: (data) => set({ showCelebrationModal: true, celebrationData: data }),
+      closeCelebrationModal: () => set({ showCelebrationModal: false, celebrationData: null }),
       incrementNudgeDismissals: () =>
         set((state) => ({
           signupNudgeDismissals: Math.min(state.signupNudgeDismissals + 1, 3),

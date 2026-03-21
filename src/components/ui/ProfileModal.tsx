@@ -7,6 +7,7 @@ import { getGradeColor } from '../../utils/gradeColors';
 import { ACHIEVEMENT_PREVIEW } from '../../data/achievementPreview';
 import { getEarnedAchievementIds } from '../../hooks/useUnlocks';
 import { SECTORS } from '../../data/sectors';
+import { computePrestigeTier, getPrestigeTierColor } from '../../data/prestigeTitles';
 import SparklineChart from './SparklineChart';
 
 // --- Types ---
@@ -358,6 +359,25 @@ export function ProfileModal({ isOpen, onClose, publicProfileId, onBackToLeaderb
                 )}
                 {normalized.familyOfficeCompleted && <span title="Family Office Legacy">🦅</span>}
               </p>
+              {(() => {
+                const bestGrade = Object.keys(normalized.gradeDistribution).reduce((best, g) => {
+                  const rank: Record<string, number> = { S: 6, A: 5, B: 4, C: 3, D: 2, F: 1 };
+                  return (rank[g] ?? 0) > (rank[best] ?? 0) ? g : best;
+                }, 'F');
+                const sGradeCount = normalized.gradeDistribution['S'] ?? 0;
+                const prestige = computePrestigeTier({
+                  totalGames: normalized.totalGames,
+                  avgScore: normalized.avgScore,
+                  achievementCount: normalized.achievementIds.length,
+                  bestGrade,
+                  sGradeCount,
+                });
+                return prestige.title ? (
+                  <p className={`text-xs font-medium ${getPrestigeTierColor(prestige.tier)}`}>
+                    {prestige.title}
+                  </p>
+                ) : null;
+              })()}
               <p className="text-text-muted text-sm">
                 {normalized.totalGames} games played · Member since {formatMemberSince(normalized.memberSince)}
               </p>
