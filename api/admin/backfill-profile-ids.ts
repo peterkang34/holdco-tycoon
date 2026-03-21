@@ -7,9 +7,16 @@ import { LEADERBOARD_KEY } from '../_lib/leaderboard.js';
 
 /**
  * POST /api/admin/backfill-profile-ids
- * One-shot backfill: scans all KV leaderboard entries with a playerId but
- * no publicProfileId, looks up (or creates) the public_id in player_profiles,
- * and patches the KV entry so the leaderboard row becomes clickable.
+ *
+ * Two modes controlled by ?mode= query param:
+ *
+ * mode=repair (default): Scans all KV entries. For entries with playerId but
+ *   no publicProfileId, looks up the player_profiles row and sets publicProfileId
+ *   if public_id exists. For entries with a bogus publicProfileId (no matching
+ *   player_profiles row), strips the publicProfileId. Also generates public_id
+ *   for profile rows that exist but have null public_id.
+ *
+ * mode=strip: Removes publicProfileId from ALL KV entries (reset for re-run).
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
@@ -18,6 +25,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!authed) return;
 
   if (!supabaseAdmin) return res.status(503).json({ error: 'Supabase not configured' });
+
+  const mode = (req.query.mode as string) || 'repair';
 
   try {
     // Fetch all leaderboard entries with scores
@@ -34,21 +43,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       } catch { /* skip */ }
     }
 
+    if (mode === 'strip') {
+      let stripped = 0;
+      for (const entry of entries) {
+        if (entry.parsed.publicProfileId) {
+          const cleaned = { ...entry.parsed };
+          delete cleaned.publicProfileId;
+          const cleanedMember = JSON.stringify(cleaned);
+          await kv.zrem(LEADERBOARD_KEY, entry.member);
+          await kv.zadd(LEADERBOARD_KEY, { score: entry.score, member: cleanedMember });
+          stripped++;
+        }
+      }
+      return res.status(200).json({ total: entries.length, stripped });
+    }
+
+    // mode=repair
     let updated = 0;
-    let skipped = 0;
+    let repaired = 0;
     let alreadyHas = 0;
     let noPlayer = 0;
+    let noProfile = 0;
+    let generatedPublicId = 0;
 
     for (const entry of entries) {
       const { parsed, member, score } = entry;
 
-      // Already has publicProfileId
-      if (parsed.publicProfileId) {
-        alreadyHas++;
-        continue;
-      }
-
-      // No playerId — can't link
+      // No playerId — anonymous, can't link
       if (!parsed.playerId) {
         noPlayer++;
         continue;
@@ -56,41 +77,65 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const playerId = parsed.playerId as string;
 
-      // Look up or create public_id from player_profiles
-      let publicId: string | undefined;
-      try {
-        const { data: profile } = await supabaseAdmin
-          .from('player_profiles')
-          .select('public_id')
-          .eq('id', playerId)
-          .maybeSingle();
+      // Look up player_profiles row
+      const { data: profile } = await supabaseAdmin
+        .from('player_profiles')
+        .select('public_id')
+        .eq('id', playerId)
+        .maybeSingle();
 
-        if (profile?.public_id) {
-          publicId = profile.public_id;
+      // No profile row in Supabase — player doesn't have an account
+      if (!profile) {
+        // If this entry has a bogus publicProfileId, strip it
+        if (parsed.publicProfileId) {
+          const cleaned = { ...parsed };
+          delete cleaned.publicProfileId;
+          const cleanedMember = JSON.stringify(cleaned);
+          await kv.zrem(LEADERBOARD_KEY, member);
+          await kv.zadd(LEADERBOARD_KEY, { score, member: cleanedMember });
+          repaired++;
         } else {
-          // Profile missing or has no public_id — upsert with a new public_id
-          const newId = randomUUID().replace(/-/g, '').slice(0, 12);
-          const initials = (parsed.initials as string) || 'AA';
-          const now = new Date().toISOString();
-          await supabaseAdmin.from('player_profiles').upsert({
-            id: playerId,
-            initials,
-            public_id: newId,
-            updated_at: now,
-          }, { onConflict: 'id' });
-          publicId = newId;
+          noProfile++;
         }
-      } catch { /* skip */ }
-
-      if (!publicId) {
-        skipped++;
         continue;
       }
 
-      // Patch the KV entry: remove old, add updated
+      // Profile exists — ensure it has a public_id
+      let publicId = profile.public_id as string | null;
+      if (!publicId) {
+        const newId = randomUUID().replace(/-/g, '').slice(0, 12);
+        const { error: updateError } = await supabaseAdmin
+          .from('player_profiles')
+          .update({ public_id: newId, updated_at: new Date().toISOString() })
+          .eq('id', playerId);
+
+        if (updateError) {
+          // Can't set public_id — skip
+          if (parsed.publicProfileId) {
+            // Strip bogus publicProfileId
+            const cleaned = { ...parsed };
+            delete cleaned.publicProfileId;
+            await kv.zrem(LEADERBOARD_KEY, member);
+            await kv.zadd(LEADERBOARD_KEY, { score, member: JSON.stringify(cleaned) });
+            repaired++;
+          } else {
+            noProfile++;
+          }
+          continue;
+        }
+        publicId = newId;
+        generatedPublicId++;
+      }
+
+      // Already has correct publicProfileId
+      if (parsed.publicProfileId === publicId) {
+        alreadyHas++;
+        continue;
+      }
+
+      // Set or fix publicProfileId in KV entry
       const updatedParsed = { ...parsed, publicProfileId: publicId };
       const updatedMember = JSON.stringify(updatedParsed);
-
       await kv.zrem(LEADERBOARD_KEY, member);
       await kv.zadd(LEADERBOARD_KEY, { score, member: updatedMember });
       updated++;
@@ -99,9 +144,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(200).json({
       total: entries.length,
       updated,
+      repaired,
       alreadyHas,
       noPlayer,
-      skipped,
+      noProfile,
+      generatedPublicId,
     });
   } catch (error) {
     console.error('Backfill profile IDs error:', error);
