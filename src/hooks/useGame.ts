@@ -40,6 +40,7 @@ import {
   pickWeightedSector,
   generateDistressedDeals,
   generateRecessionDeals,
+  generateOilShockDeals,
   calculateIntegrationGrowthPenalty,
   calculateDealInflation,
 } from '../engine/businesses';
@@ -294,7 +295,7 @@ const FOUNDER_OWNERSHIP = 0.80;
 const STARTING_SHARES = 1000;
 const FOUNDER_SHARES = 800;
 const STARTING_INTEREST_RATE = 0.07;
-import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EQUITY_ISSUANCE_SENTIMENT_PENALTY, IMPROVEMENT_COST_FLOOR, QUALITY_IMPROVEMENT_MULTIPLIER, STABILIZATION_EFFICACY_MULTIPLIER, STABILIZATION_TYPES, GROWTH_TYPES, MIN_FOUNDER_OWNERSHIP, MIN_PUBLIC_FOUNDER_OWNERSHIP, getOwnershipImprovementModifier } from '../data/gameConfig';
+import { DIFFICULTY_CONFIG, DURATION_CONFIG, EQUITY_DILUTION_STEP, EQUITY_DILUTION_FLOOR, EQUITY_BUYBACK_COOLDOWN, EQUITY_ISSUANCE_SENTIMENT_PENALTY, IMPROVEMENT_COST_FLOOR, QUALITY_IMPROVEMENT_MULTIPLIER, STABILIZATION_EFFICACY_MULTIPLIER, STABILIZATION_TYPES, GROWTH_TYPES, MIN_FOUNDER_OWNERSHIP, MIN_PUBLIC_FOUNDER_OWNERSHIP, getOwnershipImprovementModifier, OIL_SHOCK_BASE_MARGIN_HIT, OIL_SHOCK_CONSUMER_REVENUE_HIT, OIL_SHOCK_INTEREST_HIKE, OIL_SHOCK_CREDIT_TIGHTENING_ROUNDS, OIL_SHOCK_DISTRESSED_DEAL_COUNT, OIL_SHOCK_SENSITIVITY_REVENUE_THRESHOLD, OIL_SHOCK_HUNKER_REVENUE_CUT, OIL_SHOCK_HUNKER_MARGIN_HALVE, OIL_SHOCK_HUNKER_CASH_BONUS, OIL_SHOCK_HUNT_MARGIN_COST, OIL_SHOCK_PASSTHROUGH_REVENUE_HIT_HIGH, OIL_SHOCK_PASSTHROUGH_REVENUE_HIT_LOW, OIL_SHOCK_PASSTHROUGH_QUALITY_THRESHOLD } from '../data/gameConfig';
 import { calculateStockPrice } from '../engine/ipo';
 import { clampMargin, capGrowthRate, applyEbitdaFloor } from '../engine/helpers';
 import { runAllMigrations } from './migrations';
@@ -405,6 +406,11 @@ interface GameStore extends GameState {
   fillerReputationInvest: () => void;
   fillerReputationFree: () => void;
   fillerPass: () => void;
+
+  // Oil shock event choices
+  oilShockHunkerDown: () => void;
+  oilShockGoHunting: () => void;
+  oilShockPassThrough: () => void;
 
   // New event choice handlers
   cyberBreachUpgrade: () => void;
@@ -936,6 +942,7 @@ export const useGameStore = create<GameStore>()(
         let decrementedRecessionMult = state.recessionProbMultiplier ?? 1;
         let decrementedTalentShift = state.talentMarketShiftRoundsRemaining ?? 0;
         let decrementedPrivateCredit = state.privateCreditRoundsRemaining ?? 0;
+        let decrementedOilShock = state.oilShockRoundsRemaining ?? 0;
         let decrementedDealInflation = state.dealInflationState;
         if (newCash >= 0) { // only tick if not in restructuring path
           if (decrementedCreditTightening > 0) decrementedCreditTightening--;
@@ -943,6 +950,8 @@ export const useGameStore = create<GameStore>()(
           if (decrementedRecessionMult > 1) decrementedRecessionMult = 1;
           if (decrementedTalentShift > 0) decrementedTalentShift--;
           if (decrementedPrivateCredit > 0) decrementedPrivateCredit--;
+          // Note: oilShockRoundsRemaining is NOT decremented here — it's decremented in applyEventEffects
+          // for the aftershock event, to ensure the aftershock fires before the counter hits 0
           if (decrementedDealInflation?.crisisResetRoundsRemaining > 0) {
             decrementedDealInflation = {
               ...decrementedDealInflation,
@@ -960,6 +969,7 @@ export const useGameStore = create<GameStore>()(
           recessionProbMultiplier: decrementedRecessionMult,
           talentMarketShiftRoundsRemaining: decrementedTalentShift,
           privateCreditRoundsRemaining: decrementedPrivateCredit,
+          oilShockRoundsRemaining: decrementedOilShock,
           dealInflationState: decrementedDealInflation,
         };
         const event = generateEvent(stateForEventGen, roundStreams.events);
@@ -1016,13 +1026,14 @@ export const useGameStore = create<GameStore>()(
           recessionProbMultiplier: decrementedRecessionMult,
           talentMarketShiftRoundsRemaining: decrementedTalentShift,
           privateCreditRoundsRemaining: decrementedPrivateCredit,
+          oilShockRoundsRemaining: decrementedOilShock,
           dealInflationState: decrementedDealInflation,
           // PE Fund Manager: track cumulative management fees
           ...(state.isFundManagerMode ? { managementFeesCollected: (state.managementFeesCollected || 0) + managementFee } : {}),
         };
 
         // Events with choices that have NO immediate effects — skip applyEventEffects entirely
-        const skipEffects = event && (event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand' || event.type === 'portfolio_seller_note_renego' || event.type === 'portfolio_earnout_dispute' || event.type === 'mbo_proposal');
+        const skipEffects = event && (event.type === 'unsolicited_offer' || event.type === 'portfolio_equity_demand' || event.type === 'portfolio_seller_note_renego' || event.type === 'portfolio_earnout_dispute' || event.type === 'mbo_proposal' || event.type === 'global_oil_shock');
         // Note: choice-based events (unsolicited_offer, equity_demand, seller_note_renego, key_man_risk, earnout_dispute, supplier_shift, mbo_proposal)
         // need player input before advancing — handled by EventPhase UI
         if (event && !skipEffects && !requiresRestructuring) {
@@ -1147,6 +1158,7 @@ export const useGameStore = create<GameStore>()(
           if (eventRng.next() < 0.50) {
             const isNegativeEvent = ['global_recession', 'global_financial_crisis', 'global_interest_hike',
               'global_credit_tightening', 'global_yield_curve_inversion', 'global_talent_market_shift',
+              'global_oil_shock', 'global_oil_shock_aftershock',
               'portfolio_cyber_breach', 'portfolio_antitrust_scrutiny'].includes(event.type);
             const isPositiveEvent = ['global_bull_market', 'global_interest_cut', 'global_private_credit_boom',
               'portfolio_referral_deal', 'portfolio_breakthrough'].includes(event.type);
@@ -1256,6 +1268,12 @@ export const useGameStore = create<GameStore>()(
         if (state.currentEvent?.type === 'global_financial_crisis') {
           const distressedDeals = generateDistressedDeals(state.round, state.maxRounds, roundStreams.deals, state.cash);
           finalPipeline = [...finalPipeline, ...distressedDeals];
+        }
+
+        // Inject distressed deals during Oil Shock Aftershock (1-2 deals at 25% off)
+        if (state.currentEvent?.type === 'global_oil_shock_aftershock') {
+          const oilAftershockDeals = generateOilShockDeals(state.round, state.maxRounds, roundStreams.deals, state.cash, randomInt(1, 2, roundStreams.deals));
+          finalPipeline = [...finalPipeline, ...oilAftershockDeals];
         }
 
         // Inject lighter discounted deals during Recession (1-2 at 15-25% off)
@@ -4348,6 +4366,8 @@ export const useGameStore = create<GameStore>()(
           'sharedServices', 'dealPipeline', 'passedDealIds', 'maFocus', 'maSourcing',
           'integratedPlatforms', 'turnaroundTier', 'activeTurnarounds',
           'currentEvent', 'eventHistory', 'creditTighteningRoundsRemaining', 'inflationRoundsRemaining',
+          'oilShockRoundsRemaining', 'oilShockChoice',
+          'recessionProbMultiplier', 'talentMarketShiftRoundsRemaining', 'privateCreditRoundsRemaining',
           'metricsHistory', 'roundHistory', 'actionsThisRound',
           'debtPaymentThisRound', 'cashBeforeDebtPayments',
           'holdcoDebtStartRound', 'holdcoAmortizationThisRound',
@@ -5103,6 +5123,184 @@ export const useGameStore = create<GameStore>()(
         set({ ...newState, metrics: calculateMetrics(newState) });
       },
 
+      // ── Oil Shock Choice Actions ──
+
+      oilShockHunkerDown: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'global_oil_shock') return;
+        const addToast = useToastStore.getState().addToast;
+        const roundStreams = createRngStreams(state.seed, state.round);
+        const isQuickGame = state.maxRounds <= 10;
+        const cascadeRounds = isQuickGame ? 1 : 2;
+
+        // Shared base effects: interest +1%, credit tightening 1 round
+        const newInterestRate = Math.min(0.15, state.interestRate + OIL_SHOCK_INTEREST_HIKE);
+        const newCreditTightening = (state.creditTighteningRoundsRemaining || 0) + OIL_SHOCK_CREDIT_TIGHTENING_ROUNDS;
+
+        // Apply oil shock margin hit (HALVED for hunker down) + revenue hit for high-sensitivity sectors
+        // Also apply -2% revenue across portfolio
+        const businesses = state.businesses.map(b => {
+          if (b.status !== 'active') return b;
+          const sector = SECTORS[b.sectorId];
+          const sensitivity = sector.oilShockSensitivity ?? 0;
+          const marginHit = OIL_SHOCK_BASE_MARGIN_HIT * sensitivity * OIL_SHOCK_HUNKER_MARGIN_HALVE;
+          const revHit = sensitivity >= OIL_SHOCK_SENSITIVITY_REVENUE_THRESHOLD ? OIL_SHOCK_CONSUMER_REVENUE_HIT : 0;
+          const hunkerRevHit = OIL_SHOCK_HUNKER_REVENUE_CUT;
+          const totalRevHit = revHit + hunkerRevHit;
+          const newRevenue = Math.round(b.revenue * (1 - totalRevHit));
+          const rawMargin = clampMargin(b.ebitdaMargin - marginHit);
+          const rawEbitda = Math.round(newRevenue * rawMargin);
+          const floored = applyEbitdaFloor(rawEbitda, newRevenue, rawMargin, b.acquisitionEbitda);
+          return { ...b, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
+        });
+
+        // Inflation amplification
+        let inflationRounds = state.inflationRoundsRemaining;
+        let extraMarginHit = false;
+        if (inflationRounds > 0) {
+          inflationRounds += 1;
+          extraMarginHit = true;
+        }
+        const finalBusinesses = extraMarginHit ? businesses.map(b => {
+          if (b.status !== 'active') return b;
+          const rawMargin = clampMargin(b.ebitdaMargin - 0.01);
+          return { ...b, ebitdaMargin: rawMargin, ebitda: Math.round(b.revenue * rawMargin) };
+        }) : businesses;
+
+        // Generate 2-3 distressed deals at 25% off
+        const distressedDeals = generateOilShockDeals(state.round, state.maxRounds, roundStreams.deals, state.cash, randomInt(2, OIL_SHOCK_DISTRESSED_DEAL_COUNT, roundStreams.deals));
+
+        const newState: GameState = {
+          ...state as GameState,
+          interestRate: newInterestRate,
+          creditTighteningRoundsRemaining: newCreditTightening,
+          inflationRoundsRemaining: inflationRounds,
+          oilShockRoundsRemaining: cascadeRounds - 1, // -1 because round 1 is this round
+          oilShockChoice: 'hunkerDown',
+          cash: state.cash + OIL_SHOCK_HUNKER_CASH_BONUS,
+          businesses: finalBusinesses,
+          dealPipeline: [...state.dealPipeline, ...distressedDeals],
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        addToast({ message: `Hunkered down — margins halved, +${formatMoney(OIL_SHOCK_HUNKER_CASH_BONUS)} preserved`, type: 'info' });
+      },
+
+      oilShockGoHunting: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'global_oil_shock') return;
+        const addToast = useToastStore.getState().addToast;
+        const roundStreams = createRngStreams(state.seed, state.round);
+        const isQuickGame = state.maxRounds <= 10;
+        const cascadeRounds = isQuickGame ? 1 : 2;
+
+        // Shared base effects
+        const newInterestRate = Math.min(0.15, state.interestRate + OIL_SHOCK_INTEREST_HIKE);
+        const newCreditTightening = (state.creditTighteningRoundsRemaining || 0) + OIL_SHOCK_CREDIT_TIGHTENING_ROUNDS;
+
+        // Full oil shock margin hit + extra -2ppt opportunity cost on existing portfolio
+        const businesses = state.businesses.map(b => {
+          if (b.status !== 'active') return b;
+          const sector = SECTORS[b.sectorId];
+          const sensitivity = sector.oilShockSensitivity ?? 0;
+          const marginHit = OIL_SHOCK_BASE_MARGIN_HIT * sensitivity + OIL_SHOCK_HUNT_MARGIN_COST;
+          const revHit = sensitivity >= OIL_SHOCK_SENSITIVITY_REVENUE_THRESHOLD ? OIL_SHOCK_CONSUMER_REVENUE_HIT : 0;
+          const newRevenue = Math.round(b.revenue * (1 - revHit));
+          const rawMargin = clampMargin(b.ebitdaMargin - marginHit);
+          const rawEbitda = Math.round(newRevenue * rawMargin);
+          const floored = applyEbitdaFloor(rawEbitda, newRevenue, rawMargin, b.acquisitionEbitda);
+          return { ...b, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
+        });
+
+        // Inflation amplification
+        let inflationRounds = state.inflationRoundsRemaining;
+        let extraMarginHit = false;
+        if (inflationRounds > 0) {
+          inflationRounds += 1;
+          extraMarginHit = true;
+        }
+        const finalBusinesses = extraMarginHit ? businesses.map(b => {
+          if (b.status !== 'active') return b;
+          const rawMargin = clampMargin(b.ebitdaMargin - 0.01);
+          return { ...b, ebitdaMargin: rawMargin, ebitda: Math.round(b.revenue * rawMargin) };
+        }) : businesses;
+
+        // Generate base 2-3 + extra 2-3 distressed deals (Go Hunting bonus)
+        const baseDealCount = randomInt(2, OIL_SHOCK_DISTRESSED_DEAL_COUNT, roundStreams.deals);
+        const extraDealCount = randomInt(2, OIL_SHOCK_DISTRESSED_DEAL_COUNT, roundStreams.deals);
+        const distressedDeals = generateOilShockDeals(state.round, state.maxRounds, roundStreams.deals, state.cash, baseDealCount + extraDealCount);
+
+        const newState: GameState = {
+          ...state as GameState,
+          interestRate: newInterestRate,
+          creditTighteningRoundsRemaining: newCreditTightening,
+          inflationRoundsRemaining: inflationRounds,
+          oilShockRoundsRemaining: cascadeRounds - 1,
+          oilShockChoice: 'goHunting',
+          businesses: finalBusinesses,
+          dealPipeline: [...state.dealPipeline, ...distressedDeals],
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        addToast({ message: `Going hunting — ${distressedDeals.length} distressed deals at 25% off, but margins hit hard`, type: 'info' });
+      },
+
+      oilShockPassThrough: () => {
+        const state = get();
+        if (!state.currentEvent || state.currentEvent.type !== 'global_oil_shock') return;
+        const addToast = useToastStore.getState().addToast;
+        const roundStreams = createRngStreams(state.seed, state.round);
+        const isQuickGame = state.maxRounds <= 10;
+        const cascadeRounds = isQuickGame ? 1 : 2;
+
+        // Shared base effects
+        const newInterestRate = Math.min(0.15, state.interestRate + OIL_SHOCK_INTEREST_HIKE);
+        const newCreditTightening = (state.creditTighteningRoundsRemaining || 0) + OIL_SHOCK_CREDIT_TIGHTENING_ROUNDS;
+
+        // Pass Through: margins preserved (no oil shock margin hit), but revenue hit from customer churn
+        // Quality-based: Q4+ lose less, Q1-Q2 lose more
+        const businesses = state.businesses.map(b => {
+          if (b.status !== 'active') return b;
+          const churnHit = b.qualityRating >= OIL_SHOCK_PASSTHROUGH_QUALITY_THRESHOLD
+            ? OIL_SHOCK_PASSTHROUGH_REVENUE_HIT_LOW
+            : OIL_SHOCK_PASSTHROUGH_REVENUE_HIT_HIGH;
+          const newRevenue = Math.round(b.revenue * (1 - churnHit));
+          const rawEbitda = Math.round(newRevenue * b.ebitdaMargin);
+          const floored = applyEbitdaFloor(rawEbitda, newRevenue, b.ebitdaMargin, b.acquisitionEbitda);
+          return { ...b, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
+        });
+
+        // Inflation amplification
+        let inflationRounds = state.inflationRoundsRemaining;
+        let extraMarginHit = false;
+        if (inflationRounds > 0) {
+          inflationRounds += 1;
+          extraMarginHit = true;
+        }
+        const finalBusinesses = extraMarginHit ? businesses.map(b => {
+          if (b.status !== 'active') return b;
+          const rawMargin = clampMargin(b.ebitdaMargin - 0.01);
+          return { ...b, ebitdaMargin: rawMargin, ebitda: Math.round(b.revenue * rawMargin) };
+        }) : businesses;
+
+        // Generate 2-3 distressed deals at 25% off
+        const distressedDeals = generateOilShockDeals(state.round, state.maxRounds, roundStreams.deals, state.cash, randomInt(2, OIL_SHOCK_DISTRESSED_DEAL_COUNT, roundStreams.deals));
+
+        const newState: GameState = {
+          ...state as GameState,
+          interestRate: newInterestRate,
+          creditTighteningRoundsRemaining: newCreditTightening,
+          inflationRoundsRemaining: inflationRounds,
+          oilShockRoundsRemaining: cascadeRounds - 1,
+          oilShockChoice: 'passThrough',
+          businesses: finalBusinesses,
+          dealPipeline: [...state.dealPipeline, ...distressedDeals],
+          currentEvent: null,
+        };
+        set({ ...newState, metrics: calculateMetrics(newState) });
+        addToast({ message: `Passed costs through — margins preserved, customers absorbing the hit`, type: 'info' });
+      },
+
       forgeIntegratedPlatform: (recipeId: string, businessIds: string[]) => {
         const state = get();
         if (state.phase !== 'allocate') return;
@@ -5627,7 +5825,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v38', // v38: Turnaround System Overhaul
+      name: 'holdco-tycoon-save-v39', // v39: Oil Shock Market Event
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

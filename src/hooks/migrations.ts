@@ -1027,6 +1027,32 @@ function migrateV37ToV38(): void {
 }
 
 /**
+ * v38 → v39: Oil Shock event — backfill oilShockRoundsRemaining and oilShockChoice.
+ */
+function migrateV38ToV39(): void {
+  const v38Key = 'holdco-tycoon-save-v38';
+  const v39Key = 'holdco-tycoon-save-v39';
+  if (localStorage.getItem(v39Key)) return;
+  try {
+    const raw = localStorage.getItem(v38Key);
+    if (!raw) return;
+    const v38Data = JSON.parse(raw);
+
+    if (v38Data.state) {
+      if (v38Data.state.oilShockRoundsRemaining === undefined) {
+        v38Data.state.oilShockRoundsRemaining = 0;
+      }
+      // oilShockChoice defaults to undefined (no backfill needed)
+    }
+
+    localStorage.setItem(v39Key, JSON.stringify(v38Data));
+    localStorage.removeItem(v38Key);
+  } catch (e) {
+    console.error('v38→v39 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -1060,4 +1086,5 @@ export function runAllMigrations(): void {
   migrateV35ToV36();
   migrateV36ToV37();
   migrateV37ToV38();
+  migrateV38ToV39();
 }

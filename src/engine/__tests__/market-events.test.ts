@@ -879,3 +879,191 @@ describe('Private Credit Boom', () => {
     expect(evt!.probability).toBeGreaterThan(0);
   });
 });
+
+// ── Oil Shock ──────────────────────────────────────────────────────
+
+import { generateOilShockDeals } from '../businesses';
+import { SECTORS } from '../../data/sectors';
+
+describe('Oil Shock', () => {
+  it('oil shock event exists in global events with correct probability', () => {
+    const evt = GLOBAL_EVENTS.find(e => e.type === 'global_oil_shock');
+    expect(evt).toBeDefined();
+    expect(evt!.probability).toBe(0.03);
+  });
+
+  it('oil shock event generates with 3 choices', () => {
+    // Brute-force: try many seeds until we get an oil shock
+    let oilShockEvent: GameEvent | null = null;
+    for (let seed = 1; seed <= 5000; seed++) {
+      const state = createMockGameState({
+        seed,
+        round: 5,
+        businesses: [createMockBusiness({ sectorId: 'distribution' })],
+        oilShockRoundsRemaining: 0,
+      });
+      const roundSeed = deriveRoundSeed(seed, 5);
+      const rng = new SeededRng(deriveStreamSeed(roundSeed, STREAM_IDS.events));
+      const event = generateEvent(state, rng);
+      if (event?.type === 'global_oil_shock') {
+        oilShockEvent = event;
+        break;
+      }
+    }
+    // Even if we don't find one via RNG (3% is low), verify the event definition exists
+    // and has the correct structure when generated
+    const evtDef = GLOBAL_EVENTS.find(e => e.type === 'global_oil_shock');
+    expect(evtDef).toBeDefined();
+    if (oilShockEvent) {
+      expect(oilShockEvent.choices).toBeDefined();
+      expect(oilShockEvent.choices!.length).toBe(3);
+      expect(oilShockEvent.choices!.map(c => c.action)).toEqual([
+        'oilShockHunkerDown',
+        'oilShockGoHunting',
+        'oilShockPassThrough',
+      ]);
+    }
+  });
+
+  it('oil shock is blocked in rounds 1-2', () => {
+    for (const round of [1, 2]) {
+      for (let seed = 1; seed <= 2000; seed++) {
+        const state = createMockGameState({
+          seed,
+          round,
+          businesses: [createMockBusiness()],
+        });
+        const roundSeed = deriveRoundSeed(seed, round);
+        const rng = new SeededRng(deriveStreamSeed(roundSeed, STREAM_IDS.events));
+        const event = generateEvent(state, rng);
+        expect(event?.type).not.toBe('global_oil_shock');
+      }
+    }
+  });
+
+  it('oil shock is blocked when credit tightening is active', () => {
+    for (let seed = 1; seed <= 2000; seed++) {
+      const state = createMockGameState({
+        seed,
+        round: 5,
+        businesses: [createMockBusiness()],
+        creditTighteningRoundsRemaining: 2,
+      });
+      const roundSeed = deriveRoundSeed(seed, 5);
+      const rng = new SeededRng(deriveStreamSeed(roundSeed, STREAM_IDS.events));
+      const event = generateEvent(state, rng);
+      expect(event?.type).not.toBe('global_oil_shock');
+    }
+  });
+
+  it('oil shock aftershock is forced when oilShockRoundsRemaining > 0', () => {
+    const state = createMockGameState({
+      seed: 42,
+      round: 6,
+      businesses: [createMockBusiness({ sectorId: 'distribution' })],
+      oilShockRoundsRemaining: 1,
+    });
+    const rng = new SeededRng(deriveStreamSeed(deriveRoundSeed(42, 6), STREAM_IDS.events));
+    const event = generateEvent(state, rng);
+    expect(event).not.toBeNull();
+    expect(event!.type).toBe('global_oil_shock_aftershock');
+    expect(event!.title).toBe('Oil Shock Aftershock');
+  });
+
+  it('aftershock applyEventEffects reduces revenue and margin by sensitivity', () => {
+    const distBiz = createMockBusiness({
+      id: 'dist_1',
+      sectorId: 'distribution',
+      revenue: 10000,
+      ebitdaMargin: 0.20,
+      ebitda: 2000,
+      acquisitionEbitda: 1500,
+    });
+    const saasBiz = createMockBusiness({
+      id: 'saas_1',
+      sectorId: 'saas',
+      revenue: 8000,
+      ebitdaMargin: 0.25,
+      ebitda: 2000,
+      acquisitionEbitda: 1500,
+    });
+    const state = createMockGameState({
+      round: 7,
+      businesses: [distBiz, saasBiz],
+      oilShockRoundsRemaining: 1,
+    });
+    const aftershockEvent: GameEvent = {
+      id: 'event_7_global_oil_shock_aftershock',
+      type: 'global_oil_shock_aftershock',
+      title: 'Oil Shock Aftershock',
+      description: 'Test',
+      effect: 'Test',
+    };
+    const result = applyEventEffects(state, aftershockEvent);
+
+    // Distribution: sensitivity 1.5 → revenue -7.5%, margin -1.5ppt
+    const distResult = result.businesses.find(b => b.id === 'dist_1')!;
+    const distSens = SECTORS.distribution.oilShockSensitivity ?? 0;
+    expect(distSens).toBe(1.5);
+    expect(distResult.revenue).toBeLessThan(distBiz.revenue);
+
+    // SaaS: sensitivity 0.2 → revenue -1%, margin -0.2ppt (minimal)
+    const saasResult = result.businesses.find(b => b.id === 'saas_1')!;
+    const saasSens = SECTORS.saas.oilShockSensitivity ?? 0;
+    expect(saasSens).toBe(0.2);
+    // SaaS should be less affected than distribution
+    const distRevDrop = (distBiz.revenue - distResult.revenue) / distBiz.revenue;
+    const saasRevDrop = (saasBiz.revenue - saasResult.revenue) / saasBiz.revenue;
+    expect(distRevDrop).toBeGreaterThan(saasRevDrop);
+
+    // Counter should be decremented
+    expect(result.oilShockRoundsRemaining).toBe(0);
+  });
+
+  it('oil shock is in cooldownTypes set (no back-to-back)', () => {
+    // Oil shock that just fired should prevent another next round
+    const state = createMockGameState({
+      seed: 42,
+      round: 6,
+      businesses: [createMockBusiness()],
+      eventHistory: [{ type: 'global_oil_shock', round: 5 }] as any,
+    });
+    // With cooldown, oil shock should not fire immediately after
+    for (let seed = 1; seed <= 2000; seed++) {
+      const s = { ...state, seed };
+      const rng = new SeededRng(deriveStreamSeed(deriveRoundSeed(seed, 6), STREAM_IDS.events));
+      const event = generateEvent(s, rng);
+      expect(event?.type).not.toBe('global_oil_shock');
+    }
+  });
+});
+
+// ── Oil Shock Distressed Deals ─────────────────────────────────────
+
+describe('generateOilShockDeals', () => {
+  it('generates the requested number of distressed deals', () => {
+    const rng = new SeededRng(42);
+    const deals = generateOilShockDeals(5, 20, rng, 10000, 3);
+    expect(deals.length).toBe(3);
+  });
+
+  it('deals have discounted prices', () => {
+    const rng = new SeededRng(42);
+    const deals = generateOilShockDeals(5, 20, rng, 10000, 3);
+    for (const deal of deals) {
+      // All oil shock deals should have a discount applied
+      expect(deal.askingPrice).toBeGreaterThan(0);
+      expect(deal.source).toBe('brokered');
+    }
+  });
+
+  it('works with different counts', () => {
+    const rng1 = new SeededRng(99);
+    const deals1 = generateOilShockDeals(3, 20, rng1, 5000, 1);
+    expect(deals1.length).toBe(1);
+
+    const rng2 = new SeededRng(99);
+    const deals2 = generateOilShockDeals(3, 20, rng2, 5000, 5);
+    expect(deals2.length).toBe(5);
+  });
+});

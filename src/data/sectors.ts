@@ -17,6 +17,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'high',
     talentDependency: 'high',
     recessionSensitivity: 1.2,
+    oilShockSensitivity: 0.8,
     sharedServicesBenefit: 1.4,
     sectorFocusGroup: ['agency', 'b2bServices'],
     subTypes: [
@@ -51,6 +52,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'low',
     talentDependency: 'medium',
     recessionSensitivity: 0.5,
+    oilShockSensitivity: 0.2,
     sharedServicesBenefit: 0.8,
     sectorFocusGroup: ['saas', 'b2bServices'],
     subTypes: [
@@ -84,6 +86,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'low',
     talentDependency: 'medium',
     recessionSensitivity: 0.3,
+    oilShockSensitivity: 1.0,
     sharedServicesBenefit: 1.2,
     sectorFocusGroup: ['homeServices'],
     subTypes: [
@@ -117,6 +120,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'medium',
     talentDependency: 'low',
     recessionSensitivity: 1.0,
+    oilShockSensitivity: 1.2,
     sharedServicesBenefit: 1.0,
     sectorFocusGroup: ['consumer', 'restaurant'],
     subTypes: [
@@ -148,6 +152,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'low',
     talentDependency: 'low',
     recessionSensitivity: 0.7,
+    oilShockSensitivity: 1.1,
     sharedServicesBenefit: 1.3,
     sectorFocusGroup: ['industrial'],
     subTypes: [
@@ -182,6 +187,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'medium',
     talentDependency: 'medium',
     recessionSensitivity: 0.8,
+    oilShockSensitivity: 0.6,
     sharedServicesBenefit: 1.3,
     sectorFocusGroup: ['b2bServices', 'agency', 'saas'],
     subTypes: [
@@ -216,6 +222,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'low',
     talentDependency: 'high',
     recessionSensitivity: 0.2,
+    oilShockSensitivity: 0.5,
     sharedServicesBenefit: 1.1,
     sectorFocusGroup: ['healthcare'],
     subTypes: [
@@ -250,6 +257,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'low',
     talentDependency: 'medium',
     recessionSensitivity: 0.8,
+    oilShockSensitivity: 1.3,
     sharedServicesBenefit: 1.3,
     sectorFocusGroup: ['restaurant', 'consumer'],
     subTypes: [
@@ -284,6 +292,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'low',
     talentDependency: 'low',
     recessionSensitivity: 0.6,
+    oilShockSensitivity: 0.7,
     sharedServicesBenefit: 0.6,
     sectorFocusGroup: ['realEstate'],
     subTypes: [
@@ -314,6 +323,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'low',
     talentDependency: 'medium',
     recessionSensitivity: -0.2, // counter-cyclical
+    oilShockSensitivity: -0.3,
     sharedServicesBenefit: 1.1,
     sectorFocusGroup: ['education', 'saas'],
     subTypes: [
@@ -347,6 +357,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'medium',
     talentDependency: 'high',
     recessionSensitivity: 0.35,
+    oilShockSensitivity: 0.3,
     sharedServicesBenefit: 1.2,
     sectorFocusGroup: ['insurance'],
     subTypes: [
@@ -377,6 +388,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'low',
     talentDependency: 'low',
     recessionSensitivity: 0.25,
+    oilShockSensitivity: 0.5,
     sharedServicesBenefit: 1.4,
     sectorFocusGroup: ['autoServices', 'homeServices'],
     subTypes: [
@@ -408,6 +420,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'medium',
     talentDependency: 'low',
     recessionSensitivity: 0.65,
+    oilShockSensitivity: 1.5,
     sharedServicesBenefit: 1.5,
     sectorFocusGroup: ['distribution', 'industrial'],
     subTypes: [
@@ -438,6 +451,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'medium',
     talentDependency: 'high',
     recessionSensitivity: 0.4,
+    oilShockSensitivity: 0.4,
     sharedServicesBenefit: 1.1,
     sectorFocusGroup: ['wealthManagement', 'insurance'],
     subTypes: [
@@ -471,6 +485,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'low',
     talentDependency: 'low',
     recessionSensitivity: 0.3,
+    oilShockSensitivity: -0.2,
     sharedServicesBenefit: 1.4,
     sectorFocusGroup: ['environmental', 'homeServices'],
     subTypes: [
@@ -504,6 +519,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'medium',
     talentDependency: 'high',
     recessionSensitivity: 0.7,
+    oilShockSensitivity: -0.4,
     sharedServicesBenefit: 1.0,
     sectorFocusGroup: ['privateCredit', 'wealthManagement', 'insurance'],
     subTypes: [
@@ -537,6 +553,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'medium',
     talentDependency: 'high',
     recessionSensitivity: 0.9,
+    oilShockSensitivity: 0.9,
     sharedServicesBenefit: 1.2,
     sectorFocusGroup: ['mediaEntertainment', 'agency'],
     subTypes: [
@@ -570,6 +587,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'low',
     talentDependency: 'high',
     recessionSensitivity: 0.5,
+    oilShockSensitivity: 0.3,
     sharedServicesBenefit: 1.0,
     sectorFocusGroup: ['fintech', 'privateCredit', 'saas'],
     subTypes: [
@@ -603,6 +621,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'high',
     talentDependency: 'medium',
     recessionSensitivity: 0.2,
+    oilShockSensitivity: -0.3,
     sharedServicesBenefit: 1.3,
     sectorFocusGroup: ['aerospace', 'industrial'],
     subTypes: [
@@ -636,6 +655,7 @@ export const SECTORS: Record<string, SectorDefinition> = {
     clientConcentration: 'low',
     talentDependency: 'medium',
     recessionSensitivity: 0.3,
+    oilShockSensitivity: 0.4,
     sharedServicesBenefit: 0.5,
     sectorFocusGroup: ['proSports'],
     subTypes: ['nfl', 'nba', 'mlb', 'nhl', 'epl', 'mls', 'wnba', 'nwsl'],

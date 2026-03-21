@@ -1163,6 +1163,7 @@ function EventsContent() {
           ['Yield Curve Inversion', 'Doubles the probability of a recession in the following year. A warning signal for leveraged portfolios.'],
           ['Talent Market Shift', 'High-talent sectors (SaaS, Wealth Mgmt, B2B Services, Healthcare, Agency) lose -2ppt margin (-1ppt with HR shared services).'],
           ['Private Credit Boom', 'Existing bank debt rates drop 1.5%. Competitive lending environment for 3 rounds.'],
+          ['Oil Shock', 'Energy crisis: margin -2ppt × oil sensitivity, revenue -5% for high-sensitivity sectors, interest +1%, credit tightening 1 round. Choose: Hunker Down (halve margin hit, -2% rev, +$750K cash), Go Hunting (extra distressed deals at 25% off, but -2ppt margin on portfolio), or Pass Through Costs (preserve margins, revenue loss based on quality). In 20yr mode, an aftershock hits the following round.'],
           ['Quiet Year', 'Nothing significant happens; a chance to execute your plan undisturbed. Capped at 2 per game (10yr) or 4 per game (20yr).'],
         ]}
       />
@@ -1188,6 +1189,20 @@ function EventsContent() {
           ['Medium (0.6-0.8)', 'Real Estate (0.6), Distribution (0.65), Industrial (0.7), Private Credit (0.7), B2B Services (0.8), Restaurants (0.8)'],
           ['High (1.0-1.2)', 'Consumer Brands (1.0), Agency (1.2)'],
           ['Counter-Cyclical (-0.2)', 'Education (-0.2) — actually benefits from recessions'],
+        ]}
+      />
+
+      <SubHeading>Oil Shock Sensitivity by Sector</SubHeading>
+      <P>
+        Oil shocks hit sectors differently based on their exposure to energy costs, physical supply chains, and consumer discretionary spending:
+      </P>
+      <DataTable
+        headers={['Sensitivity', 'Sectors']}
+        rows={[
+          ['High (1.0-1.5)', 'Distribution (1.5), Restaurants (1.3), Consumer (1.2), Industrial (1.1), Home Services (1.0)'],
+          ['Medium (0.5-0.9)', 'Media/Entertainment (0.9), Agency (0.8), Real Estate (0.7), B2B Services (0.6), Healthcare (0.5), Auto Services (0.5)'],
+          ['Low (0.2-0.4)', 'Wealth Mgmt (0.4), Pro Sports (0.4), Insurance (0.3), Fintech (0.3), SaaS (0.2)'],
+          ['Counter-Cyclical', 'Environmental (-0.2), Education (-0.3), Aerospace (-0.3), Private Credit (-0.4) — benefit from energy disruption'],
         ]}
       />
 

@@ -1494,6 +1494,55 @@ export function generateRecessionDeals(
   }));
 }
 
+// Generate distressed deals during Oil Shock (at 25% off, Q3 cap)
+export function generateOilShockDeals(
+  round: number,
+  maxRounds: number = 20,
+  rng?: SeededRng,
+  cash: number = 0,
+  count: number = 3,
+): Deal[] {
+  const deals: Deal[] = [];
+
+  // Compute affordability internally for tier selection
+  const affordResult = rng
+    ? calculateAffordability(cash, false, false, null, rng)
+    : { base: cash * 4, stretched: cash * 4, stretchFactor: 0, ipoBonus: 0 };
+  const tierWeights = getAffordabilityWeights(affordResult.stretched, cash);
+
+  for (let i = 0; i < count; i++) {
+    const sectorId = pickWeightedSector(round, maxRounds, rng);
+    const multipleDiscount = 0.25; // Fixed 25% discount per plan
+    const tier = rng ? pickWeightedTier(tierWeights, rng) : 'micro';
+
+    deals.push(generateDealWithSize(
+      sectorId,
+      round,
+      'any',
+      0,
+      {
+        qualityFloor: 2 as QualityRating,
+        source: 'brokered',
+        freshnessBonus: 1,
+        multipleDiscount,
+        maxRounds,
+      },
+      rng,
+      tier,
+      affordResult.stretched,
+    ));
+  }
+
+  // Cap quality at 3 (fixable problems, not gems)
+  return deals.map(deal => ({
+    ...deal,
+    business: {
+      ...deal.business,
+      qualityRating: Math.min(3, deal.business.qualityRating) as QualityRating,
+    },
+  }));
+}
+
 // Generate additional deals through investment banker sourcing
 // More expensive but higher chance of getting deals in your focus sector
 export function generateSourcedDeals(

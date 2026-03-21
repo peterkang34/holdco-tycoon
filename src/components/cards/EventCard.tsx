@@ -66,6 +66,9 @@ export function EventCard({ event, businesses, currentRound, lastEventType, onCh
         return '👥';
       case 'global_private_credit_boom':
         return '💳';
+      case 'global_oil_shock':
+      case 'global_oil_shock_aftershock':
+        return '🛢️';
       case 'sector_event':
         return '📊';
       default:
@@ -96,6 +99,8 @@ export function EventCard({ event, businesses, currentRound, lastEventType, onCh
     event.type === 'portfolio_antitrust_scrutiny' ||
     event.type === 'global_yield_curve_inversion' ||
     event.type === 'global_talent_market_shift' ||
+    event.type === 'global_oil_shock' ||
+    event.type === 'global_oil_shock_aftershock' ||
     (event.type === 'sector_event' && event.effect.includes('-'));
 
   const borderColor = event.type === 'global_quiet' ? 'border-white/20' :

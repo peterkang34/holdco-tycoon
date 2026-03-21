@@ -13,6 +13,28 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'March 21, 2026',
+    title: 'Oil Shock Market Event',
+    sections: [
+      {
+        heading: 'Geopolitical Crisis — Oil Shock',
+        items: [
+          'New global event: an energy crisis disrupts supply chains and consumer spending. 3% probability, blocked in early rounds.',
+          'Three strategic choices: Hunker Down (preserve cash, halve margin damage), Go Hunting (buy distressed deals at 25% off, but existing portfolio takes -2ppt margin), or Pass Through Costs (preserve margins, lose revenue based on business quality).',
+          'Every sector has a unique oil sensitivity (-0.4 to 1.5). Distribution and restaurants get hammered; SaaS and private credit barely notice.',
+          'In 20-year mode, the shock cascades over 2 rounds — a cost shock followed by a demand aftershock. 10-year mode resolves in 1 round.',
+          'Distressed deals appear during the crisis. Cash-rich holdcos can pick up bargains while others hunker down.',
+        ],
+      },
+      {
+        heading: 'Bug Fixes',
+        items: [
+          'Fixed several event counter fields (recession probability, talent market shift, private credit boom, oil shock) not persisting across save/load.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 17, 2026',
     title: 'Turnaround System Overhaul',
     sections: [

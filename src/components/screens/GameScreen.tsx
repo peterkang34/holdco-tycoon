@@ -235,6 +235,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     competitorAccelerate,
     competitorDifferentiate,
     competitorAbsorb,
+    oilShockHunkerDown,
+    oilShockGoHunting,
+    oilShockPassThrough,
     forgeIntegratedPlatform,
     addToIntegratedPlatform,
     sellPlatform,
@@ -364,6 +367,10 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       case 'competitorAccelerate': competitorAccelerate(); break;
       case 'competitorDifferentiate': competitorDifferentiate(); break;
       case 'competitorAbsorb': competitorAbsorb(); break;
+      // Oil shock choices
+      case 'oilShockHunkerDown': oilShockHunkerDown(); break;
+      case 'oilShockGoHunting': oilShockGoHunting(); break;
+      case 'oilShockPassThrough': oilShockPassThrough(); break;
     }
     // Only advance if the action succeeded (cleared currentEvent)
     // If it failed (e.g., insufficient cash), event stays on screen

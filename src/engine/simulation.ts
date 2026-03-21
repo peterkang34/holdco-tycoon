@@ -102,6 +102,16 @@ import {
   FILLER_REPUTATION_COST_MIN,
   FILLER_REPUTATION_COST_MAX,
   COMPETITIVE_POSITION_PREMIUM,
+  OIL_SHOCK_BASE_MARGIN_HIT,
+  OIL_SHOCK_AFTERSHOCK_DECAY,
+  OIL_SHOCK_CONSUMER_REVENUE_HIT,
+  OIL_SHOCK_DISTRESSED_DEAL_COUNT,
+  OIL_SHOCK_HUNKER_REVENUE_CUT,
+  OIL_SHOCK_HUNKER_CASH_BONUS,
+  OIL_SHOCK_HUNT_MARGIN_COST,
+  OIL_SHOCK_PASSTHROUGH_REVENUE_HIT_HIGH,
+  OIL_SHOCK_PASSTHROUGH_REVENUE_HIT_LOW,
+  OIL_SHOCK_PASSTHROUGH_QUALITY_THRESHOLD,
   COMPLEXITY_ACTIVATION_THRESHOLD,
   COMPLEXITY_ACTIVATION_THRESHOLD_QUICK,
   COMPLEXITY_COST_PER_OPCO,
@@ -887,9 +897,26 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
   // Note: recessionProbMultiplier and talentMarketShiftRoundsRemaining are consumed/decremented
   // in advanceToEvent (the caller), not here. This function only reads them.
 
+  // Oil shock aftershock: forced event, bypasses normal generation
+  if ((state.oilShockRoundsRemaining ?? 0) > 0) {
+    const isQuickGame = state.maxRounds <= 10;
+    const aftershockEffect = isQuickGame
+      ? `Revenue -5% × oil sensitivity. Margin -1ppt × oil sensitivity (aftershock decay). More distressed deals appear.`
+      : `Revenue -5% × oil sensitivity. Margin -1ppt × oil sensitivity (aftershock decay). More distressed deals appear.`;
+    return {
+      id: `event_${state.round}_global_oil_shock_aftershock`,
+      type: 'global_oil_shock_aftershock' as EventType,
+      title: 'Oil Shock Aftershock',
+      description: 'The energy crisis reverberates through the economy. Consumer demand erodes as costs remain elevated.',
+      effect: aftershockEffect,
+      tip: 'Danaher\'s playbook: buy quality businesses during the aftershock when sellers are most desperate.',
+      tipSource: 'Ch. VI',
+    };
+  }
+
   // Anti-repeat: 1-round cooldown for severe global events
   const lastGlobalEvent = [...state.eventHistory].reverse().find(e => e.type.startsWith('global_'));
-  const cooldownTypes = new Set(['global_recession', 'global_financial_crisis', 'global_credit_tightening']);
+  const cooldownTypes = new Set(['global_recession', 'global_financial_crisis', 'global_credit_tightening', 'global_oil_shock']);
 
   // Roll for global event
   const globalRoll = rng ? rng.next() : Math.random();
@@ -904,6 +931,11 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
     // Yield curve inversion: double recession probability for one round
     if (eventDef.type === 'global_recession' && (state.recessionProbMultiplier ?? 1) > 1) {
       prob *= state.recessionProbMultiplier!;
+    }
+    // Oil shock: block rounds 1-2, block if financial crisis is active
+    if (eventDef.type === 'global_oil_shock') {
+      if (state.round <= 2) prob = 0;
+      if ((state.creditTighteningRoundsRemaining ?? 0) > 0) prob = 0;
     }
     cumulativeProb += prob;
     if (globalRoll < cumulativeProb) {
@@ -921,6 +953,42 @@ export function generateEvent(state: GameState, rng?: SeededRng): GameEvent | nu
         const ctRounds = isQuickGame ? 1 : 2;
         effect = `Exit multiples -1.0x. Interest rate +2%. Existing bank debt rates +1.5%. Credit tightening for ${ctRounds} round${ctRounds === 1 ? '' : 's'}. But: 3-4 distressed deals appear at 30-50% off.`;
       }
+      // Oil shock: choice-based event with 3 options
+      if (eventDef.type === 'global_oil_shock') {
+        const cascadeRounds = isQuickGame ? 1 : 2;
+        const oilEffect = `Margin -2ppt × oil sensitivity. Revenue -5% for high-sensitivity sectors. Interest +1%. Credit tightening 1 round. ${OIL_SHOCK_DISTRESSED_DEAL_COUNT} distressed deals at 25% off.${cascadeRounds > 1 ? ' Aftershock next round.' : ''}`;
+        const choices: EventChoice[] = [
+          {
+            label: 'Hunker Down',
+            description: `-${(OIL_SHOCK_HUNKER_REVENUE_CUT * 100).toFixed(0)}% rev, margin hit halved, +${formatMoney(OIL_SHOCK_HUNKER_CASH_BONUS)} cash preserved`,
+            action: 'oilShockHunkerDown',
+            variant: 'neutral',
+          },
+          {
+            label: 'Go Hunting',
+            description: `${OIL_SHOCK_DISTRESSED_DEAL_COUNT} extra distressed deals at 25% off, but -${(OIL_SHOCK_HUNT_MARGIN_COST * 100).toFixed(0)}ppt margin on existing portfolio`,
+            action: 'oilShockGoHunting',
+            variant: 'positive',
+          },
+          {
+            label: 'Pass Through Costs',
+            description: `Margins preserved. Revenue hit varies by quality: Q${OIL_SHOCK_PASSTHROUGH_QUALITY_THRESHOLD}+ lose ${(OIL_SHOCK_PASSTHROUGH_REVENUE_HIT_LOW * 100).toFixed(0)}%, others lose ${(OIL_SHOCK_PASSTHROUGH_REVENUE_HIT_HIGH * 100).toFixed(0)}%`,
+            action: 'oilShockPassThrough',
+            variant: 'negative',
+          },
+        ];
+        return {
+          id: `event_${state.round}_global_oil_shock`,
+          type: 'global_oil_shock' as EventType,
+          title: eventDef.title,
+          description: eventDef.description,
+          effect: oilEffect,
+          tip: eventDef.tip,
+          tipSource: eventDef.tipSource,
+          choices,
+        };
+      }
+
       // PE Fund mode: replace quiet year flavor text
       const title = (eventDef.type === 'global_quiet' && state.isFundManagerMode)
         ? 'Steady Quarter'
@@ -1695,6 +1763,45 @@ export function applyEventEffects(state: GameState, event: GameEvent, rng?: Seed
         };
       }
 
+      break;
+    }
+
+    case 'global_oil_shock_aftershock': {
+      // Aftershock: revenue shock + decayed margin hit across all sectors
+      newState.businesses = newState.businesses.map(b => {
+        if (b.status !== 'active') return b;
+        const sector = SECTORS[b.sectorId];
+        const sensitivity = sector.oilShockSensitivity ?? 0;
+        const revImpact = OIL_SHOCK_CONSUMER_REVENUE_HIT * sensitivity;
+        const marginImpact = OIL_SHOCK_BASE_MARGIN_HIT * OIL_SHOCK_AFTERSHOCK_DECAY * sensitivity; // decayed margin hit
+        const beforeEbitda = b.ebitda;
+        const newRevenue = Math.round(b.revenue * (1 - revImpact));
+        const rawMargin = clampMargin(b.ebitdaMargin - marginImpact);
+        const rawEbitda = Math.round(newRevenue * rawMargin);
+        const floored = applyEbitdaFloor(rawEbitda, newRevenue, rawMargin, b.acquisitionEbitda);
+        if (Math.abs(revImpact) > 0.001) {
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'revenue',
+            before: b.revenue, after: newRevenue, delta: newRevenue - b.revenue, deltaPercent: -revImpact,
+          });
+        }
+        if (Math.abs(floored.ebitda - beforeEbitda) > 0) {
+          impacts.push({
+            businessId: b.id, businessName: b.name, metric: 'ebitda',
+            before: beforeEbitda, after: floored.ebitda, delta: floored.ebitda - beforeEbitda,
+            deltaPercent: beforeEbitda > 0 ? (floored.ebitda - beforeEbitda) / beforeEbitda : 0,
+          });
+        }
+        return { ...b, revenue: newRevenue, ebitdaMargin: floored.margin, ebitda: floored.ebitda };
+      });
+      // Decrement aftershock counter
+      newState.oilShockRoundsRemaining = Math.max(0, (newState.oilShockRoundsRemaining ?? 0) - 1);
+      break;
+    }
+
+    case 'global_oil_shock': {
+      // Oil shock Round 1 is a choice event — effects applied via Zustand actions, not here
+      // This case should not be reached (skipEffects), but handle gracefully
       break;
     }
 

@@ -105,6 +105,15 @@ export const GLOBAL_EVENTS: EventDefinition[] = [
     effectDescription: 'Existing bank debt rates drop 1.5%. Competitive lending environment for 3 rounds.',
     tip: 'Private credit is the fastest-growing asset class in alternatives. Use it strategically when bank markets are tight.',
   },
+  {
+    type: 'global_oil_shock',
+    title: 'Geopolitical Crisis — Oil Shock',
+    description: 'A geopolitical crisis disrupts global energy markets. Oil prices spike, rippling through supply chains and consumer spending.',
+    probability: 0.03,
+    effectDescription: 'Margin compression based on oil sensitivity. Interest +1%. Credit tightening 1 round. Distressed deals at 25% off.',
+    tip: 'Constellation Software\'s digital portfolio barely felt the 2022 energy crisis. Physical supply chain exposure is the real risk factor.',
+    tipSource: 'Ch. VI',
+  },
 ];
 
 export const PORTFOLIO_EVENTS: EventDefinition[] = [

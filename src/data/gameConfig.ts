@@ -201,6 +201,24 @@ export const CONSOLIDATION_BOOM_EXCLUSIVE_MIN_OPCOS = 2;     // need 2+ in secto
 export const CONSOLIDATION_BOOM_SECTORS = ['environmental', 'homeServices', 'autoServices', 'industrial'] as const;
 export const CONSOLIDATION_BOOM_DYNAMIC_MIN_OPCOS = 3;
 
+// ── Oil Shock Event Constants ──
+
+export const OIL_SHOCK_BASE_MARGIN_HIT = 0.02;
+export const OIL_SHOCK_CONSUMER_REVENUE_HIT = 0.05;
+export const OIL_SHOCK_INTEREST_HIKE = 0.01;
+export const OIL_SHOCK_CREDIT_TIGHTENING_ROUNDS = 1;
+export const OIL_SHOCK_DISTRESSED_DEAL_COUNT = 3;
+export const OIL_SHOCK_DISTRESSED_DISCOUNT = 0.25;
+export const OIL_SHOCK_AFTERSHOCK_DECAY = 0.60;
+export const OIL_SHOCK_SENSITIVITY_REVENUE_THRESHOLD = 1.0;
+export const OIL_SHOCK_HUNKER_REVENUE_CUT = 0.02;
+export const OIL_SHOCK_HUNKER_MARGIN_HALVE = 0.50;
+export const OIL_SHOCK_HUNKER_CASH_BONUS = 750;
+export const OIL_SHOCK_HUNT_MARGIN_COST = 0.02;
+export const OIL_SHOCK_PASSTHROUGH_REVENUE_HIT_HIGH = 0.06;
+export const OIL_SHOCK_PASSTHROUGH_REVENUE_HIT_LOW = 0.02;
+export const OIL_SHOCK_PASSTHROUGH_QUALITY_THRESHOLD = 4;
+
 // ── 20-Year Mode: Deal Inflation ──
 
 export const DEAL_INFLATION_START_ROUND = 11;

@@ -61,6 +61,7 @@ export interface SectorDefinition {
   clientConcentration: ConcentrationLevel;
   talentDependency: ConcentrationLevel;
   recessionSensitivity: number; // multiplier
+  oilShockSensitivity?: number; // multiplier for oil shock margin/revenue impact
   sharedServicesBenefit: number; // 0.5-1.5x
   sectorFocusGroup: SectorFocusGroup[];
   subTypes: string[];
@@ -368,7 +369,9 @@ export type EventType =
   | 'portfolio_competitor_acquisition'
   | 'global_yield_curve_inversion'
   | 'global_talent_market_shift'
-  | 'global_private_credit_boom';
+  | 'global_private_credit_boom'
+  | 'global_oil_shock'
+  | 'global_oil_shock_aftershock';
 
 export interface EventChoice {
   label: string;
@@ -593,6 +596,8 @@ export interface GameState {
   recessionProbMultiplier?: number; // Yield curve inversion: 2x recession prob next round, then resets
   talentMarketShiftRoundsRemaining?: number; // Great Resignation: margin pressure for high-talent sectors
   privateCreditRoundsRemaining?: number; // Private credit boom: extra financing option
+  oilShockRoundsRemaining?: number; // Oil shock cascade: 2 rounds (standard), 1 round (quick)
+  oilShockChoice?: string; // Player's Round 1 choice for aftershock context
 
   // History
   metricsHistory: HistoricalMetrics[];
