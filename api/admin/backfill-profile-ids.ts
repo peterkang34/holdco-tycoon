@@ -56,23 +56,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       const playerId = parsed.playerId as string;
 
-      // Look up public_id from player_profiles
+      // Look up or create public_id from player_profiles
       let publicId: string | undefined;
       try {
         const { data: profile } = await supabaseAdmin
           .from('player_profiles')
           .select('public_id')
           .eq('id', playerId)
-          .single();
+          .maybeSingle();
 
         if (profile?.public_id) {
           publicId = profile.public_id;
-        } else if (profile) {
-          // Profile exists but no public_id — generate one
+        } else {
+          // Profile missing or has no public_id — upsert with a new public_id
           const newId = randomUUID().replace(/-/g, '').slice(0, 12);
-          await supabaseAdmin.from('player_profiles')
-            .update({ public_id: newId, updated_at: new Date().toISOString() })
-            .eq('id', playerId);
+          const initials = (parsed.initials as string) || 'AA';
+          const now = new Date().toISOString();
+          await supabaseAdmin.from('player_profiles').upsert({
+            id: playerId,
+            initials,
+            public_id: newId,
+            updated_at: now,
+          }, { onConflict: 'id' });
           publicId = newId;
         }
       } catch { /* skip */ }
