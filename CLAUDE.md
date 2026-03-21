@@ -30,10 +30,11 @@ After implementing any non-trivial change (2+ files, new component, mechanic cha
 | What you just built | Deploy immediately (in parallel, background) |
 |---------------------|----------------------------------------------|
 | **New UI / component / screen** | Jake (QA) + Priya (cross-platform) + Lena (copy/UX) |
-| **New game mechanic / feature** | Marcus (realism) + Reiko (balance) + Jake (edge cases) |
+| **New game mechanic / feature** | Marcus (realism) + Reiko (balance) + Jake (edge cases + structural tests) |
 | **Balance change / constant tweak** | Reiko (numbers) + Marcus (realism gut-check) |
 | **Code refactor / architecture change** | Dara (code review) + Jake (regression check) |
 | **UI copy / onboarding / manual change** | Lena (clarity) + Priya (responsiveness) |
+| **New engine function / type variant** | Jake (writes tests to clear coverage-tripwires) |
 | **Pre-deploy (any significant release)** | Dara (code) + Jake (game logic) + Priya (cross-platform) |
 
 **Key principle**: Deploy agents as soon as implementation is done, report findings alongside or shortly after your implementation summary. Don't present finished work without QA coverage.
@@ -73,7 +74,7 @@ Spawn via Agent tool (background). Always include in the prompt:
 ## Architecture
 - **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
 - **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v38`
-- **Tests**: Vitest in `src/engine/__tests__/` — ~1569 tests across 34 suites (incl. display-proofreader + playtest system + synergy + unlocks); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
+- **Tests**: Vitest in `src/engine/__tests__/` — ~2700 tests across 51 suites (incl. display-proofreader + playtest system + structural parity/exhaustiveness/tripwires); API integration tests in `api/__tests__/` — 62 tests across 7 suites (health, stats, history, claim-history, export, delete, auto-link)
 - **Game Over Screen**: `GameOverScreen.tsx` is a ~500-line orchestrator importing 13 child components from `src/components/gameover/`. Components are pure presentational (props-in, no store access). `ProfileAchievementSection` manages its own modal state for `AchievementBrowserModal`
 - **Test Shortcuts**: `#/fo-test` (Family Office), `#/go-test` (Game Over — variants: `?v=holdco|pe|bankrupt|pe-bankrupt`). Both guard against completion API submission. Mock state injected via Zustand `setState`
 - **All monetary values in thousands** (1000 = $1M)
@@ -132,7 +133,11 @@ research/                   # GIT-TRACKED — external research (podcasts, books
 - `src/engine/affordability.ts` — 7-tier affordability engine (calculateAffordability, getAffordabilityWeights, pickWeightedTier, generateTrophyEbitda)
 - `src/hooks/chronicleContext.ts` — AI chronicle context builder
 - `src/engine/helpers.ts` — Shared helpers (clampMargin, capGrowthRate, applyEbitdaFloor)
-- `src/engine/__tests__/display-proofreader.test.ts` — 286 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
+- `src/engine/__tests__/display-proofreader.test.ts` — 330 tests: UI copy vs engine constants (MUST update when changing mechanics or UI copy)
+- `src/engine/__tests__/coverage-tripwires.test.ts` — 211 tests: structural meta-tests that fire when new exports/types lack test coverage
+- `src/engine/__tests__/switch-exhaustiveness.test.ts` — 112 tests: verifies every type variant has a handler in UI switches/maps
+- `src/engine/__tests__/drilldown-parity.test.ts` — 64 tests: engine calculateMetrics() vs drilldown modal computations
+- `src/engine/drilldownComputations.ts` — Pure functions extracted from MetricDrilldownModal for testable engine-UI parity
 - `src/data/mechanicsCopy.ts` — Centralized registry for mechanic descriptions (debt labels, waterfall labels, countdown functions, banned patterns)
 - `src/data/gameConfig.ts` — Game constants and configuration
 - `src/components/screens/GameScreen.tsx` — Main game screen (phase routing, toast handlers)
@@ -177,29 +182,55 @@ research/                   # GIT-TRACKED — external research (podcasts, books
 ### Phase 1: VERIFY (do this FIRST — stop if anything fails)
 1. **`npx tsc -b`** — Use `tsc -b`, NOT `tsc --noEmit`. Vercel uses `tsc -b` which is stricter (catches unused vars, etc.). This has burned us multiple times.
 2. **Display Proofreader** — `npx vitest run src/engine/__tests__/display-proofreader.test.ts` (if mechanics/UI copy changed)
-3. **Full test suite** — `npx vitest run`
-4. **Vite build** — `npx vite build` (verify bundle compiles)
+3. **Coverage Tripwires** — `npx vitest run src/engine/__tests__/coverage-tripwires.test.ts` (if new engine exports, types, events, achievements, recipes, or sectors added)
+4. **Full test suite** — `npx vitest run`
+5. **Vite build** — `npx vite build` (verify bundle compiles)
 
 ### Phase 2: DOCUMENT (only after Phase 1 passes)
-5. **Changelog** — Update `src/data/changelog.ts` with player-facing summary (editorial, not auto-generated)
-6. **Activity Log** — Update `activity-log.md` with session summary (context, changes, files, test count, commit hash)
-7. **CLAUDE.md** — Update any new gotchas/patterns and key file references
-8. **UserManualModal** — Update if any game mechanics changed
-9. **mechanicsCopy.ts** — If changing mechanic behavior, update `src/data/mechanicsCopy.ts` AND add old description to `BANNED_COPY_PATTERNS`
-10. **Secret Sauce Docs** — Update `_secret-sauce/` files if any game mechanics, formulas, events, recipes, scoring, or balance constants changed (these are gitignored, local-only design docs)
-11. **Playtest Coverage** — If adding a new game mechanic, add a key to `FEATURE_REGISTRY` in `src/engine/__tests__/playtest/coverage.ts`, wire up `coverage.record()` in `simulator.ts`, and update a strategy or the hard-to-trigger list in `playtest.test.ts` (see instructions in coverage.ts)
+6. **Changelog** — Update `src/data/changelog.ts` with player-facing summary (editorial, not auto-generated)
+7. **Activity Log** — Update `activity-log.md` with session summary (context, changes, files, test count, commit hash)
+8. **CLAUDE.md** — Update any new gotchas/patterns and key file references
+9. **UserManualModal** — Update if any game mechanics changed
+10. **mechanicsCopy.ts** — If changing mechanic behavior, update `src/data/mechanicsCopy.ts` AND add old description to `BANNED_COPY_PATTERNS`
+11. **Secret Sauce Docs** — Update `_secret-sauce/` files if any game mechanics, formulas, events, recipes, scoring, or balance constants changed (these are gitignored, local-only design docs)
+12. **Playtest Coverage** — If adding a new game mechanic, add a key to `FEATURE_REGISTRY` in `src/engine/__tests__/playtest/coverage.ts`, wire up `coverage.record()` in `simulator.ts`, and update a strategy or the hard-to-trigger list in `playtest.test.ts` (see instructions in coverage.ts)
 
 ### Phase 3: COMMIT & DEPLOY
-12. Stage specific files, commit, push, `npx vercel --prod`
+13. Stage specific files, commit, push, `npx vercel --prod`
 
 ## Display Proofreader (MANDATORY)
-- **`display-proofreader.test.ts`** — 286 tests that validate UI copy matches engine constants
+- **`display-proofreader.test.ts`** — 330 tests that validate UI copy matches engine constants
 - **When changing ANY game mechanic**: ALWAYS update UserManualModal.tsx to reflect the change (user rule: manual must ALWAYS be updated automatically)
 - **When changing ANY engine constant** (rates, thresholds, formulas, scoring weights): update the proofreader test AND the UI copy (UserManualModal, CollectPhase, DealCard, etc.)
 - **When changing ANY UI copy** that references numbers/mechanics: update the proofreader test to assert the new value
-- **Four strategies**: A (direct import engine constants), B (fs.readFileSync + regex scan .tsx files), C (calculation parity — same inputs, compare outputs), D (behavioral claim scanner — banned patterns + absence-of-old-pattern verification via mechanicsCopy.ts)
-- **Key UI surfaces tested**: UserManualModal scoring table, difficulty config, deal structures, heat premiums, distress thresholds, tax rate, capex by sector, equity system, improvements, turnarounds, platforms, leaderboard, exit valuation, debt behavioral claims
+- **Five strategies**: A (direct import engine constants), B (fs.readFileSync + regex scan .tsx files), B+ (semantic copy verification — UI descriptions match engine behavior), C (calculation parity — same inputs, compare outputs), D (behavioral claim scanner — banned patterns + absence-of-old-pattern verification via mechanicsCopy.ts)
+- **Key UI surfaces tested**: UserManualModal scoring table, difficulty config, deal structures, heat premiums, distress thresholds, tax rate, capex by sector, equity system, improvements, turnarounds, platforms, leaderboard, exit valuation, debt behavioral claims, M&A tiers, shared services, PE fund, achievement unlocks, IPO eligibility
 - **Run after any mechanic/UI change**: `npx vitest run src/engine/__tests__/display-proofreader.test.ts`
+
+## Structural Test Architecture (Self-Healing Coverage)
+
+Three layers of tests catch drift automatically when new code is added:
+
+### Layer 1: Coverage Tripwires (`coverage-tripwires.test.ts` — 211 tests)
+Scans source files and asserts that every exported function, event type, achievement, recipe, sector, improvement type, and distress level has corresponding test coverage. **Fires automatically when you add new exports without tests.**
+- `KNOWN_GAPS` list: Functions that lack coverage but are documented debt (remove from list when test added)
+- `BROWSER_ONLY_ALLOWLIST`: Functions requiring localStorage/browser APIs (cannot unit test)
+
+### Layer 2: Switch Exhaustiveness (`switch-exhaustiveness.test.ts` — 112 tests)
+Reads source files and verifies every type variant has a handler in the corresponding switch/map. Catches new enum values that lack UI handling.
+
+### Layer 3: Drilldown Parity (`drilldown-parity.test.ts` — 64 tests)
+Pure computation functions extracted to `src/engine/drilldownComputations.ts` are tested against `calculateMetrics()` output. Catches engine-UI computation drift.
+
+### When to update structural tests
+| What you changed | Which structural test fires |
+|-----------------|---------------------------|
+| New exported engine function | `coverage-tripwires` (no test references it) |
+| New event type / enum variant | `coverage-tripwires` + `switch-exhaustiveness` (no handler) |
+| New achievement / recipe / sector | `coverage-tripwires` (not in predicate/integrity/consistency test) |
+| Changed engine constant | `display-proofreader` (UI copy shows old value) |
+| New metric or drilldown | `drilldown-parity` + `switch-exhaustiveness` (no handler) |
+| UI recomputes a value differently | `drilldown-parity` (extracted fn vs calculateMetrics disagree) |
 
 ## New Sector Rollout SOP
 When adding a new sector to `src/data/sectors.ts`:

@@ -21,7 +21,7 @@ import { TAX_RATE, calculateAnnualFcf, calculatePortfolioTax } from '../simulati
 import { createMockBusiness } from './helpers';
 import { calculateDistressLevel, getDistressRestrictions, getDistressDescription, calculateCovenantHeadroom } from '../distress';
 import { calculateHeatPremium, getMaxAcquisitions, calculateMultipleExpansion } from '../businesses';
-import { MA_SOURCING_CONFIG, SHARED_SERVICES_CONFIG } from '../../data/sharedServices';
+import { MA_SOURCING_CONFIG, SHARED_SERVICES_CONFIG, MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES } from '../../data/sharedServices';
 import { SECTORS, SECTOR_LIST, UNLOCKABLE_SECTORS } from '../../data/sectors';
 import {
   DIFFICULTY_CONFIG,
@@ -67,6 +67,11 @@ import {
   IPO_FEV_BONUS_MAX,
   IPO_SHARE_FUNDED_DEALS_PER_ROUND,
   IPO_MIN_PLATFORMS,
+  IPO_MIN_ROUND,
+  IPO_MIN_EBITDA,
+  STABILIZATION_TYPES,
+  GROWTH_TYPES,
+  STABILIZATION_EFFICACY_MULTIPLIER,
   DEAL_SIZE_TIERS,
   TIER_PIPELINE_COUNTS,
   BUYER_PREMIUM_EBITDA_CAP,
@@ -2253,6 +2258,266 @@ describe('Display Proofreader', () => {
     it('telemetry includes irrMultiplier for PE mode (Strategy B)', () => {
       const gameOver = readComponent('components/screens/GameOverScreen.tsx');
       expect(gameOver).toContain('irrMultiplier');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // STRATEGY B+ — SEMANTIC COPY VERIFICATION
+  // Verifies that UI descriptions reference correct engine constants
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Strategy B+ — Semantic Copy Verification', () => {
+    // ── M&A Sourcing tier descriptions match MA_SOURCING_CONFIG ──
+
+    it('UserManual M&A tier 1 costs match MA_SOURCING_CONFIG (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('$800K'); // upgradeCost: 800
+      expect(manual).toContain('$350K/yr'); // annualCost: 350
+      expect(MA_SOURCING_CONFIG[1].upgradeCost).toBe(800);
+      expect(MA_SOURCING_CONFIG[1].annualCost).toBe(350);
+      expect(MA_SOURCING_CONFIG[1].requiredOpcos).toBe(2);
+    });
+
+    it('UserManual M&A tier 2 costs match MA_SOURCING_CONFIG (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('$1.2M'); // upgradeCost: 1200
+      expect(manual).toContain('$550K/yr'); // annualCost: 550
+      expect(MA_SOURCING_CONFIG[2].upgradeCost).toBe(1200);
+      expect(MA_SOURCING_CONFIG[2].annualCost).toBe(550);
+      expect(MA_SOURCING_CONFIG[2].requiredOpcos).toBe(3);
+    });
+
+    it('UserManual M&A tier 3 costs match MA_SOURCING_CONFIG (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('$1.5M'); // upgradeCost: 1500
+      expect(manual).toContain('$800K/yr'); // annualCost: 800
+      expect(MA_SOURCING_CONFIG[3].upgradeCost).toBe(1500);
+      expect(MA_SOURCING_CONFIG[3].annualCost).toBe(800);
+      expect(MA_SOURCING_CONFIG[3].requiredOpcos).toBe(4);
+    });
+
+    it('UserManual M&A tier names match MA_SOURCING_CONFIG (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain(MA_SOURCING_CONFIG[1].name); // 'Deal Sourcing Team'
+      expect(manual).toContain(MA_SOURCING_CONFIG[2].name); // 'Industry Specialists'
+      expect(manual).toContain(MA_SOURCING_CONFIG[3].name); // 'Proprietary Network'
+    });
+
+    // ── Shared service descriptions match SHARED_SERVICES_CONFIG ──
+
+    it('UserManual shared service costs match SHARED_SERVICES_CONFIG (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      for (const [, config] of Object.entries(SHARED_SERVICES_CONFIG)) {
+        // Verify each service name appears
+        expect(manual).toContain(config.name);
+      }
+    });
+
+    it('SHARED_SERVICES_CONFIG has exactly 5 services (B+)', () => {
+      expect(Object.keys(SHARED_SERVICES_CONFIG)).toHaveLength(5);
+    });
+
+    it('shared services min opcos matches UserManual (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      // Manual says "3 businesses to unlock"
+      expect(manual).toContain('3 businesses');
+      expect(MIN_OPCOS_FOR_SHARED_SERVICES).toBe(3);
+      expect(MAX_ACTIVE_SHARED_SERVICES).toBe(3);
+    });
+
+    // ── PE Fund descriptions match PE_FUND_CONFIG ──
+
+    it('PE fund management fee matches config (B+)', () => {
+      expect(PE_FUND_CONFIG.managementFeeRate).toBe(0.02);
+      expect(PE_FUND_CONFIG.annualManagementFee).toBe(2000);
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('2%');
+    });
+
+    it('PE fund carry rate matches config (B+)', () => {
+      expect(PE_FUND_CONFIG.carryRate).toBe(0.20);
+      expect(PE_FUND_CONFIG.hurdleRate).toBe(0.08);
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('20%');
+      expect(manual).toContain('8%');
+    });
+
+    it('PE fund size matches config (B+)', () => {
+      expect(PE_FUND_CONFIG.fundSize).toBe(100_000);
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('$100M');
+    });
+
+    it('PE fund concentration limit matches config (B+)', () => {
+      expect(PE_FUND_CONFIG.maxConcentration).toBe(0.25);
+      // 25% of $100M = $25M
+      const maxSingleDeal = PE_FUND_CONFIG.fundSize * PE_FUND_CONFIG.maxConcentration;
+      expect(maxSingleDeal).toBe(25_000);
+    });
+
+    // ── Distress threshold descriptions match calculateDistressLevel ──
+
+    it('distress thresholds in UserManual match engine (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      // Elevated: 2.5x - 3.5x
+      expect(manual).toContain('2.5x');
+      expect(manual).toContain('3.5x');
+      // Covenant Breach: > 4.5x
+      expect(manual).toContain('4.5x');
+
+      // Verify engine matches
+      expect(calculateDistressLevel(2.4, 1000, 500, 0)).toBe('comfortable');
+      expect(calculateDistressLevel(2.5, 1000, 500, 0)).toBe('elevated');
+      expect(calculateDistressLevel(3.5, 1000, 500, 0)).toBe('stressed');
+      expect(calculateDistressLevel(4.5, 1000, 500, 0)).toBe('breach');
+    });
+
+    it('covenant breach bankruptcy rounds match UserManual (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      // "remain in covenant breach for 2 consecutive rounds"
+      expect(manual).toMatch(/2\s+(consecutive\s+)?round/i);
+      expect(COVENANT_BREACH_ROUNDS_THRESHOLD).toBe(2);
+    });
+
+    it('distress interest penalty matches UserManual (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      // Covenant Breach: +2% penalty
+      expect(manual).toContain('+2%');
+      const breachRestrictions = getDistressRestrictions('breach');
+      expect(breachRestrictions.interestPenalty).toBe(0.02);
+    });
+
+    // ── Achievement sector unlock thresholds match UNLOCKABLE_SECTORS ──
+
+    it('prestige sector unlock counts match UNLOCKABLE_SECTORS (B+)', () => {
+      expect(UNLOCKABLE_SECTORS.mediaEntertainment?.gateAchievementCount).toBe(5);
+      expect(UNLOCKABLE_SECTORS.fintech?.gateAchievementCount).toBe(11);
+      expect(UNLOCKABLE_SECTORS.aerospace?.gateAchievementCount).toBe(11);
+      expect(UNLOCKABLE_SECTORS.privateCredit?.gateAchievementCount).toBe(16);
+    });
+
+    it('UserManual mentions Private Credit unlock threshold (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      const pcThreshold = UNLOCKABLE_SECTORS.privateCredit!.gateAchievementCount;
+      expect(manual).toContain(`${pcThreshold} achievements`);
+    });
+
+    it('all prestige sectors require account (B+)', () => {
+      for (const [, config] of Object.entries(UNLOCKABLE_SECTORS)) {
+        expect(config.requiresAccount).toBe(true);
+      }
+    });
+
+    // ── IPO eligibility descriptions match gate thresholds ──
+
+    it('IPO eligibility thresholds match AllocatePhase display (B+)', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      // Uses IPO_MIN_ROUND, IPO_MIN_EBITDA, IPO_MIN_PLATFORMS directly from imports
+      expect(allocate).toContain('IPO_MIN_ROUND');
+      expect(allocate).toContain('IPO_MIN_EBITDA');
+      expect(allocate).toContain('IPO_MIN_PLATFORMS');
+
+      // Verify actual values
+      expect(IPO_MIN_PLATFORMS).toBe(1);
+      expect(IPO_MIN_ROUND).toBe(16);
+      expect(IPO_MIN_EBITDA).toBe(75000);
+    });
+
+    it('IPO eligibility uses constants from engine (not hardcoded) in AllocatePhase (B+)', () => {
+      const allocate = readComponent('components/phases/AllocatePhase.tsx');
+      // AllocatePhase imports and uses these constants directly — no hardcoded values
+      expect(allocate).toContain('round < IPO_MIN_ROUND');
+      expect(allocate).toContain('teaserEbitda >= IPO_MIN_EBITDA');
+      expect(allocate).toContain('teaserPlatforms >= IPO_MIN_PLATFORMS');
+    });
+
+    it('UserManual mentions IPO round threshold (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      // "At round 16+"
+      expect(manual).toContain('round 16');
+    });
+
+    // ── Improvement type descriptions ──
+
+    it('stabilization types match config (B+)', () => {
+      expect(STABILIZATION_TYPES.has('fix_underperformance')).toBe(true);
+      expect(STABILIZATION_TYPES.has('management_professionalization')).toBe(true);
+      expect(STABILIZATION_TYPES.has('operating_playbook')).toBe(true);
+      expect(STABILIZATION_TYPES.size).toBe(3);
+    });
+
+    it('growth types match config (B+)', () => {
+      expect(GROWTH_TYPES.has('service_expansion')).toBe(true);
+      expect(GROWTH_TYPES.has('digital_transformation')).toBe(true);
+      expect(GROWTH_TYPES.has('recurring_revenue_conversion')).toBe(true);
+      expect(GROWTH_TYPES.has('pricing_model')).toBe(true);
+      expect(GROWTH_TYPES.size).toBe(4);
+    });
+
+    it('stabilization + growth = 7 total improvement types (B+)', () => {
+      expect(STABILIZATION_TYPES.size + GROWTH_TYPES.size).toBe(7);
+    });
+
+    it('stabilization efficacy multipliers match quality tiers (B+)', () => {
+      expect(STABILIZATION_EFFICACY_MULTIPLIER[1]).toBe(0.85);
+      expect(STABILIZATION_EFFICACY_MULTIPLIER[2]).toBe(0.90);
+      expect(STABILIZATION_EFFICACY_MULTIPLIER[3]).toBe(1.0);
+    });
+
+    // ── Rollover equity descriptions ──
+
+    it('rollover equity config matches UserManual description (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      // Manual says "25% rollover + 10% note"
+      expect(manual).toContain('25% rollover');
+      expect(ROLLOVER_EQUITY_CONFIG.standard.rolloverPct).toBe(0.25);
+
+      // Note rate 5%
+      expect(manual).toContain('5% note rate');
+      expect(ROLLOVER_EQUITY_CONFIG.standard.noteRate).toBe(0.05);
+    });
+
+    it('rollover gating matches UserManual (B+)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      // Requires M&A Sourcing Tier 2+ and Quality 3+
+      expect(manual).toContain('M&A Sourcing Tier 2+');
+      expect(manual).toContain('Quality 3+');
+      expect(ROLLOVER_MIN_MA_TIER).toBe(2);
+      expect(ROLLOVER_MIN_QUALITY).toBe(3);
+    });
+
+    // ── Restructuring FEV penalty ──
+
+    it('restructuring penalty constant is 0.80 (B+)', () => {
+      expect(RESTRUCTURING_FEV_PENALTY).toBe(0.80);
+    });
+
+    // ── Turnaround fatigue ──
+
+    it('turnaround fatigue threshold and penalty match config (B+)', () => {
+      expect(TURNAROUND_FATIGUE_THRESHOLD).toBe(4);
+      expect(TURNAROUND_FATIGUE_PENALTY).toBe(0.10); // 10ppt stored as decimal
+    });
+
+    // ── Equity system ──
+
+    it('equity dilution step and floor match config (B+)', () => {
+      expect(EQUITY_DILUTION_STEP).toBe(0.10);
+      expect(EQUITY_DILUTION_FLOOR).toBe(0.10);
+    });
+
+    it('equity issuance sentiment penalty matches config (B+)', () => {
+      expect(EQUITY_ISSUANCE_SENTIMENT_PENALTY).toBe(0.01); // stored as positive, applied as negative
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      // "-1% market sentiment"
+      expect(manual).toMatch(/-1%\s+market\s+sentiment/i);
+    });
+
+    // ── Portfolio complexity ──
+
+    it('complexity activation threshold matches config (B+)', () => {
+      expect(COMPLEXITY_ACTIVATION_THRESHOLD).toBe(5);
+      expect(COMPLEXITY_MAX_MARGIN_COMPRESSION).toBe(0.04);
     });
   });
 });

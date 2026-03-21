@@ -206,6 +206,196 @@ export function createMockDealStructure(overrides: Partial<DealStructure> = {}):
   };
 }
 
+/** Create a PE Fund Mode game state with LP distributions, fund metrics, etc. */
+export function createPEFundState(overrides: Partial<GameState> = {}): GameState {
+  const businesses = [
+    createMockBusiness({
+      id: 'pe_biz_1',
+      name: 'PE Portfolio Co 1',
+      sectorId: 'b2bServices',
+      ebitda: 3000,
+      peakEbitda: 3000,
+      acquisitionEbitda: 2500,
+      acquisitionPrice: 12000,
+      revenue: 15000,
+      ebitdaMargin: 0.20,
+      acquisitionRevenue: 12500,
+      acquisitionMargin: 0.20,
+      peakRevenue: 15000,
+      totalAcquisitionCost: 12000,
+      cashEquityInvested: 8000,
+      bankDebtBalance: 4000,
+      bankDebtRate: 0.06,
+      bankDebtRoundsRemaining: 5,
+      qualityRating: 4 as QualityRating,
+    }),
+    createMockBusiness({
+      id: 'pe_biz_2',
+      name: 'PE Portfolio Co 2',
+      sectorId: 'healthcare',
+      ebitda: 5000,
+      peakEbitda: 5000,
+      acquisitionEbitda: 4000,
+      acquisitionPrice: 25000,
+      revenue: 25000,
+      ebitdaMargin: 0.20,
+      acquisitionRevenue: 20000,
+      acquisitionMargin: 0.20,
+      peakRevenue: 25000,
+      totalAcquisitionCost: 25000,
+      cashEquityInvested: 15000,
+      bankDebtBalance: 10000,
+      bankDebtRate: 0.055,
+      bankDebtRoundsRemaining: 7,
+      qualityRating: 3 as QualityRating,
+    }),
+  ];
+
+  return createMockGameState({
+    businesses,
+    isFundManagerMode: true,
+    fundName: 'Test Fund I',
+    fundSize: 100000,
+    cash: 60000,
+    totalDebt: 14000, // holdco + bank debt
+    totalInvestedCapital: 23000,
+    totalCapitalDeployed: 23000,
+    lpDistributions: 15000,
+    lpSatisfactionScore: 70,
+    managementFeesCollected: 4000,
+    fundCashFlows: [
+      { round: 1, amount: -23000 },
+      { round: 3, amount: 15000 },
+    ],
+    dpiMilestones: { half: false, full: false },
+    lpCommentary: [],
+    round: 5,
+    maxRounds: 10,
+    duration: 'quick',
+    difficulty: 'normal',
+    initialRaiseAmount: 100000,
+    initialOwnershipPct: 1.0,
+    founderShares: 1000,
+    sharesOutstanding: 1000,
+    ...overrides,
+  });
+}
+
+/** Create a state heavy on debt — holdco loan + bank debt + seller notes + earnouts */
+export function createDebtHeavyState(overrides: Partial<GameState> = {}): GameState {
+  const businesses = [
+    createMockBusiness({
+      id: 'debt_biz_1',
+      name: 'Leveraged Co 1',
+      sectorId: 'industrial',
+      ebitda: 2000,
+      peakEbitda: 2000,
+      acquisitionEbitda: 1800,
+      acquisitionPrice: 8000,
+      revenue: 10000,
+      ebitdaMargin: 0.20,
+      acquisitionRevenue: 9000,
+      acquisitionMargin: 0.20,
+      peakRevenue: 10000,
+      totalAcquisitionCost: 8000,
+      cashEquityInvested: 4000,
+      bankDebtBalance: 2000,
+      bankDebtRate: 0.065,
+      bankDebtRoundsRemaining: 5,
+      sellerNoteBalance: 1500,
+      sellerNoteRate: 0.08,
+      sellerNoteRoundsRemaining: 4,
+      earnoutRemaining: 500,
+      earnoutTarget: 0.10,
+      qualityRating: 3 as QualityRating,
+    }),
+    createMockBusiness({
+      id: 'debt_biz_2',
+      name: 'Leveraged Co 2',
+      sectorId: 'consumer',
+      ebitda: 1500,
+      peakEbitda: 1500,
+      acquisitionEbitda: 1500,
+      acquisitionPrice: 6000,
+      revenue: 7500,
+      ebitdaMargin: 0.20,
+      acquisitionRevenue: 7500,
+      acquisitionMargin: 0.20,
+      peakRevenue: 7500,
+      totalAcquisitionCost: 6000,
+      cashEquityInvested: 3500,
+      bankDebtBalance: 1500,
+      bankDebtRate: 0.07,
+      bankDebtRoundsRemaining: 4,
+      sellerNoteBalance: 1000,
+      sellerNoteRate: 0.09,
+      sellerNoteRoundsRemaining: 3,
+      qualityRating: 3 as QualityRating,
+    }),
+  ];
+
+  return createMockGameState({
+    businesses,
+    cash: 3000,
+    totalDebt: 3500 + 2000 + 1500, // holdcoLoan + bankDebt1 + bankDebt2
+    holdcoLoanBalance: 3500,
+    holdcoLoanRate: 0.07,
+    holdcoLoanRoundsRemaining: 5,
+    totalInvestedCapital: 7500,
+    round: 3,
+    interestRate: 0.07,
+    ...overrides,
+  });
+}
+
+/** Create a complex portfolio state — 6+ businesses triggering complexity cost + shared services */
+export function createComplexPortfolioState(overrides: Partial<GameState> = {}): GameState {
+  const sectors: SectorId[] = ['agency', 'saas', 'homeServices', 'consumer', 'industrial', 'b2bServices', 'healthcare'];
+  const businesses: Business[] = [];
+
+  for (let i = 0; i < 7; i++) {
+    const ebitda = 800 + i * 300;
+    const margin = 0.18 + (i % 3) * 0.02;
+    const rev = Math.round(ebitda / margin);
+    businesses.push(
+      createMockBusiness({
+        id: `complex_biz_${i + 1}`,
+        name: `Complex Co ${i + 1}`,
+        sectorId: sectors[i],
+        ebitda,
+        peakEbitda: ebitda,
+        acquisitionEbitda: ebitda,
+        acquisitionPrice: ebitda * 4,
+        revenue: rev,
+        ebitdaMargin: margin,
+        acquisitionRevenue: rev,
+        acquisitionMargin: margin,
+        peakRevenue: rev,
+        totalAcquisitionCost: ebitda * 4,
+        cashEquityInvested: ebitda * 4,
+        qualityRating: (3 + (i % 3)) as QualityRating,
+      })
+    );
+  }
+
+  const totalInvested = businesses.reduce((sum, b) => sum + b.acquisitionPrice, 0);
+
+  // Activate 2 shared services to test complexity offset
+  const ss = initializeSharedServices();
+  ss[0].active = true; // finance_reporting
+  ss[2].active = true; // procurement
+
+  return createMockGameState({
+    businesses,
+    sharedServices: ss,
+    cash: 50000 - totalInvested,
+    totalInvestedCapital: totalInvested,
+    initialRaiseAmount: 50000,
+    round: 5,
+    ...overrides,
+  });
+}
+
 /** Create a game state with multiple businesses for testing portfolio-level calculations */
 export function createMultiBusinessState(count: number = 3): GameState {
   const businesses: Business[] = [];

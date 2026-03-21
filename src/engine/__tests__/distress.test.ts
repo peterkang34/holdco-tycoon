@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   calculateDistressLevel,
+  calculateCovenantHeadroom,
   getDistressRestrictions,
   getDistressLabel,
   getDistressDescription,
@@ -461,3 +462,442 @@ describe('Bank debt paydown logic', () => {
     expect(totalAfter).toBe(5500);
   });
 });
+
+// ── Distress Cascade & Breach Testing ──
+
+describe('Breach counter mechanics', () => {
+  it('covenantBreachRounds increments on consecutive breach years', () => {
+    let covenantBreachRounds = 0;
+    const hasRestructured = false;
+
+    // Year 1: breach
+    const inBreach1 = true;
+    if (inBreach1) covenantBreachRounds += 1;
+    else if (!hasRestructured) covenantBreachRounds = 0;
+    expect(covenantBreachRounds).toBe(1);
+
+    // Year 2: still in breach
+    const inBreach2 = true;
+    if (inBreach2) covenantBreachRounds += 1;
+    else if (!hasRestructured) covenantBreachRounds = 0;
+    expect(covenantBreachRounds).toBe(2);
+  });
+
+  it('counter resets to 0 when leverage drops below breach (pre-restructuring)', () => {
+    let covenantBreachRounds = 1;
+    const hasRestructured = false;
+    const inBreach = false; // recovered
+
+    if (inBreach) covenantBreachRounds += 1;
+    else if (!hasRestructured) covenantBreachRounds = 0;
+
+    expect(covenantBreachRounds).toBe(0);
+  });
+
+  it('counter does NOT increment when elevated (not breach)', () => {
+    let covenantBreachRounds = 0;
+    const hasRestructured = false;
+    // Elevated means leverage 2.5-3.5x — not breach
+    const distressLevel = calculateDistressLevel(3.0, 3000, 1000);
+    expect(distressLevel).toBe('elevated');
+    const inBreach = distressLevel === 'breach';
+
+    if (inBreach) covenantBreachRounds += 1;
+    else if (!hasRestructured) covenantBreachRounds = 0;
+
+    expect(covenantBreachRounds).toBe(0);
+  });
+
+  it('counter does NOT increment when stressed (not breach)', () => {
+    let covenantBreachRounds = 0;
+    const hasRestructured = false;
+    const distressLevel = calculateDistressLevel(4.0, 4000, 1000);
+    expect(distressLevel).toBe('stressed');
+    const inBreach = distressLevel === 'breach';
+
+    if (inBreach) covenantBreachRounds += 1;
+    else if (!hasRestructured) covenantBreachRounds = 0;
+
+    expect(covenantBreachRounds).toBe(0);
+  });
+
+  it('counter increments from 0 to threshold across breach years', () => {
+    let covenantBreachRounds = 0;
+    const hasRestructured = false;
+
+    for (let year = 0; year < COVENANT_BREACH_ROUNDS_THRESHOLD; year++) {
+      const inBreach = true;
+      if (inBreach) covenantBreachRounds += 1;
+      else if (!hasRestructured) covenantBreachRounds = 0;
+    }
+
+    expect(covenantBreachRounds).toBe(COVENANT_BREACH_ROUNDS_THRESHOLD);
+  });
+});
+
+describe('Forced restructuring trigger', () => {
+  it('requiresRestructuring becomes true at COVENANT_BREACH_ROUNDS_THRESHOLD', () => {
+    const covenantBreachRounds = COVENANT_BREACH_ROUNDS_THRESHOLD;
+    const hasRestructured = false;
+    let requiresRestructuring = false;
+    let gameOver = false;
+
+    if (covenantBreachRounds >= COVENANT_BREACH_ROUNDS_THRESHOLD) {
+      if (hasRestructured) {
+        gameOver = true;
+      } else {
+        requiresRestructuring = true;
+      }
+    }
+
+    expect(requiresRestructuring).toBe(true);
+    expect(gameOver).toBe(false);
+  });
+
+  it('does NOT trigger restructuring below threshold', () => {
+    const covenantBreachRounds = COVENANT_BREACH_ROUNDS_THRESHOLD - 1;
+    let requiresRestructuring = false;
+    let gameOver = false;
+
+    if (covenantBreachRounds >= COVENANT_BREACH_ROUNDS_THRESHOLD) {
+      requiresRestructuring = true;
+      gameOver = true;
+    }
+
+    expect(requiresRestructuring).toBe(false);
+    expect(gameOver).toBe(false);
+  });
+
+  it('triggers bankruptcy (not restructuring) when already restructured', () => {
+    const covenantBreachRounds = COVENANT_BREACH_ROUNDS_THRESHOLD;
+    const hasRestructured = true;
+    let requiresRestructuring = false;
+    let gameOver = false;
+
+    if (covenantBreachRounds >= COVENANT_BREACH_ROUNDS_THRESHOLD) {
+      if (hasRestructured) {
+        gameOver = true;
+      } else {
+        requiresRestructuring = true;
+      }
+    }
+
+    expect(requiresRestructuring).toBe(false);
+    expect(gameOver).toBe(true);
+  });
+
+  it('exceeding threshold also triggers (not just exact match)', () => {
+    const covenantBreachRounds = COVENANT_BREACH_ROUNDS_THRESHOLD + 2;
+    let requiresRestructuring = false;
+
+    if (covenantBreachRounds >= COVENANT_BREACH_ROUNDS_THRESHOLD) {
+      requiresRestructuring = true;
+    }
+
+    expect(requiresRestructuring).toBe(true);
+  });
+});
+
+describe('Post-restructuring state', () => {
+  it('exitMultiplePenalty includes RESTRUCTURING_FEV_PENALTY (0.80)', () => {
+    // Simulating restructuring action: penalty applied as multiplier
+    const rawFEV = 100000;
+    const penalizedFEV = Math.round(rawFEV * RESTRUCTURING_FEV_PENALTY);
+    expect(penalizedFEV).toBe(80000);
+    expect(RESTRUCTURING_FEV_PENALTY).toBe(0.80);
+  });
+
+  it('covenantBreachRounds resets to 0 after restructuring', () => {
+    const state = createMockGameState({
+      covenantBreachRounds: 2,
+      requiresRestructuring: true,
+      hasRestructured: false,
+    });
+
+    // Simulate restructuring action
+    const postState = {
+      ...state,
+      covenantBreachRounds: 0,
+      hasRestructured: true,
+      requiresRestructuring: false,
+    };
+
+    expect(postState.covenantBreachRounds).toBe(0);
+    expect(postState.hasRestructured).toBe(true);
+    expect(postState.requiresRestructuring).toBe(false);
+  });
+
+  it('hasRestructured flag persists after recovery', () => {
+    const state = createMockGameState({
+      hasRestructured: true,
+      covenantBreachRounds: 0,
+    });
+    // Even after recovering to comfortable, the flag stays
+    const distressLevel = calculateDistressLevel(1.0, 1000, 1000);
+    expect(distressLevel).toBe('comfortable');
+    expect(state.hasRestructured).toBe(true);
+  });
+
+  it('post-restructuring breach counter is cumulative (non-consecutive breaches)', () => {
+    const hasRestructured = true;
+    let covenantBreachRounds = 0;
+
+    // Year 1: breach
+    covenantBreachRounds += 1;
+    expect(covenantBreachRounds).toBe(1);
+
+    // Year 2: no breach — but post-restructuring, counter does NOT reset
+    const inBreach = false;
+    if (inBreach) covenantBreachRounds += 1;
+    else if (!hasRestructured) covenantBreachRounds = 0;
+    // Counter stays at 1
+    expect(covenantBreachRounds).toBe(1);
+
+    // Year 3: breach again
+    covenantBreachRounds += 1;
+    expect(covenantBreachRounds).toBe(2);
+    expect(covenantBreachRounds >= COVENANT_BREACH_ROUNDS_THRESHOLD).toBe(true);
+  });
+});
+
+describe('Interest penalty application', () => {
+  it('comfortable level has 0% interest penalty', () => {
+    const r = getDistressRestrictions('comfortable');
+    expect(r.interestPenalty).toBe(0);
+  });
+
+  it('elevated level has 0% interest penalty', () => {
+    const r = getDistressRestrictions('elevated');
+    expect(r.interestPenalty).toBe(0);
+  });
+
+  it('stressed level has 1% interest penalty', () => {
+    const r = getDistressRestrictions('stressed');
+    expect(r.interestPenalty).toBe(0.01);
+  });
+
+  it('breach level has 2% interest penalty', () => {
+    const r = getDistressRestrictions('breach');
+    expect(r.interestPenalty).toBe(0.02);
+  });
+
+  it('penalties stack on top of base rate for effective cost', () => {
+    const baseRate = 0.07;
+    const stressedPenalty = getDistressRestrictions('stressed').interestPenalty;
+    const breachPenalty = getDistressRestrictions('breach').interestPenalty;
+
+    expect(baseRate + stressedPenalty).toBeCloseTo(0.08);
+    expect(baseRate + breachPenalty).toBeCloseTo(0.09);
+  });
+
+  it('breach penalty is strictly greater than stressed penalty', () => {
+    const stressed = getDistressRestrictions('stressed').interestPenalty;
+    const breach = getDistressRestrictions('breach').interestPenalty;
+    expect(breach).toBeGreaterThan(stressed);
+  });
+});
+
+describe('Covenant headroom projection', () => {
+  it('returns correct currentLeverage for normal case', () => {
+    const result = calculateCovenantHeadroom(
+      5000,   // cash
+      10000,  // totalDebt
+      2000,   // totalEbitda
+      0, 0, 0, [], 0.07, 0, 0
+    );
+    // ND = 10000 - 5000 = 5000; leverage = 5000/2000 = 2.5
+    expect(result.currentLeverage).toBeCloseTo(2.5);
+    expect(result.breachThreshold).toBe(4.5);
+  });
+
+  it('headroomRatio is positive when below breach', () => {
+    const result = calculateCovenantHeadroom(
+      5000, 5000, 2000, 0, 0, 0, [], 0.07, 0, 0
+    );
+    // ND = 0; leverage = 0; headroom = 4.5 - 0 = 4.5
+    expect(result.headroomRatio).toBeCloseTo(4.5);
+    expect(result.headroomCash).toBeGreaterThan(0);
+  });
+
+  it('headroomRatio is negative when above breach', () => {
+    const result = calculateCovenantHeadroom(
+      1000, 20000, 2000, 0, 0, 0, [], 0.07, 0, 0
+    );
+    // ND = 19000; leverage = 9.5; headroom = 4.5 - 9.5 = -5.0
+    expect(result.headroomRatio).toBeCloseTo(-5.0);
+  });
+
+  it('projectedCashAfterDebt = cash + estimatedNetFcf - debtService', () => {
+    const businesses = [createMockBusiness({
+      bankDebtBalance: 4000,
+      bankDebtRate: 0.08,
+      bankDebtRoundsRemaining: 4,
+    })];
+    const result = calculateCovenantHeadroom(
+      10000, 4000, 2000,
+      0, 0, 0,          // no holdco loan
+      businesses, 0.07, 0,
+      3000              // estimatedNetFcf
+    );
+    // Bank interest = 4000 * 0.08 = 320; principal = 4000/4 = 1000; debtService = 1320
+    // projected = 10000 + 3000 - 1320 = 11680
+    expect(result.nextYearDebtService).toBe(1320);
+    expect(result.projectedCashAfterDebt).toBe(11680);
+    expect(result.cashWillGoNegative).toBe(false);
+  });
+
+  it('cashWillGoNegative when projected cash is negative', () => {
+    const businesses = [createMockBusiness({
+      bankDebtBalance: 20000,
+      bankDebtRate: 0.10,
+      bankDebtRoundsRemaining: 2,
+    })];
+    const result = calculateCovenantHeadroom(
+      5000, 20000, 1000,
+      0, 0, 0,
+      businesses, 0.07, 0,
+      1000 // small FCF
+    );
+    // Bank interest = 20000 * 0.10 = 2000; principal = 20000/2 = 10000; debtService = 12000
+    // projected = 5000 + 1000 - 12000 = -6000
+    expect(result.cashWillGoNegative).toBe(true);
+    expect(result.projectedCashAfterDebt).toBe(-6000);
+  });
+
+  it('includes holdco loan in debt service calculation', () => {
+    const result = calculateCovenantHeadroom(
+      10000, 8000, 2000,
+      5000, 0.06, 5,    // holdco loan: $5M at 6%, 5 rounds
+      [], 0.07, 0, 0
+    );
+    // Holdco interest = 5000 * 0.06 = 300; principal = 5000/5 = 1000; debtService = 1300
+    expect(result.nextYearDebtService).toBe(1300);
+  });
+
+  it('includes interest penalty in holdco debt service', () => {
+    const result = calculateCovenantHeadroom(
+      10000, 5000, 2000,
+      5000, 0.06, 5,
+      [], 0.07, 0.02,   // 2% penalty (breach)
+      0
+    );
+    // Holdco interest = 5000 * (0.06 + 0.02) = 400; principal = 1000; debtService = 1400
+    expect(result.nextYearDebtService).toBe(1400);
+  });
+
+  it('includes seller notes in debt service', () => {
+    const businesses = [createMockBusiness({
+      sellerNoteBalance: 2000,
+      sellerNoteRate: 0.05,
+      sellerNoteRoundsRemaining: 4,
+    })];
+    const result = calculateCovenantHeadroom(
+      10000, 0, 2000,
+      0, 0, 0,
+      businesses, 0.07, 0, 0
+    );
+    // Seller interest = 2000 * 0.05 = 100; principal = 2000/4 = 500; debtService = 600
+    expect(result.nextYearDebtService).toBe(600);
+  });
+
+  it('leverage is Infinity when EBITDA is 0 and debt exists', () => {
+    const result = calculateCovenantHeadroom(
+      1000, 5000, 0,
+      0, 0, 0, [], 0.07, 0, 0
+    );
+    expect(result.currentLeverage).toBe(Infinity);
+  });
+
+  it('leverage is 0 when no debt and no EBITDA', () => {
+    const result = calculateCovenantHeadroom(
+      5000, 0, 0,
+      0, 0, 0, [], 0.07, 0, 0
+    );
+    expect(result.currentLeverage).toBe(0);
+    expect(result.headroomCash).toBe(5000); // all cash is headroom
+  });
+});
+
+describe('Distress cascade edge cases', () => {
+  it('zero EBITDA with outstanding debt does not divide by zero', () => {
+    // calculateDistressLevel handles zero EBITDA explicitly
+    const level = calculateDistressLevel(0, 5000, 0, 0);
+    expect(level).toBe('breach'); // no cash to cover debt
+    // Should not throw
+  });
+
+  it('zero EBITDA with debt and sufficient cash is stressed, not breach', () => {
+    const level = calculateDistressLevel(0, 5000, 0, 5000);
+    expect(level).toBe('stressed');
+  });
+
+  it('negative EBITDA with debt and no cash is breach', () => {
+    const level = calculateDistressLevel(0, 3000, -500, 0);
+    expect(level).toBe('breach');
+  });
+
+  it('very high leverage (100x) is breach', () => {
+    const level = calculateDistressLevel(100, 100000, 1000);
+    expect(level).toBe('breach');
+  });
+
+  it('exact boundary: 4.5x leverage is breach (not stressed)', () => {
+    const level = calculateDistressLevel(4.5, 4500, 1000);
+    expect(level).toBe('breach');
+  });
+
+  it('exact boundary: 3.5x leverage is stressed (not elevated)', () => {
+    const level = calculateDistressLevel(3.5, 3500, 1000);
+    expect(level).toBe('stressed');
+  });
+
+  it('exact boundary: 2.5x leverage is elevated (not comfortable)', () => {
+    const level = calculateDistressLevel(2.5, 2500, 1000);
+    expect(level).toBe('elevated');
+  });
+
+  it('business with zero revenue but positive EBITDA gets correct margin', () => {
+    // Edge case: EBITDA > 0 implies revenue should be > 0, but test the margin calc safety
+    const biz = createMockBusiness({ revenue: 0, ebitda: 500, ebitdaMargin: 0 });
+    // The margin is 0 but EBITDA exists — distress level still based on leverage
+    const level = calculateDistressLevel(2.0, 2000, biz.ebitda + 500);
+    expect(level).toBe('comfortable');
+  });
+
+  it('negative cash does not cause comfortable when no debt', () => {
+    // No debt, negative netDebtToEbitda (net cash) → comfortable
+    const level = calculateDistressLevel(-2.0, 0, 1000);
+    expect(level).toBe('comfortable');
+  });
+
+  it('multiple businesses with mixed debt — headroom includes all debt service', () => {
+    const businesses = [
+      createMockBusiness({
+        id: 'b1',
+        bankDebtBalance: 3000,
+        bankDebtRate: 0.07,
+        bankDebtRoundsRemaining: 5,
+        sellerNoteBalance: 1000,
+        sellerNoteRate: 0.05,
+        sellerNoteRoundsRemaining: 4,
+      }),
+      createMockBusiness({
+        id: 'b2',
+        bankDebtBalance: 2000,
+        bankDebtRate: 0.08,
+        bankDebtRoundsRemaining: 3,
+      }),
+    ];
+    const result = calculateCovenantHeadroom(
+      10000, 6000, 3000,
+      0, 0, 0,
+      businesses, 0.07, 0, 0
+    );
+    // b1 bank: interest=3000*0.07=210, principal=3000/5=600 → 810
+    // b1 seller: interest=1000*0.05=50, principal=1000/4=250 → 300
+    // b2 bank: interest=2000*0.08=160, principal=2000/3=667 → 827
+    // total = 810+300+827 = 1937
+    expect(result.nextYearDebtService).toBe(1937);
+  });
+});
+

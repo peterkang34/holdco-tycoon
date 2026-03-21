@@ -15,6 +15,11 @@ import { getMASourcingAnnualCost } from '../../data/sharedServices';
 import { getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
 import { EARNOUT_EXPIRATION_YEARS, PE_FUND_CONFIG } from '../../data/gameConfig';
 import { debtCountdownLabel } from '../../data/mechanicsCopy';
+// Drilldown computation functions are exported from drilldownComputations.ts
+// for testing parity with calculateMetrics(). The component still uses its own
+// inline render functions (which duplicate the logic) — a future refactor can
+// switch to using these directly.
+export type { DrilldownContext } from '../../engine/drilldownComputations';
 
 interface MetricDrilldownModalProps {
   metricKey: string;
