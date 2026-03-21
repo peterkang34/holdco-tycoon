@@ -496,6 +496,24 @@ function simulateCollectToEvent(state: GameState, coverage: PlaytestCoverage): G
     newCash = 0;
   }
 
+  // Decrement duration counters from PREVIOUS round before generating new events
+  // (prevents this round's new events from being immediately consumed)
+  if (state.creditTighteningRoundsRemaining > 0) {
+    state = { ...state, creditTighteningRoundsRemaining: state.creditTighteningRoundsRemaining - 1 };
+  }
+  if (state.inflationRoundsRemaining > 0) {
+    state = { ...state, inflationRoundsRemaining: state.inflationRoundsRemaining - 1 };
+  }
+  if (state.dealInflationState?.crisisResetRoundsRemaining > 0) {
+    state = {
+      ...state,
+      dealInflationState: {
+        ...state.dealInflationState,
+        crisisResetRoundsRemaining: state.dealInflationState.crisisResetRoundsRemaining - 1,
+      },
+    };
+  }
+
   // Generate event
   const event = generateEvent(state, roundStreams.events);
   const newTotalDebt = computeTotalDebt(updatedBusinesses, updatedHoldcoLoanBalance);
@@ -571,19 +589,8 @@ function simulateCollectToEvent(state: GameState, coverage: PlaytestCoverage): G
     gameState.dealPipeline = [...gameState.dealPipeline, referralDeal];
   }
 
-  // Decrement counters
-  if (gameState.creditTighteningRoundsRemaining > 0) {
-    gameState.creditTighteningRoundsRemaining--;
-  }
-  if (gameState.inflationRoundsRemaining > 0) {
-    gameState.inflationRoundsRemaining--;
-  }
-  if (gameState.dealInflationState?.crisisResetRoundsRemaining > 0) {
-    gameState.dealInflationState = {
-      ...gameState.dealInflationState,
-      crisisResetRoundsRemaining: gameState.dealInflationState.crisisResetRoundsRemaining - 1,
-    };
-  }
+  // NOTE: Duration counter decrements moved ABOVE event generation (lines ~499-515)
+  // to prevent this round's new events from being immediately consumed.
 
   // Resolve turnarounds
   let resolvedTurnarounds = [...(gameState.activeTurnarounds || state.activeTurnarounds)];

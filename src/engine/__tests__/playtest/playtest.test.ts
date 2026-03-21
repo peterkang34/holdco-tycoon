@@ -125,6 +125,8 @@ describe.each(MODES)('$label Playtest', ({ difficulty, duration }) => {
       'filler_event_choice',
       // Quality improvement from ops/turnarounds requires specific RNG outcomes
       'quality_improvement',
+      // Shared service unlock requires enough businesses + cash surplus (RNG-dependent in quick mode)
+      'shared_service_unlocked',
     ];
 
     for (const strategy of strategies) {

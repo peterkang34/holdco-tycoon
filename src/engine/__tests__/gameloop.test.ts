@@ -65,24 +65,28 @@ function simulateEventPhase(state: GameState): GameState {
   const annualInterest = Math.round(state.totalDebt * state.interestRate);
 
   const newCash = state.cash + annualFcf - annualInterest - sharedServicesCost;
-  const event = generateEvent(state);
-
+  // Decrement duration counters from PREVIOUS round before generating new events
   let gameState: GameState = {
     ...state,
     cash: Math.round(newCash),
+  };
+  if (gameState.creditTighteningRoundsRemaining > 0) {
+    gameState.creditTighteningRoundsRemaining--;
+  }
+  if (gameState.inflationRoundsRemaining > 0) {
+    gameState.inflationRoundsRemaining--;
+  }
+
+  const event = generateEvent(gameState);
+
+  gameState = {
+    ...gameState,
     currentEvent: event,
     phase: 'event' as GamePhase,
   };
 
   if (event && event.type !== 'unsolicited_offer') {
     gameState = applyEventEffects(gameState, event);
-  }
-
-  if (gameState.creditTighteningRoundsRemaining > 0) {
-    gameState.creditTighteningRoundsRemaining--;
-  }
-  if (gameState.inflationRoundsRemaining > 0) {
-    gameState.inflationRoundsRemaining--;
   }
 
   return {

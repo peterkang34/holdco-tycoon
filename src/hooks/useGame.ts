@@ -927,8 +927,42 @@ export const useGameStore = create<GameStore>()(
           });
         }
 
+        // Decrement duration counters from PREVIOUS round's events BEFORE generating new ones.
+        // This ensures this round's new events (e.g. credit tightening setting counter=2)
+        // aren't immediately consumed in the same phase transition.
+        // These decremented values are folded into gameState construction below.
+        let decrementedCreditTightening = state.creditTighteningRoundsRemaining;
+        let decrementedInflation = state.inflationRoundsRemaining;
+        let decrementedRecessionMult = state.recessionProbMultiplier ?? 1;
+        let decrementedTalentShift = state.talentMarketShiftRoundsRemaining ?? 0;
+        let decrementedPrivateCredit = state.privateCreditRoundsRemaining ?? 0;
+        let decrementedDealInflation = state.dealInflationState;
+        if (newCash >= 0) { // only tick if not in restructuring path
+          if (decrementedCreditTightening > 0) decrementedCreditTightening--;
+          if (decrementedInflation > 0) decrementedInflation--;
+          if (decrementedRecessionMult > 1) decrementedRecessionMult = 1;
+          if (decrementedTalentShift > 0) decrementedTalentShift--;
+          if (decrementedPrivateCredit > 0) decrementedPrivateCredit--;
+          if (decrementedDealInflation?.crisisResetRoundsRemaining > 0) {
+            decrementedDealInflation = {
+              ...decrementedDealInflation,
+              crisisResetRoundsRemaining: decrementedDealInflation.crisisResetRoundsRemaining - 1,
+            };
+          }
+        }
+
         // Generate event (seeded for challenge mode determinism)
-        const event = generateEvent(state as GameState, roundStreams.events);
+        // Pass decremented counters to generateEvent so it sees correct state
+        const stateForEventGen: GameState = {
+          ...state as GameState,
+          creditTighteningRoundsRemaining: decrementedCreditTightening,
+          inflationRoundsRemaining: decrementedInflation,
+          recessionProbMultiplier: decrementedRecessionMult,
+          talentMarketShiftRoundsRemaining: decrementedTalentShift,
+          privateCreditRoundsRemaining: decrementedPrivateCredit,
+          dealInflationState: decrementedDealInflation,
+        };
+        const event = generateEvent(stateForEventGen, roundStreams.events);
 
         // Generate guaranteed proSports event if player owns a franchise
         // Uses cosmetic stream fork to avoid disturbing the event RNG
@@ -976,6 +1010,13 @@ export const useGameStore = create<GameStore>()(
           pendingProSportsEvent: primaryIsProSports ? null : (proSportsEvent ?? null),
           requiresRestructuring,
           phase: requiresRestructuring ? 'restructure' as GamePhase : 'event' as GamePhase,
+          // Decremented duration counters (ticked BEFORE event generation)
+          creditTighteningRoundsRemaining: decrementedCreditTightening,
+          inflationRoundsRemaining: decrementedInflation,
+          recessionProbMultiplier: decrementedRecessionMult,
+          talentMarketShiftRoundsRemaining: decrementedTalentShift,
+          privateCreditRoundsRemaining: decrementedPrivateCredit,
+          dealInflationState: decrementedDealInflation,
           // PE Fund Manager: track cumulative management fees
           ...(state.isFundManagerMode ? { managementFeesCollected: (state.managementFeesCollected || 0) + managementFee } : {}),
         };
@@ -999,32 +1040,8 @@ export const useGameStore = create<GameStore>()(
           gameState.dealPipeline = [...gameState.dealPipeline, referralDeal];
         }
 
-        // Decrement tightening/inflation counters
-        if (gameState.creditTighteningRoundsRemaining > 0) {
-          gameState.creditTighteningRoundsRemaining--;
-        }
-        if (gameState.inflationRoundsRemaining > 0) {
-          gameState.inflationRoundsRemaining--;
-        }
-        // Reset yield curve inversion multiplier (consumed this round)
-        if ((gameState.recessionProbMultiplier ?? 1) > 1) {
-          gameState.recessionProbMultiplier = 1;
-        }
-        // Decrement talent market shift (margin hit applied once in applyEventEffects; counter is for UI/future use)
-        if ((gameState.talentMarketShiftRoundsRemaining ?? 0) > 0) {
-          gameState.talentMarketShiftRoundsRemaining = gameState.talentMarketShiftRoundsRemaining! - 1;
-        }
-        // Decrement private credit boom (rate reduction applied once in applyEventEffects; counter is for UI/future use)
-        if ((gameState.privateCreditRoundsRemaining ?? 0) > 0) {
-          gameState.privateCreditRoundsRemaining = gameState.privateCreditRoundsRemaining! - 1;
-        }
-        // Decrement deal inflation crisis reset counter
-        if (gameState.dealInflationState?.crisisResetRoundsRemaining > 0) {
-          gameState.dealInflationState = {
-            ...gameState.dealInflationState,
-            crisisResetRoundsRemaining: gameState.dealInflationState.crisisResetRoundsRemaining - 1,
-          };
-        }
+        // NOTE: Duration counter decrements moved ABOVE event generation (before line ~931)
+        // to prevent this round's new events from being immediately consumed.
 
         // Resolve turnarounds that have reached their end round
         let resolvedTurnarounds = [...(gameState.activeTurnarounds || state.activeTurnarounds)];
