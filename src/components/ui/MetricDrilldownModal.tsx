@@ -6,12 +6,14 @@ import {
   calculateExitValuation,
   calculatePortfolioTax,
   calculateSharedServicesBenefits,
+  calculateComplexityCost,
   TAX_RATE,
 } from '../../engine/simulation';
+import { calculateEnterpriseValue } from '../../engine/scoring';
 import { getDistressLabel, getDistressDescription, calculateCovenantHeadroom, getDistressRestrictions, calculateDistressLevel } from '../../engine/distress';
 import { getMASourcingAnnualCost } from '../../data/sharedServices';
 import { getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
-import { EARNOUT_EXPIRATION_YEARS } from '../../data/gameConfig';
+import { EARNOUT_EXPIRATION_YEARS, PE_FUND_CONFIG } from '../../data/gameConfig';
 import { debtCountdownLabel } from '../../data/mechanicsCopy';
 
 interface MetricDrilldownModalProps {
@@ -29,14 +31,27 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
   const maSourcingCost = state.maSourcing?.active
     ? getMASourcingAnnualCost(state.maSourcing.tier)
     : 0;
-  const totalDeductibleCosts = sharedServicesCost + maSourcingCost;
+  // PE Fund management fee (tax-deductible — matches calculateMetrics in simulation.ts)
+  const managementFee = state.isFundManagerMode ? PE_FUND_CONFIG.annualManagementFee : 0;
+  const totalDeductibleCosts = sharedServicesCost + maSourcingCost + managementFee;
 
   // Distress restrictions for accurate interest penalty
   const allDebtBusinessesTop = state.businesses.filter(b => b.status === 'active' || b.status === 'integrated');
   const totalEbitdaTop = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
   const totalDebtTop = state.holdcoLoanBalance + allDebtBusinessesTop.reduce((sum, b) => sum + b.bankDebtBalance, 0)
     + allDebtBusinessesTop.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
-  const leverageTop = totalEbitdaTop > 0 ? Math.max(0, totalDebtTop - state.cash) / totalEbitdaTop : 0;
+
+  // PE fund mode: 1-year covenant holiday on newly acquired debt (matches calculateMetrics)
+  let leverageTop: number;
+  if (state.isFundManagerMode && state.round > 0) {
+    const graceBusinesses = allDebtBusinessesTop.filter(b => b.acquisitionRound === state.round);
+    const graceDebt = graceBusinesses.reduce((sum, b) => sum + b.bankDebtBalance + b.sellerNoteBalance, 0);
+    const adjustedDebt = totalDebtTop - graceDebt;
+    const adjustedEbitda = totalEbitdaTop - graceBusinesses.reduce((sum, b) => sum + Math.max(0, b.ebitda), 0);
+    leverageTop = adjustedEbitda > 0 ? (adjustedDebt - state.cash) / adjustedEbitda : 0;
+  } else {
+    leverageTop = totalEbitdaTop > 0 ? Math.max(0, totalDebtTop - state.cash) / totalEbitdaTop : 0;
+  }
   const distressLevelTop = calculateDistressLevel(leverageTop, totalDebtTop, totalEbitdaTop, state.cash);
   const distressRestrictionsTop = getDistressRestrictions(distressLevelTop);
 
@@ -65,6 +80,14 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
         return renderLeverage();
       case 'cashconv':
         return renderCashConv();
+      case 'nav':
+        return renderNav();
+      case 'dpi':
+        return renderDpi();
+      case 'carry':
+        return renderCarry();
+      case 'deployed':
+        return renderDeployed();
       default:
         return <p className="text-text-muted">Unknown metric</p>;
     }
@@ -232,17 +255,29 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
       }, 0);
     const turnaroundCost = turnaroundTierCost + turnaroundProgramCosts;
 
+    // Portfolio complexity cost (matches calculateMetrics in simulation.ts)
+    const totalRevenue = activeBusinesses.reduce((sum, b) => sum + b.revenue, 0);
+    const complexityCost = calculateComplexityCost(
+      state.businesses,
+      state.sharedServices,
+      totalRevenue,
+      state.duration,
+      state.integratedPlatforms,
+    );
+
     const preTaxFcf = activeBusinesses.reduce(
       (sum, b) => sum + calculateAnnualFcf(b, ssBenefits.capexReduction, ssBenefits.cashConversionBonus), 0
     );
 
-    // Net FCF matching CollectPhase waterfall
+    // Net FCF matching CollectPhase waterfall (includes complexity cost + management fee)
     const netFcf = preTaxFcf - taxBreakdown.taxAmount - holdcoPI - opcoDebtService
-      - earnoutPayments - sharedServicesCost - maSourcingCost - turnaroundCost;
+      - earnoutPayments - sharedServicesCost - maSourcingCost - turnaroundCost
+      - complexityCost.netCost - managementFee;
 
     return {
       totalEbitda, totalCapex, holdcoLoanInterest, holdcoLoanPrincipal, holdcoPI,
       opcoDebtService, earnoutPayments, turnaroundCost, preTaxFcf, netFcf,
+      complexityCostNet: complexityCost.netCost, managementFee,
     };
   }
 
@@ -250,6 +285,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
     const {
       totalEbitda, totalCapex, holdcoLoanInterest, holdcoLoanPrincipal, holdcoPI,
       opcoDebtService, earnoutPayments, turnaroundCost, netFcf,
+      complexityCostNet, managementFee: mgmtFee,
     } = computeWaterfall();
 
     return (
@@ -277,6 +313,12 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
           {turnaroundCost > 0 && (
             <WaterfallRow label="Turnaround Programs" value={turnaroundCost} isSubtract />
           )}
+          {complexityCostNet > 0 && (
+            <WaterfallRow label="Portfolio Complexity" value={complexityCostNet} isSubtract />
+          )}
+          {mgmtFee > 0 && (
+            <WaterfallRow label="Management Fee (2% AUM)" value={mgmtFee} isSubtract />
+          )}
           <WaterfallRow label="Net FCF" value={netFcf} isTotal />
         </div>
 
@@ -292,7 +334,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
               )}
               {taxBreakdown.sharedServicesTaxShield > 0 && (
                 <div className="flex justify-between text-text-secondary">
-                  <span>Shared services deduction</span>
+                  <span>{managementFee > 0 ? 'Holdco costs deduction (SS + mgmt fee)' : 'Shared services deduction'}</span>
                   <span className="font-mono">{formatMoney(taxBreakdown.sharedServicesTaxShield)}</span>
                 </div>
               )}
@@ -519,14 +561,98 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
   }
 
   function renderMoic() {
-    // Use actual exit valuations — matches calculateMetrics() in simulation.ts
+    // PE Fund mode: use calculateEnterpriseValue (matches dashboard's fundGrossMoic)
+    if (state.isFundManagerMode) {
+      const nav = calculateEnterpriseValue(state);
+      const lpDist = state.lpDistributions ?? 0;
+      const fs = state.fundSize ?? PE_FUND_CONFIG.fundSize;
+      const totalValue = nav + lpDist;
+      const grossMoic = fs > 0 ? totalValue / fs : 0;
+
+      const portfolioValuePE = activeBusinesses.reduce((sum, b) => {
+        const valuation = calculateExitValuation(b, state.round, undefined, undefined, state.integratedPlatforms);
+        return sum + b.ebitda * valuation.totalMultiple;
+      }, 0);
+
+      return (
+        <>
+          <SectionHeader title="Gross MOIC" formula="(NAV + LP Distributions) ÷ Committed Capital" />
+          <div className="bg-white/5 rounded-lg p-3 mb-4 text-center">
+            <p className="text-3xl font-bold font-mono">{formatMultiple(grossMoic)}</p>
+            <p className="text-xs text-text-muted mt-1">
+              {formatMoney(totalValue)} total value ÷ {formatMoney(fs)} committed
+            </p>
+          </div>
+
+          <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">Value Waterfall</p>
+          <div className="bg-white/5 rounded-lg p-3 space-y-0 mb-4">
+            <WaterfallRow label="NAV (portfolio + cash − debt)" value={Math.round(nav)} />
+            <WaterfallRow label="LP Distributions (returned)" value={lpDist} />
+            <WaterfallRow label="Total Value" value={Math.round(totalValue)} isTotal />
+          </div>
+
+          <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">NAV Composition</p>
+          <div className="bg-white/5 rounded-lg p-3 space-y-0 mb-4">
+            <WaterfallRow label="Portfolio Value" value={Math.round(portfolioValuePE)} />
+            <WaterfallRow label="Cash" value={state.cash} />
+            <WaterfallRow label="Total Debt" value={state.totalDebt} isSubtract />
+            <WaterfallRow label="NAV" value={Math.round(nav)} isTotal />
+          </div>
+
+          <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">Per-Business Value</p>
+          <BusinessTable
+            headers={['Business', 'Total Cost', 'Current Value', 'Biz MOIC']}
+            rows={activeBusinesses.map(b => {
+              const valuation = calculateExitValuation(b, state.round, undefined, undefined, state.integratedPlatforms);
+              const currentValue = b.ebitda * valuation.totalMultiple;
+              const invested = b.totalAcquisitionCost || b.acquisitionPrice;
+              const bizMoic = invested > 0 ? currentValue / invested : 0;
+              return [
+                b.name,
+                formatMoney(invested),
+                formatMoney(Math.round(currentValue)),
+                formatMultiple(bizMoic),
+              ];
+            })}
+          />
+
+          {state.exitedBusinesses.filter(b => b.status === 'sold' && b.exitPrice && !b.parentPlatformId).length > 0 && (
+            <>
+              <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2 mt-4">Exited Businesses</p>
+              <BusinessTable
+                headers={['Business', 'Total Cost', 'Exit Price', 'Exit MOIC']}
+                rows={state.exitedBusinesses
+                  .filter(b => b.status === 'sold' && b.exitPrice && !b.parentPlatformId)
+                  .map(b => {
+                    const invested = b.totalAcquisitionCost || b.acquisitionPrice;
+                    const exitMoic = invested > 0 ? (b.exitPrice || 0) / invested : 0;
+                    return [
+                      b.name,
+                      formatMoney(invested),
+                      formatMoney(b.exitPrice || 0),
+                      formatMultiple(exitMoic),
+                    ];
+                  })}
+              />
+            </>
+          )}
+
+          <p className="text-xs text-text-muted mt-3 italic">
+            PE benchmark: 2.0x+ Gross MOIC = strong. 3.0x+ = top-quartile. Hurdle: 8%/yr ({formatMoney(PE_FUND_CONFIG.hurdleReturn)} target).
+          </p>
+        </>
+      );
+    }
+
+    // Holdco mode: use calculateMetrics-style MOIC
     const portfolioValue = activeBusinesses.reduce((sum, b) => {
       const valuation = calculateExitValuation(b, state.round, undefined, undefined, state.integratedPlatforms);
       return sum + b.ebitda * valuation.totalMultiple;
     }, 0);
 
-    const opcoDebt = activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
-    const totalDebt = state.totalDebt + opcoDebt;
+    const allDebtBusinessesMoic = state.businesses.filter(b => b.status === 'active' || b.status === 'integrated');
+    const opcoSellerNotes = allDebtBusinessesMoic.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+    const totalDebt = state.totalDebt + opcoSellerNotes;
     const nav = portfolioValue + state.cash - totalDebt + state.totalDistributions;
     const moic = state.initialRaiseAmount > 0 ? nav / state.initialRaiseAmount : 1;
 
@@ -597,6 +723,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
     const opcoBankDebt = allDebtBusinesses.reduce((sum, b) => sum + b.bankDebtBalance, 0);
     const totalDebt = state.holdcoLoanBalance + opcoBankDebt + opcoDebt;
     const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
+    const totalRevLeverage = activeBusinesses.reduce((sum, b) => sum + b.revenue, 0);
     const netDebt = totalDebt - state.cash;
     const leverage = totalEbitda > 0 ? netDebt / totalEbitda : 0;
 
@@ -632,12 +759,18 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
       return sum;
     }, 0);
 
-    // Tax with penalty and all deductible costs
-    const taxEstLeverage = calculatePortfolioTax(activeBusinesses, state.holdcoLoanBalance, state.holdcoLoanRate + distressRestrictions.interestPenalty, sharedServicesCost + maSourcingCost);
+    // Tax with penalty and all deductible costs (including management fee)
+    const taxEstLeverage = calculatePortfolioTax(activeBusinesses, state.holdcoLoanBalance, state.holdcoLoanRate + distressRestrictions.interestPenalty, totalDeductibleCosts);
+
+    // Complexity cost for this portfolio
+    const complexityCostLeverage = calculateComplexityCost(
+      state.businesses, state.sharedServices, totalRevLeverage, state.duration, state.integratedPlatforms,
+    );
 
     // Net FCF after tax, operating costs, and opco-level debt service
     // NOTE: holdco P&I, bank debt P&I, and seller note P&I are computed inside calculateCovenantHeadroom — do NOT include here
-    const estimatedNetFcf = preTaxFcfEst - taxEstLeverage.taxAmount - sharedServicesCost - maSourcingCost - turnaroundCostAnnual - earnoutEst;
+    const estimatedNetFcf = preTaxFcfEst - taxEstLeverage.taxAmount - sharedServicesCost - maSourcingCost
+      - turnaroundCostAnnual - earnoutEst - complexityCostLeverage.netCost - managementFee;
 
     const covenantHeadroom = calculateCovenantHeadroom(
       state.cash,
@@ -892,6 +1025,268 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
           After-tax benchmark: 60%+ is good, 70%+ is excellent. Per-business rows show pre-tax conversion (before portfolio-level tax).
           {ssBenefits.capexReduction > 0 && ` Procurement shared service reducing capex by ${(ssBenefits.capexReduction * 100).toFixed(0)}%.`}
           {ssBenefits.cashConversionBonus > 0 && ` Finance & reporting adding +${(ssBenefits.cashConversionBonus * 100).toFixed(0)}% conversion bonus.`}
+        </p>
+      </>
+    );
+  }
+
+  // --- PE Fund-specific drilldown views ---
+
+  function renderNav() {
+    const nav = calculateEnterpriseValue(state);
+    const portfolioValue = activeBusinesses.reduce((sum, b) => {
+      const valuation = calculateExitValuation(b, state.round, undefined, undefined, state.integratedPlatforms);
+      return sum + b.ebitda * valuation.totalMultiple;
+    }, 0);
+
+    return (
+      <>
+        <SectionHeader title="Fund NAV" formula="Portfolio Value + Cash − Total Debt" />
+        <div className="bg-white/5 rounded-lg p-3 mb-4 text-center">
+          <p className="text-3xl font-bold font-mono">{formatMoney(Math.round(nav))}</p>
+          <p className="text-xs text-text-muted mt-1">
+            Net Asset Value of the fund
+          </p>
+        </div>
+
+        <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">NAV Waterfall</p>
+        <div className="bg-white/5 rounded-lg p-3 space-y-0 mb-4">
+          <WaterfallRow label="Portfolio Value" value={Math.round(portfolioValue)} />
+          <WaterfallRow label="Cash" value={state.cash} />
+          <WaterfallRow label="Total Debt" value={state.totalDebt} isSubtract />
+          <WaterfallRow label="NAV" value={Math.round(nav)} isTotal />
+        </div>
+
+        <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">Per-Business Value</p>
+        <BusinessTable
+          headers={['Business', 'EBITDA', 'Multiple', 'Value', '% NAV']}
+          rows={activeBusinesses.map(b => {
+            const valuation = calculateExitValuation(b, state.round, undefined, undefined, state.integratedPlatforms);
+            const currentValue = b.ebitda * valuation.totalMultiple;
+            return [
+              b.name,
+              formatMoney(b.ebitda),
+              formatMultiple(valuation.totalMultiple),
+              formatMoney(Math.round(currentValue)),
+              nav > 0 ? `${(currentValue / nav * 100).toFixed(0)}%` : '—',
+            ];
+          })}
+        />
+
+        <p className="text-xs text-text-muted mt-3 italic">
+          NAV is marked-to-market using exit valuation multiples. At Year 10, remaining portfolio is liquidated at 0.90x discount.
+        </p>
+      </>
+    );
+  }
+
+  function renderDpi() {
+    const lpDist = state.lpDistributions ?? 0;
+    const fs = state.fundSize ?? PE_FUND_CONFIG.fundSize;
+    const dpi = fs > 0 ? lpDist / fs : 0;
+
+    return (
+      <>
+        <SectionHeader title="DPI (Distributions to Paid-In)" formula="LP Distributions ÷ Committed Capital" />
+        <div className="bg-white/5 rounded-lg p-3 mb-4 text-center">
+          <p className="text-3xl font-bold font-mono">{formatMultiple(dpi)}</p>
+          <p className="text-xs text-text-muted mt-1">
+            {formatMoney(lpDist)} distributed ÷ {formatMoney(fs)} committed
+          </p>
+        </div>
+
+        <div className="bg-white/5 rounded-lg p-3 space-y-0 mb-4">
+          <div className="flex justify-between py-1.5 text-sm">
+            <span className="text-text-secondary">Total LP Distributions</span>
+            <span className="font-mono">{formatMoney(lpDist)}</span>
+          </div>
+          <div className="flex justify-between py-1.5 text-sm">
+            <span className="text-text-secondary">Committed Capital</span>
+            <span className="font-mono">{formatMoney(fs)}</span>
+          </div>
+          <div className="flex justify-between py-1.5 text-sm">
+            <span className="text-text-secondary">Capital Deployed</span>
+            <span className="font-mono">{formatMoney(state.totalCapitalDeployed ?? 0)}</span>
+          </div>
+          <div className="flex justify-between py-1.5 text-sm">
+            <span className="text-text-secondary">Mgmt Fees Collected</span>
+            <span className="font-mono">{formatMoney(state.managementFeesCollected ?? 0)}</span>
+          </div>
+        </div>
+
+        <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">DPI Benchmarks</p>
+        <div className="grid grid-cols-4 gap-1 text-center text-xs">
+          <div className={`p-2 rounded ${dpi < 0.5 ? 'bg-red-500/20 border border-red-500/40' : 'bg-white/5'}`}>
+            <p className="font-bold text-red-400">&lt;0.5x</p>
+            <p className="text-text-muted">Low</p>
+          </div>
+          <div className={`p-2 rounded ${dpi >= 0.5 && dpi < 1.0 ? 'bg-yellow-500/20 border border-yellow-500/40' : 'bg-white/5'}`}>
+            <p className="font-bold text-yellow-400">0.5-1.0x</p>
+            <p className="text-text-muted">Partial</p>
+          </div>
+          <div className={`p-2 rounded ${dpi >= 1.0 && dpi < 2.0 ? 'bg-accent/20 border border-accent/40' : 'bg-white/5'}`}>
+            <p className="font-bold text-accent">1.0-2.0x</p>
+            <p className="text-text-muted">Full Return</p>
+          </div>
+          <div className={`p-2 rounded ${dpi >= 2.0 ? 'bg-green-500/20 border border-green-500/40' : 'bg-white/5'}`}>
+            <p className="font-bold text-green-400">2.0x+</p>
+            <p className="text-text-muted">Strong</p>
+          </div>
+        </div>
+
+        <p className="text-xs text-text-muted mt-3 italic">
+          DPI measures actual cash returned to LPs. LPs care about DPI because it is realized return, not just paper gains (MOIC includes unrealized).
+          Min distribution: {formatMoney(PE_FUND_CONFIG.minDistribution)}. Requires {formatMoney(PE_FUND_CONFIG.minDeploymentForDistribution)} deployed first.
+        </p>
+      </>
+    );
+  }
+
+  function renderCarry() {
+    const nav = calculateEnterpriseValue(state);
+    const lpDist = state.lpDistributions ?? 0;
+    const fs = state.fundSize ?? PE_FUND_CONFIG.fundSize;
+    const totalValue = nav + lpDist;
+    const hurdleTarget = PE_FUND_CONFIG.hurdleReturn;
+    const aboveHurdle = totalValue - hurdleTarget;
+    const estCarry = aboveHurdle > 0 ? aboveHurdle * PE_FUND_CONFIG.carryRate : 0;
+
+    return (
+      <>
+        <SectionHeader title="Estimated Carry" formula="(Total Value − Hurdle Return) × 20% carry rate" />
+        <div className="bg-white/5 rounded-lg p-3 mb-4 text-center">
+          <p className={`text-3xl font-bold font-mono ${estCarry > 0 ? 'text-accent' : 'text-text-muted'}`}>
+            {estCarry > 0 ? `~${formatMoney(Math.round(estCarry))}` : 'Below hurdle'}
+          </p>
+          <p className="text-xs text-text-muted mt-1">
+            GP compensation (carried interest)
+          </p>
+        </div>
+
+        <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">Carry Waterfall</p>
+        <div className="bg-white/5 rounded-lg p-3 space-y-0 mb-4">
+          <div className="flex justify-between py-1.5 text-sm">
+            <span className="text-text-secondary">Total Value (NAV + LP Dist)</span>
+            <span className="font-mono">{formatMoney(Math.round(totalValue))}</span>
+          </div>
+          <div className="flex justify-between py-1.5 text-sm">
+            <span className="text-text-secondary">Hurdle Target (8% × 10yr)</span>
+            <span className="font-mono">{formatMoney(Math.round(hurdleTarget))}</span>
+          </div>
+          <div className="flex justify-between py-1.5 text-sm border-t border-white/10 mt-1 pt-2">
+            <span className="text-text-secondary">Above Hurdle</span>
+            <span className={`font-mono font-bold ${aboveHurdle > 0 ? 'text-accent' : 'text-danger'}`}>
+              {formatMoney(Math.round(aboveHurdle))}
+            </span>
+          </div>
+          <div className="flex justify-between py-1.5 text-sm">
+            <span className="text-text-secondary">Carry Rate</span>
+            <span className="font-mono">{(PE_FUND_CONFIG.carryRate * 100).toFixed(0)}%</span>
+          </div>
+          <div className="flex justify-between py-1.5 text-sm border-t border-white/20 mt-1 pt-2 font-bold">
+            <span>Estimated Carry</span>
+            <span className="font-mono text-accent">{estCarry > 0 ? `~${formatMoney(Math.round(estCarry))}` : '$0'}</span>
+          </div>
+        </div>
+
+        <div className="bg-white/5 rounded-lg p-3 mb-4">
+          <p className="text-xs font-medium text-text-secondary mb-2">Fund Economics</p>
+          <div className="space-y-1 text-xs">
+            <div className="flex justify-between text-text-secondary">
+              <span>Committed Capital</span>
+              <span className="font-mono">{formatMoney(fs)}</span>
+            </div>
+            <div className="flex justify-between text-text-secondary">
+              <span>Management Fees Earned</span>
+              <span className="font-mono">{formatMoney(state.managementFeesCollected ?? 0)}</span>
+            </div>
+            <div className="flex justify-between text-text-secondary">
+              <span>Total GP Compensation</span>
+              <span className="font-mono font-bold">{formatMoney(Math.round(estCarry + (state.managementFeesCollected ?? 0)))}</span>
+            </div>
+          </div>
+        </div>
+
+        <p className="text-xs text-text-muted italic">
+          Carry is the GP's share of profits above the hurdle. This is an estimate — final carry includes IRR-based supercarry multiplier (0.70x-1.30x) applied at game end.
+        </p>
+      </>
+    );
+  }
+
+  function renderDeployed() {
+    const fs = state.fundSize ?? PE_FUND_CONFIG.fundSize;
+    const deployed = state.totalCapitalDeployed ?? 0;
+    const deployPct = fs > 0 ? (deployed / fs) * 100 : 0;
+    const investmentPeriodActive = state.round <= 5;
+
+    return (
+      <>
+        <SectionHeader title="Capital Deployed" formula="Total acquisition costs ÷ Committed Capital" />
+        <div className="bg-white/5 rounded-lg p-3 mb-4 text-center">
+          <p className="text-3xl font-bold font-mono">{formatMoney(deployed)}</p>
+          <p className="text-xs text-text-muted mt-1">
+            {deployPct.toFixed(0)}% of {formatMoney(fs)} committed capital
+          </p>
+        </div>
+
+        <div className="bg-white/5 rounded-lg p-3 space-y-0 mb-4">
+          <div className="flex justify-between py-1.5 text-sm">
+            <span className="text-text-secondary">Committed Capital</span>
+            <span className="font-mono">{formatMoney(fs)}</span>
+          </div>
+          <div className="flex justify-between py-1.5 text-sm">
+            <span className="text-text-secondary">Capital Deployed</span>
+            <span className="font-mono">{formatMoney(deployed)}</span>
+          </div>
+          <div className="flex justify-between py-1.5 text-sm">
+            <span className="text-text-secondary">Available (Cash)</span>
+            <span className="font-mono">{formatMoney(state.cash)}</span>
+          </div>
+          <div className="flex justify-between py-1.5 text-sm">
+            <span className="text-text-secondary">Active Businesses</span>
+            <span className="font-mono">{activeBusinesses.length}</span>
+          </div>
+        </div>
+
+        {/* Deployment pace indicator */}
+        <div className="bg-white/5 rounded-lg p-3 mb-4">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-medium text-text-secondary">Deployment Pace</span>
+            <span className="text-xs font-mono text-text-muted">{deployPct.toFixed(0)}% / 80% target by Y5</span>
+          </div>
+          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+            <div
+              className={`h-full transition-all duration-500 rounded-full ${deployPct >= 80 ? 'bg-accent' : deployPct >= 50 ? 'bg-yellow-400' : 'bg-red-400'}`}
+              style={{ width: `${Math.min(100, (deployPct / 80) * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {activeBusinesses.length > 0 && (
+          <>
+            <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">Portfolio Positions</p>
+            <BusinessTable
+              headers={['Business', 'Acquisition Cost', 'Current EBITDA', '% of Fund']}
+              rows={activeBusinesses.map(b => {
+                const cost = b.totalAcquisitionCost || b.acquisitionPrice;
+                return [
+                  b.name,
+                  formatMoney(cost),
+                  formatMoney(b.ebitda),
+                  fs > 0 ? `${(cost / fs * 100).toFixed(0)}%` : '—',
+                ];
+              })}
+            />
+          </>
+        )}
+
+        <p className="text-xs text-text-muted mt-3 italic">
+          {investmentPeriodActive
+            ? `Investment period: Years 1-5. Target 80% deployed by Year 5. LPs penalize slow deployment.`
+            : `Harvest period (Years 6-10). Focus on value creation and exits. New deals still possible but less expected.`
+          }
+          {' '}Max concentration: {formatMoney(PE_FUND_CONFIG.maxConcentration * fs)} (25%) per deal.
         </p>
       </>
     );

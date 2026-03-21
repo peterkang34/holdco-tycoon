@@ -149,6 +149,13 @@ export function CollectPhase({
   // Calculate total pre-tax FCF from all businesses (annual)
   const totalBusinessFcf = businessBreakdowns.reduce((sum, { breakdown }) => sum + breakdown.fcf, 0);
   const totalEbitda = businessBreakdowns.reduce((sum, { breakdown }) => sum + breakdown.ebitda, 0);
+  const totalCapex = businessBreakdowns.reduce((sum, { breakdown }) => sum + breakdown.capex, 0);
+
+  // Portfolio-level cash conversion (EBITDA → FCF, before and after tax)
+  // Pre-tax: (EBITDA - CapEx) / EBITDA — how much EBITDA survives capex
+  // Post-tax: (EBITDA - CapEx - Tax) / EBITDA — matches dashboard "Cash Conv." metric
+  const preTaxPortfolioFcf = totalEbitda - totalCapex;
+  const preTaxCashConversion = totalEbitda > 0 ? preTaxPortfolioFcf / totalEbitda : 0;
 
   // Debt service from integrated (tuck-in) businesses: seller notes + earnouts
   const integratedDebt = calculateIntegratedDebtService(businesses, round);
@@ -158,6 +165,7 @@ export function CollectPhase({
   const taxBreakdown = calculatePortfolioTax(activeBusinesses, holdcoLoanBalance, holdcoLoanRate + (interestPenalty ?? 0), sharedServicesCost + (maSourcingCost ?? 0) + managementFee);
   const hasDeductions = taxBreakdown.totalTaxSavings > 0;
   const effectiveRatePct = Math.round(taxBreakdown.effectiveTaxRate * 100);
+  const postTaxCashConversion = totalEbitda > 0 ? (preTaxPortfolioFcf - taxBreakdown.taxAmount) / totalEbitda : 0;
 
   // Holdco loan P&I (interest + principal)
   const holdcoLoanInterest = Math.round(holdcoLoanBalance * (holdcoLoanRate + (interestPenalty ?? 0)));
@@ -269,6 +277,26 @@ export function CollectPhase({
             </p>
           </div>
         </div></div>
+
+        {/* Cash Conversion */}
+        {totalEbitda > 0 && (
+          <div className="mt-3 sm:mt-4 pt-2 sm:pt-3 border-t border-white/10 flex flex-col sm:flex-row gap-1.5 sm:gap-6 text-xs sm:text-sm">
+            <div className="flex items-center gap-2">
+              <span className="text-text-muted">Pre-Tax Cash Conversion:</span>
+              <span className="font-mono font-bold text-text-primary">
+                {formatPercent(preTaxCashConversion)}
+              </span>
+              <span className="text-xs text-text-muted hidden sm:inline">(EBITDA − CapEx) ÷ EBITDA</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-text-muted">Cash Conversion (After Tax):</span>
+              <span className={`font-mono font-bold ${postTaxCashConversion >= 0.7 ? 'text-accent' : postTaxCashConversion >= 0.6 ? 'text-yellow-400' : 'text-text-primary'}`}>
+                {formatPercent(postTaxCashConversion)}
+              </span>
+              <span className="text-xs text-text-muted hidden sm:inline">(EBITDA − CapEx − Tax) ÷ EBITDA</span>
+            </div>
+          </div>
+        )}
 
         {/* Coverage Ratios */}
         {hasDebtObligations && (
@@ -499,7 +527,7 @@ export function CollectPhase({
                             {formatMoney(breakdown.fcf)}
                           </td>
                           <td className="py-2 text-right text-text-muted text-xs">
-                            {formatPercent(breakdown.ebitda > 0 ? breakdown.fcf / breakdown.ebitda : 0)} conv.
+                            {formatPercent(breakdown.ebitda > 0 ? breakdown.fcf / breakdown.ebitda : 0)} pre-tax
                           </td>
                         </tr>
                       </tbody>
