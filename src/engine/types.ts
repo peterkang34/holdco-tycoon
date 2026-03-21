@@ -876,3 +876,174 @@ export interface IntegratedPlatform {
   forgedInRound: number;
   bonuses: PlatformBonuses;
 }
+
+// ── Operator's Playbook ──────────────────────────────────────────────
+
+export interface PlaybookData {
+  version: 1;
+  generatedAt: string;
+  isMinimal?: boolean;
+
+  thesis: {
+    archetype: string;
+    holdcoName: string;
+    grade: string;
+    score: number;
+    fev: number;
+    adjustedFev: number;
+    difficulty: string;
+    duration: string;
+    seed: number;
+    sophisticationScore: number;
+    sectorFocus: string[];
+    isFundManager: boolean;
+    isBankrupt: boolean;
+    totalRounds: number;
+    challengeSeed?: string;
+    fundName?: string;
+    carryEarned?: number;
+  };
+
+  sectors: {
+    endingSectorIds: string[];
+    allTimeSectorIds: string[];
+    endingSubTypes: string[];
+    businessesPerSector: Record<string, number>;
+    platformSectors: string[];
+  };
+
+  capital: {
+    dealStructureTypes: Record<string, number>;
+    peakLeverage: number;
+    endingLeverage: number;
+    peakDistressLevel: DistressLevel;
+    totalDistributions: number;
+    totalBuybacks: number;
+    equityRaisesUsed: number;
+    rolloverEquityCount: number;
+    hasRestructured: boolean;
+    antiPatterns: string[];
+    holdcoLoanUsed: boolean;
+    sellerNotePercentage: number;
+    avgMultiplePaid: number;
+  };
+
+  portfolio: {
+    totalAcquisitions: number;
+    totalSells: number;
+    activeCount: number;
+    peakActiveCount: number;
+    platformsForged: number;
+    platformCount: number;
+    endingConstruction: Record<string, number>;
+    tuckInCount: number;
+    neverSoldCount: number;
+    avgHoldYears: number;
+    avgAcquisitionQuality: number;
+    ownershipPercentage: number;
+  };
+
+  operations: {
+    turnaroundsStarted: number;
+    turnaroundsSucceeded: number;
+    turnaroundsFailed: number;
+    sharedServicesActive: number;
+    maSourcingTier: number;
+    sourceDealUses: number;
+    proactiveOutreachUses: number;
+    smbBrokerUses: number;
+    recessionAcquisitionCount: number;
+  };
+
+  exits: {
+    exitedBusinesses: Array<{
+      name: string;
+      sector: string;
+      acquisitionPrice: number;
+      exitPrice: number;
+      holdYears: number;
+      moic: number;
+    }>;
+    totalExitProceeds: number;
+    blendedMultiple: number;
+    portfolioMoic: number;
+  };
+
+  performance: {
+    metricsTimeline: Array<{
+      round: number;
+      fev: number;
+      totalEbitda: number;
+      totalDebt: number;
+      cash: number;
+      fcfPerShare: number;
+      netDebtToEbitda: number;
+      distressLevel: DistressLevel;
+      activeBusinessCount: number;
+      totalRevenue: number;
+      avgEbitdaMargin: number;
+      ownershipPct: number;
+      eventType: string | null;
+      totalDistributions: number;
+    }>;
+    totalInvestedCapital: number;
+    totalShareholderReturn: number;
+    roiic: number;
+    fcfConversionRate: number;
+    scoreBreakdown: {
+      valueCreation: number;
+      fcfShareGrowth: number;
+      portfolioRoic: number;
+      capitalDeployment: number;
+      balanceSheetHealth: number;
+      strategicDiscipline: number;
+    };
+  };
+
+  peFund?: {
+    grossMoic: number;
+    netIrr: number;
+    dpi: number;
+    tvpi: number;
+    rvpi: number;
+    carryEarned: number;
+    managementFees: number;
+    lpSatisfaction: number;
+    hurdleClearance: boolean;
+    irrMultiplier: number;
+    totalFundSize: number;
+    totalLpDistributions: number;
+    peScoreBreakdown: {
+      returnGeneration: number;
+      capitalEfficiency: number;
+      valueCreation: number;
+      deployment: number;
+      riskManagement: number;
+      lpSatisfaction: number;
+    };
+  };
+
+  familyOffice?: {
+    foFev: number;
+    foMoic: number;
+    foMultiplier: number;
+    legacyGrade: string;
+    philanthropyAmount: number;
+    foRounds: number;
+    hasRestructuredDuringFo: boolean;
+  };
+
+  ipo?: {
+    wentPublic: boolean;
+    ipoRound: number;
+    stockPrice: number;
+    sharesOutstanding: number;
+    marketSentiment: number;
+    publicCompanyBonus: number;
+    shareFundedDeals: number;
+  };
+
+  realityCheck: {
+    gameToRealityGaps: string[];
+  };
+}

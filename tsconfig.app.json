@@ -22,6 +22,5 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"],
-  "exclude": ["src/utils/playbookBuilder.ts", "src/utils/playbookThesis.ts"]
+  "include": ["src"]
 }
