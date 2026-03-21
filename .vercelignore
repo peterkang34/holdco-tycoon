@@ -13,5 +13,3 @@ _architecture-review.md
 activity-log.md
 CLAUDE.md
 .claude/
-src/utils/playbookBuilder.ts
-src/utils/playbookThesis.ts
