@@ -156,6 +156,8 @@ interface ValidatedPayload {
   feature?: string;
   eventType?: string;
   choiceAction?: string;
+  // Game mode (fund_manager, etc.)
+  gameMode?: string;
 }
 
 /**
@@ -258,6 +260,7 @@ export function validateTelemetryPayload(body: any): ValidatedPayload {
   const feature = optionalEnum(body.feature, VALID_FEATURES);
   const eventType = optionalString(body.eventType, 50);
   const choiceAction = optionalString(body.choiceAction, 50);
+  const gameMode = optionalString(body.gameMode, 30);
 
   return {
     valid: true,
@@ -278,7 +281,7 @@ export function validateTelemetryPayload(body: any): ValidatedPayload {
     sharedServicesActive, maSourcingTier, sectorIds, dealStructureTypes,
     rolloverEquityCount, strategyArchetype, antiPatterns, sophisticationScore,
     endingSubTypes, avgEndingEbitda, endingConstruction,
-    challengeCode, shareMethod, feature, eventType, choiceAction,
+    challengeCode, shareMethod, feature, eventType, choiceAction, gameMode,
   };
 }
 

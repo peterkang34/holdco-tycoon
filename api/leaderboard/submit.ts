@@ -256,9 +256,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           last_played_at: entryDate,
         }, { onConflict: 'id', ignoreDuplicates: true });
 
-        // Always update last_played_at (never touch initials or public_id)
+        // Always update last_played_at + sync initials to latest submission
         await supabaseAdmin.from('player_profiles')
-          .update({ last_played_at: entryDate, updated_at: entryDate })
+          .update({ initials, last_played_at: entryDate, updated_at: entryDate })
           .eq('id', playerId);
       } catch (err) {
         console.error('player_profiles upsert failed:', err);

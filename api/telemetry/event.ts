@@ -109,6 +109,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         sector,
         device,
         gameNumber,
+        ...(payload.gameMode ? { gameMode: payload.gameMode } : {}),
       }));
       pipe.ltrim('t:activity:recent', 0, 99);
 
@@ -232,6 +233,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         device,
         sessionDurationMs,
         fev,
+        gameNumber,
+        ...(payload.gameMode ? { gameMode: payload.gameMode } : {}),
       }));
       pipe.ltrim('t:activity:recent', 0, 99);
 

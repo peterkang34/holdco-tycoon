@@ -1,11 +1,12 @@
-import { useState, Fragment } from 'react';
+import { useState, useMemo, Fragment } from 'react';
 import { MetricCard } from '../ui/MetricCard';
 import { ScoreRadar } from './ScoreRadar';
 import { formatMoney } from '../../engine/types';
 import type { LeaderboardStrategy } from '../../engine/types';
 import { getGradeColor } from '../../utils/gradeColors';
 import { SECTORS } from '../../data/sectors';
-import { computeAdjFev, MultiplierBadges } from './adminShared';
+import { computeAdjFev, MultiplierBadges, DonutChart, SectionHeader, FunnelStep } from './adminShared';
+import { AdminBarChart } from './AdminBarChart';
 import { AnalyticsChart } from './AnalyticsChart';
 import type { AnalyticsData, Totals, ActivityEvent, DayData, GameCompletionAdmin, LeaderboardEntryAdmin } from './adminTypes';
 
@@ -516,6 +517,11 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
                     {evt.fev != null && <span className="font-mono text-accent">{formatMoney(evt.fev)}</span>}
                     {mins != null && <span className="text-text-muted ml-auto">{mins}m played</span>}
                     {evt.device && <span className="text-text-muted">{evt.device}</span>}
+                    {evt.gameNumber != null && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${evt.gameNumber === 1 ? 'bg-red-500/20 text-red-400' : 'bg-white/5 text-text-muted'}`}>
+                        {evt.gameNumber === 1 ? '1st game' : `#${evt.gameNumber}`}
+                      </span>
+                    )}
                   </div>
                 );
               }
@@ -524,6 +530,102 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
           <p className="text-[10px] text-text-muted mt-2">Shows last 50 events. Feed populates from new sessions going forward.</p>
         </div>
       )}
+
+      {/* ── Engagement Insights ── */}
+      <EngagementInsights data={data} totals={totals} />
     </>
+  );
+}
+
+// ── Engagement Insights Section ──
+
+function EngagementInsights({ data, totals }: { data: AnalyticsData; totals: Totals }) {
+  const abandonItems = useMemo(() =>
+    Object.entries(totals.allAbandon)
+      .map(([round, count]) => ({ label: `Year ${round}`, value: count, color: '#ef4444' }))
+      .sort((a, b) => parseInt(a.label.split(' ')[1]) - parseInt(b.label.split(' ')[1])),
+  [totals.allAbandon]);
+
+  const totalAbandons = useMemo(() =>
+    Object.values(totals.allAbandon).reduce((s, v) => s + v, 0),
+  [totals.allAbandon]);
+
+  const durationItems = useMemo(() => {
+    const order = ['<5m', '5-15m', '15-30m', '30-60m', '60m+'];
+    return order.map(k => ({
+      label: k,
+      value: totals.allDuration[k] || 0,
+      color: '#60a5fa',
+    })).filter(i => i.value > 0);
+  }, [totals.allDuration]);
+
+  // Abandon rate: first-game vs returning
+  const newStarts = totals.allReturning['new'] || 0;
+  const returningStarts = totals.allReturning['returning'] || 0;
+  const abandonRate = data.allTime.started > 0
+    ? ((totalAbandons / data.allTime.started) * 100).toFixed(1) + '%'
+    : '—';
+
+  // Compute funnel milestones
+  const reachedYear3 = useMemo(() =>
+    Object.entries(totals.allRounds).filter(([r]) => parseInt(r) >= 3).reduce((s, [, v]) => s + v, 0)
+    + Object.entries(totals.allAbandon).filter(([r]) => parseInt(r) >= 3).reduce((s, [, v]) => s + v, 0),
+  [totals.allRounds, totals.allAbandon]);
+
+  const reachedYear5 = useMemo(() =>
+    Object.entries(totals.allRounds).filter(([r]) => parseInt(r) >= 5).reduce((s, [, v]) => s + v, 0)
+    + Object.entries(totals.allAbandon).filter(([r]) => parseInt(r) >= 5).reduce((s, [, v]) => s + v, 0),
+  [totals.allRounds, totals.allAbandon]);
+
+  return (
+    <div className="mt-6">
+      <h3 className="text-sm font-semibold text-text-secondary mb-3">Engagement Insights</h3>
+
+      {/* Quick metrics row */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <MetricCard label="Abandon Rate" value={abandonRate} status={parseFloat(abandonRate) > 50 ? 'warning' : 'neutral'} />
+        <MetricCard label="Total Abandons" value={totalAbandons} />
+        <MetricCard label="New Players" value={newStarts} />
+        <MetricCard label="Returning Players" value={returningStarts} />
+      </div>
+
+      {/* Funnel + Abandon by Round */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+        <div className="card p-4">
+          <SectionHeader title="Player Funnel" />
+          <div className="space-y-2">
+            <FunnelStep label="Page Views" value={totals.totalViews} maxValue={totals.totalViews || 1} />
+            <FunnelStep label="Games Started" value={data.allTime.started} maxValue={totals.totalViews || data.allTime.started} />
+            <FunnelStep label="Reached Year 3" value={reachedYear3} maxValue={data.allTime.started} color="#60a5fa" />
+            <FunnelStep label="Reached Year 5" value={reachedYear5} maxValue={data.allTime.started} color="#a78bfa" />
+            <FunnelStep label="Completed" value={data.allTime.completed} maxValue={data.allTime.started} color="#34d399" />
+          </div>
+        </div>
+
+        <AdminBarChart title="Abandonment by Round" items={abandonItems} />
+      </div>
+
+      {/* Session Duration + Device Abandon + New vs Returning */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <AdminBarChart title="Session Duration (Completed)" items={durationItems} />
+
+        <div className="card p-4">
+          <SectionHeader title="Abandons by Device" />
+          <DonutChart items={[
+            { label: 'Desktop', value: totals.allDeviceAbandon['desktop'] || 0, color: 'var(--color-accent)' },
+            { label: 'Mobile', value: totals.allDeviceAbandon['mobile'] || 0, color: '#f59e0b' },
+            { label: 'Tablet', value: totals.allDeviceAbandon['tablet'] || 0, color: '#a78bfa' },
+          ]} />
+        </div>
+
+        <div className="card p-4">
+          <SectionHeader title="New vs Returning" />
+          <DonutChart items={[
+            { label: 'New', value: newStarts, color: 'var(--color-accent)' },
+            { label: 'Returning', value: returningStarts, color: '#f59e0b' },
+          ]} />
+        </div>
+      </div>
+    </div>
   );
 }

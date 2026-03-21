@@ -31,31 +31,45 @@ interface AnalyticsChartProps {
 }
 
 function aggregateWeekly(daily: DayData[]): DataPoint[] {
-  const weekMap = new Map<string, DataPoint>();
+  const weekMap = new Map<string, DataPoint & { firstDate: string; lastDate: string }>();
   // daily is most-recent-first from API; iterate in chronological order
   const sorted = [...daily].reverse();
   for (const d of sorted) {
+    // Week key = Monday of that week (ISO week start)
     const date = new Date(d.date + 'T00:00:00');
-    const dayOfYear = Math.floor((date.getTime() - new Date(date.getFullYear(), 0, 1).getTime()) / 86400000);
-    const weekNum = Math.ceil((dayOfYear + new Date(date.getFullYear(), 0, 1).getDay() + 1) / 7);
-    const weekKey = `W${weekNum}`;
+    const day = date.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const monday = new Date(date);
+    monday.setDate(monday.getDate() + mondayOffset);
+    const weekKey = monday.toISOString().slice(0, 10);
     const existing = weekMap.get(weekKey);
     if (existing) {
       existing.started += d.started;
       existing.completed += d.completed;
       existing.pageViews += d.pageViews;
       existing.uniquePlayers += d.uniquePlayers;
+      existing.lastDate = d.date;
     } else {
       weekMap.set(weekKey, {
-        label: weekKey,
+        label: '', // filled below
         started: d.started,
         completed: d.completed,
         pageViews: d.pageViews,
         uniquePlayers: d.uniquePlayers,
+        firstDate: d.date,
+        lastDate: d.date,
       });
     }
   }
-  return Array.from(weekMap.values());
+  // Build readable labels like "Mar 10–16"
+  const fmt = (iso: string) => {
+    const dt = new Date(iso + 'T00:00:00');
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+  return Array.from(weekMap.values()).map(({ firstDate, lastDate, ...pt }) => ({
+    ...pt,
+    label: firstDate === lastDate ? fmt(firstDate) : `${fmt(firstDate)}–${new Date(lastDate + 'T00:00:00').getDate()}`,
+  }));
 }
 
 function toMonthlyPoints(months: MonthData[]): DataPoint[] {
