@@ -1,0 +1,17 @@
+docs/
+plans/
+research/
+_secret-sauce/
+img/
+assets/
+src/engine/__tests__/
+api/__tests__/
+*.test.ts
+*.test.tsx
+holdco-tycoon-manual.md
+_architecture-review.md
+activity-log.md
+CLAUDE.md
+.claude/
+src/utils/playbookBuilder.ts
+src/utils/playbookThesis.ts
