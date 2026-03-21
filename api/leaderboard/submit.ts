@@ -270,6 +270,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       // Look up the public_id (may be newly created or existing)
+      // If null (profile created by auto-link/claim before public_id existed), backfill it
       if (verifiedPlayerId) {
         try {
           const { data: profile } = await supabaseAdmin
@@ -277,7 +278,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .select('public_id')
             .eq('id', verifiedPlayerId)
             .single();
-          publicProfileId = profile?.public_id ?? undefined;
+          if (profile?.public_id) {
+            publicProfileId = profile.public_id;
+          } else {
+            // Backfill: profile exists but public_id is null
+            const newPublicId = randomUUID().replace(/-/g, '').slice(0, 12);
+            await supabaseAdmin.from('player_profiles')
+              .update({ public_id: newPublicId, updated_at: entryDate })
+              .eq('id', verifiedPlayerId);
+            publicProfileId = newPublicId;
+          }
         } catch { /* best effort */ }
       }
 
