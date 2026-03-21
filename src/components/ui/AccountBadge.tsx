@@ -2,12 +2,14 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { supabase, initAnonymousAuth, fetchWithAuth } from '../../lib/supabase';
 import { useToastStore } from '../../hooks/useToast';
+import { ProfileModal } from './ProfileModal';
 
 export function AccountBadge() {
   const isLoggedIn = useIsLoggedIn();
   const player = useAuthStore((s) => s.player);
   const openStatsModal = useAuthStore((s) => s.openStatsModal);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
 
@@ -81,6 +83,7 @@ export function AccountBadge() {
   };
 
   return (
+    <>
     <div className="relative" ref={dropdownRef} onKeyDown={handleKeyDown}>
       <button
         ref={triggerRef}
@@ -106,6 +109,13 @@ export function AccountBadge() {
               <div className="border-t border-white/10" />
             </>
           )}
+          <button
+            role="menuitem"
+            onClick={() => { setShowDropdown(false); setShowProfile(true); }}
+            className="w-full text-left px-3 min-h-[44px] flex items-center text-sm text-text-secondary hover:bg-white/5 transition-colors"
+          >
+            My Profile
+          </button>
           <button
             role="menuitem"
             onClick={() => { setShowDropdown(false); openStatsModal(); }}
@@ -145,5 +155,13 @@ export function AccountBadge() {
         </div>
       )}
     </div>
+    {showProfile && (
+      <ProfileModal
+        isOpen={showProfile}
+        onClose={() => setShowProfile(false)}
+        publicProfileId={null}
+      />
+    )}
+    </>
   );
 }
