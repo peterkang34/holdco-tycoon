@@ -90,8 +90,11 @@ export function AccountBadge() {
         aria-haspopup="true"
         aria-expanded={showDropdown}
       >
-        <span className="w-7 h-7 rounded-full bg-accent/20 text-accent text-xs font-bold flex items-center justify-center hover:bg-accent/30 transition-colors">
-          {player.initials.slice(0, 2)}
+        <span className="w-7 h-7 rounded-full bg-accent/20 text-accent flex items-center justify-center hover:bg-accent/30 transition-colors">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+            <circle cx="12" cy="7" r="4" />
+          </svg>
         </span>
       </button>
 
