@@ -39,7 +39,6 @@ import {
   PortfolioSummary,
   ScoreBreakdownSection,
   PlayAgainSection,
-  PlaybookCard,
   OperatorPlaybook,
 } from '../gameover';
 
@@ -784,13 +783,28 @@ export function GameOverScreen({
           difficulty={difficulty}
           maxRounds={maxRounds}
         />
-      ) : isFundManagerMode && peScore && carryWaterfallData ? (
+      ) : null}
+
+      {/* Post-mortem CTA for bankruptcy */}
+      {isBankruptcy && playbookData && (
+        <button
+          onClick={() => setShowPlaybook(true)}
+          className="w-full min-h-[48px] text-sm bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-colors rounded-lg flex items-center justify-center gap-1.5 mb-4"
+        >
+          <span className="text-xs">📋</span>
+          View Post-Mortem
+        </button>
+      )}
+
+      {isBankruptcy ? null : isFundManagerMode && peScore && carryWaterfallData ? (
         <CarryHeroSection
           fundName={fundName || 'PE Fund'}
           peScore={peScore}
           carryWaterfallData={carryWaterfallData}
           difficulty={difficulty}
           archetype={strategyData.archetype}
+          hasPlaybook={!!playbookData}
+          onViewPlaybook={() => setShowPlaybook(true)}
         />
       ) : (
         <FEVHeroSection
@@ -817,6 +831,8 @@ export function GameOverScreen({
           cash={cash}
           totalDebt={totalDebt}
           initialOwnershipPct={initialOwnershipPct}
+          hasPlaybook={!!playbookData}
+          onViewPlaybook={() => setShowPlaybook(true)}
         />
       )}
 
@@ -918,17 +934,7 @@ export function GameOverScreen({
             founderOwnership={enterpriseValue > 0 ? founderEquityValue / enterpriseValue : 1}
           />
 
-          {/* Section 8: Operator's Playbook CTA */}
-          {playbookData && (
-            <PlaybookCard
-              playbook={playbookData}
-              isLoggedIn={isLoggedIn}
-              onView={() => setShowPlaybook(true)}
-              onSignUp={openAccountModal}
-            />
-          )}
-
-          {/* Section 9: Score Breakdown + Grade (demoted) */}
+          {/* Section 8: Score Breakdown + Grade (demoted) */}
           <ScoreBreakdownSection
             isFundManagerMode={isFundManagerMode}
             score={score}

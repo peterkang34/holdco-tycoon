@@ -41,6 +41,9 @@ interface FEVHeroSectionProps {
   cash: number;
   totalDebt: number;
   initialOwnershipPct: number;
+  /** When provided, renders a side-by-side "FEV Breakdown / Operator's Playbook" CTA pair */
+  onViewPlaybook?: () => void;
+  hasPlaybook?: boolean;
 }
 
 export function FEVHeroSection({
@@ -62,6 +65,8 @@ export function FEVHeroSection({
   cash,
   totalDebt,
   initialOwnershipPct,
+  onViewPlaybook,
+  hasPlaybook = false,
 }: FEVHeroSectionProps) {
   const [showBreakdown, setShowBreakdown] = useState(false);
   const archetypeDisplay = ARCHETYPE_DISPLAY_NAMES[archetype] || 'The Balanced Allocator';
@@ -140,15 +145,39 @@ export function FEVHeroSection({
         </div>
       </div>
 
-      {/* Collapsible FEV/EV Breakdown */}
-      <button
-        onClick={() => setShowBreakdown(!showBreakdown)}
-        className="w-full min-h-[44px] text-sm text-text-muted hover:text-text-secondary transition-colors mb-2 flex items-center justify-center gap-1"
-        aria-expanded={showBreakdown}
-      >
-        <span className={`transition-transform ${showBreakdown ? 'rotate-90' : ''}`}>▶</span>
-        {showBreakdown ? 'Hide' : 'Show'} FEV / EV Breakdown
-      </button>
+      {/* CTA pair: FEV Breakdown + Operator's Playbook */}
+      {hasPlaybook ? (
+        <div className="grid grid-cols-2 gap-3 mb-2">
+          <button
+            onClick={() => setShowBreakdown(!showBreakdown)}
+            className={`min-h-[48px] text-sm transition-colors rounded-lg border flex items-center justify-center gap-1.5 ${
+              showBreakdown
+                ? 'bg-white/[0.06] border-accent/40 text-text-primary'
+                : 'bg-white/[0.03] border-white/10 text-text-muted hover:bg-white/[0.06] hover:text-text-secondary'
+            }`}
+            aria-expanded={showBreakdown}
+          >
+            <span className={`text-xs transition-transform ${showBreakdown ? 'rotate-90' : ''}`}>▶</span>
+            FEV Breakdown
+          </button>
+          <button
+            onClick={onViewPlaybook}
+            className="min-h-[48px] text-sm bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 transition-colors rounded-lg flex items-center justify-center gap-1.5"
+          >
+            <span className="text-xs">📋</span>
+            Operator's Playbook
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => setShowBreakdown(!showBreakdown)}
+          className="w-full min-h-[44px] text-sm text-text-muted hover:text-text-secondary transition-colors mb-2 flex items-center justify-center gap-1"
+          aria-expanded={showBreakdown}
+        >
+          <span className={`transition-transform ${showBreakdown ? 'rotate-90' : ''}`}>▶</span>
+          {showBreakdown ? 'Hide' : 'Show'} FEV / EV Breakdown
+        </button>
+      )}
 
       {showBreakdown && (
         <div className="card mb-4">

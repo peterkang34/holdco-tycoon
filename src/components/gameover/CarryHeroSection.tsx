@@ -8,6 +8,8 @@ interface CarryHeroSectionProps {
   carryWaterfallData: CarryWaterfall;
   difficulty: string;
   archetype: string;
+  hasPlaybook?: boolean;
+  onViewPlaybook?: () => void;
 }
 
 export function CarryHeroSection({
@@ -16,6 +18,8 @@ export function CarryHeroSection({
   carryWaterfallData,
   difficulty: _difficulty,
   archetype,
+  hasPlaybook = false,
+  onViewPlaybook,
 }: CarryHeroSectionProps) {
   const archetypeDisplay = ARCHETYPE_DISPLAY_NAMES[archetype] || 'The Balanced Allocator';
 
@@ -60,6 +64,17 @@ export function CarryHeroSection({
           <p className="text-sm text-text-muted mt-3">Playstyle: {archetypeDisplay}</p>
         </div>
       </div>
+
+      {/* Operator's Playbook CTA */}
+      {hasPlaybook && onViewPlaybook && (
+        <button
+          onClick={onViewPlaybook}
+          className="w-full min-h-[48px] text-sm bg-accent/10 border border-accent/30 text-accent hover:bg-accent/20 transition-colors rounded-lg flex items-center justify-center gap-1.5"
+        >
+          <span className="text-xs">📋</span>
+          GP's Playbook
+        </button>
+      )}
     </div>
   );
 }
