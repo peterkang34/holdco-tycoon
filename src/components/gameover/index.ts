@@ -11,3 +11,5 @@ export { ProfileAchievementSection } from './ProfileAchievementSection';
 export { AchievementBrowserModal } from './AchievementBrowserModal';
 export { ScoreBreakdownSection } from './ScoreBreakdownSection';
 export { PlayAgainSection } from './PlayAgainSection';
+export { PlaybookCard } from './PlaybookCard';
+export { OperatorPlaybook } from './OperatorPlaybook';

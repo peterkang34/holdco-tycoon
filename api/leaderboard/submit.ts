@@ -6,6 +6,7 @@ import { LEADERBOARD_KEY, DIFFICULTY_MULTIPLIER } from '../_lib/leaderboard.js';
 import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { updatePlayerStats, updateGlobalStats } from '../_lib/playerStats.js';
+import { validatePlaybook } from '../_lib/playbookValidation.js';
 
 const MAX_ENTRIES = 500;
 const RATE_LIMIT_SECONDS = 60;
@@ -34,7 +35,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  if (isBodyTooLarge(req.body)) {
+  if (isBodyTooLarge(req.body, 25000)) {
     return res.status(413).json({ error: 'Request too large' });
   }
 
@@ -222,6 +223,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // Validate playbook (optional — auto-generated Operator's Playbook)
+    const validPlaybook = validatePlaybook(body?.playbook);
+    const playbookShareId = validPlaybook ? randomUUID().replace(/-/g, '').slice(0, 12) : undefined;
+
     // --- Player Identity (optional — silent if unauthenticated) ---
     const playerId = await getPlayerIdFromToken(req);
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -378,6 +383,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           } : {}),
           leaderboard_entry_id: id,
           completed_at: entryDate,
+          // Operator's Playbook
+          ...(validPlaybook ? { playbook: validPlaybook } : {}),
+          ...(playbookShareId ? { playbook_share_id: playbookShareId } : {}),
         });
       } catch (err) {
         console.error('game_history insert failed:', err);
@@ -388,7 +396,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       updateGlobalStats().catch(console.error);
     }
 
-    return res.status(200).json({ success: true, id, rank });
+    return res.status(200).json({
+      success: true,
+      id,
+      rank,
+      ...(playbookShareId ? { playbookShareId } : {}),
+    });
   } catch (error) {
     console.error('Leaderboard submit error:', error);
     return res.status(500).json({ error: 'Failed to submit score' });

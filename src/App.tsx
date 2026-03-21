@@ -6,8 +6,10 @@ import { GameScreen } from './components/screens/GameScreen';
 import { GameOverScreen } from './components/screens/GameOverScreen';
 import { FamilyOfficeScreen } from './components/screens/FamilyOfficeScreen';
 import { ScoreboardScreen } from './components/screens/ScoreboardScreen';
+import { PlaybookScreen } from './components/screens/PlaybookScreen';
 import { SectorId, GameDifficulty, GameDuration, formatMoney } from './engine/types';
 import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, replaceUrlWithChallenge, type ChallengeParams, type PlayerResult } from './utils/challenge';
+import { parsePlaybookFromUrl, cleanPlaybookUrl } from './utils/playbookShare';
 import { checkFamilyOfficeEligibility } from './engine/familyOffice';
 import { calculateFinalScore, calculatePEFundScore, calculateCarryWaterfall } from './engine/scoring';
 import { trackPageView } from './services/telemetry';
@@ -17,12 +19,13 @@ import { StatsModal } from './components/ui/StatsModal';
 import { ClaimGamesModal } from './components/ui/ClaimGamesModal';
 import { PrivacyPolicyModal } from './components/ui/PrivacyPolicyModal';
 import { DeleteAccountModal } from './components/ui/DeleteAccountModal';
+import { StrategyLibraryModal } from './components/ui/StrategyLibraryModal';
 import { CelebrationModal } from './components/ui/CelebrationModal';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { setupGoTest, getGoTestVariant } from './utils/goTestSetup';
 import { syncAchievementsFromServer } from './hooks/useUnlocks';
 
-type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard';
+type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard' | 'playbook';
 
 function App() {
   const [isAdmin, setIsAdmin] = useState(window.location.hash === '#/admin');
@@ -60,6 +63,7 @@ function App() {
   const [challengeData, setChallengeData] = useState<ChallengeParams | null>(null);
   const [incomingResult, setIncomingResult] = useState<PlayerResult | null>(null);
   const [scoreboardParams, setScoreboardParams] = useState<ChallengeParams | null>(null);
+  const [playbookShareId, setPlaybookShareId] = useState<string | null>(null);
   const [foTestAmount, setFoTestAmount] = useState(2000000); // $2B default
 
   const {
@@ -104,6 +108,13 @@ function App() {
   // Parse challenge/scoreboard URL on mount (?s= takes precedence over ?c=)
   // URL params are kept in the browser bar for bookmarking/sharing — cleaned only on explicit navigation
   useEffect(() => {
+    const pbShareId = parsePlaybookFromUrl();
+    if (pbShareId) {
+      setPlaybookShareId(pbShareId);
+      setScreen('playbook');
+      return;
+    }
+
     const scoreboard = parseScoreboardFromUrl();
     if (scoreboard) {
       setScoreboardParams(scoreboard);
@@ -137,7 +148,7 @@ function App() {
 
   // Check if there's a saved game on mount (skip if scoreboard URL already set screen)
   useEffect(() => {
-    if (scoreboardParams) return;
+    if (scoreboardParams || playbookShareId) return;
     // #/fo-test shortcut — set up mock FO-eligible state and show bridge
     if (isFoTest) {
       return; // handled in render
@@ -425,6 +436,16 @@ function App() {
       {screen === 'familyOfficeResults' && (
         <FamilyOfficeScreen onComplete={handleFamilyOfficeResultsComplete} />
       )}
+      {screen === 'playbook' && playbookShareId && (
+        <PlaybookScreen
+          shareId={playbookShareId}
+          onBack={() => {
+            setPlaybookShareId(null);
+            cleanPlaybookUrl();
+            setScreen('intro');
+          }}
+        />
+      )}
       {screen === 'scoreboard' && scoreboardParams && (
         <ScoreboardScreen
           challengeParams={scoreboardParams}
@@ -447,6 +468,7 @@ function App() {
       <ClaimGamesModal />
       <PrivacyPolicyModal />
       <DeleteAccountModal />
+      <StrategyLibraryModal />
       <CelebrationModal />
     </div>
   );

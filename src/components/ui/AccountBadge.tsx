@@ -112,6 +112,13 @@ export function AccountBadge() {
           </button>
           <button
             role="menuitem"
+            onClick={() => { setShowDropdown(false); useAuthStore.getState().openStrategyLibraryModal(); }}
+            className="w-full text-left px-3 min-h-[44px] flex items-center text-sm text-text-secondary hover:bg-white/5 transition-colors"
+          >
+            Strategy Library
+          </button>
+          <button
+            role="menuitem"
             onClick={handleExportData}
             className="w-full text-left px-3 min-h-[44px] flex items-center text-sm text-text-secondary hover:bg-white/5 transition-colors"
           >

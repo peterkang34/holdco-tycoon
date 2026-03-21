@@ -22,6 +22,7 @@ import {
 import { ChallengeComparison } from '../ui/ChallengeComparison';
 import { FeedbackModal } from '../ui/FeedbackModal';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
+import { buildPlaybook } from '../../utils/playbookBuilder';
 import { ACHIEVEMENT_PREVIEW, type AchievementContext } from '../../data/achievementPreview';
 import { saveEarnedAchievements, getEarnedAchievementIds } from '../../hooks/useUnlocks';
 import { HOLDCO_GRADE_TIPS, PE_GRADE_TIPS } from '../../data/gradeTips';
@@ -38,6 +39,8 @@ import {
   PortfolioSummary,
   ScoreBreakdownSection,
   PlayAgainSection,
+  PlaybookCard,
+  OperatorPlaybook,
 } from '../gameover';
 
 /** Heuristic archetype classification based on game actions */
@@ -164,6 +167,7 @@ export function GameOverScreen({
 
   // ── UI State ──
   const [showFeedback, setShowFeedback] = useState(false);
+  const [showPlaybook, setShowPlaybook] = useState(false);
 
   // ── Outcome Reactions (PE) ──
   const outcomeReactions = useMemo(() => {
@@ -344,6 +348,24 @@ export function GameOverScreen({
       allTimeSectorCount: allTimeSectorIds.length,
       recessionAcquisitionCount,
     };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Operator's Playbook ──
+  const playbookData = useMemo(() => {
+    const state = useGameStore.getState();
+    return buildPlaybook({
+      holdcoName, difficulty, duration, seed, maxRounds,
+      score, peScore,
+      enterpriseValue, founderEquityValue, founderPersonalWealth, cash, totalDebt,
+      totalDistributions, totalBuybacks, totalInvestedCapital,
+      equityRaisesUsed, sharedServicesActive, founderShares, sharesOutstanding,
+      initialOwnershipPct, hasRestructured, bankruptRound,
+      businesses, exitedBusinesses, metricsHistory, integratedPlatforms, metrics,
+      strategyData,
+      isFundManagerMode, fundName, carryWaterfall: carryWaterfallData, ipoState,
+      familyOfficeState, lpSatisfactionScore, lpDistributions, fundSize: state.fundSize,
+      challengeData, roundHistory: state.roundHistory,
+    });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Telemetry ──
@@ -689,6 +711,7 @@ export function GameOverScreen({
             })(),
             earnedAchievementIds: earnedAchievements.length > 0 ? earnedAchievements.map(a => a.id) : undefined,
           },
+          playbook: playbookData,
         }
       );
 
@@ -895,7 +918,17 @@ export function GameOverScreen({
             founderOwnership={enterpriseValue > 0 ? founderEquityValue / enterpriseValue : 1}
           />
 
-          {/* Section 8: Score Breakdown + Grade (demoted) */}
+          {/* Section 8: Operator's Playbook CTA */}
+          {playbookData && (
+            <PlaybookCard
+              playbook={playbookData}
+              isLoggedIn={isLoggedIn}
+              onView={() => setShowPlaybook(true)}
+              onSignUp={openAccountModal}
+            />
+          )}
+
+          {/* Section 9: Score Breakdown + Grade (demoted) */}
           <ScoreBreakdownSection
             isFundManagerMode={isFundManagerMode}
             score={score}
@@ -925,6 +958,13 @@ export function GameOverScreen({
         onClose={() => setShowFeedback(false)}
         context={{ screen: 'gameover', round: maxRounds, difficulty, duration, holdcoName }}
       />
+      {playbookData && (
+        <OperatorPlaybook
+          isOpen={showPlaybook}
+          onClose={() => setShowPlaybook(false)}
+          playbook={playbookData}
+        />
+      )}
 
       {/* ── Footer ── */}
       <p className="text-center text-text-muted text-sm mt-8">
