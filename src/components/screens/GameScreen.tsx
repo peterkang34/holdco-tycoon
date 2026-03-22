@@ -405,18 +405,31 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         detail: 'Another buyer snatched the deal',
         type: 'danger',
       });
-    } else if (result === 'success' && structure.type === 'share_funded') {
-      showUndoToast(
-        `Acquired ${deal.business.name} via stock`,
-        snap,
-        `${structure.shareTerms?.sharesToIssue?.toLocaleString() ?? 0} shares issued — ${((structure.shareTerms?.dilutionPct ?? 0) * 100).toFixed(1)}% dilution`,
-      );
+    } else if (result === 'success' && deal.heat === 'cold') {
+      // Undo only for cold deals — warm/hot/contested have snatch risk,
+      // allowing undo would let players scout outcomes risk-free
+      if (structure.type === 'share_funded') {
+        showUndoToast(
+          `Acquired ${deal.business.name} via stock`,
+          snap,
+          `${structure.shareTerms?.sharesToIssue?.toLocaleString() ?? 0} shares issued — ${((structure.shareTerms?.dilutionPct ?? 0) * 100).toFixed(1)}% dilution`,
+        );
+      } else {
+        showUndoToast(
+          `Acquired ${deal.business.name}`,
+          snap,
+          `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`,
+        );
+      }
     } else if (result === 'success') {
-      showUndoToast(
-        `Acquired ${deal.business.name}`,
-        snap,
-        `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`,
-      );
+      // Non-cold deals: no undo
+      addToast({
+        message: `Acquired ${deal.business.name}`,
+        detail: structure.type === 'share_funded'
+          ? `${structure.shareTerms?.sharesToIssue?.toLocaleString() ?? 0} shares issued — ${((structure.shareTerms?.dilutionPct ?? 0) * 100).toFixed(1)}% dilution`
+          : `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`,
+        type: 'success',
+      });
     }
     // Show LP deal reaction toast if one was generated
     if (result === 'success' && isFundManagerMode) {
