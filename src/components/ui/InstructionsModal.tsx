@@ -77,7 +77,7 @@ export function InstructionsModal({ holdcoName, initialRaise, founderOwnership, 
             onClick={() => setShowVideo(true)}
             className="w-full p-3 rounded-lg border border-white/10 bg-white/5 hover:border-accent/40 hover:bg-accent/5 transition-all text-sm text-text-secondary flex items-center justify-center gap-2"
           >
-            <span>▶</span> Watch a Playthrough
+            <span>▶</span> Watch Video Tutorials
           </button>
         </>
       ),
