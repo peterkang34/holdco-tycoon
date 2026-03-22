@@ -1317,7 +1317,7 @@ export const useGameStore = create<GameStore>()(
           dealPipeline: finalPipeline,
           passedDealIds: cleanedPassedIds,
           consolidationBoomSectorId: clearedBoomSectorId,
-          actionsThisRound: [] as typeof state.actionsThisRound,
+          actionsThisRound: state.actionsThisRound.filter(a => a.type === 'turnaround_resolved'),
           focusBonus,
           lastAcquisitionResult: null,
           lastIntegrationOutcome: null,
