@@ -1991,8 +1991,7 @@ export const useGameStore = create<GameStore>()(
           const hasSharedServicesSF = state.sharedServices.filter(s => s.active).length > 0;
           const subTypeAffinitySF = getSubTypeAffinity(platform.sectorId, platform.subType, deal.business.subType);
           const { tier: sizeRatioTierSF, ratio: sizeRatioSF } = getSizeRatioTier(deal.business.ebitda, platform.ebitda);
-          const integrationRngSF = createRngStreams(state.seed, state.round).deals.fork(`integration:${deal.id}:sf`);
-          const outcomeSF = determineIntegrationOutcome(deal.business, platform, hasSharedServicesSF, subTypeAffinitySF, sizeRatioTierSF, false, integrationRngSF);
+          const outcomeSF = determineIntegrationOutcome(deal.business, platform, hasSharedServicesSF, subTypeAffinitySF, sizeRatioTierSF);
           const synergiesSF = calculateSynergies(outcomeSF, deal.business.ebitda, true, subTypeAffinitySF, sizeRatioTierSF);
           const boltOnIdSF = generateBusinessId();
           const boltOnBusinessSF: Business = {
@@ -2073,9 +2072,8 @@ export const useGameStore = create<GameStore>()(
         // Calculate size ratio tier (bolt-on EBITDA vs platform EBITDA)
         const { tier: sizeRatioTier, ratio: sizeRatio } = getSizeRatioTier(deal.business.ebitda, platform.ebitda);
 
-        // Determine integration outcome (seeded for undo-determinism)
-        const integrationRng = createRngStreams(state.seed, state.round).deals.fork(`integration:${deal.id}`);
-        const outcome = determineIntegrationOutcome(deal.business, platform, hasSharedServices, subTypeAffinity, sizeRatioTier, false, integrationRng);
+        // Determine integration outcome
+        const outcome = determineIntegrationOutcome(deal.business, platform, hasSharedServices, subTypeAffinity, sizeRatioTier);
         const synergies = calculateSynergies(outcome, deal.business.ebitda, true, subTypeAffinity, sizeRatioTier);
 
         // Create the bolt-on business record
@@ -2274,9 +2272,8 @@ export const useGameStore = create<GameStore>()(
         const { tier: mergerSizeRatioTier, ratio: mergerSizeRatio } = getSizeRatioTier(smallerEbitda, largerEbitda);
         const mergerBalanceRatio = smallerEbitda > 0 ? largerEbitda / smallerEbitda : 99;
 
-        // Integration outcome for merger (with isMerger flag for softer penalties, seeded for undo-determinism)
-        const mergerRng = createRngStreams(state.seed, state.round).deals.fork(`merger:${businessId1}:${businessId2}`);
-        const outcome = determineIntegrationOutcome(biz2, biz1, hasSharedServices, subTypeAffinity, mergerSizeRatioTier, true, mergerRng);
+        // Integration outcome for merger (with isMerger flag for softer penalties)
+        const outcome = determineIntegrationOutcome(biz2, biz1, hasSharedServices, subTypeAffinity, mergerSizeRatioTier, true);
         // Synergy base: smaller EBITDA (prevents combined-EBITDA exploit)
         const synergies = calculateSynergies(outcome, smallerEbitda, false, subTypeAffinity, mergerSizeRatioTier, true);
 
