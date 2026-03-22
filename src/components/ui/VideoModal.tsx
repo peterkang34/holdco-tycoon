@@ -1,7 +1,20 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { YouTubeEmbed } from './YouTubeEmbed';
 
-const VIDEO_ID = '7CqH_R69qDQ';
+const VIDEOS = [
+  {
+    id: '7CqH_R69qDQ',
+    title: 'Quick Tutorial',
+    duration: '6 min',
+    description: 'Learn the basics fast',
+  },
+  {
+    id: 'jc92OfYMc0U',
+    title: 'Full Playthrough',
+    duration: '45 min',
+    description: 'Watch a complete game start to finish',
+  },
+];
 
 interface VideoModalProps {
   isOpen: boolean;
@@ -9,6 +22,13 @@ interface VideoModalProps {
 }
 
 export function VideoModal({ isOpen, onClose }: VideoModalProps) {
+  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
+
+  // Reset selection when modal opens
+  useEffect(() => {
+    if (isOpen) setSelectedVideoId(null);
+  }, [isOpen]);
+
   // Prevent background scroll when open
   useEffect(() => {
     if (!isOpen) return;
@@ -45,12 +65,40 @@ export function VideoModal({ isOpen, onClose }: VideoModalProps) {
         &times;
       </button>
 
-      {/* Video container */}
       <div
         className="w-[90%] max-w-4xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <YouTubeEmbed videoId={VIDEO_ID} />
+        {selectedVideoId ? (
+          <>
+            <button
+              onClick={() => setSelectedVideoId(null)}
+              className="text-sm text-text-muted hover:text-text-primary transition-colors mb-3 flex items-center gap-1"
+            >
+              ← Back to videos
+            </button>
+            <YouTubeEmbed videoId={selectedVideoId} />
+          </>
+        ) : (
+          <div className="flex flex-col gap-3 max-w-md mx-auto">
+            <h3 className="text-lg font-bold text-text-primary text-center mb-1">Watch & Learn</h3>
+            {VIDEOS.map((video) => (
+              <button
+                key={video.id}
+                onClick={() => setSelectedVideoId(video.id)}
+                className="bg-white/5 border border-white/10 hover:border-accent/40 hover:bg-accent/5 rounded-lg p-4 text-left transition-colors group"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl text-accent group-hover:scale-110 transition-transform">▶</span>
+                  <div>
+                    <p className="font-semibold text-text-primary">{video.title} <span className="text-text-muted font-normal text-sm">({video.duration})</span></p>
+                    <p className="text-sm text-text-muted">{video.description}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
