@@ -405,9 +405,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         detail: 'Another buyer snatched the deal',
         type: 'danger',
       });
-    } else if (result === 'success' && deal.heat === 'cold') {
-      // Undo only for cold deals — warm/hot/contested have snatch risk,
-      // allowing undo would let players scout outcomes risk-free
+    } else if (result === 'success' && deal.heat !== 'contested') {
+      // Undo for cold/warm/hot — only contested has snatch risk (40%),
+      // allowing undo there would let players scout if the deal goes through
       if (structure.type === 'share_funded') {
         showUndoToast(
           `Acquired ${deal.business.name} via stock`,
@@ -422,7 +422,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         );
       }
     } else if (result === 'success') {
-      // Non-cold deals: no undo
+      // Contested deals: no undo — 40% snatch risk means undo lets you scout
       addToast({
         message: `Acquired ${deal.business.name}`,
         detail: structure.type === 'share_funded'
