@@ -414,7 +414,11 @@ export function AllocatePhase({
           const heatOrder = { cold: 0, warm: 1, hot: 2, contested: 3 };
           return heatOrder[b.heat] - heatOrder[a.heat];
         }
-        case 'multiple': return a.business.acquisitionMultiple - b.business.acquisitionMultiple;
+        case 'multiple': {
+          const aMultiple = a.effectivePrice / a.business.ebitda;
+          const bMultiple = b.effectivePrice / b.business.ebitda;
+          return aMultiple - bMultiple;
+        }
         default: return 0;
       }
     });

@@ -624,6 +624,7 @@ export function determineIntegrationOutcome(
   subTypeAffinity?: SubTypeAffinity,
   sizeRatioTier?: SizeRatioTier,
   isMerger?: boolean,
+  rng?: import('./rng').SeededRng,
 ): IntegrationOutcome {
   let successProbability = 0.6; // Base 60% chance
 
@@ -672,7 +673,7 @@ export function determineIntegrationOutcome(
   }
 
   // Roll the dice
-  const roll = Math.random();
+  const roll = rng ? rng.next() : Math.random();
   if (roll < successProbability * 0.6) {
     return 'success';
   } else if (roll < successProbability * 1.2) {
