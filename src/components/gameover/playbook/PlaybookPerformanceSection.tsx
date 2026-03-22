@@ -38,7 +38,7 @@ function FEVChart({ data, isPE }: { data: PlaybookData['performance']['metricsTi
   const areaPath = linePath + ` L ${points[points.length - 1].x} ${padY + chartH} L ${points[0].x} ${padY + chartH} Z`;
 
   const fmtAxis = (v: number): string => {
-    if (v >= 1_000_000) return `$${(v / 1000).toFixed(0)}B`;
+    if (v >= 1_000_000) return `$${(v / 1_000_000).toFixed(1)}B`;
     if (v >= 1000) return `$${(v / 1000).toFixed(0)}M`;
     return `$${v.toFixed(0)}K`;
   };

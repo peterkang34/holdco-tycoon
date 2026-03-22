@@ -5629,9 +5629,20 @@ export const useGameStore = create<GameStore>()(
           status: 'active',
         };
 
+        // Track turnaround cost on the business for accurate MOIC
+        const updatedBusinesses = state.businesses.map(b => {
+          if (b.id !== businessId) return b;
+          return {
+            ...b,
+            cashEquityInvested: (b.cashEquityInvested ?? b.totalAcquisitionCost ?? b.acquisitionPrice) + upfrontCost,
+            totalAcquisitionCost: (b.totalAcquisitionCost || b.acquisitionPrice) + upfrontCost,
+          };
+        });
+
         const newState = {
           ...state,
           cash: state.cash - upfrontCost,
+          businesses: updatedBusinesses,
           activeTurnarounds: [...state.activeTurnarounds, turnaround],
         };
         set({

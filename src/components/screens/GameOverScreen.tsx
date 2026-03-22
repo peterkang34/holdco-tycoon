@@ -237,9 +237,8 @@ export function GameOverScreen({
     const allActions = state.roundHistory.flatMap(r => r.actions);
 
     const acquireTypes = new Set(['acquire', 'acquire_tuck_in']);
-    const sellTypes = new Set(['sell', 'sell_platform', 'accept_offer']);
     const totalAcquisitions = allActions.filter(a => acquireTypes.has(a.type)).length;
-    const totalSells = allActions.filter(a => sellTypes.has(a.type)).length;
+    const totalSells = exitedBusinesses.filter(b => b.exitPrice != null && b.exitPrice > 0).length;
     const turnaroundsStarted = allActions.filter(a => a.type === 'start_turnaround').length;
 
     const resolvedTurnarounds = allActions.filter(a => a.type === 'turnaround_resolved');
