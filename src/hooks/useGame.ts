@@ -5323,6 +5323,7 @@ export const useGameStore = create<GameStore>()(
 
         const platform = forgePlatform(recipe, businessIds, state.round);
 
+        const costPerConstituent = Math.round(integrationCost / businessIds.length);
         const updatedBusinesses = state.businesses.map(b => {
           if (!businessIds.includes(b.id)) return b;
           const newMargin = clampMargin(b.ebitdaMargin + recipe.bonuses.marginBoost);
@@ -5334,6 +5335,8 @@ export const useGameStore = create<GameStore>()(
             organicGrowthRate: capGrowthRate(b.organicGrowthRate + recipe.bonuses.growthBoost),
             // Growth boost is forward-looking only — EBITDA recalc uses new margin but current revenue
             ebitda: Math.round(b.revenue * newMargin),
+            // Allocate integration cost to denominator for accurate MOIC
+            totalAcquisitionCost: (b.totalAcquisitionCost || b.acquisitionPrice) + costPerConstituent,
           };
         });
 
@@ -5400,6 +5403,8 @@ export const useGameStore = create<GameStore>()(
             organicGrowthRate: capGrowthRate(b.organicGrowthRate + recipe.bonuses.growthBoost),
             // Growth boost is forward-looking only — EBITDA recalc uses new margin but current revenue
             ebitda: Math.round(b.revenue * newMargin),
+            // Allocate integration cost for accurate MOIC
+            totalAcquisitionCost: (b.totalAcquisitionCost || b.acquisitionPrice) + integrationCost,
           };
         });
 

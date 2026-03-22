@@ -247,15 +247,15 @@ export function calculateExitValuation(
     : rawEarnedPremiums;
 
   // Integrated platform premium is STRUCTURAL (from recipe forging cost), not earned —
-  // apply after cap so it never squeezes earned premiums out of headroom.
+  // apply after cap so it never squeezes earned premiums out of headroom,
+  // and after seasoning so it isn't dampened by recent acquisition timing.
   // Without this, a star performer's growth/quality premiums get cut when platform
   // premium pushes total over the cap, making individual sale > platform sale.
-  const totalPremiums = cappedEarnedPremiums + integratedPlatformPremium;
 
-  // Calculate exit multiple (premiums scaled by seasoning, raw premiums preserved for display)
+  // Calculate exit multiple: earned premiums scaled by seasoning, platform premium bypasses both
   const totalMultiple = Math.max(
     2.0, // Absolute floor - distressed sale
-    baseMultiple + totalPremiums * seasoningMultiplier
+    baseMultiple + cappedEarnedPremiums * seasoningMultiplier + integratedPlatformPremium
   );
 
   const exitPrice = Math.max(0, Math.round(business.ebitda * totalMultiple));

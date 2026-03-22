@@ -1155,9 +1155,9 @@ describe('Display Proofreader', () => {
       // simulation.ts: premiumCap = Math.max(10 + platformHeadroom, baseMultiple * 1.5)
       const sim = readComponent('engine/simulation.ts');
       expect(sim).toContain('Math.max(10 + platformHeadroom, baseMultiple * 1.5)');
-      // Earned premiums are capped, then structural platform premium added after
+      // Earned premiums are capped, then structural platform premium added after (bypasses seasoning)
       expect(sim).toContain('Math.min(rawEarnedPremiums, premiumCap)');
-      expect(sim).toContain('cappedEarnedPremiums + integratedPlatformPremium');
+      expect(sim).toContain('cappedEarnedPremiums * seasoningMultiplier + integratedPlatformPremium');
     });
   });
 
