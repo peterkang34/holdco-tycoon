@@ -26,6 +26,7 @@ import { buildPlaybook } from '../../utils/playbookBuilder';
 import { ACHIEVEMENT_PREVIEW, type AchievementContext } from '../../data/achievementPreview';
 import { saveEarnedAchievements, getEarnedAchievementIds } from '../../hooks/useUnlocks';
 import { HOLDCO_GRADE_TIPS, PE_GRADE_TIPS } from '../../data/gradeTips';
+import { checkFamilyOfficeEligibility } from '../../engine/familyOffice';
 
 import {
   BankruptcyHeader,
@@ -946,6 +947,27 @@ export function GameOverScreen({
           />
         </>
       )}
+
+      {/* ── FO Eligibility Hint (20yr holdco games that didn't trigger FO) ── */}
+      {duration === 'standard' && !isFundManagerMode && !familyOfficeState && !isBankruptcy && (() => {
+        const state = useGameStore.getState();
+        const { reasons } = checkFamilyOfficeEligibility(state, score);
+        if (reasons.length === 0) return null; // eligible — shouldn't happen (would have triggered)
+        return (
+          <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-4 sm:p-5">
+            <p className="text-sm font-bold text-amber-400/80 mb-2">Family Office Not Unlocked</p>
+            <p className="text-xs text-text-muted mb-3">Complete a legendary 20-year run to unlock the Family Office endgame. Requirements not met:</p>
+            <ul className="space-y-1">
+              {reasons.map((r, i) => (
+                <li key={i} className="text-xs text-text-secondary flex items-start gap-2">
+                  <span className="text-danger mt-0.5 shrink-0">✗</span>
+                  <span>{r}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })()}
 
       {/* ── Section 9: Play Again with Intent (always shown) ── */}
       <PlayAgainSection
