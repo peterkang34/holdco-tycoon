@@ -27,6 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (!supabaseAdmin) return res.status(503).json({ error: 'Supabase not configured' });
 
   const mode = (req.query.mode as string) || 'repair';
+  const dryRun = req.query.dryRun === 'true';
 
   try {
     // Fetch all leaderboard entries with scores
@@ -65,6 +66,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let noPlayer = 0;
     let noProfile = 0;
     let generatedPublicId = 0;
+    const samplePlayerIds: string[] = [];
+    const sampleErrors: string[] = [];
 
     for (const entry of entries) {
       const { parsed, member, score } = entry;
@@ -76,13 +79,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
 
       const playerId = parsed.playerId as string;
+      if (samplePlayerIds.length < 5) samplePlayerIds.push(playerId);
 
       // Look up player_profiles row
-      const { data: profile } = await supabaseAdmin
+      const { data: profile, error: profileError } = await supabaseAdmin
         .from('player_profiles')
         .select('public_id')
         .eq('id', playerId)
         .maybeSingle();
+
+      if (profileError && sampleErrors.length < 5) {
+        sampleErrors.push(`${playerId}: ${profileError.message}`);
+      }
 
       // No profile row in Supabase — player doesn't have an account
       if (!profile) {
@@ -149,6 +157,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       noPlayer,
       noProfile,
       generatedPublicId,
+      dryRun,
+      debug: { samplePlayerIds, sampleErrors },
     });
   } catch (error) {
     console.error('Backfill profile IDs error:', error);

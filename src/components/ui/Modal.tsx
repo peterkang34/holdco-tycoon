@@ -1,4 +1,4 @@
-import { ReactNode, useEffect } from 'react';
+import { ReactNode, useEffect, useRef, useCallback } from 'react';
 
 interface ModalProps {
   isOpen: boolean;
@@ -26,6 +26,51 @@ export function Modal({ isOpen, onClose, title, subtitle, header, children, size
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = original; };
   }, [isOpen]);
+
+  // Drag-to-dismiss for mobile bottom sheet
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const dragStartY = useRef<number | null>(null);
+  const dragCurrentY = useRef<number>(0);
+
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    // Only start drag if at top of scroll or touching the drag handle area
+    if (sheet.scrollTop <= 0) {
+      dragStartY.current = e.touches[0].clientY;
+      dragCurrentY.current = 0;
+    }
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (dragStartY.current === null) return;
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    const dy = e.touches[0].clientY - dragStartY.current;
+    // Only allow downward drag
+    if (dy > 0) {
+      dragCurrentY.current = dy;
+      sheet.style.transform = `translateY(${dy}px)`;
+      sheet.style.transition = 'none';
+    }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (dragStartY.current === null) return;
+    const sheet = sheetRef.current;
+    if (!sheet) return;
+    dragStartY.current = null;
+    // Dismiss if dragged more than 100px down
+    if (dragCurrentY.current > 100) {
+      sheet.style.transform = 'translateY(100%)';
+      sheet.style.transition = 'transform 0.2s ease-out';
+      setTimeout(onClose, 200);
+    } else {
+      sheet.style.transform = '';
+      sheet.style.transition = 'transform 0.2s ease-out';
+    }
+    dragCurrentY.current = 0;
+  }, [onClose]);
 
   if (!isOpen) return null;
 
@@ -63,14 +108,21 @@ export function Modal({ isOpen, onClose, title, subtitle, header, children, size
       {/* Mobile bottom sheet */}
       <div className="fixed inset-0 bg-black/80 z-50 md:hidden" onClick={onClose}>
         <div
-          className="fixed bottom-0 left-0 right-0 bg-bg-primary border-t border-white/10 rounded-t-2xl max-h-[90dvh] overflow-y-auto overscroll-contain p-4 pb-[env(safe-area-inset-bottom,16px)] animate-slide-up z-50"
+          ref={sheetRef}
+          className="fixed bottom-0 left-0 right-0 bg-bg-primary border-t border-white/10 rounded-t-2xl max-h-[90dvh] overflow-y-auto p-4 pb-[env(safe-area-inset-bottom,16px)] animate-slide-up z-50"
           onClick={e => e.stopPropagation()}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
-          {/* Drag handle */}
-          <div className="flex justify-center mb-3">
+          {/* Drag handle — tap to dismiss */}
+          <div className="flex justify-center mb-3" onClick={onClose}>
             <div className="w-10 h-1 rounded-full bg-white/20" />
           </div>
-          {headerContent}
+          {/* Sticky header so close button is always reachable */}
+          <div className="sticky top-0 z-10 bg-bg-primary pb-1">
+            {headerContent}
+          </div>
           {children}
         </div>
       </div>
