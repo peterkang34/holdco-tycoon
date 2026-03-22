@@ -242,8 +242,11 @@ export function GameOverScreen({
     const turnaroundsStarted = allActions.filter(a => a.type === 'start_turnaround').length;
 
     const resolvedTurnarounds = allActions.filter(a => a.type === 'turnaround_resolved');
-    const turnaroundsSucceeded = resolvedTurnarounds.filter(a => (a.details as any)?.outcome === 'success').length;
-    const turnaroundsFailed = resolvedTurnarounds.filter(a => (a.details as any)?.outcome !== 'success').length;
+    const turnaroundsSucceeded = resolvedTurnarounds.filter(a => {
+      const outcome = (a.details as any)?.outcome;
+      return outcome === 'success' || outcome === 'partial';
+    }).length;
+    const turnaroundsFailed = resolvedTurnarounds.filter(a => (a.details as any)?.outcome === 'failure').length;
 
     const peakLeverage = metricsHistory.length > 0
       ? Math.max(...metricsHistory.map(m => m.metrics.netDebtToEbitda))
