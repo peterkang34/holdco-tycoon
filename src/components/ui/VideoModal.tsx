@@ -16,18 +16,22 @@ const VIDEOS = [
   },
 ];
 
+export const TUTORIAL_VIDEO_ID = '7CqH_R69qDQ';
+
 interface VideoModalProps {
   isOpen: boolean;
   onClose: () => void;
+  /** When provided, skips the picker and plays this video directly */
+  initialVideoId?: string;
 }
 
-export function VideoModal({ isOpen, onClose }: VideoModalProps) {
+export function VideoModal({ isOpen, onClose, initialVideoId }: VideoModalProps) {
   const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
 
-  // Reset selection when modal opens
+  // Reset selection when modal opens — use initialVideoId if provided
   useEffect(() => {
-    if (isOpen) setSelectedVideoId(null);
-  }, [isOpen]);
+    if (isOpen) setSelectedVideoId(initialVideoId ?? null);
+  }, [isOpen, initialVideoId]);
 
   // Prevent background scroll when open
   useEffect(() => {
@@ -71,12 +75,14 @@ export function VideoModal({ isOpen, onClose }: VideoModalProps) {
       >
         {selectedVideoId ? (
           <>
-            <button
-              onClick={() => setSelectedVideoId(null)}
-              className="text-sm text-text-muted hover:text-text-primary transition-colors mb-3 flex items-center gap-1"
-            >
-              ← Back to videos
-            </button>
+            {!initialVideoId && (
+              <button
+                onClick={() => setSelectedVideoId(null)}
+                className="text-sm text-text-muted hover:text-text-primary transition-colors mb-3 flex items-center gap-1"
+              >
+                ← Back to videos
+              </button>
+            )}
             <YouTubeEmbed videoId={selectedVideoId} />
           </>
         ) : (

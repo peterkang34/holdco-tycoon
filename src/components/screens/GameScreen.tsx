@@ -32,7 +32,7 @@ import { hasSeenNudge, dismissNudge } from '../../hooks/useNudges';
 import { MIN_OPCOS_FOR_SHARED_SERVICES } from '../../data/sharedServices';
 import { buildChallengeUrl, copyToClipboard } from '../../utils/challenge';
 import { AccountBadge } from '../ui/AccountBadge';
-import { VideoModal } from '../ui/VideoModal';
+import { VideoModal, TUTORIAL_VIDEO_ID } from '../ui/VideoModal';
 
 // ── Mobile Nav Overflow Menu ──────────────────────────────────────
 function NavOverflowMenu({ hasReports, onReports, onManual, onVideo, onFeedback, onTutorial, onReset }: {
@@ -130,6 +130,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   const [showFOTutorial, setShowFOTutorial] = useState(false);
   const [showFMTutorial, setShowFMTutorial] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
+  const [videoInitialId, setVideoInitialId] = useState<string | undefined>(undefined);
 
   const {
     holdcoName,
@@ -1090,7 +1091,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             onDeclineIPO={declineIPO}
             isFamilyOfficeMode={isFamilyOfficeMode}
             isFundManagerMode={isFundManagerMode}
-            onShowVideo={() => setShowVideo(true)}
+            onShowVideo={() => { setVideoInitialId(TUTORIAL_VIDEO_ID); setShowVideo(true); }}
             fundSize={fundSize}
             totalCapitalDeployed={totalCapitalDeployed}
             lpDistributions={lpDistributions}
@@ -1393,7 +1394,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       )}
 
       {/* Video Modal */}
-      <VideoModal isOpen={showVideo} onClose={() => setShowVideo(false)} />
+      <VideoModal isOpen={showVideo} onClose={() => { setShowVideo(false); setVideoInitialId(undefined); }} initialVideoId={videoInitialId} />
 
       {/* Feedback Modal */}
       <FeedbackModal
