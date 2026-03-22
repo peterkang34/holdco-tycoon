@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { YouTubeEmbed } from './YouTubeEmbed';
 
-const VIDEO_ID = 'jc92OfYMc0U';
+const VIDEO_ID = '7CqH_R69qDQ';
 
 interface VideoModalProps {
   isOpen: boolean;

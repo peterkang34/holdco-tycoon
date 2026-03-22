@@ -1090,6 +1090,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             onDeclineIPO={declineIPO}
             isFamilyOfficeMode={isFamilyOfficeMode}
             isFundManagerMode={isFundManagerMode}
+            onShowVideo={() => setShowVideo(true)}
             fundSize={fundSize}
             totalCapitalDeployed={totalCapitalDeployed}
             lpDistributions={lpDistributions}

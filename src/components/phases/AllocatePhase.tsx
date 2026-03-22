@@ -130,6 +130,7 @@ interface AllocatePhaseProps {
   onDeclineIPO?: () => void;
   isFamilyOfficeMode?: boolean;
   isFundManagerMode?: boolean;
+  onShowVideo?: () => void;
   fundSize?: number;
   totalCapitalDeployed?: number;
   lpDistributions?: number;
@@ -212,6 +213,7 @@ export function AllocatePhase({
   onDeclineIPO,
   isFamilyOfficeMode = false,
   isFundManagerMode = false,
+  onShowVideo,
   fundSize = 0,
   totalCapitalDeployed = 0,
   lpDistributions = 0,
@@ -220,6 +222,7 @@ export function AllocatePhase({
 }: AllocatePhaseProps) {
   const isAnonymous = useAuthStore((s) => s.player?.isAnonymous ?? true);
   const isMobile = useIsMobile();
+  const [videoBannerDismissed, setVideoBannerDismissed] = useState(() => localStorage.getItem('holdco-video-banner-dismissed') === 'true');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const swipeHintCount = useRef(parseInt(localStorage.getItem('holdco-swipe-hint-count') || '0'));
   const [activeTab, setActiveTab] = useState<AllocateTab>('portfolio');
@@ -1130,6 +1133,29 @@ export function AllocatePhase({
           <p className="text-2xl sm:text-3xl font-bold font-mono text-accent">{formatMoney(cash)}</p>
         </div>
       </div>
+
+      {/* Video tutorial banner — shown early rounds, dismissible */}
+      {!videoBannerDismissed && !isFundManagerMode && round <= 4 && onShowVideo && (
+        <div className="flex items-center gap-2 mb-4 px-3 py-2 bg-accent/5 border border-accent/20 rounded-lg text-sm">
+          <button
+            onClick={onShowVideo}
+            className="flex items-center gap-1.5 text-accent hover:text-accent/80 transition-colors font-medium whitespace-nowrap"
+          >
+            <span className="text-base">▶</span>
+            <span className="hidden sm:inline">New to Holdco Tycoon?</span> Watch the 6-min tutorial
+          </button>
+          <button
+            onClick={() => {
+              setVideoBannerDismissed(true);
+              localStorage.setItem('holdco-video-banner-dismissed', 'true');
+            }}
+            className="ml-auto text-text-muted hover:text-text-primary transition-colors text-lg leading-none min-w-[28px] min-h-[28px] flex items-center justify-center"
+            title="Dismiss"
+          >
+            ×
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex gap-2 mb-6 border-b border-white/10 pb-2 overflow-x-auto">
