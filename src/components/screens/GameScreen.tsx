@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { useGameStore } from '../../hooks/useGame';
 import { useToastStore } from '../../hooks/useToast';
+import { takeSnapshot, showUndoToast } from '../../hooks/useUndo';
 import { getDistressRestrictions } from '../../engine/distress';
 import { getMASourcingAnnualCost, MA_SOURCING_CONFIG } from '../../data/sharedServices';
 import { getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
@@ -383,6 +384,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
 
   // Toast-wrapped action handlers
   const handleAcquire = useCallback((deal: Deal, structure: DealStructure) => {
+    const snap = takeSnapshot();
     acquireBusiness(deal, structure);
     const result = useGameStore.getState().lastAcquisitionResult;
     if (result === 'lpac_denied') {
@@ -404,17 +406,17 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         type: 'danger',
       });
     } else if (result === 'success' && structure.type === 'share_funded') {
-      addToast({
-        message: `Acquired ${deal.business.name} via stock`,
-        detail: `${structure.shareTerms?.sharesToIssue?.toLocaleString() ?? 0} shares issued — ${((structure.shareTerms?.dilutionPct ?? 0) * 100).toFixed(1)}% dilution`,
-        type: 'success',
-      });
+      showUndoToast(
+        `Acquired ${deal.business.name} via stock`,
+        snap,
+        `${structure.shareTerms?.sharesToIssue?.toLocaleString() ?? 0} shares issued — ${((structure.shareTerms?.dilutionPct ?? 0) * 100).toFixed(1)}% dilution`,
+      );
     } else if (result === 'success') {
-      addToast({
-        message: `Acquired ${deal.business.name}`,
-        detail: `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`,
-        type: 'success',
-      });
+      showUndoToast(
+        `Acquired ${deal.business.name}`,
+        snap,
+        `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`,
+      );
     }
     // Show LP deal reaction toast if one was generated
     if (result === 'success' && isFundManagerMode) {
@@ -433,6 +435,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
 
   const handleAcquireTuckIn = useCallback((deal: Deal, structure: DealStructure, platformId: string) => {
     const platform = businesses.find(b => b.id === platformId);
+    const snap = takeSnapshot();
     acquireTuckIn(deal, structure, platformId);
     const state = useGameStore.getState();
     const result = state.lastAcquisitionResult;
@@ -455,103 +458,87 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       const suffix = integrationOutcome === 'failure' ? ' — troubled integration'
         : integrationOutcome === 'partial' ? ' — rocky integration, reduced synergies'
         : ' — seamless integration';
-      addToast({
-        message: `Tucked ${deal.business.name} into ${platform?.name ?? 'platform'} via stock`,
-        detail: `${structure.shareTerms?.sharesToIssue?.toLocaleString() ?? 0} shares issued — ${((structure.shareTerms?.dilutionPct ?? 0) * 100).toFixed(1)}% dilution${suffix}`,
-        type: integrationOutcome === 'failure' ? 'danger' : 'info',
-      });
+      const toastType = integrationOutcome === 'failure' ? 'danger' as const : 'info' as const;
+      showUndoToast(
+        `Tucked ${deal.business.name} into ${platform?.name ?? 'platform'} via stock`,
+        snap,
+        `${structure.shareTerms?.sharesToIssue?.toLocaleString() ?? 0} shares issued — ${((structure.shareTerms?.dilutionPct ?? 0) * 100).toFixed(1)}% dilution${suffix}`,
+        toastType,
+      );
     } else {
       const structureLabel = `${formatMoney(deal.askingPrice)} via ${getStructureLabel(structure.type)}`;
-      const toastType = integrationOutcome === 'failure' ? 'danger' : integrationOutcome === 'partial' ? 'info' : 'success';
       const suffix = integrationOutcome === 'failure' ? ' — troubled integration'
         : integrationOutcome === 'partial' ? ' — rocky integration, reduced synergies'
         : ' — seamless integration';
-      addToast({
-        message: `Tucked ${deal.business.name} into ${platform?.name ?? 'platform'}`,
-        detail: structureLabel + suffix,
-        type: toastType,
-      });
+      const toastType = integrationOutcome === 'failure' ? 'danger' as const : integrationOutcome === 'partial' ? 'info' as const : 'success' as const;
+      showUndoToast(
+        `Tucked ${deal.business.name} into ${platform?.name ?? 'platform'}`,
+        snap,
+        structureLabel + suffix,
+        toastType,
+      );
     }
-  }, [acquireTuckIn, businesses, addToast]);
+  }, [acquireTuckIn, businesses]);
 
   const handleMerge = useCallback((id1: string, id2: string, newName: string) => {
     const b1 = businesses.find(b => b.id === id1);
     const b2 = businesses.find(b => b.id === id2);
+    const snap = takeSnapshot();
     mergeBusinesses(id1, id2, newName);
     const integrationOutcome = useGameStore.getState().lastIntegrationOutcome;
     const names = b1 && b2 ? `${b1.name} + ${b2.name}` : undefined;
-    const toastType = integrationOutcome === 'failure' ? 'danger' : integrationOutcome === 'partial' ? 'info' : 'success';
     const suffix = integrationOutcome === 'failure' ? ' — troubled integration'
       : integrationOutcome === 'partial' ? ' — rocky integration, reduced synergies'
       : ' — seamless integration';
-    addToast({
-      message: `Merged into ${newName}`,
-      detail: names ? names + suffix : undefined,
-      type: toastType,
-    });
-  }, [mergeBusinesses, businesses, addToast]);
+    const toastType = integrationOutcome === 'failure' ? 'danger' as const : integrationOutcome === 'partial' ? 'info' as const : 'success' as const;
+    showUndoToast(`Merged into ${newName}`, snap, names ? names + suffix : undefined, toastType);
+  }, [mergeBusinesses, businesses]);
 
   const handleDesignatePlatform = useCallback((businessId: string) => {
     const biz = businesses.find(b => b.id === businessId);
+    const snap = takeSnapshot();
     designatePlatform(businessId);
-    addToast({
-      message: `${biz?.name ?? 'Business'} designated as platform`,
-      detail: 'Can now receive tuck-in acquisitions',
-      type: 'info',
-    });
-  }, [designatePlatform, businesses, addToast]);
+    showUndoToast(`${biz?.name ?? 'Business'} designated as platform`, snap, 'Can now receive tuck-in acquisitions');
+  }, [designatePlatform, businesses]);
 
   const handleUnlockSharedService = useCallback((serviceType: SharedServiceType) => {
     const svc = sharedServices.find(s => s.type === serviceType);
+    const snap = takeSnapshot();
     unlockSharedService(serviceType);
-    addToast({
-      message: `Unlocked ${svc?.name ?? serviceType}`,
-      detail: svc ? `${formatMoney(svc.unlockCost)} setup + ${formatMoney(svc.annualCost)}/yr` : undefined,
-      type: 'success',
-    });
-  }, [unlockSharedService, sharedServices, addToast]);
+    showUndoToast(`Unlocked ${svc?.name ?? serviceType}`, snap, svc ? `${formatMoney(svc.unlockCost)} setup + ${formatMoney(svc.annualCost)}/yr` : undefined);
+  }, [unlockSharedService, sharedServices]);
 
   const handleDeactivateSharedService = useCallback((serviceType: SharedServiceType) => {
     const svc = sharedServices.find(s => s.type === serviceType);
+    const snap = takeSnapshot();
     deactivateSharedService(serviceType);
-    addToast({
-      message: `Deactivated ${svc?.name ?? serviceType}`,
-      type: 'warning',
-    });
-  }, [deactivateSharedService, sharedServices, addToast]);
+    showUndoToast(`Deactivated ${svc?.name ?? serviceType}`, snap);
+  }, [deactivateSharedService, sharedServices]);
 
   const handlePayDebt = useCallback((amount: number) => {
+    const snap = takeSnapshot();
     payDownDebt(amount);
     const remaining = useGameStore.getState().holdcoLoanBalance;
-    addToast({
-      message: `Paid down ${formatMoney(amount)} holdco debt`,
-      detail: remaining > 0 ? `${formatMoney(remaining)} remaining` : 'Holdco debt-free!',
-      type: 'success',
-    });
-  }, [payDownDebt, addToast]);
+    showUndoToast(`Paid down ${formatMoney(amount)} holdco debt`, snap, remaining > 0 ? `${formatMoney(remaining)} remaining` : 'Holdco debt-free!');
+  }, [payDownDebt]);
 
   const handlePayBankDebt = useCallback((businessId: string, amount: number) => {
     const biz = businesses.find(b => b.id === businessId);
+    const snap = takeSnapshot();
     payDownBankDebt(businessId, amount);
     const updatedBiz = useGameStore.getState().businesses.find(b => b.id === businessId);
     const remaining = updatedBiz?.bankDebtBalance ?? 0;
-    addToast({
-      message: `Paid down ${formatMoney(amount)} bank debt on ${biz?.name ?? 'business'}`,
-      detail: remaining > 0 ? `${formatMoney(remaining)} remaining` : 'Bank debt cleared!',
-      type: 'success',
-    });
-  }, [payDownBankDebt, businesses, addToast]);
+    showUndoToast(`Paid down ${formatMoney(amount)} bank debt on ${biz?.name ?? 'business'}`, snap, remaining > 0 ? `${formatMoney(remaining)} remaining` : 'Bank debt cleared!');
+  }, [payDownBankDebt, businesses]);
 
   const handleIssueEquity = useCallback((amount: number) => {
+    const snap = takeSnapshot();
     const prevShares = sharesOutstanding;
     const prevSentiment = useGameStore.getState().ipoState?.marketSentiment;
     issueEquity(amount);
-    // Check if equity raise actually succeeded (sharesOutstanding would change)
-    // We need to read from store directly since state update is synchronous in Zustand
     const newState = useGameStore.getState();
     const newShares = newState.sharesOutstanding;
     if (newShares === prevShares) {
-      // Diagnose actual rejection reason
       const freshMetrics = calculateMetrics(newState);
       let detail: string;
       if (freshMetrics.intrinsicValuePerShare <= 0) {
@@ -569,22 +556,21 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       const newOwnership = founderShares / newShares;
       const isPublic = !!newState.ipoState?.isPublic;
       const sentimentDelta = isPublic && prevSentiment != null ? (newState.ipoState!.marketSentiment - prevSentiment) : 0;
-      addToast({
-        message: `Raised ${formatMoney(amount)} equity${isPublic ? ' at market price' : ''}`,
-        detail: `Ownership: ${(newOwnership * 100).toFixed(1)}%${sentimentDelta !== 0 ? ` | Sentiment: ${(sentimentDelta * 100).toFixed(0)}%` : ''}`,
-        type: 'info',
-      });
+      showUndoToast(
+        `Raised ${formatMoney(amount)} equity${isPublic ? ' at market price' : ''}`,
+        snap,
+        `Ownership: ${(newOwnership * 100).toFixed(1)}%${sentimentDelta !== 0 ? ` | Sentiment: ${(sentimentDelta * 100).toFixed(0)}%` : ''}`,
+      );
     }
   }, [issueEquity, founderShares, sharesOutstanding, addToast]);
 
   const handleBuyback = useCallback((amount: number) => {
+    const snap = takeSnapshot();
     const prevShares = sharesOutstanding;
     buybackShares(amount);
-    // Check if buyback actually succeeded (sharesOutstanding would decrease)
     const newState = useGameStore.getState();
     const newShares = newState.sharesOutstanding;
     if (newShares === prevShares) {
-      // Diagnose rejection reason
       const freshMetrics = calculateMetrics(newState);
       let detail: string;
       if (freshMetrics.intrinsicValuePerShare <= 0) {
@@ -601,15 +587,12 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       });
     } else {
       const newOwnership = founderShares / newShares;
-      addToast({
-        message: `Repurchased shares for ${formatMoney(amount)}`,
-        detail: `Ownership: ${(newOwnership * 100).toFixed(1)}%`,
-        type: 'success',
-      });
+      showUndoToast(`Repurchased shares for ${formatMoney(amount)}`, snap, `Ownership: ${(newOwnership * 100).toFixed(1)}%`);
     }
   }, [buybackShares, founderShares, sharesOutstanding, addToast]);
 
   const handleDistribute = useCallback((amount: number) => {
+    const snap = takeSnapshot();
     const prevCash = cash;
     distributeToOwners(amount);
     const newCash = useGameStore.getState().cash;
@@ -620,35 +603,29 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         type: 'warning',
       });
     } else {
-      addToast({
-        message: `Distributed ${formatMoney(amount)}`,
-        detail: 'Cash returned to shareholders',
-        type: 'success',
-      });
+      showUndoToast(`Distributed ${formatMoney(amount)}`, snap, 'Cash returned to shareholders');
     }
   }, [distributeToOwners, cash, addToast]);
 
   const handleSell = useCallback((businessId: string) => {
     const biz = businesses.find(b => b.id === businessId);
+    const snap = takeSnapshot();
     sellBusiness(businessId);
-    addToast({
-      message: `Sold ${biz?.name ?? 'business'}`,
-      detail: 'Proceeds added to cash',
-      type: 'success',
-    });
-  }, [sellBusiness, businesses, addToast]);
+    showUndoToast(`Sold ${biz?.name ?? 'business'}`, snap, 'Proceeds added to cash');
+  }, [sellBusiness, businesses]);
 
   const handleImprove = useCallback((businessId: string, improvementType: OperationalImprovementType) => {
     const biz = businesses.find(b => b.id === businessId);
+    const snap = takeSnapshot();
     const cashBefore = useGameStore.getState().cash;
     improveBusiness(businessId, improvementType);
     const cashAfter = useGameStore.getState().cash;
     if (cashAfter < cashBefore) {
-      addToast({
-        message: `${IMPROVEMENT_LABELS[improvementType] ?? improvementType}`,
-        detail: `Applied to ${biz?.name ?? 'business'}`,
-        type: 'success',
-      });
+      showUndoToast(
+        `${IMPROVEMENT_LABELS[improvementType] ?? improvementType}`,
+        snap,
+        `Applied to ${biz?.name ?? 'business'}`,
+      );
     } else {
       addToast({
         message: 'Improvement failed',
@@ -659,98 +636,70 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   }, [improveBusiness, businesses, addToast]);
 
   const handleSourceDeals = useCallback(() => {
+    const snap = takeSnapshot();
     sourceDealFlow();
-    addToast({
-      message: 'Deal pipeline refreshed',
-      detail: 'New opportunities sourced',
-      type: 'info',
-    });
-  }, [sourceDealFlow, addToast]);
+    showUndoToast('Deal pipeline refreshed', snap, 'New opportunities sourced');
+  }, [sourceDealFlow]);
 
   const handleUpgradeMASourcing = useCallback(() => {
     const nextTier = Math.min(maSourcing.tier + 1, 3);
+    const snap = takeSnapshot();
     upgradeMASourcing();
-    addToast({
-      message: `MA sourcing upgraded to Tier ${nextTier}`,
-      detail: MA_SOURCING_CONFIG[nextTier as 1 | 2 | 3]?.name ?? '',
-      type: 'success',
-    });
-  }, [upgradeMASourcing, maSourcing.tier, addToast]);
+    showUndoToast(`MA sourcing upgraded to Tier ${nextTier}`, snap, MA_SOURCING_CONFIG[nextTier as 1 | 2 | 3]?.name ?? '');
+  }, [upgradeMASourcing, maSourcing.tier]);
 
   const handleToggleMASourcing = useCallback(() => {
     const wasActive = maSourcing.active;
+    const snap = takeSnapshot();
     toggleMASourcing();
-    addToast({
-      message: wasActive ? 'MA sourcing paused' : 'MA sourcing activated',
-      type: wasActive ? 'warning' : 'success',
-    });
-  }, [toggleMASourcing, maSourcing.active, addToast]);
+    showUndoToast(wasActive ? 'MA sourcing paused' : 'MA sourcing activated', snap);
+  }, [toggleMASourcing, maSourcing.active]);
 
   const handleProactiveOutreach = useCallback(() => {
+    const snap = takeSnapshot();
     proactiveOutreach();
-    addToast({
-      message: 'Proactive outreach launched',
-      detail: 'Targeted deals incoming',
-      type: 'info',
-    });
-  }, [proactiveOutreach, addToast]);
+    showUndoToast('Proactive outreach launched', snap, 'Targeted deals incoming');
+  }, [proactiveOutreach]);
 
   const handleSMBBroker = useCallback(() => {
+    const snap = takeSnapshot();
     smbBrokerDealFlow();
-    addToast({
-      message: 'Small biz broker hired',
-      detail: '1 micro deal sourced — $75K',
-      type: 'info',
-    });
-  }, [smbBrokerDealFlow, addToast]);
+    showUndoToast('Small biz broker hired', snap, '1 micro deal sourced — $75K');
+  }, [smbBrokerDealFlow]);
 
   const handleForgePlatform = useCallback((recipeId: string, businessIds: string[], platformName: string, cost: number) => {
+    const snap = takeSnapshot();
     forgeIntegratedPlatform(recipeId, businessIds);
-    addToast({
-      message: `Forged ${platformName}`,
-      detail: `${formatMoney(cost)} integration cost — margin and growth boosted`,
-      type: 'success',
-    });
-  }, [forgeIntegratedPlatform, addToast]);
+    showUndoToast(`Forged ${platformName}`, snap, `${formatMoney(cost)} integration cost — margin and growth boosted`);
+  }, [forgeIntegratedPlatform]);
 
   const handleAddToIntegratedPlatform = useCallback((platformId: string, businessId: string, businessName: string, cost: number) => {
     const platform = integratedPlatforms.find(p => p.id === platformId);
+    const snap = takeSnapshot();
     addToIntegratedPlatform(platformId, businessId);
-    addToast({
-      message: `${businessName} joined ${platform?.name ?? 'platform'}`,
-      detail: `${formatMoney(cost)} integration cost — bonuses applied`,
-      type: 'success',
-    });
-  }, [addToIntegratedPlatform, integratedPlatforms, addToast]);
+    showUndoToast(`${businessName} joined ${platform?.name ?? 'platform'}`, snap, `${formatMoney(cost)} integration cost — bonuses applied`);
+  }, [addToIntegratedPlatform, integratedPlatforms]);
 
   const handleSellPlatform = useCallback((platformId: string) => {
     const platform = integratedPlatforms.find(p => p.id === platformId);
+    const snap = takeSnapshot();
     sellPlatform(platformId);
-    addToast({
-      message: `Sold platform ${platform?.name ?? ''}`,
-      detail: 'All constituent businesses sold with platform bonus',
-      type: 'success',
-    });
-  }, [sellPlatform, integratedPlatforms, addToast]);
+    showUndoToast(`Sold platform ${platform?.name ?? ''}`, snap, 'All constituent businesses sold with platform bonus');
+  }, [sellPlatform, integratedPlatforms]);
 
   const handleUnlockTurnaroundTier = useCallback(() => {
     const nextTier = Math.min(turnaroundTier + 1, 3);
+    const snap = takeSnapshot();
     unlockTurnaroundTier();
-    addToast({
-      message: `Turnaround capability unlocked: Tier ${nextTier}`,
-      type: 'success',
-    });
-  }, [unlockTurnaroundTier, turnaroundTier, addToast]);
+    showUndoToast(`Turnaround capability unlocked: Tier ${nextTier}`, snap);
+  }, [unlockTurnaroundTier, turnaroundTier]);
 
   const handleStartTurnaround = useCallback((businessId: string, programId: string) => {
     const biz = businesses.find(b => b.id === businessId);
+    const snap = takeSnapshot();
     startTurnaroundProgram(businessId, programId);
-    addToast({
-      message: `Turnaround started for ${biz?.name ?? 'business'}`,
-      detail: 'Program in progress — results at completion',
-      type: 'info',
-    });
-  }, [startTurnaroundProgram, businesses, addToast]);
+    showUndoToast(`Turnaround started for ${biz?.name ?? 'business'}`, snap, 'Program in progress — results at completion');
+  }, [startTurnaroundProgram, businesses]);
 
   // Show tutorial on new game start or first visit
   useEffect(() => {

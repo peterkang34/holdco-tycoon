@@ -32,14 +32,15 @@ export function Modal({ isOpen, onClose, title, subtitle, header, children, size
   const dragStartY = useRef<number | null>(null);
   const dragCurrentY = useRef<number>(0);
 
+  const isDragging = useRef(false);
+
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const sheet = sheetRef.current;
     if (!sheet) return;
-    // Only start drag if at top of scroll or touching the drag handle area
-    if (sheet.scrollTop <= 0) {
-      dragStartY.current = e.touches[0].clientY;
-      dragCurrentY.current = 0;
-    }
+    // Track touch start position tentatively — only commit in move handler
+    dragStartY.current = e.touches[0].clientY;
+    dragCurrentY.current = 0;
+    isDragging.current = false;
   }, []);
 
   const handleTouchMove = useCallback((e: React.TouchEvent) => {
@@ -47,7 +48,13 @@ export function Modal({ isOpen, onClose, title, subtitle, header, children, size
     const sheet = sheetRef.current;
     if (!sheet) return;
     const dy = e.touches[0].clientY - dragStartY.current;
-    // Only allow downward drag
+
+    // Only commit to drag mode if scrolled to top AND dragging downward past threshold
+    if (!isDragging.current) {
+      if (sheet.scrollTop > 0 || dy < 10) return; // Not at top or not enough downward movement
+      isDragging.current = true;
+    }
+
     if (dy > 0) {
       dragCurrentY.current = dy;
       sheet.style.transform = `translateY(${dy}px)`;
@@ -56,7 +63,10 @@ export function Modal({ isOpen, onClose, title, subtitle, header, children, size
   }, []);
 
   const handleTouchEnd = useCallback(() => {
-    if (dragStartY.current === null) return;
+    if (dragStartY.current === null || !isDragging.current) {
+      dragStartY.current = null;
+      return;
+    }
     const sheet = sheetRef.current;
     if (!sheet) return;
     dragStartY.current = null;
@@ -116,11 +126,11 @@ export function Modal({ isOpen, onClose, title, subtitle, header, children, size
           onTouchEnd={handleTouchEnd}
         >
           {/* Drag handle — tap to dismiss */}
-          <div className="flex justify-center mb-3" onClick={onClose}>
+          <div className="min-h-[44px] flex items-center justify-center" onClick={onClose}>
             <div className="w-10 h-1 rounded-full bg-white/20" />
           </div>
           {/* Sticky header so close button is always reachable */}
-          <div className="sticky top-0 z-10 bg-bg-primary pb-1">
+          <div className="sticky top-0 z-10 bg-bg-primary pt-2 pb-1">
             {headerContent}
           </div>
           {children}

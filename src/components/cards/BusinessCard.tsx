@@ -120,7 +120,7 @@ export const BusinessCard = memo(function BusinessCard({
               </span>
             )}
           </div>
-          <div className="text-xs text-text-muted">{sector.name}</div>
+          <div className="text-xs text-text-muted truncate">{leagueConfig ? leagueConfig.fullName : business.subType}</div>
         </div>
         <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
           business.qualityRating >= 4 ? 'bg-accent/20 text-accent' :
@@ -155,7 +155,7 @@ export const BusinessCard = memo(function BusinessCard({
               </span>
             )}
           </div>
-          <div className="text-xs text-text-muted">{sector.name}</div>
+          <div className="text-xs text-text-muted truncate">{leagueConfig ? leagueConfig.fullName : business.subType}</div>
         </div>
         <span className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
           business.qualityRating >= 4 ? 'bg-accent/20 text-accent' :

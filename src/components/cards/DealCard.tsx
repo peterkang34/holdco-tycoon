@@ -158,19 +158,22 @@ export const DealCard = memo(function DealCard({ deal, onSelect, disabled, unaff
           onClick={swipe.swiping || swipe.recentlySwiped ? undefined : onToggle}
         >
           <span className="text-xl shrink-0">{sector.emoji}</span>
-          <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-            <span className="font-medium truncate">{deal.business.name}</span>
-            {leagueConfig && (
-              <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 font-bold ${leagueBlocked ? 'bg-warning/20 text-warning' : 'bg-amber-500/20 text-amber-400'}`}>
-                {leagueConfig.label}{leagueBlocked ? ' Owned' : ''}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5">
+              <span className="font-medium truncate flex-1 min-w-0">{deal.business.name}</span>
+              {leagueConfig && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 font-bold ${leagueBlocked ? 'bg-warning/20 text-warning' : 'bg-amber-500/20 text-amber-400'}`}>
+                  {leagueConfig.label}{leagueBlocked ? ' Owned' : ''}
+                </span>
+              )}
+              <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${acquisitionBadge.color}`}>
+                {acquisitionBadge.label}
               </span>
-            )}
-            <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${acquisitionBadge.color}`}>
-              {acquisitionBadge.label}
-            </span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${heatBadge.color}`}>
-              {heatBadge.label}
-            </span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded shrink-0 ${heatBadge.color}`}>
+                {heatBadge.label}
+              </span>
+            </div>
+            <div className="text-xs text-text-muted truncate">{leagueConfig ? leagueConfig.fullName : deal.business.subType}</div>
           </div>
           <div className="flex items-center gap-1.5 shrink-0">
             <span className="font-mono text-sm font-bold">{formatMoney(deal.effectivePrice)}</span>

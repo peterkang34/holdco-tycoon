@@ -27,7 +27,7 @@ export const useToastStore = create<ToastState>((set) => ({
       set((state) => ({
         toasts: state.toasts.filter((t) => t.id !== id),
       }));
-    }, toast.type === 'nudge' ? 7000 : 3500);
+    }, toast.type === 'nudge' ? 7000 : toast.action ? 5000 : 3500);
   },
   removeToast: (id) =>
     set((state) => ({
