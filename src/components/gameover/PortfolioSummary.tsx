@@ -148,6 +148,7 @@ export function PortfolioSummary({
               {allBusinesses.map(business => {
                 const sector = SECTORS[business.sectorId];
                 const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
+                const cashInvested = business.cashEquityInvested ?? totalInvested;
                 let exitValue: number;
                 let exitMultiple: number | null = null;
                 if (business.status === 'sold') {
@@ -157,7 +158,7 @@ export function PortfolioSummary({
                   exitMultiple = valuation.totalMultiple;
                   exitValue = Math.round(business.ebitda * valuation.totalMultiple);
                 }
-                const moic = totalInvested > 0 ? exitValue / totalInvested : 0;
+                const moic = cashInvested > 0 ? exitValue / cashInvested : 0;
 
                 return (
                   <div

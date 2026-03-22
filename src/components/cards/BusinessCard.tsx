@@ -73,8 +73,8 @@ export const BusinessCard = memo(function BusinessCard({
     : undefined;
   const totalInvested = business.totalAcquisitionCost || business.acquisitionPrice;
   const cashInvested = business.cashEquityInvested ?? totalInvested;
-  const gainLoss = exitValuation.exitPrice - totalInvested; // EV-on-EV comparison
-  const moic = totalInvested > 0 ? exitValuation.exitPrice / totalInvested : 0; // Gross EV MOIC
+  const gainLoss = exitValuation.netProceeds - cashInvested; // Equity gain/loss
+  const moic = cashInvested > 0 ? exitValuation.netProceeds / cashInvested : 0; // Equity MOIC: net proceeds / cash invested
 
   // League badge for pro sports teams
   const leagueConfig = business.sectorId === 'proSports'

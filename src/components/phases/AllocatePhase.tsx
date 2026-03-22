@@ -3566,7 +3566,7 @@ export function AllocatePhase({
         const valuation = calculateExitValuation(biz, round, lastEventType, undefined, integratedPlatforms);
         const totalInvested = biz.totalAcquisitionCost || biz.acquisitionPrice;
         const cashInvested = biz.cashEquityInvested ?? totalInvested;
-        const sellMoic = totalInvested > 0 ? valuation.exitPrice / totalInvested : 0; // EV MOIC
+        const sellMoic = cashInvested > 0 ? valuation.netProceeds / cashInvested : 0; // Equity MOIC
         return (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
             <div className="bg-bg-primary border border-white/10 rounded-xl max-w-md w-full p-6">
