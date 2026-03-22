@@ -471,6 +471,7 @@ export interface IPOState {
   initialStockPrice: number;
   consecutiveMisses: number;
   shareFundedDealsThisRound: number; // count for this round (display only)
+  totalShareFundedDeals?: number;    // cumulative across all rounds (added v40)
 }
 
 // ── 20-Year Mode: Family Office Endgame ──
@@ -1036,11 +1037,16 @@ export interface PlaybookData {
   ipo?: {
     wentPublic: boolean;
     ipoRound: number;
+    roundsAsPublic: number;
     stockPrice: number;
+    initialStockPrice: number;
+    stockPriceChangePct: number;
     sharesOutstanding: number;
+    preIPOShares: number;
     marketSentiment: number;
     publicCompanyBonus: number;
-    shareFundedDeals: number;
+    totalShareFundedDeals: number;
+    consecutiveMisses: number;
   };
 
   realityCheck: {

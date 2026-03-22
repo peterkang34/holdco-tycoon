@@ -1822,6 +1822,7 @@ export const useGameStore = create<GameStore>()(
             ...state.ipoState,
             sharesOutstanding: structure.shareTerms.newTotalShares,
             shareFundedDealsThisRound: state.ipoState.shareFundedDealsThisRound + 1,
+            totalShareFundedDeals: (state.ipoState.totalShareFundedDeals ?? 0) + 1,
           };
           set({
             ipoState: updatedIPO,
@@ -1983,6 +1984,7 @@ export const useGameStore = create<GameStore>()(
             ...state.ipoState,
             sharesOutstanding: structure.shareTerms.newTotalShares,
             shareFundedDealsThisRound: state.ipoState.shareFundedDealsThisRound + 1,
+            totalShareFundedDeals: (state.ipoState.totalShareFundedDeals ?? 0) + 1,
           };
           // Swap state references so the rest of the tuck-in logic uses updated IPO
           // We'll re-enter the function with a modified state snapshot
@@ -5836,7 +5838,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v39', // v39: Oil Shock Market Event
+      name: 'holdco-tycoon-save-v40', // v40: IPO Transparency — totalShareFundedDeals
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,

@@ -4,6 +4,7 @@ import { fetchWithAuth } from '../../lib/supabase';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { getArchetypeDisplayName } from '../../utils/playbookThesis';
 import type { PlaybookData } from '../../engine/types';
+import { formatMoney } from '../../engine/utils';
 import { OperatorPlaybook } from '../gameover/OperatorPlaybook';
 
 interface PlaybookIndexEntry {
@@ -27,12 +28,6 @@ type DurationFilter = 'all' | 'standard' | 'quick';
 type SortKey = 'date' | 'fev' | 'grade';
 
 const GRADE_ORDER: Record<string, number> = { S: 6, A: 5, B: 4, C: 3, D: 2, F: 1 };
-
-function fmtMoney(thousands: number): string {
-  if (thousands >= 1_000_000) return `$${(thousands / 1000).toFixed(0)}B`;
-  if (thousands >= 1000) return `$${(thousands / 1000).toFixed(0)}M`;
-  return `$${thousands.toFixed(0)}K`;
-}
 
 function fmtDate(iso: string): string {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -199,7 +194,7 @@ export function StrategyLibraryModal() {
                   </span>
                 </div>
                 <div className="flex items-center gap-3 text-xs text-text-muted">
-                  <span className="font-mono">{fmtMoney(entry.isFundManager ? entry.adjustedFev : entry.fev)}</span>
+                  <span className="font-mono">{formatMoney(entry.isFundManager ? entry.adjustedFev : entry.fev)}</span>
                   <span>{entry.difficulty === 'normal' ? 'Hard' : 'Easy'}-{entry.duration === 'standard' ? '20' : '10'}</span>
                   <span className="ml-auto">{fmtDate(entry.completedAt)}</span>
                 </div>

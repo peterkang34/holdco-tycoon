@@ -39,9 +39,6 @@ import { ImprovementModal } from '../modals/ImprovementModal';
 import { TurnaroundModal } from '../modals/TurnaroundModal';
 import { isAIEnabled } from '../../services/aiGeneration';
 import { checkPlatformEligibility, checkNearEligiblePlatforms, calculateIntegrationCost, getEligibleBusinessesForExistingPlatform, calculateAddToPlatformCost } from '../../engine/platforms';
-import { PLATFORM_RECIPES } from '../../data/platformRecipes';
-import { UNLOCKABLE_SECTORS } from '../../data/sectors';
-import { getEarnedAchievementIds } from '../../hooks/useUnlocks';
 import { getPlatformSaleBonus } from '../../data/gameConfig';
 import { getEligiblePrograms, canUnlockTier } from '../../engine/turnarounds';
 import { TURNAROUND_TIER_CONFIG, getTurnaroundTierAnnualCost, getProgramById } from '../../data/turnaroundPrograms';
@@ -634,26 +631,6 @@ export function AllocatePhase({
     () => checkNearEligiblePlatforms(businesses, integratedPlatforms, difficulty, duration),
     [businesses, integratedPlatforms, difficulty, duration]
   );
-
-  // Locked platform recipes — recipes requiring sectors the player hasn't unlocked yet
-  const lockedRecipes = useMemo(() => {
-    const unlockedIds = getUnlockedSectorIds(false);
-    const lockedSectorIds = new Set(
-      Object.keys(UNLOCKABLE_SECTORS).filter(sid => !unlockedIds.includes(sid as SectorId))
-    );
-    if (lockedSectorIds.size === 0) return [];
-    const earnedCount = getEarnedAchievementIds().length;
-    // Show recipes that require at least one locked sector
-    return PLATFORM_RECIPES.filter(r => {
-      const sectors = r.sectorId ? [r.sectorId] : (r.crossSectorIds ?? []);
-      return sectors.some(sid => lockedSectorIds.has(sid));
-    }).map(r => {
-      const sectors = r.sectorId ? [r.sectorId] : (r.crossSectorIds ?? []);
-      const lockingSector = sectors.find(sid => lockedSectorIds.has(sid))!;
-      const gate = UNLOCKABLE_SECTORS[lockingSector as SectorId];
-      return { recipe: r, lockingSectorId: lockingSector, gateCount: gate?.gateAchievementCount ?? 0, earnedCount };
-    }).slice(0, 6);
-  }, [businesses]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const tabs: { id: AllocateTab; label: string; badge?: number }[] = [
     { id: 'portfolio', label: 'Portfolio', badge: activeBusinesses.length },
@@ -1544,38 +1521,6 @@ export function AllocatePhase({
                             <p className="text-xs text-text-muted mt-1 text-right font-mono">{progressPct}%</p>
                           </>
                         )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Locked Platform Recipes (require unlockable sectors) */}
-            {lockedRecipes.length > 0 && (
-              <div className="card bg-white/5 border border-white/10 mb-6 opacity-60">
-                <h3 className="font-bold text-text-secondary mb-1 flex items-center gap-2">
-                  <span className="text-sm">🔒</span> Locked Recipes
-                </h3>
-                <p className="text-sm text-text-muted mb-4">
-                  Earn more achievements to unlock prestige sectors and their platform recipes.
-                </p>
-                <div className="space-y-2">
-                  {lockedRecipes.map(({ recipe, lockingSectorId, gateCount, earnedCount }) => {
-                    const sector = SECTORS[lockingSectorId];
-                    return (
-                      <div key={recipe.id} className="bg-white/5 rounded-lg p-3 grayscale">
-                        <div className="flex items-start justify-between gap-2 mb-1">
-                          <h4 className="font-bold text-xs text-text-secondary">
-                            {sector?.emoji ?? '🔒'} {recipe.name}
-                          </h4>
-                          <span className="text-[10px] text-text-muted whitespace-nowrap flex-shrink-0">
-                            {earnedCount}/{gateCount} achievements
-                          </span>
-                        </div>
-                        <p className="text-[10px] text-text-muted">
-                          Requires {sector?.name ?? lockingSectorId} sector · {recipe.requiredSubTypes.slice(0, 2).join(' + ')}{recipe.requiredSubTypes.length > 2 ? ` +${recipe.requiredSubTypes.length - 2} more` : ''}
-                        </p>
                       </div>
                     );
                   })}

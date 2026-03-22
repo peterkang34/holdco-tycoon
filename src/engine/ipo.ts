@@ -119,6 +119,7 @@ export function executeIPO(state: GameState): {
     initialStockPrice: stockPrice,
     consecutiveMisses: 0,
     shareFundedDealsThisRound: 0,
+    totalShareFundedDeals: 0,
   };
 
   return { ipoState, cashRaised, newSharesIssued: newShares };

@@ -4,6 +4,7 @@ import type { IPOState } from '../../engine/types';
 import { useGameStore } from '../../hooks/useGame';
 import { loadLeaderboard, saveToLeaderboard, wouldMakeLeaderboardFromList, getLeaderboardRankFromList } from '../../engine/scoring';
 import { calculateExitValuation } from '../../engine/simulation';
+import { calculatePublicCompanyBonus } from '../../engine/ipo';
 import { AIAnalysisSection } from '../ui/AIAnalysisSection';
 import { DIFFICULTY_CONFIG, RESTRUCTURING_FEV_PENALTY } from '../../data/gameConfig';
 import { getOutcomeReactions } from '../../data/lpCommentary';
@@ -590,8 +591,32 @@ export function GameOverScreen({
     const totalEbitda = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
     const blendedMultiple = totalEbitda > 0 ? portfolioValue / totalEbitda : 0;
     const hypotheticalFEV = Math.round(enterpriseValue * initialOwnershipPct);
-    return { currentOwnership, opcoDebt, portfolioValue, blendedMultiple, hypotheticalFEV };
-  }, [activeBusinesses, sharesOutstanding, founderShares, maxRounds, enterpriseValue, initialOwnershipPct, integratedPlatforms]);
+
+    // IPO transparency: compute sentiment effect and public company premium
+    const isPublic = !!ipoState?.isPublic;
+    const sentimentPct = isPublic ? (ipoState?.marketSentiment ?? 0) : 0;
+    const sentimentDollars = portfolioValue * sentimentPct; // raw portfolio * sentiment
+    const gameState = useGameStore.getState();
+    const publicPremiumPct = isPublic ? calculatePublicCompanyBonus(gameState) : 0;
+    // The bonus applies to the post-sentiment, post-debt EV — reconstruct pre-bonus EV
+    const postSentimentPortfolio = portfolioValue + sentimentDollars;
+    const rolloverClaims = activeBusinesses.reduce((sum, b) => {
+      if (!b.rolloverEquityPct || b.rolloverEquityPct <= 0) return sum;
+      const bVal = businessValues.find(bv => bv.business.id === b.id);
+      const bizNet = Math.max(0, (bVal?.value ?? 0) - b.sellerNoteBalance - b.bankDebtBalance);
+      return sum + bizNet * b.rolloverEquityPct;
+    }, 0);
+    const preBonusEV = postSentimentPortfolio + cash - totalDebt - opcoDebt - rolloverClaims;
+    const publicPremiumDollars = preBonusEV * publicPremiumPct;
+    // Counterfactual: EV without sentiment or bonus (raw portfolio + cash - debt - rollover)
+    const privateCounterfactualEV = Math.round(Math.max(0, portfolioValue + cash - totalDebt - opcoDebt - rolloverClaims));
+
+    return {
+      currentOwnership, opcoDebt, portfolioValue, blendedMultiple, hypotheticalFEV,
+      isPublic, sentimentPct, sentimentDollars, publicPremiumPct, publicPremiumDollars,
+      privateCounterfactualEV,
+    };
+  }, [activeBusinesses, sharesOutstanding, founderShares, maxRounds, enterpriseValue, initialOwnershipPct, integratedPlatforms, ipoState, cash, totalDebt]);
 
   // ── Leaderboard ──
   useEffect(() => {

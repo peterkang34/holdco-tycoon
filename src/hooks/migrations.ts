@@ -1053,6 +1053,29 @@ function migrateV38ToV39(): void {
 }
 
 /**
+ * v39 → v40: IPO Transparency — backfill totalShareFundedDeals on IPOState.
+ */
+function migrateV39ToV40(): void {
+  const v39Key = 'holdco-tycoon-save-v39';
+  const v40Key = 'holdco-tycoon-save-v40';
+  if (localStorage.getItem(v40Key)) return;
+  try {
+    const raw = localStorage.getItem(v39Key);
+    if (!raw) return;
+    const v39Data = JSON.parse(raw);
+
+    if (v39Data.state?.ipoState && v39Data.state.ipoState.totalShareFundedDeals === undefined) {
+      v39Data.state.ipoState.totalShareFundedDeals = 0;
+    }
+
+    localStorage.setItem(v40Key, JSON.stringify(v39Data));
+    localStorage.removeItem(v39Key);
+  } catch (e) {
+    console.error('v39→v40 migration failed:', e);
+  }
+}
+
+/**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
  */
@@ -1087,4 +1110,5 @@ export function runAllMigrations(): void {
   migrateV36ToV37();
   migrateV37ToV38();
   migrateV38ToV39();
+  migrateV39ToV40();
 }

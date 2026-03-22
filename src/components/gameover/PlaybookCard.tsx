@@ -1,4 +1,5 @@
 import type { PlaybookData } from '../../engine/types';
+import { formatMoney } from '../../engine/utils';
 import { generateThesis, getArchetypeDisplayName } from '../../utils/playbookThesis';
 
 interface PlaybookCardProps {
@@ -6,12 +7,6 @@ interface PlaybookCardProps {
   isLoggedIn: boolean;
   onView: () => void;
   onSignUp: () => void;
-}
-
-function fmtMoney(thousands: number): string {
-  if (thousands >= 1_000_000) return `$${(thousands / 1000).toFixed(0)}B`;
-  if (thousands >= 1000) return `$${(thousands / 1000).toFixed(0)}M`;
-  return `$${thousands.toFixed(0)}K`;
 }
 
 export function PlaybookCard({ playbook, isLoggedIn, onView, onSignUp }: PlaybookCardProps) {
@@ -52,7 +47,7 @@ export function PlaybookCard({ playbook, isLoggedIn, onView, onSignUp }: Playboo
       <div className="flex items-center gap-4 mb-4 text-sm">
         <div>
           <span className="text-text-muted text-xs">{heroLabel}</span>
-          <p className="font-mono font-bold text-text-primary">{fmtMoney(heroValue)}</p>
+          <p className="font-mono font-bold text-text-primary">{formatMoney(heroValue)}</p>
         </div>
         <div className="w-px h-8 bg-white/10" />
         <div>

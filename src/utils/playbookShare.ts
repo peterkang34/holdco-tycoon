@@ -3,6 +3,7 @@
  */
 
 import type { PlaybookData } from '../engine/types';
+import { formatMoney } from '../engine/utils';
 import { generateThesis, getArchetypeDisplayName } from './playbookThesis';
 
 /** Build a shareable playbook URL from a share ID */
@@ -25,12 +26,6 @@ export function cleanPlaybookUrl(): void {
   window.history.replaceState({}, '', url.toString());
 }
 
-function fmtMoney(thousands: number): string {
-  if (thousands >= 1_000_000) return `$${(thousands / 1000).toFixed(0)}B`;
-  if (thousands >= 1000) return `$${(thousands / 1000).toFixed(0)}M`;
-  return `$${thousands.toFixed(0)}K`;
-}
-
 /** Generate a text summary for clipboard sharing */
 export function buildPlaybookSummary(playbook: PlaybookData): string {
   const { thesis } = playbook;
@@ -40,7 +35,7 @@ export function buildPlaybookSummary(playbook: PlaybookData): string {
 
   return [
     `${thesis.holdcoName} — ${archName}`,
-    `Grade: ${thesis.grade} | FEV: ${fmtMoney(thesis.fev)} | Score: ${thesis.score}/100`,
+    `Grade: ${thesis.grade} | FEV: ${formatMoney(thesis.fev)} | Score: ${thesis.score}/100`,
     `Mode: ${mode}${thesis.isFundManager ? ' PE Fund' : ''}`,
     '',
     thesisText,

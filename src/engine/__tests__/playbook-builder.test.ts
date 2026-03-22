@@ -234,12 +234,16 @@ describe('buildPlaybook', () => {
         isPublic: true, stockPrice: 25.50, sharesOutstanding: 1000,
         preIPOShares: 800, marketSentiment: 0.15, earningsExpectations: 3000,
         ipoRound: 12, initialStockPrice: 20, consecutiveMisses: 0,
-        shareFundedDealsThisRound: 1,
+        shareFundedDealsThisRound: 1, totalShareFundedDeals: 3,
       },
     }))!;
     expect(result.ipo).toBeDefined();
     expect(result.ipo!.wentPublic).toBe(true);
     expect(result.ipo!.ipoRound).toBe(12);
+    expect(result.ipo!.totalShareFundedDeals).toBe(3);
+    expect(result.ipo!.publicCompanyBonus).toBeGreaterThan(0);
+    expect(result.ipo!.stockPriceChangePct).toBeCloseTo(0.275, 2);
+    expect(result.ipo!.roundsAsPublic).toBe(8); // 20 - 12
   });
 
   it('includes challenge seed when in challenge mode', () => {

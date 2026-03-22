@@ -21,6 +21,7 @@ import type {
   GameDifficulty,
   GameDuration,
 } from '../engine/types';
+import { calculatePublicCompanyBonus } from '../engine/ipo';
 import { DIFFICULTY_CONFIG, RESTRUCTURING_FEV_PENALTY } from '../data/gameConfig';
 // generateThesis is used by consumers, not internally
 
@@ -497,11 +498,18 @@ function buildPlaybookUnsafe(input: PlaybookBuilderInput): PlaybookData {
       ipo: {
         wentPublic: true,
         ipoRound: ipoState.ipoRound,
+        roundsAsPublic: actualRounds - ipoState.ipoRound,
         stockPrice: Math.round(ipoState.stockPrice * 100) / 100,
+        initialStockPrice: Math.round(ipoState.initialStockPrice * 100) / 100,
+        stockPriceChangePct: ipoState.initialStockPrice > 0
+          ? Math.round(((ipoState.stockPrice - ipoState.initialStockPrice) / ipoState.initialStockPrice) * 1000) / 1000
+          : 0,
         sharesOutstanding: ipoState.sharesOutstanding,
+        preIPOShares: ipoState.preIPOShares,
         marketSentiment: Math.round(ipoState.marketSentiment * 1000) / 1000,
-        publicCompanyBonus: 0, // calculated elsewhere, not stored on IPOState
-        shareFundedDeals: ipoState.shareFundedDealsThisRound,
+        publicCompanyBonus: Math.round(calculatePublicCompanyBonus({ ipoState, businesses } as any) * 1000) / 1000,
+        totalShareFundedDeals: ipoState.totalShareFundedDeals ?? 0,
+        consecutiveMisses: ipoState.consecutiveMisses,
       },
     } : {}),
 

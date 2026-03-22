@@ -110,14 +110,19 @@ export function OperatorPlaybook({ isOpen, onClose, playbook }: OperatorPlaybook
                   <span className="text-text-muted text-xs font-mono">IPO</span>
                   <h4 className="text-sm font-semibold text-text-primary">Public Company</h4>
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                   <div>
                     <p className="text-text-muted text-xs">IPO Round</p>
-                    <p className="font-bold text-text-primary">Year {playbook.ipo.ipoRound}</p>
+                    <p className="font-bold text-text-primary">Year {playbook.ipo.ipoRound}{playbook.ipo.roundsAsPublic != null ? ` (${playbook.ipo.roundsAsPublic}yr public)` : ''}</p>
                   </div>
                   <div>
-                    <p className="text-text-muted text-xs">Stock Price</p>
-                    <p className="font-mono font-bold text-text-primary">${playbook.ipo.stockPrice.toFixed(2)}</p>
+                    <p className="text-text-muted text-xs">Stock Price Change</p>
+                    <p className={`font-mono font-bold ${(playbook.ipo.stockPriceChangePct ?? 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                      ${playbook.ipo.initialStockPrice?.toFixed(2) ?? '?'} → ${playbook.ipo.stockPrice.toFixed(2)}
+                      <span className="text-xs ml-1">
+                        ({(playbook.ipo.stockPriceChangePct ?? 0) >= 0 ? '+' : ''}{((playbook.ipo.stockPriceChangePct ?? 0) * 100).toFixed(0)}%)
+                      </span>
+                    </p>
                   </div>
                   <div>
                     <p className="text-text-muted text-xs">Market Sentiment</p>
@@ -126,10 +131,27 @@ export function OperatorPlaybook({ isOpen, onClose, playbook }: OperatorPlaybook
                     </p>
                   </div>
                   <div>
+                    <p className="text-text-muted text-xs">Public Company Premium</p>
+                    <p className="font-mono font-bold text-green-400">+{((playbook.ipo.publicCompanyBonus ?? 0) * 100).toFixed(0)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-text-muted text-xs">Total Dilution</p>
+                    <p className="font-mono font-bold text-text-primary">
+                      {playbook.ipo.preIPOShares != null && playbook.ipo.sharesOutstanding > 0
+                        ? `${((1 - playbook.ipo.preIPOShares / playbook.ipo.sharesOutstanding) * 100).toFixed(0)}%`
+                        : '—'}
+                    </p>
+                  </div>
+                  <div>
                     <p className="text-text-muted text-xs">Share-Funded Deals</p>
-                    <p className="font-mono font-bold text-text-primary">{playbook.ipo.shareFundedDeals}</p>
+                    <p className="font-mono font-bold text-text-primary">{playbook.ipo.totalShareFundedDeals ?? 0}</p>
                   </div>
                 </div>
+                {(playbook.ipo.consecutiveMisses ?? 0) > 0 && (
+                  <p className="text-xs text-red-400/70 mt-2">
+                    Ended with {playbook.ipo.consecutiveMisses} consecutive earnings miss{playbook.ipo.consecutiveMisses === 1 ? '' : 'es'}
+                  </p>
+                )}
               </div>
             )}
 

@@ -40,8 +40,13 @@ export function takeSnapshot(): GameSnapshot {
     // Skip functions — we only want serializable state
     if (typeof value === 'function') continue;
     if (EXCLUDE_KEYS.has(key)) continue;
-    // Deep clone to prevent mutation
-    snap[key] = JSON.parse(JSON.stringify(value));
+    if (value === undefined) {
+      // Preserve undefined keys so restoreSnapshot can set them back
+      snap[key] = undefined;
+    } else {
+      // Deep clone to prevent mutation
+      snap[key] = JSON.parse(JSON.stringify(value));
+    }
   }
   useUndoStore.setState({ snapshot: snap });
   return snap;

@@ -1,8 +1,6 @@
 import { useState } from 'react';
 import { formatMoney, formatMultiple } from '../../engine/types';
 import type { GameDifficulty, GameDuration } from '../../engine/types';
-import { useGameStore } from '../../hooks/useGame';
-import { calculatePublicCompanyBonus } from '../../engine/ipo';
 import { EV_WATERFALL_LABELS, FEV_LABELS } from '../../data/mechanicsCopy';
 import { ARCHETYPE_DISPLAY_NAMES } from '../../data/archetypeNames';
 import { Tooltip } from '../ui/Tooltip';
@@ -14,12 +12,19 @@ interface FamilyOfficeLegacy {
   foMultiplier: number;
 }
 
-interface FEVBreakdown {
+export interface FEVBreakdown {
   currentOwnership: number;
   opcoDebt: number;
   portfolioValue: number;
   blendedMultiple: number;
   hypotheticalFEV: number;
+  // IPO transparency fields
+  isPublic: boolean;
+  sentimentPct: number;        // raw market sentiment (-0.3 to +0.3)
+  sentimentDollars: number;    // portfolioValue * sentiment (dollar impact)
+  publicPremiumPct: number;    // public company bonus percentage (0.05-0.18)
+  publicPremiumDollars: number; // dollar value of the bonus
+  privateCounterfactualEV: number; // what EV would be without any IPO effects
 }
 
 interface FEVHeroSectionProps {
@@ -187,6 +192,17 @@ export function FEVHeroSection({
               <span className="text-text-muted">Portfolio Value <span className="text-xs">({formatMultiple(fevBreakdown.blendedMultiple)} blended)</span></span>
               <span className="font-mono">{formatMoney(fevBreakdown.portfolioValue)}</span>
             </div>
+            {/* IPO: Market Sentiment sub-item under Portfolio Value */}
+            {fevBreakdown.isPublic && fevBreakdown.sentimentDollars !== 0 && (
+              <div className="flex justify-between text-xs pl-4">
+                <span className={fevBreakdown.sentimentDollars >= 0 ? 'text-green-400/80' : 'text-red-400/80'}>
+                  ↳ Market Sentiment ({fevBreakdown.sentimentPct >= 0 ? '+' : ''}{(fevBreakdown.sentimentPct * 100).toFixed(0)}%)
+                </span>
+                <span className={`font-mono ${fevBreakdown.sentimentDollars >= 0 ? 'text-green-400/80' : 'text-red-400/80'}`}>
+                  {fevBreakdown.sentimentDollars >= 0 ? '+' : ''}{formatMoney(Math.round(fevBreakdown.sentimentDollars))}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-text-muted">+ Cash</span>
               <span className="font-mono">{formatMoney(cash)}</span>
@@ -207,15 +223,26 @@ export function FEVHeroSection({
               <span>= Enterprise Value</span>
               <span className="font-mono">{formatMoney(enterpriseValue)}</span>
             </div>
-            {(() => {
-              const gameState = useGameStore.getState();
-              const publicBonus = calculatePublicCompanyBonus(gameState);
-              return publicBonus > 0 ? (
-                <div className="text-xs text-green-400/70 -mt-0.5">
-                  Includes +{(publicBonus * 100).toFixed(0)}% public company bonus
-                </div>
-              ) : null;
-            })()}
+            {/* IPO: Public Company Premium sub-item under EV */}
+            {fevBreakdown.isPublic && fevBreakdown.publicPremiumPct > 0 && (
+              <div className="flex justify-between text-xs pl-4">
+                <span className="text-green-400/80">
+                  ↳ Public Company Premium (+{(fevBreakdown.publicPremiumPct * 100).toFixed(0)}%)
+                </span>
+                <span className="font-mono text-green-400/80">
+                  +{formatMoney(Math.round(fevBreakdown.publicPremiumDollars))}
+                </span>
+              </div>
+            )}
+            {/* IPO: Stay-private counterfactual */}
+            {fevBreakdown.isPublic && (
+              <div className="flex justify-between text-xs pl-4">
+                <span className="text-text-muted/60">
+                  ↳ If Private: {formatMoney(fevBreakdown.privateCounterfactualEV)}
+                  {' '}({enterpriseValue >= fevBreakdown.privateCounterfactualEV ? '+' : ''}{formatMoney(enterpriseValue - fevBreakdown.privateCounterfactualEV)})
+                </span>
+              </div>
+            )}
             <div className="flex justify-between text-sm">
               <span className="text-text-muted">x Your Ownership ({(fevBreakdown.currentOwnership * 100).toFixed(1)}%)</span>
               <span className="font-mono"></span>
