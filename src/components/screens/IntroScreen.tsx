@@ -558,16 +558,17 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
 
               {/* Locked prestige sectors */}
               {lockedSectors.length > 0 && (
-                <div className="mb-4">
+                <div className="mb-6">
                   <div className="flex items-center gap-2 mb-3">
                     <div className="flex-1 h-px bg-white/10" />
                     <span className="text-[10px] tracking-widest text-text-muted font-bold">UNLOCKABLE SECTORS</span>
                     <div className="flex-1 h-px bg-white/10" />
                   </div>
-                  {/* Mobile collapse toggle */}
+                  {/* Mobile collapse toggle — relative z-10 prevents submit button touch overlap */}
                   <button
-                    onClick={() => setShowLockedSectors(!showLockedSectors)}
-                    className="sm:hidden text-xs text-text-muted mb-2 min-h-[36px] inline-flex items-center"
+                    onClick={(e) => { e.preventDefault(); setShowLockedSectors(!showLockedSectors); }}
+                    className="sm:hidden text-xs text-text-muted mb-3 min-h-[44px] px-2 inline-flex items-center relative z-10"
+                    type="button"
                   >
                     {showLockedSectors ? 'Hide' : 'Show'} locked sectors ({lockedSectors.length})
                   </button>
