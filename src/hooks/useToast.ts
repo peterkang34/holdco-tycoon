@@ -21,7 +21,15 @@ export const useToastStore = create<ToastState>((set) => ({
   addToast: (toast) => {
     const id = `toast-${++toastId}`;
     set((state) => ({
-      toasts: [...state.toasts.slice(-2), { ...toast, id }],
+      // If adding a toast with an action (undo), dismiss any existing undo toasts
+      // to prevent stale undo from reverting multiple actions
+      toasts: [
+        ...(toast.action
+          ? state.toasts.filter((t) => !t.action)
+          : state.toasts
+        ).slice(-2),
+        { ...toast, id },
+      ],
     }));
     setTimeout(() => {
       set((state) => ({
