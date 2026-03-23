@@ -34,7 +34,7 @@ function buildConditionalClauses(
 ): string {
   const clauses: string[] = [];
 
-  if (portfolio.neverSoldCount > 0 && portfolio.neverSoldCount >= portfolio.activeCount) {
+  if (portfolio.totalSells === 0 && portfolio.totalAcquisitions > 0 && !_thesis.isFundManager) {
     clauses.push('Never sold a single business — a permanent capital philosophy.');
   }
   if (operations.recessionAcquisitionCount >= 2) {

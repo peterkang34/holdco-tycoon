@@ -190,24 +190,51 @@ describe('generateThesis', () => {
   });
 
   describe('conditional clauses', () => {
-    it('adds never-sold clause for permanent capital approach', () => {
-      const thesis = generateThesis(makePlaybook({ neverSoldCount: 5, activeCount: 5, totalSells: 0 }));
+    it('adds never-sold clause when totalSells is 0', () => {
+      const thesis = generateThesis(makePlaybook({ totalSells: 0, totalAcquisitions: 5, activeCount: 5 }));
       expect(thesis).toContain('Never sold');
     });
 
+    it('does NOT add never-sold clause when businesses were sold', () => {
+      const thesis = generateThesis(makePlaybook({ totalSells: 3, totalAcquisitions: 5, activeCount: 2 }));
+      expect(thesis).not.toContain('Never sold');
+    });
+
+    it('does NOT add never-sold clause when no acquisitions made', () => {
+      const thesis = generateThesis(makePlaybook({ totalSells: 0, totalAcquisitions: 0, activeCount: 0 }));
+      expect(thesis).not.toContain('Never sold');
+    });
+
     it('adds recession acquisition clause', () => {
-      const thesis = generateThesis(makePlaybook({ recessionAcquisitionCount: 3, neverSoldCount: 0, totalSells: 2 }));
+      const thesis = generateThesis(makePlaybook({ recessionAcquisitionCount: 3, totalSells: 2 }));
       expect(thesis).toContain('recession');
     });
 
     it('adds rollover equity clause', () => {
-      const thesis = generateThesis(makePlaybook({ rolloverEquityCount: 3, neverSoldCount: 0, totalSells: 2 }));
+      const thesis = generateThesis(makePlaybook({ rolloverEquityCount: 3, totalSells: 2 }));
       expect(thesis).toContain('rollover equity');
     });
 
     it('adds restructuring clause', () => {
-      const thesis = generateThesis(makePlaybook({ hasRestructured: true, neverSoldCount: 0, totalSells: 2, recessionAcquisitionCount: 0, rolloverEquityCount: 0 }));
+      const thesis = generateThesis(makePlaybook({ hasRestructured: true, totalSells: 2, recessionAcquisitionCount: 0, rolloverEquityCount: 0 }));
       expect(thesis).toContain('restructuring');
+    });
+
+    it('does NOT add never-sold clause for PE fund mode', () => {
+      const thesis = generateThesis(makePlaybook({
+        isFundManager: true, totalSells: 0, totalAcquisitions: 5, activeCount: 5,
+        grossMoic: 1.5, carryEarned: 10000, totalFundSize: 100000,
+      }));
+      expect(thesis).not.toContain('Never sold');
+    });
+
+    it('only appends the first matching conditional clause', () => {
+      // Triggers both recession and rollover conditions
+      const thesis = generateThesis(makePlaybook({
+        totalSells: 2, recessionAcquisitionCount: 3, rolloverEquityCount: 3,
+      }));
+      expect(thesis).toContain('recession');
+      expect(thesis).not.toContain('rollover equity');
     });
   });
 });

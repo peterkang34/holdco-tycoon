@@ -267,6 +267,87 @@ export function generateFallbackContent(
   return content;
 }
 
+// AI-powered strategy debrief thesis
+import type { PlaybookData } from '../engine/types';
+
+export async function generateAIThesis(playbook: PlaybookData): Promise<string | null> {
+  const isEnabled = await checkAIStatus();
+  if (!isEnabled) {
+    return null;
+  }
+
+  try {
+    const response = await fetch('/api/ai/generate-thesis', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        holdcoName: playbook.thesis.holdcoName,
+        archetype: playbook.thesis.archetype,
+        grade: playbook.thesis.grade,
+        score: playbook.thesis.score,
+        fev: playbook.thesis.fev,
+        difficulty: playbook.thesis.difficulty,
+        duration: playbook.thesis.duration,
+        totalRounds: playbook.thesis.totalRounds,
+        isFundManager: playbook.thesis.isFundManager,
+        isBankrupt: playbook.thesis.isBankrupt,
+        // Portfolio
+        totalAcquisitions: playbook.portfolio.totalAcquisitions,
+        totalSells: playbook.portfolio.totalSells,
+        activeCount: playbook.portfolio.activeCount,
+        platformsForged: playbook.portfolio.platformsForged,
+        platformCount: playbook.portfolio.platformCount,
+        tuckInCount: playbook.portfolio.tuckInCount,
+        avgHoldYears: playbook.portfolio.avgHoldYears,
+        // Capital
+        peakLeverage: playbook.capital.peakLeverage,
+        totalDistributions: playbook.capital.totalDistributions,
+        hasRestructured: playbook.capital.hasRestructured,
+        rolloverEquityCount: playbook.capital.rolloverEquityCount,
+        avgMultiplePaid: playbook.capital.avgMultiplePaid,
+        // Operations
+        turnaroundsStarted: playbook.operations.turnaroundsStarted,
+        turnaroundsSucceeded: playbook.operations.turnaroundsSucceeded,
+        turnaroundsFailed: playbook.operations.turnaroundsFailed,
+        recessionAcquisitionCount: playbook.operations.recessionAcquisitionCount,
+        // Exits
+        totalExitProceeds: playbook.exits.totalExitProceeds,
+        portfolioMoic: playbook.exits.portfolioMoic,
+        exitedBusinesses: playbook.exits.exitedBusinesses.slice(0, 5).map(e => ({
+          name: e.name,
+          sector: e.sector,
+          moic: e.moic,
+          holdYears: e.holdYears,
+        })),
+        // Sectors
+        sectorFocus: playbook.thesis.sectorFocus,
+        allTimeSectorIds: playbook.sectors.allTimeSectorIds,
+        // Performance
+        totalInvestedCapital: playbook.performance.totalInvestedCapital,
+        totalShareholderReturn: playbook.performance.totalShareholderReturn,
+        // PE fund
+        ...(playbook.thesis.isFundManager && playbook.peFund ? {
+          fundName: playbook.thesis.fundName,
+          grossMoic: playbook.peFund.grossMoic,
+          netIrr: playbook.peFund.netIrr,
+          carryEarned: playbook.peFund.carryEarned,
+        } : {}),
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('AI thesis generation failed:', response.status);
+      return null;
+    }
+
+    const data = await response.json();
+    return data.thesis || null;
+  } catch (error) {
+    console.error('AI thesis generation error:', error);
+    return null;
+  }
+}
+
 // Post-game AI analysis
 export interface AIGameAnalysis {
   overallAssessment: string;

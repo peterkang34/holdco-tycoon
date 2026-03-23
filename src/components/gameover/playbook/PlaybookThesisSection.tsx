@@ -1,6 +1,8 @@
+import { useState, useEffect, useRef } from 'react';
 import type { PlaybookData } from '../../../engine/types';
 import { formatMoney } from '../../../engine/types';
 import { generateThesis, getArchetypeDisplayName } from '../../../utils/playbookThesis';
+import { generateAIThesis } from '../../../services/aiGeneration';
 
 interface PlaybookThesisSectionProps {
   playbook: PlaybookData;
@@ -15,12 +17,46 @@ const GRADE_COLORS: Record<string, string> = {
   F: 'text-red-400',
 };
 
+/** Grace period: if AI hasn't responded by this time, lock in the template */
+const AI_GRACE_MS = 600;
+
 export function PlaybookThesisSection({ playbook }: PlaybookThesisSectionProps) {
   const { thesis } = playbook;
   const isBankrupt = thesis.isBankrupt;
   const isPE = thesis.isFundManager;
-  const thesisText = generateThesis(playbook);
+  const fallbackText = generateThesis(playbook);
   const archetypeName = getArchetypeDisplayName(thesis.archetype);
+
+  const [thesisText, setThesisText] = useState(fallbackText);
+  const [fading, setFading] = useState(false);
+  const requestedRef = useRef(false);
+  const lockedRef = useRef(false);
+
+  useEffect(() => {
+    if (requestedRef.current || playbook.isMinimal) return;
+    requestedRef.current = true;
+
+    // Lock in template after grace period if AI hasn't arrived
+    const lockTimer = setTimeout(() => { lockedRef.current = true; }, AI_GRACE_MS);
+
+    let cancelled = false;
+    generateAIThesis(playbook).then(aiThesis => {
+      clearTimeout(lockTimer);
+      if (cancelled || !aiThesis || lockedRef.current) return;
+      // Crossfade: fade out → swap text → fade in
+      setFading(true);
+      setTimeout(() => {
+        if (!cancelled) {
+          setThesisText(aiThesis);
+          setFading(false);
+        }
+      }, 200);
+    }).catch(() => { /* AI unavailable — template stays */ });
+    return () => {
+      cancelled = true;
+      clearTimeout(lockTimer);
+    };
+  }, [playbook]);
 
   const sectionTitle = isBankrupt ? 'Post-Mortem' : isPE ? "GP's Thesis" : 'Investment Thesis';
 
@@ -52,8 +88,13 @@ export function PlaybookThesisSection({ playbook }: PlaybookThesisSectionProps) 
         </div>
       )}
 
-      {/* Thesis sentence */}
-      <p className="text-text-secondary text-sm leading-relaxed mb-6">{thesisText}</p>
+      {/* Thesis sentence — crossfade on AI swap */}
+      <p
+        className="text-text-secondary text-sm leading-relaxed mb-6 transition-opacity duration-200"
+        style={{ opacity: fading ? 0 : 1 }}
+      >
+        {thesisText}
+      </p>
 
       {/* Hero numbers */}
       <div className="grid grid-cols-3 gap-4 mb-4">

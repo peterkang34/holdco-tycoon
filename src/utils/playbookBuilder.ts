@@ -263,8 +263,9 @@ function buildPlaybookUnsafe(input: PlaybookBuilderInput): PlaybookData {
   const tuckInCount = roundHistory.flatMap(r => r.actions)
     .filter(a => a.type === 'acquire_tuck_in').length;
 
-  // Never-sold count
-  const neverSoldCount = activeBiz.filter(b => b.status === 'active').length;
+  // Never-sold count: businesses acquired but never exited
+  // totalAcquisitions - totalSells = businesses still held (never sold)
+  const neverSoldCount = Math.max(0, strategyData.totalAcquisitions - strategyData.totalSells);
 
   // Avg hold years for exited businesses
   const exitedWithHold = exitedBusinesses.filter(b => b.exitRound != null && b.acquisitionRound != null);

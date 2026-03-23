@@ -56,14 +56,14 @@ export function PlaybookPortfolioSection({ portfolio }: PlaybookPortfolioSection
         </div>
       </div>
 
-      {/* Permanent capital signal */}
-      {portfolio.neverSoldCount > 0 && (
+      {/* Permanent capital signal — only show when player genuinely never sold */}
+      {portfolio.totalSells === 0 && portfolio.totalAcquisitions > 0 && (
         <div className="rounded-lg p-3 bg-emerald-500/5 border border-emerald-500/10 mb-4">
           <p className="text-xs text-emerald-400 font-medium">
-            {portfolio.neverSoldCount} business{portfolio.neverSoldCount !== 1 ? 'es' : ''} never sold
+            {portfolio.activeCount} business{portfolio.activeCount !== 1 ? 'es' : ''} held permanently
           </p>
           <p className="text-[11px] text-text-muted mt-0.5">
-            Permanent capital philosophy — held from acquisition through game end.
+            Permanent capital philosophy — never sold a single business.
           </p>
         </div>
       )}
