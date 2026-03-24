@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useGameStore } from '../../hooks/useGame';
 import { SECTORS } from '../../data/sectors';
 import { formatMoney, formatPercent, formatMultiple } from '../../engine/types';
@@ -27,6 +28,7 @@ interface MetricDrilldownModalProps {
 }
 
 export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModalProps) {
+  const [debtLoadExpanded, setDebtLoadExpanded] = useState(false);
   const state = useGameStore();
   const activeBusinesses = state.businesses.filter(b => b.status === 'active');
   const ssBenefits = calculateSharedServicesBenefits(state);
@@ -120,9 +122,10 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
     </div>
   );
 
-  const BusinessTable = ({ headers, rows }: {
+  const BusinessTable = ({ headers, rows, rowClassNames }: {
     headers: string[];
     rows: (string | number)[][];
+    rowClassNames?: (string | undefined)[];
   }) => (
     <div className="overflow-x-auto -mx-2">
       <table className="w-full text-xs">
@@ -137,7 +140,7 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
         </thead>
         <tbody>
           {rows.map((row, i) => (
-            <tr key={i} className="border-b border-white/5">
+            <tr key={i} className={`border-b border-white/5 ${rowClassNames?.[i] || ''}`}>
               {row.map((cell, j) => (
                 <td key={j} className={`py-1.5 px-2 font-mono ${j === 0 ? 'text-left font-sans' : 'text-right'}`}>
                   {cell}
@@ -189,14 +192,25 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
           </p>
         </div>
         <BusinessTable
-          headers={['Business', 'Revenue', 'Margin', 'EBITDA', '% Total']}
-          rows={activeBusinesses.map(b => [
-            b.name,
-            formatMoney(b.revenue),
-            `${(b.ebitdaMargin * 100).toFixed(1)}%`,
-            formatMoney(b.ebitda),
-            totalEbitda > 0 ? `${(b.ebitda / totalEbitda * 100).toFixed(0)}%` : '—',
-          ])}
+          headers={['Business', 'Revenue', 'Margin', 'EBITDA', '% Total', 'Growth']}
+          rows={activeBusinesses.map(b => {
+            const growth = b.acquisitionEbitda > 0
+              ? (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda
+              : null;
+            return [
+              b.name,
+              formatMoney(b.revenue),
+              `${(b.ebitdaMargin * 100).toFixed(1)}%`,
+              formatMoney(b.ebitda),
+              totalEbitda > 0 ? `${(b.ebitda / totalEbitda * 100).toFixed(0)}%` : '—',
+              growth !== null ? `${growth >= 0 ? '+' : ''}${(growth * 100).toFixed(0)}%` : '—',
+            ];
+          })}
+          rowClassNames={activeBusinesses.map(b => {
+            if (b.acquisitionEbitda <= 0) return undefined;
+            const growth = (b.ebitda - b.acquisitionEbitda) / b.acquisitionEbitda;
+            return growth >= 0 ? '[&>td:last-child]:text-accent' : '[&>td:last-child]:text-danger';
+          })}
         />
       </>
     );
@@ -369,6 +383,58 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
             ];
           })}
         />
+
+        {/* Per-Business Debt Burden — only shown if any business has opco debt */}
+        {(() => {
+          const bizWithDebt = allDebtBusinessesTop.filter(b =>
+            (b.status === 'active' || b.status === 'integrated') &&
+            (b.sellerNoteBalance > 0 || b.bankDebtBalance > 0)
+          );
+          if (bizWithDebt.length === 0) return null;
+
+          return (
+            <>
+              <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2 mt-4">Per-Business Debt Burden</p>
+              <BusinessTable
+                headers={['Business', 'Note P&I', 'Bank P&I', 'Net Cash']}
+                rows={bizWithDebt.map(b => {
+                  const noteInterest = b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0
+                    ? Math.round(b.sellerNoteBalance * b.sellerNoteRate) + Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining)
+                    : 0;
+                  const bankPI = b.bankDebtBalance > 0 && b.bankDebtRoundsRemaining > 0
+                    ? Math.round(b.bankDebtBalance * (b.bankDebtRate || 0)) + Math.round(b.bankDebtBalance / b.bankDebtRoundsRemaining)
+                    : 0;
+                  // Pre-tax FCF for active businesses; 0 for integrated (EBITDA folded into parent)
+                  const preTaxFcf = b.status === 'active'
+                    ? calculateAnnualFcf(b, ssBenefits.capexReduction, ssBenefits.cashConversionBonus)
+                    : 0;
+                  const netCash = preTaxFcf - noteInterest - bankPI;
+                  return [
+                    b.name,
+                    noteInterest > 0 ? formatMoney(noteInterest) : '—',
+                    bankPI > 0 ? formatMoney(bankPI) : '—',
+                    formatMoney(netCash),
+                  ];
+                })}
+                rowClassNames={bizWithDebt.map(b => {
+                  const notePI = b.sellerNoteBalance > 0 && b.sellerNoteRoundsRemaining > 0
+                    ? Math.round(b.sellerNoteBalance * b.sellerNoteRate) + Math.round(b.sellerNoteBalance / b.sellerNoteRoundsRemaining)
+                    : 0;
+                  const bankPI = b.bankDebtBalance > 0 && b.bankDebtRoundsRemaining > 0
+                    ? Math.round(b.bankDebtBalance * (b.bankDebtRate || 0)) + Math.round(b.bankDebtBalance / b.bankDebtRoundsRemaining)
+                    : 0;
+                  const preTaxFcf = b.status === 'active'
+                    ? calculateAnnualFcf(b, ssBenefits.capexReduction, ssBenefits.cashConversionBonus)
+                    : 0;
+                  return (preTaxFcf - notePI - bankPI) < 0 ? 'border-l-2 border-l-danger/50' : undefined;
+                })}
+              />
+              <p className="text-xs text-text-muted mt-2 italic">
+                Net Cash = Pre-Tax FCF minus opco debt service. Negative = this business is a net cash drain after debt.
+              </p>
+            </>
+          );
+        })()}
       </>
     );
   }
@@ -485,13 +551,22 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
 
         <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">Per-Business Contribution</p>
         <BusinessTable
-          headers={['Business', 'Total Cost', 'EBITDA', '% NOPAT']}
-          rows={activeBusinesses.map(b => [
-            b.name,
-            formatMoney(b.totalAcquisitionCost || b.acquisitionPrice),
-            formatMoney(b.ebitda),
-            totalEbitda > 0 ? `${(b.ebitda / totalEbitda * 100).toFixed(0)}%` : '—',
-          ])}
+          headers={['Business', 'Total Cost', 'EBITDA', 'Yield', 'Yrs Held']}
+          rows={activeBusinesses.map(b => {
+            const cost = b.totalAcquisitionCost || b.acquisitionPrice;
+            const sector = SECTORS[b.sectorId];
+            const effectiveCapexRate = sector.capexRate * (1 - ssBenefits.capexReduction);
+            const afterCapexEbitda = b.ebitda * (1 - effectiveCapexRate);
+            const bizYield = cost > 0 ? afterCapexEbitda / cost : 0;
+            const yrsHeld = Math.max(0, state.round - b.acquisitionRound);
+            return [
+              b.name,
+              formatMoney(cost),
+              formatMoney(b.ebitda),
+              formatPercent(bizYield),
+              yrsHeld > 0 ? `${yrsHeld}yr` : '<1yr',
+            ];
+          })}
         />
 
         <p className="text-xs text-text-muted mt-3 italic">
@@ -610,17 +685,19 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
 
           <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">Per-Business Value</p>
           <BusinessTable
-            headers={['Business', 'Total Cost', 'Current Value', 'Biz MOIC']}
+            headers={['Business', 'Total Cost', 'Current Value', 'Biz MOIC', 'Impl. Mult']}
             rows={activeBusinesses.map(b => {
               const valuation = calculateExitValuation(b, state.round, undefined, undefined, state.integratedPlatforms);
               const currentValue = b.ebitda * valuation.totalMultiple;
               const invested = b.totalAcquisitionCost || b.acquisitionPrice;
               const bizMoic = invested > 0 ? currentValue / invested : 0;
+              const impliedMult = b.ebitda > 0 ? currentValue / b.ebitda : 0;
               return [
                 b.name,
                 formatMoney(invested),
                 formatMoney(Math.round(currentValue)),
                 formatMultiple(bizMoic),
+                formatMultiple(impliedMult),
               ];
             })}
           />
@@ -686,17 +763,19 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
 
         <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-2">Per-Business Value</p>
         <BusinessTable
-          headers={['Business', 'Total Cost', 'Current Value', 'Biz MOIC']}
+          headers={['Business', 'Total Cost', 'Current Value', 'Biz MOIC', 'Impl. Mult']}
           rows={activeBusinesses.map(b => {
             const valuation = calculateExitValuation(b, state.round, undefined, undefined, state.integratedPlatforms);
             const currentValue = b.ebitda * valuation.totalMultiple;
             const invested = b.totalAcquisitionCost || b.acquisitionPrice;
             const bizMoic = invested > 0 ? currentValue / invested : 0;
+            const impliedMult = b.ebitda > 0 ? currentValue / b.ebitda : 0;
             return [
               b.name,
               formatMoney(invested),
               formatMoney(Math.round(currentValue)),
               formatMultiple(bizMoic),
+              formatMultiple(impliedMult),
             ];
           })}
         />
@@ -987,6 +1066,42 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
             )}
           </div>
         )}
+
+        {/* Per-Business Debt Load — collapsed by default */}
+        {(() => {
+          const bizWithOpcoDebt = allDebtBusinesses.filter(b => b.bankDebtBalance > 0 || b.sellerNoteBalance > 0);
+          if (bizWithOpcoDebt.length === 0) return null;
+          const totalOpcoDebt = bizWithOpcoDebt.reduce((sum, b) => sum + b.bankDebtBalance + b.sellerNoteBalance, 0);
+
+          return (
+            <div className="mt-4">
+              <button
+                onClick={() => setDebtLoadExpanded(!debtLoadExpanded)}
+                className="flex items-center gap-2 text-xs text-text-muted uppercase tracking-wide font-medium mb-2 hover:text-text-secondary transition-colors"
+              >
+                <span>{debtLoadExpanded ? '▼' : '▶'}</span>
+                Per-Business Debt Load
+              </button>
+              {debtLoadExpanded && (
+                <BusinessTable
+                  headers={['Business', 'Total Debt', 'EBITDA', 'Debt Load', '% of Total']}
+                  rows={bizWithOpcoDebt.map(b => {
+                    const bizDebt = b.bankDebtBalance + b.sellerNoteBalance;
+                    const bizEbitda = b.status === 'active' ? b.ebitda : 0;
+                    const debtLoad = bizEbitda > 0 ? bizDebt / bizEbitda : (bizDebt > 0 ? Infinity : 0);
+                    return [
+                      b.name,
+                      formatMoney(bizDebt),
+                      b.status === 'active' ? formatMoney(bizEbitda) : '(integrated)',
+                      debtLoad === Infinity ? '—' : formatMultiple(debtLoad),
+                      totalOpcoDebt > 0 ? `${(bizDebt / totalOpcoDebt * 100).toFixed(0)}%` : '—',
+                    ];
+                  })}
+                />
+              )}
+            </div>
+          );
+        })()}
       </>
     );
   }
@@ -1013,22 +1128,31 @@ export function MetricDrilldownModal({ metricKey, onClose }: MetricDrilldownModa
           </p>
         </div>
 
-        <BusinessTable
-          headers={['Business', 'EBITDA', 'CapEx %', 'Pre-Tax FCF', 'Conv.']}
-          rows={activeBusinesses.map(b => {
+        {(() => {
+          const bizWithConv = activeBusinesses.map(b => {
             const sector = SECTORS[b.sectorId];
             const effectiveRate = sector.capexRate * (1 - ssBenefits.capexReduction);
             const fcf = calculateAnnualFcf(b, ssBenefits.capexReduction, ssBenefits.cashConversionBonus);
             const conv = b.ebitda > 0 ? fcf / b.ebitda : 0;
-            return [
-              b.name,
-              formatMoney(b.ebitda),
-              `${(effectiveRate * 100).toFixed(0)}%`,
-              formatMoney(fcf),
-              `${(conv * 100).toFixed(0)}%`,
-            ];
-          })}
-        />
+            return { b, effectiveRate, fcf, conv };
+          }).sort((a, b) => a.conv - b.conv); // worst-to-best
+
+          return (
+            <BusinessTable
+              headers={['Business', 'EBITDA', 'CapEx %', 'Pre-Tax FCF', 'Conv.']}
+              rows={bizWithConv.map(({ b, effectiveRate, fcf, conv }) => [
+                b.name,
+                formatMoney(b.ebitda),
+                `${(effectiveRate * 100).toFixed(0)}%`,
+                formatMoney(fcf),
+                `${(conv * 100).toFixed(0)}%`,
+              ])}
+              rowClassNames={bizWithConv.map(({ conv }) =>
+                conv < 0.60 ? 'border-l-2 border-l-danger/50' : undefined
+              )}
+            />
+          );
+        })()}
 
         <p className="text-xs text-text-muted mt-3 italic">
           After-tax benchmark: 60%+ is good, 70%+ is excellent. Per-business rows show pre-tax conversion (before portfolio-level tax).
