@@ -239,6 +239,27 @@ function App() {
     setScreen('intro');
   };
 
+  const handleQuickRematch = () => {
+    // Read current settings before reset
+    const state = useGameStore.getState();
+    const prevName = state.holdcoName;
+    const prevDifficulty = state.difficulty;
+    const prevDuration = state.duration;
+    const prevSector = state.businesses[0]?.sectorId;
+    // Reset and start fresh with same settings
+    resetGame();
+    setChallengeData(null);
+    setIncomingResult(null);
+    cleanChallengeUrl();
+    if (prevName && prevSector) {
+      startGame(prevName, prevSector, prevDifficulty, prevDuration);
+      setIsNewGame(false); // skip tutorial on rematch
+      setScreen('game');
+    } else {
+      setScreen('intro');
+    }
+  };
+
   const handleFamilyOfficeResultsComplete = () => {
     window.scrollTo(0, 0);
     setScreen('gameOver');
@@ -431,6 +452,7 @@ function App() {
           carryWaterfall={carryWaterfall}
           lpCommentary={lpCommentary}
           onPlayAgain={handlePlayAgain}
+          onQuickRematch={handleQuickRematch}
         /></ErrorBoundary>
       )}
       {screen === 'familyOfficeResults' && (

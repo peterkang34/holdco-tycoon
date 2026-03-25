@@ -504,7 +504,7 @@ export const PE_GRADE_TITLES: Record<string, string> = {
 // ── Mode Selection Copy ──
 
 export const DURATION_SUBTITLE = {
-  quick: 'Make your fortune',
+  quick: '~15 min per game. Great for trying new strategies',
   standard: 'Build your legacy',
 } as const;
 

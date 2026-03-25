@@ -98,6 +98,7 @@ interface GameOverScreenProps {
   carryWaterfall?: CarryWaterfall | null;
   lpCommentary?: LPComment[];
   onPlayAgain: () => void;
+  onQuickRematch?: () => void;
 }
 
 export function GameOverScreen({
@@ -137,6 +138,7 @@ export function GameOverScreen({
   carryWaterfall: carryWaterfallData,
   lpCommentary: _lpCommentary,
   onPlayAgain,
+  onQuickRematch,
 }: GameOverScreenProps) {
   // ── Stores & Auth ──
   const familyOfficeState = useGameStore(s => s.familyOfficeState);
@@ -996,7 +998,15 @@ export function GameOverScreen({
       {/* ── Section 9: Play Again with Intent (always shown) ── */}
       <PlayAgainSection
         onPlayAgain={onPlayAgain}
+        onQuickRematch={onQuickRematch}
         onShowFeedback={() => setShowFeedback(true)}
+        businesses={businesses}
+        exitedBusinesses={exitedBusinesses}
+        integratedPlatforms={integratedPlatforms}
+        cash={cash}
+        totalInvestedCapital={totalInvestedCapital}
+        duration={duration}
+        isFundManagerMode={isFundManagerMode}
       />
 
       {/* ── Modals ── */}
