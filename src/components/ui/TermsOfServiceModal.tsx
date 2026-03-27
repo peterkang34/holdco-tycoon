@@ -38,7 +38,7 @@ export function TermsOfServiceModal() {
         <section>
           <h3 className="font-bold text-text-primary mb-1">Intellectual Property</h3>
           <p className="text-text-secondary">
-            Holdco Tycoon, its mechanics, content, and design are the property of Barrel Holdings. The game is inspired by real-world holdco and PE concepts but all business names, scenarios, and AI-generated content are fictional.
+            Holdco Tycoon, its mechanics, content, and design are the property of Peter Kang. The game is inspired by real-world holdco and PE concepts but all business names, scenarios, and AI-generated content are fictional.
           </p>
         </section>
 
