@@ -48,6 +48,7 @@ export interface AchievementContext {
   lpSatisfaction?: number;
   initialCapital: number;
   endingCashConversion: number;
+  bSchoolCompleted?: boolean;
 }
 
 export type AchievementRarity = 'common' | 'uncommon' | 'rare' | 'epic';
@@ -424,5 +425,15 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
     rarity: 'epic',
     check: (ctx) =>
       ctx.duration === 'quick' && ['S', 'A', 'B'].includes(ctx.score.grade),
+  },
+  // Business School
+  {
+    id: 'bschool_graduate',
+    name: 'B-School Graduate',
+    description: 'Complete the Business School tutorial.',
+    emoji: '🎓',
+    category: 'milestone',
+    rarity: 'common',
+    check: (ctx) => ctx.bSchoolCompleted === true,
   },
 ];

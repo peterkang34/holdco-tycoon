@@ -101,6 +101,7 @@ function createCtx(overrides: Partial<AchievementContext> = {}): AchievementCont
     lpSatisfaction: overrides.lpSatisfaction,
     initialCapital: overrides.initialCapital ?? 5000,
     endingCashConversion: overrides.endingCashConversion ?? 0,
+    bSchoolCompleted: overrides.bSchoolCompleted,
   };
 }
 
@@ -113,8 +114,8 @@ function getAchievement(id: string) {
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe('Achievement Predicates', () => {
-  it('should have 33 achievement definitions', () => {
-    expect(ACHIEVEMENT_PREVIEW.length).toBe(33);
+  it('should have 34 achievement definitions', () => {
+    expect(ACHIEVEMENT_PREVIEW.length).toBe(34);
   });
 
   // ── Milestones ──
@@ -697,6 +698,21 @@ describe('Achievement Predicates', () => {
     });
     it('fails with 0 conversion', () => {
       expect(ach.check(createCtx({ endingCashConversion: 0 }))).toBe(false);
+    });
+  });
+
+  // ── Business School ──
+
+  describe('bschool_graduate', () => {
+    const ach = getAchievement('bschool_graduate');
+    it('triggers when bSchoolCompleted is true', () => {
+      expect(ach.check(createCtx({ bSchoolCompleted: true }))).toBe(true);
+    });
+    it('fails when bSchoolCompleted is false', () => {
+      expect(ach.check(createCtx({ bSchoolCompleted: false }))).toBe(false);
+    });
+    it('fails when bSchoolCompleted is undefined', () => {
+      expect(ach.check(createCtx())).toBe(false);
     });
   });
 });

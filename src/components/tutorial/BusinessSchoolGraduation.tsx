@@ -4,6 +4,7 @@ import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { calculateEnterpriseValue, calculateFounderEquityValue } from '../../engine/scoring';
 import { BS_CHECKLIST_INFO, BS_TOTAL_CHECKLIST_ITEMS } from '../../data/businessSchool';
 import { submitGameCompletion } from '../../services/completionApi';
+import { saveEarnedAchievements, isAchievementEarned } from '../../hooks/useUnlocks';
 
 export const BSCHOOL_COMPLETED_KEY = 'holdco-tycoon-bschool-completed';
 
@@ -59,9 +60,14 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
     return { honor: 'Graduate', sub: '' };
   }, [fevK]);
 
+  // Track whether this is a newly earned achievement (before we save it)
+  const isNewAchievement = useRef(!isAchievementEarned('bschool_graduate'));
+
   const submittedRef = useRef(false);
   useEffect(() => {
     try { localStorage.setItem(BSCHOOL_COMPLETED_KEY, 'true'); } catch { /* noop */ }
+    // Save B-School Graduate achievement (additive, idempotent)
+    saveEarnedAchievements(['bschool_graduate']);
     // Submit B-School completion for admin analytics (fire-and-forget, once)
     if (!submittedRef.current) {
       submittedRef.current = true;
@@ -275,15 +281,28 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
         </div>
       </div>
 
+      {/* ══ ACHIEVEMENT UNLOCKED ══ */}
+      {isNewAchievement.current && (
+        <div className="w-full max-w-xl mt-5">
+          <div className="rounded-lg border border-amber-500/30 bg-amber-950/30 px-4 py-3 flex items-center gap-3">
+            <span className="text-2xl select-none">🎓</span>
+            <div className="flex-1">
+              <p className="text-sm text-amber-300 font-medium">Achievement Unlocked</p>
+              <p className="text-xs text-amber-200/50">B-School Graduate — your first step toward unlocking prestige sectors</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ══ SAVE YOUR DIPLOMA — signup nudge (anonymous only) ══ */}
       {!isLoggedIn && (
-        <div className="w-full max-w-xl mt-6">
+        <div className="w-full max-w-xl mt-4">
           <div className="rounded-lg border border-amber-600/20 bg-amber-950/20 px-5 py-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
             <div className="shrink-0 text-amber-500/60 text-2xl select-none">&#127891;</div>
             <div className="flex-1 text-center sm:text-left">
-              <p className="text-sm text-amber-300/90 font-medium">Save your diploma</p>
+              <p className="text-sm text-amber-300/90 font-medium">Save your diploma &amp; achievement</p>
               <p className="text-xs text-amber-200/40 mt-0.5">
-                Create a free account to keep your MBA, track achievements, and compete on the leaderboard.
+                Create a free account to keep your B-School Graduate achievement, track progress, and compete on the leaderboard.
               </p>
             </div>
             <button
