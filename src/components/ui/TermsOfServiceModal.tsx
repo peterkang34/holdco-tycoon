@@ -60,7 +60,7 @@ export function TermsOfServiceModal() {
           <h3 className="font-bold text-text-primary mb-1">Contact</h3>
           <p className="text-text-secondary">
             Questions about these terms? Reach us at{' '}
-            <a href="mailto:peter@barrelholdings.com" className="text-accent hover:underline">peter@barrelholdings.com</a>.
+            <a href="mailto:peter@peterkang.com" className="text-accent hover:underline">peter@peterkang.com</a>.
           </p>
         </section>
 
