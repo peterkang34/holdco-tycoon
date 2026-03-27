@@ -1,7 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import { verifyAdminToken } from '../_lib/adminAuth.js';
-import { supabaseAdmin } from '../_lib/supabase.js';
+import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 
 /**
  * GET /api/admin/bschool-stats
