@@ -47,6 +47,7 @@ export function CommunityTab({ token }: { token: string }) {
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'anonymous'>('all');
 
   // Player detail panel
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
@@ -293,9 +294,18 @@ export function CommunityTab({ token }: { token: string }) {
             )}
           </div>
           <div className="flex gap-2">
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value as 'all' | 'verified' | 'anonymous')}
+              className="text-xs bg-bg-primary border border-border rounded px-2 py-1 text-text-secondary focus:outline-none focus:border-accent"
+            >
+              <option value="all">All Players</option>
+              <option value="verified">Verified Only</option>
+              <option value="anonymous">Anonymous Only</option>
+            </select>
             <input
               type="text"
-              placeholder="Search name or initials..."
+              placeholder="Search email or initials..."
               value={searchInput}
               onChange={e => setSearchInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleSearch()}
@@ -413,7 +423,11 @@ export function CommunityTab({ token }: { token: string }) {
               </tr>
             </thead>
             <tbody>
-              {data.players.map(player => (
+              {data.players.filter(player =>
+                statusFilter === 'all' ? true
+                : statusFilter === 'verified' ? !player.is_anonymous
+                : player.is_anonymous
+              ).map(player => (
                 <Fragment key={player.id}>
                   <tr
                     onClick={() => {
