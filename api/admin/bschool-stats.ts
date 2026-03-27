@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
+import { verifyAdminToken } from '../_lib/adminAuth.js';
 
 /**
  * GET /api/admin/bschool-stats
@@ -8,11 +9,8 @@ import { kv } from '@vercel/kv';
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  // Simple admin auth check
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  if (!token || token !== process.env.ADMIN_TOKEN) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
+  const authorized = await verifyAdminToken(req, res);
+  if (!authorized) return;
 
   try {
     // Get all B-School completions from KV (sorted set, most recent first)
