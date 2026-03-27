@@ -11,7 +11,11 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undef
  * Uses anon key — all access governed by RLS policies.
  */
 export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        flowType: 'implicit', // Use implicit flow for OAuth — token returned in hash, no server-side code exchange needed
+      },
+    })
   : null;
 
 /**
