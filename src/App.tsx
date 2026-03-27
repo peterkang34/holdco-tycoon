@@ -25,7 +25,7 @@ import { CelebrationModal } from './components/ui/CelebrationModal';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { setupGoTest, getGoTestVariant } from './utils/goTestSetup';
 import { syncAchievementsFromServer } from './hooks/useUnlocks';
-import { createBSStartingBusinesses, createBSRound1Deals, createBSRound2Deals, createInitialBSState, BS_STARTING_CASH } from './data/businessSchool';
+// B-School test shortcut uses startBusinessSchool from the store (no direct data imports needed)
 
 type Screen = 'intro' | 'game' | 'gameOver' | 'graduation' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard' | 'playbook';
 
@@ -166,26 +166,25 @@ function App() {
     }
     // #/bs-test shortcut — mock B-School completion and show graduation screen
     if (isBsTest) {
-      const bsBusinesses = createBSStartingBusinesses();
-      const checklist = createInitialBSState(createBSRound1Deals(), createBSRound2Deals());
-      // Mark most items complete for display
-      const items = { ...checklist.checklist.items };
-      for (const key of Object.keys(items)) items[key as keyof typeof items] = true;
-      checklist.checklist = { items, completedCount: 15 };
-      useGameStore.setState({
-        holdcoName: 'Apex Holdings',
-        round: 2,
-        maxRounds: 2,
-        gameOver: true,
-        isBusinessSchoolMode: true,
-        businessSchoolState: checklist,
-        businesses: bsBusinesses,
-        cash: BS_STARTING_CASH + 5000,
-        totalDebt: 3500,
-        founderShares: 920,
-        sharesOutstanding: 1000,
-        integratedPlatforms: [{ id: 'test', name: 'Multi-Trade Home Services', recipeId: 'home_multi_trade', constituentBusinessIds: ['bs_biz_b', 'bs_biz_c'], forgedInRound: 1, sectorIds: ['homeServices'], bonuses: { marginBoost: 0.04, growthBoost: 0.03, multipleExpansion: 1.5, recessionResistanceReduction: 0.8 } }],
-      });
+      // Use startBusinessSchool to set up proper state, then override to game-over
+      startBusinessSchool('Apex Holdings');
+      const state = useGameStore.getState();
+      // Mark all checklist items complete
+      if (state.businessSchoolState) {
+        const items = { ...state.businessSchoolState.checklist.items };
+        for (const key of Object.keys(items)) items[key as keyof typeof items] = true;
+        useGameStore.setState({
+          round: 2,
+          gameOver: true,
+          founderShares: 920,
+          sharesOutstanding: 1000,
+          businessSchoolState: {
+            ...state.businessSchoolState,
+            checklist: { items, completedCount: 15 },
+          },
+          integratedPlatforms: [{ id: 'test', name: 'Multi-Trade Home Services', recipeId: 'home_multi_trade', constituentBusinessIds: ['bs_biz_b', 'bs_biz_c'], forgedInRound: 1, sectorIds: ['homeServices'], bonuses: { marginBoost: 0.04, growthBoost: 0.03, multipleExpansion: 1.5, recessionResistanceReduction: 0.8 } }],
+        });
+      }
       setScreen('graduation');
       return;
     }
