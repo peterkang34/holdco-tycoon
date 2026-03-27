@@ -896,19 +896,23 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, chall
           <p className="mb-2">{DURATION_CONFIG[isChallenge ? selectedDuration : selectedDuration].label.match(/\d+/)?.[0] || '20'} years. Build a long-term compounder.</p>
           <p>Based on <a href="https://holdcoguide.com" target="_blank" rel="noopener noreferrer" className="text-accent hover:underline">The Holdco Guide</a> by Peter Kang</p>
           <div className="flex gap-3 mt-4 justify-center">
-            <button
-              onClick={() => useAuthStore.getState().openTermsModal()}
+            <a
+              href="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-xs text-text-muted/50 hover:text-text-muted transition-colors"
             >
               Terms of Service
-            </button>
+            </a>
             <span className="text-xs text-text-muted/30">&middot;</span>
-            <button
-              onClick={() => useAuthStore.getState().openPrivacyModal()}
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
               className="text-xs text-text-muted/50 hover:text-text-muted transition-colors"
             >
               Privacy Policy
-            </button>
+            </a>
           </div>
         </div>
       </div>
