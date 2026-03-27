@@ -32,6 +32,8 @@ import { getSubTypeAffinity, getSizeRatioTier } from '../../engine/businesses';
 import { SECTORS } from '../../data/sectors';
 import { getUnlockedSectorIds } from '../../hooks/useUnlocks';
 import { useAuthStore } from '../../hooks/useAuth';
+import { useGameStore } from '../../hooks/useGame';
+import { BS_YEAR_1_ITEMS, BS_YEAR_2_ITEMS, BS_CHECKLIST_INFO } from '../../data/businessSchool';
 import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES, MA_SOURCING_CONFIG, getMASourcingUpgradeCost, getMASourcingAnnualCost } from '../../data/sharedServices';
 import { MarketGuideModal } from '../ui/MarketGuideModal';
 import { RollUpGuideModal } from '../ui/RollUpGuideModal';
@@ -221,6 +223,8 @@ export function AllocatePhase({
   onDistributeToLPs,
 }: AllocatePhaseProps) {
   const isAnonymous = useAuthStore((s) => s.player?.isAnonymous ?? true);
+  const isBusinessSchoolMode = useGameStore((s) => s.isBusinessSchoolMode);
+  const businessSchoolState = useGameStore((s) => s.businessSchoolState);
   const isMobile = useIsMobile();
   const [videoBannerDismissed, setVideoBannerDismissed] = useState(() => localStorage.getItem('holdco-video-banner-dismissed') === 'true');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -236,6 +240,18 @@ export function AllocatePhase({
   const [buybackMode, setBuybackMode] = useState<'dollars' | 'shares'>('dollars');
   const [distributeAmount, setDistributeAmount] = useState('');
   const [showEndTurnConfirm, setShowEndTurnConfirm] = useState(false);
+
+  // B-School incomplete checklist items for current year
+  const bsIncompleteItems = useMemo(() => {
+    if (!isBusinessSchoolMode || !businessSchoolState) return [];
+    const yearItems = round <= 1 ? BS_YEAR_1_ITEMS : BS_YEAR_2_ITEMS;
+    // Exclude bs_end_year_1 — it completes automatically on confirm
+    return yearItems
+      .filter((id) => id !== 'bs_end_year_1' && !businessSchoolState.checklist.items[id])
+      .map((id) => BS_CHECKLIST_INFO.find((info) => info.id === id)!)
+      .filter(Boolean);
+  }, [isBusinessSchoolMode, businessSchoolState, round]);
+
   // In-modal equity raise state
   const [modalEquityAmount, setModalEquityAmount] = useState('');
   const [showModalEquityRaise, setShowModalEquityRaise] = useState(false);
@@ -3304,8 +3320,11 @@ export function AllocatePhase({
           </button>
           <span className="text-sm font-mono text-text-secondary">Cash: <span className="text-accent font-bold">{formatMoney(cash)}</span></span>
         </div>
-        <button onClick={() => setShowEndTurnConfirm(true)} className="btn-primary text-sm px-4 py-2">
+        <button onClick={() => setShowEndTurnConfirm(true)} className="btn-primary text-sm px-4 py-2 relative">
           End Year {round} →
+          {bsIncompleteItems.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-amber-500 text-[10px] font-bold text-white flex items-center justify-center">{bsIncompleteItems.length}</span>
+          )}
         </button>
       </div>
 
@@ -3330,8 +3349,11 @@ export function AllocatePhase({
             </button>
           ))}
         </div>
-        <button onClick={() => setShowEndTurnConfirm(true)} className="btn-primary text-sm px-5 py-1.5">
+        <button onClick={() => setShowEndTurnConfirm(true)} className="btn-primary text-sm px-5 py-1.5 relative">
           End Year {round} →
+          {bsIncompleteItems.length > 0 && (
+            <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-amber-500 text-[10px] font-bold text-white flex items-center justify-center">{bsIncompleteItems.length}</span>
+          )}
         </button>
       </div>
 
@@ -3804,81 +3826,120 @@ export function AllocatePhase({
       {/* End Turn Confirmation Modal */}
       {showEndTurnConfirm && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-bg-primary border border-white/10 rounded-xl max-w-md w-full p-6">
-            <h3 className="text-xl font-bold mb-4">End Year {round}?</h3>
-            <p className="text-text-secondary mb-2">
-              Are you sure you want to end Year {round}?
-            </p>
-            <p className="text-sm text-text-muted mb-4">
-              You have <span className="text-accent font-mono">{formatMoney(cash)}</span> unallocated cash.
-              {(() => {
-                const expiring = dealPipeline.filter(d => d.freshness === 1).length;
-                const carrying = dealPipeline.filter(d => d.freshness > 1).length;
-                return (
-                  <>
-                    {expiring > 0 && <span className="text-warning"> {expiring} deal{expiring > 1 ? 's' : ''} will expire.</span>}
-                    {carrying > 0 && <span className="text-text-muted"> {carrying} will carry over.</span>}
-                  </>
-                );
-              })()}
-            </p>
-            {/* Year-End Forecast */}
-            {totalDebt > 0 && (
-              <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-4">
-                <h4 className="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Year-End Forecast</h4>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div>
-                    <span className="text-text-muted text-xs">Leverage</span>
-                    <p className={`font-mono font-medium ${
-                      covenantHeadroom.currentLeverage >= 4.0 ? 'text-red-400' :
-                      covenantHeadroom.currentLeverage >= 3.5 ? 'text-orange-400' :
-                      covenantHeadroom.currentLeverage >= 2.5 ? 'text-yellow-400' :
-                      'text-green-400'
-                    }`}>
-                      {covenantHeadroom.currentLeverage === Infinity ? '∞' : covenantHeadroom.currentLeverage.toFixed(1)}x / 4.5x
-                    </p>
-                  </div>
-                  <div>
-                    <span className="text-text-muted text-xs">Debt service (next yr)</span>
-                    <p className="font-mono font-medium text-text-primary">~{formatMoney(covenantHeadroom.nextYearDebtService)}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-text-muted text-xs">Projected yr-end cash (incl. FCF)</span>
-                    <p className={`font-mono font-medium ${covenantHeadroom.cashWillGoNegative ? 'text-red-400' : 'text-text-primary'}`}>
-                      ~{formatMoney(covenantHeadroom.projectedCashAfterDebt)}
-                    </p>
+          <div className={`bg-bg-primary border rounded-xl max-w-md w-full p-6 max-h-[90vh] overflow-y-auto ${
+            isBusinessSchoolMode && bsIncompleteItems.length > 0 ? 'border-amber-500/30' : 'border-white/10'
+          }`}>
+            {/* B-School incomplete warning header */}
+            {isBusinessSchoolMode && bsIncompleteItems.length > 0 ? (
+              <>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-xl">🎓</span>
+                  <h3 className="text-lg font-bold text-amber-300">Unfinished coursework</h3>
+                </div>
+                <p className="text-sm text-text-secondary mb-4">
+                  {round <= 1
+                    ? "These Year 1 skills won't be available once you advance. Complete them now for the full experience."
+                    : "Once you end Year 2, Business School is over. Anything you skip, you skip for good."
+                  }
+                </p>
+                <div className="bg-amber-950/30 border border-amber-500/15 rounded-lg p-3 mb-4">
+                  <p className="text-[10px] font-bold text-amber-400/60 tracking-wider uppercase mb-2">
+                    {bsIncompleteItems.length} item{bsIncompleteItems.length > 1 ? 's' : ''} remaining
+                  </p>
+                  <div className="space-y-2">
+                    {bsIncompleteItems.map((item) => (
+                      <div key={item.id} className="flex items-start gap-2">
+                        <span className="text-amber-400/40 text-xs mt-0.5">○</span>
+                        <div>
+                          <p className="text-sm text-amber-200/80">{item.title}</p>
+                          <p className="text-[11px] text-amber-200/40 leading-snug">{item.subtitle}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
-                {/* Warnings */}
-                {(covenantHeadroom.currentLeverage >= 4.0 || covenantHeadroom.cashWillGoNegative) && (
-                  <div className="mt-2 space-y-1">
-                    {covenantHeadroom.currentLeverage >= 4.0 && covenantHeadroom.currentLeverage < 4.5 && (
-                      <p className="text-xs text-yellow-400">⚠ Close to 4.5x covenant breach</p>
-                    )}
-                    {covenantHeadroom.cashWillGoNegative && (
-                      <p className="text-xs text-red-400">⚠ Cash may go negative after debt service</p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={() => setShowEndTurnConfirm(false)}
+                    className="btn-primary w-full px-6 py-2.5 bg-emerald-600 hover:bg-emerald-500"
+                  >
+                    Go Back &amp; Complete Coursework
+                  </button>
+                  <button
+                    onClick={() => { setShowEndTurnConfirm(false); onEndRound(); }}
+                    className="w-full py-2 text-sm text-text-muted hover:text-text-secondary transition-colors"
+                  >
+                    Skip anyway — end Year {round}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <h3 className="text-xl font-bold mb-4">End Year {round}?</h3>
+                <p className="text-text-secondary mb-2">
+                  Are you sure you want to end Year {round}?
+                </p>
+                {isBusinessSchoolMode && bsIncompleteItems.length === 0 && (
+                  <p className="text-sm text-emerald-400/80 mb-3">All coursework complete — nice work!</p>
+                )}
+                <p className="text-sm text-text-muted mb-4">
+                  You have <span className="text-accent font-mono">{formatMoney(cash)}</span> unallocated cash.
+                  {(() => {
+                    const expiring = dealPipeline.filter(d => d.freshness === 1).length;
+                    const carrying = dealPipeline.filter(d => d.freshness > 1).length;
+                    return (
+                      <>
+                        {expiring > 0 && <span className="text-warning"> {expiring} deal{expiring > 1 ? 's' : ''} will expire.</span>}
+                        {carrying > 0 && <span className="text-text-muted"> {carrying} will carry over.</span>}
+                      </>
+                    );
+                  })()}
+                </p>
+                {/* Year-End Forecast */}
+                {totalDebt > 0 && (
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-3 mb-4">
+                    <h4 className="text-xs font-medium text-text-muted uppercase tracking-wide mb-2">Year-End Forecast</h4>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-text-muted text-xs">Leverage</span>
+                        <p className={`font-mono font-medium ${
+                          covenantHeadroom.currentLeverage >= 4.0 ? 'text-red-400' :
+                          covenantHeadroom.currentLeverage >= 3.5 ? 'text-orange-400' :
+                          covenantHeadroom.currentLeverage >= 2.5 ? 'text-yellow-400' :
+                          'text-green-400'
+                        }`}>
+                          {covenantHeadroom.currentLeverage === Infinity ? '∞' : covenantHeadroom.currentLeverage.toFixed(1)}x / 4.5x
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-text-muted text-xs">Debt service (next yr)</span>
+                        <p className="font-mono font-medium text-text-primary">~{formatMoney(covenantHeadroom.nextYearDebtService)}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-text-muted text-xs">Projected yr-end cash (incl. FCF)</span>
+                        <p className={`font-mono font-medium ${covenantHeadroom.cashWillGoNegative ? 'text-red-400' : 'text-text-primary'}`}>
+                          ~{formatMoney(covenantHeadroom.projectedCashAfterDebt)}
+                        </p>
+                      </div>
+                    </div>
+                    {(covenantHeadroom.currentLeverage >= 4.0 || covenantHeadroom.cashWillGoNegative) && (
+                      <div className="mt-2 space-y-1">
+                        {covenantHeadroom.currentLeverage >= 4.0 && covenantHeadroom.currentLeverage < 4.5 && (
+                          <p className="text-xs text-yellow-400">⚠ Close to 4.5x covenant breach</p>
+                        )}
+                        {covenantHeadroom.cashWillGoNegative && (
+                          <p className="text-xs text-red-400">⚠ Cash may go negative after debt service</p>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
-              </div>
+                <div className="flex gap-3 justify-end">
+                  <button onClick={() => setShowEndTurnConfirm(false)} className="btn-secondary px-6">Cancel</button>
+                  <button onClick={() => { setShowEndTurnConfirm(false); onEndRound(); }} className="btn-primary px-6">End Year</button>
+                </div>
+              </>
             )}
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowEndTurnConfirm(false)}
-                className="btn-secondary px-6"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => {
-                  setShowEndTurnConfirm(false);
-                  onEndRound();
-                }}
-                className="btn-primary px-6"
-              >
-                End Year
-              </button>
-            </div>
           </div>
         </div>
       )}

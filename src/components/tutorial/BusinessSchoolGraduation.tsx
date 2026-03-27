@@ -65,20 +65,30 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
   }, [businesses, businessSchoolState, totalDebt, integratedPlatforms]);
 
   const fevK = stats.endingFev;
-  const tagline = useMemo(() => {
-    if (fevK >= 35000) return { honor: 'Summa Cum Laude', sub: 'With Highest Distinction' };
-    if (fevK >= 25000) return { honor: 'Cum Laude', sub: 'With Distinction' };
-    return { honor: 'Graduate', sub: '' };
-  }, [fevK]);
+  const completionTier = useMemo(() => {
+    const count = stats.completedCount;
+    if (count >= BS_TOTAL_CHECKLIST_ITEMS) {
+      // Full completion — honor based on FEV
+      if (fevK >= 35000) return { tier: 'full' as const, honor: 'Summa Cum Laude', sub: 'With Highest Distinction', conferral: 'has completed the requirements for the degree of' };
+      if (fevK >= 25000) return { tier: 'full' as const, honor: 'Cum Laude', sub: 'With Distinction', conferral: 'has completed the requirements for the degree of' };
+      return { tier: 'full' as const, honor: 'Graduate', sub: '', conferral: 'has completed the requirements for the degree of' };
+    }
+    if (count >= 10) return { tier: 'partial' as const, honor: 'Passed', sub: `${count}/${BS_TOTAL_CHECKLIST_ITEMS} Coursework Completed`, conferral: 'has substantially completed the requirements for' };
+    if (count >= 5) return { tier: 'conditional' as const, honor: 'Conditional Pass', sub: `${count}/${BS_TOTAL_CHECKLIST_ITEMS} Coursework Completed`, conferral: 'has partially completed the requirements for' };
+    return { tier: 'audit' as const, honor: 'Program Audited', sub: `${count}/${BS_TOTAL_CHECKLIST_ITEMS} Coursework Completed`, conferral: 'attended the' };
+  }, [fevK, stats.completedCount]);
 
   // Track whether this is a newly earned achievement (before we save it)
-  const isNewAchievement = useRef(!isAchievementEarned('bschool_graduate'));
+  // Only award achievement for 10+ completion (partial or full)
+  const isNewAchievement = useRef(stats.completedCount >= 10 && !isAchievementEarned('bschool_graduate'));
 
   const submittedRef = useRef(false);
   useEffect(() => {
     try { localStorage.setItem(BSCHOOL_COMPLETED_KEY, 'true'); } catch { /* noop */ }
-    // Save B-School Graduate achievement (additive, idempotent)
-    saveEarnedAchievements(['bschool_graduate']);
+    // Save B-School Graduate achievement only if 10+ items completed
+    if (stats.completedCount >= 10) {
+      saveEarnedAchievements(['bschool_graduate']);
+    }
     // Submit B-School completion for admin analytics (fire-and-forget, once)
     if (!submittedRef.current) {
       submittedRef.current = true;
@@ -178,33 +188,23 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
                 className="text-[10px] sm:text-xs text-amber-200/40 tracking-widest uppercase"
                 style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
               >
-                has completed the requirements for the degree of
+                {completionTier.conferral}
               </p>
             </div>
 
             <div className="text-center mb-5">
               <p
-                className="text-sm sm:text-base text-amber-400/80 tracking-[0.12em]"
+                className={`text-sm sm:text-base tracking-[0.12em] ${completionTier.tier === 'audit' || completionTier.tier === 'conditional' ? 'text-slate-400/80' : 'text-amber-400/80'}`}
                 style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
               >
                 Master of Business Allocation
               </p>
-              {tagline.sub && (
-                <p
-                  className="text-xs text-amber-500/50 mt-1 italic"
-                  style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-                >
-                  {tagline.honor} &mdash; {tagline.sub}
-                </p>
-              )}
-              {!tagline.sub && (
-                <p
-                  className="text-xs text-amber-500/50 mt-1"
-                  style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
-                >
-                  Accelerated Capital Allocation Program
-                </p>
-              )}
+              <p
+                className={`text-xs mt-1 ${completionTier.tier === 'audit' || completionTier.tier === 'conditional' ? 'text-slate-500/50' : 'text-amber-500/50'} ${completionTier.sub ? 'italic' : ''}`}
+                style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+              >
+                {completionTier.sub ? `${completionTier.honor} — ${completionTier.sub}` : completionTier.honor}
+              </p>
             </div>
 
             {/* Decorative middle rule */}
@@ -329,20 +329,46 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
       {/* ══ BELOW THE DIPLOMA — CTAs ══ */}
       <div className="w-full max-w-md mt-8 flex flex-col gap-3">
         <p className="text-sm text-text-secondary text-center mb-1">
-          You've earned your MBA. Now go build a real holdco.
+          {completionTier.tier === 'full'
+            ? "You've earned your MBA. Now go build a real holdco."
+            : completionTier.tier === 'partial'
+            ? 'You know the basics. The real game will fill in the gaps.'
+            : completionTier.tier === 'conditional'
+            ? "You've seen the mechanics, but there's more to learn."
+            : 'Business School has a lot more to teach you.'
+          }
         </p>
-        <button
-          onClick={handleStartClick}
-          className="btn-primary w-full text-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400"
-        >
-          Start Building Your Holdco
-        </button>
-        <button
-          onClick={onReplay}
-          className="btn-secondary w-full text-sm"
-        >
-          Replay Business School
-        </button>
+        {completionTier.tier === 'audit' ? (
+          <>
+            <button
+              onClick={onReplay}
+              className="btn-primary w-full text-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400"
+            >
+              Replay &amp; Earn Your Diploma
+            </button>
+            <button
+              onClick={handleStartClick}
+              className="w-full py-2 text-sm text-text-muted hover:text-text-secondary transition-colors"
+            >
+              Skip to the real game
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={handleStartClick}
+              className="btn-primary w-full text-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400"
+            >
+              Start Building Your Holdco
+            </button>
+            <button
+              onClick={onReplay}
+              className="btn-secondary w-full text-sm"
+            >
+              {completionTier.tier === 'full' ? 'Replay Business School' : 'Replay & Complete All Coursework'}
+            </button>
+          </>
+        )}
       </div>
 
       {/* ══ SIGNUP INTERCEPT MODAL (anonymous users only) ══ */}
