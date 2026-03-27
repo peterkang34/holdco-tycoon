@@ -15,6 +15,7 @@ import { checkFamilyOfficeEligibility } from './engine/familyOffice';
 import { calculateFinalScore, calculatePEFundScore, calculateCarryWaterfall } from './engine/scoring';
 import { trackPageView } from './services/telemetry';
 import { initAnonymousAuth, initAuthListener } from './lib/supabase';
+import { useAuthStore } from './hooks/useAuth';
 import { AccountModal } from './components/ui/AccountModal';
 import { StatsModal } from './components/ui/StatsModal';
 import { ClaimGamesModal } from './components/ui/ClaimGamesModal';
@@ -35,12 +36,22 @@ function App() {
   const [isGoTest, setIsGoTest] = useState(window.location.hash.startsWith('#/go-test'));
   const [isBsTest, setIsBsTest] = useState(window.location.hash === '#/bs-test');
 
+  // Open privacy modal if URL hash is #/privacy
+  useEffect(() => {
+    if (window.location.hash === '#/privacy') {
+      useAuthStore.getState().openPrivacyModal();
+    }
+  }, []);
+
   useEffect(() => {
     const onHash = () => {
       setIsAdmin(window.location.hash === '#/admin');
       setIsFoTest(window.location.hash === '#/fo-test');
       setIsGoTest(window.location.hash.startsWith('#/go-test'));
       setIsBsTest(window.location.hash === '#/bs-test');
+      if (window.location.hash === '#/privacy') {
+        useAuthStore.getState().openPrivacyModal();
+      }
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
