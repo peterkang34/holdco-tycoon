@@ -1,7 +1,8 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useGameStore } from '../../hooks/useGame';
 import { calculateEnterpriseValue, calculateFounderEquityValue } from '../../engine/scoring';
 import { BS_CHECKLIST_INFO, BS_TOTAL_CHECKLIST_ITEMS } from '../../data/businessSchool';
+import { submitGameCompletion } from '../../services/completionApi';
 
 export const BSCHOOL_COMPLETED_KEY = 'holdco-tycoon-bschool-completed';
 
@@ -55,9 +56,28 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
     return { honor: 'Graduate', sub: '' };
   }, [fevK]);
 
+  const submittedRef = useRef(false);
   useEffect(() => {
     try { localStorage.setItem(BSCHOOL_COMPLETED_KEY, 'true'); } catch { /* noop */ }
-  }, []);
+    // Submit B-School completion for admin analytics (fire-and-forget, once)
+    if (!submittedRef.current) {
+      submittedRef.current = true;
+      submitGameCompletion({
+        isBusinessSchool: true,
+        holdcoName,
+        founderEquityValue: stats.endingFev,
+        enterpriseValue: stats.endingEv,
+        checklistCompleted: stats.completedCount,
+        checklistTotal: BS_TOTAL_CHECKLIST_ITEMS,
+        platformForged: stats.platformForged,
+        businessCount: stats.activeCount,
+        totalDebt: stats.totalDebt,
+        difficulty: 'easy',
+        duration: 'quick',
+        totalRounds: 2,
+      });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const formatK = (val: number) => {
     if (val >= 1000) return `$${(val / 1000).toFixed(1)}M`;

@@ -12,7 +12,7 @@ import type { AnalyticsData, Totals, DayData } from './adminTypes';
 
 // ── Tab Configuration ────────────────────────────────────────
 
-type TabId = 'overview' | 'funnel' | 'retention' | 'engagement' | 'balance' | 'challenge' | 'devices' | 'feedback' | 'community';
+type TabId = 'overview' | 'funnel' | 'retention' | 'engagement' | 'balance' | 'challenge' | 'devices' | 'feedback' | 'community' | 'bschool';
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'funnel', label: 'Funnel' },
@@ -23,6 +23,7 @@ const TABS: { id: TabId; label: string }[] = [
   { id: 'devices', label: 'Devices' },
   { id: 'feedback', label: 'Feedback' },
   { id: 'community', label: 'Community' },
+  { id: 'bschool', label: 'B-School' },
 ];
 
 // ── Health Alerts ─────────────────────────────────────────────
@@ -688,6 +689,107 @@ export function AdminDashboard() {
 
       {/* ═══════ COMMUNITY TAB ═══════ */}
       {activeTab === 'community' && <CommunityTab token={token!} />}
+      {activeTab === 'bschool' && <BSchoolTab token={token!} />}
+    </div>
+  );
+}
+
+// ── B-School Tab ─────────────────────────────────────────────
+function BSchoolTab({ token }: { token: string }) {
+  const [stats, setStats] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch('/api/admin/bschool-stats', { headers: { Authorization: `Bearer ${token}` } })
+      .then(r => r.json())
+      .then(setStats)
+      .catch(() => setStats(null))
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  if (loading) return <p className="text-text-muted text-center py-8">Loading B-School data...</p>;
+  if (!stats) return <p className="text-text-muted text-center py-8">No B-School data available yet.</p>;
+
+  const formatDate = (d: string) => {
+    try { return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+    catch { return d; }
+  };
+
+  return (
+    <div className="space-y-6">
+      <SectionHeader title="Business School Analytics" />
+
+      {/* Key metrics */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <MetricCard label="Total Completions" value={stats.totalCompletions} />
+        <MetricCard label="Full Completions (15/15)" value={stats.fullCompletions} />
+        <MetricCard label="Completion Rate" value={`${stats.fullCompletionRate}%`} />
+        <MetricCard label="Avg Checklist" value={`${stats.avgChecklistCompleted}/15`} />
+      </div>
+
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <MetricCard label="Platform Forged" value={stats.platformForgedCount} />
+        <MetricCard label="Platform Rate" value={`${stats.platformForgedRate}%`} />
+        <MetricCard label="Partial Completions" value={stats.partialCompletions} />
+        <MetricCard
+          label="Device Split"
+          value={Object.entries(stats.deviceBreakdown || {}).map(([d, c]) => `${d}: ${c}`).join(', ') || '--'}
+        />
+      </div>
+
+      {/* Completions by day chart (simple text for now) */}
+      {stats.completionsByDay?.length > 0 && (
+        <div>
+          <SectionHeader title="Completions by Day (Last 30d)" />
+          <div className="grid grid-cols-7 gap-1">
+            {stats.completionsByDay.map((d: any) => (
+              <div key={d.date} className="text-center">
+                <div className="text-[9px] text-text-muted">{d.date.slice(5)}</div>
+                <div className="text-sm font-mono text-text-primary">{d.count}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent completions */}
+      {stats.recentCompletions?.length > 0 && (
+        <div>
+          <SectionHeader title="Recent Completions" />
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="py-2 px-2 text-left text-text-muted font-medium">Holdco</th>
+                  <th className="py-2 px-2 text-right text-text-muted font-medium">Checklist</th>
+                  <th className="py-2 px-2 text-center text-text-muted font-medium">Platform</th>
+                  <th className="py-2 px-2 text-right text-text-muted font-medium">FEV</th>
+                  <th className="py-2 px-2 text-right text-text-muted font-medium">Device</th>
+                  <th className="py-2 px-2 text-right text-text-muted font-medium">Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.recentCompletions.map((c: any, i: number) => (
+                  <tr key={i} className="border-b border-border/30">
+                    <td className="py-2 px-2 text-text-primary">{c.holdcoName}</td>
+                    <td className="py-2 px-2 text-right font-mono text-text-secondary">
+                      <span className={c.checklistCompleted >= c.checklistTotal ? 'text-emerald-400' : ''}>
+                        {c.checklistCompleted}/{c.checklistTotal}
+                      </span>
+                    </td>
+                    <td className="py-2 px-2 text-center">{c.platformForged ? '✓' : '--'}</td>
+                    <td className="py-2 px-2 text-right font-mono text-text-secondary">
+                      {c.founderEquityValue >= 1000 ? `$${(c.founderEquityValue / 1000).toFixed(1)}M` : `$${c.founderEquityValue}K`}
+                    </td>
+                    <td className="py-2 px-2 text-right text-text-muted">{c.device || '--'}</td>
+                    <td className="py-2 px-2 text-right text-text-muted">{formatDate(c.date)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -60,6 +60,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const body = req.body || {};
 
+    // --- Business School completion (lightweight, separate tracking) ---
+    if (body.isBusinessSchool === true) {
+      const bsRecord = {
+        holdcoName: typeof body.holdcoName === 'string' ? body.holdcoName.trim().slice(0, 50) : 'Unknown',
+        founderEquityValue: typeof body.founderEquityValue === 'number' ? Math.round(body.founderEquityValue) : 0,
+        checklistCompleted: typeof body.checklistCompleted === 'number' ? body.checklistCompleted : 0,
+        checklistTotal: typeof body.checklistTotal === 'number' ? body.checklistTotal : 15,
+        platformForged: body.platformForged === true,
+        businessCount: typeof body.businessCount === 'number' ? Math.round(body.businessCount) : 0,
+        device: ['desktop', 'mobile', 'tablet'].includes(body.device) ? body.device : undefined,
+        date: new Date().toISOString(),
+      };
+      await kv.zadd('holdco:bschool_completions', { score: Date.now(), member: JSON.stringify(bsRecord) });
+      // Prune to keep last 500
+      try {
+        const count = await kv.zcard('holdco:bschool_completions');
+        if (count > 500) await kv.zremrangebyrank('holdco:bschool_completions', 0, count - 501);
+      } catch { /* non-critical */ }
+      return ok();
+    }
+
     // --- Basic validation (lenient — observational data) ---
     const completionId = typeof body.completionId === 'string' ? body.completionId.slice(0, 100) : '';
     if (!completionId) return ok();
