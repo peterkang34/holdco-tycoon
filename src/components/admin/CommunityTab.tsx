@@ -10,12 +10,14 @@ const PAGE_SIZE = 25;
 
 type SortField = 'display_name' | 'initials' | 'total_games' | 'best_grade' | 'best_adjusted_fev' | 'created_at';
 
-const COLUMNS: { key: SortField; label: string; className?: string }[] = [
-  { key: 'display_name', label: 'Name' },
+const COLUMNS: { key: SortField | string; label: string; className?: string }[] = [
+  { key: 'display_name', label: 'Email' },
   { key: 'initials', label: 'Init' },
   { key: 'total_games', label: 'Games', className: 'text-right' },
   { key: 'best_grade', label: 'Grade', className: 'text-center' },
   { key: 'best_adjusted_fev', label: 'Best FEV', className: 'text-right' },
+  { key: 'achievements_count', label: 'Achievements', className: 'text-right' },
+  { key: 'last_played_at', label: 'Last Played', className: 'text-right' },
   { key: 'created_at', label: 'Joined', className: 'text-right' },
 ];
 
@@ -395,7 +397,10 @@ export function CommunityTab({ token }: { token: string }) {
                 {COLUMNS.map(col => (
                   <th
                     key={col.key}
-                    onClick={() => handleSort(col.key)}
+                    onClick={() => {
+                      const sortableFields: SortField[] = ['display_name', 'initials', 'total_games', 'best_grade', 'best_adjusted_fev', 'created_at'];
+                      if (sortableFields.includes(col.key as SortField)) handleSort(col.key as SortField);
+                    }}
                     className={`py-2 px-2 font-medium text-text-muted cursor-pointer hover:text-text-primary transition-colors select-none ${col.className || 'text-left'}`}
                   >
                     {col.label}
@@ -432,8 +437,8 @@ export function CommunityTab({ token }: { token: string }) {
                             : 'hover:bg-white/5'
                     }`}
                   >
-                    <td className="py-2 px-2 text-text-primary truncate max-w-[160px]">
-                      {player.display_name || <span className="text-text-muted italic">unnamed</span>}
+                    <td className="py-2 px-2 text-text-primary truncate max-w-[200px]">
+                      {player.email || <span className="text-text-muted italic">{player.display_name || 'anonymous'}</span>}
                     </td>
                     <td className="py-2 px-2 font-mono text-text-secondary">{player.initials}</td>
                     <td className="py-2 px-2 text-right font-mono text-text-secondary">{player.total_games}</td>
@@ -448,6 +453,12 @@ export function CommunityTab({ token }: { token: string }) {
                     </td>
                     <td className="py-2 px-2 text-right font-mono text-text-secondary">
                       {player.best_adjusted_fev > 0 ? formatMoney(player.best_adjusted_fev) : '--'}
+                    </td>
+                    <td className="py-2 px-2 text-right font-mono text-text-secondary">
+                      {player.achievements_count > 0 ? player.achievements_count : '--'}
+                    </td>
+                    <td className="py-2 px-2 text-right text-text-muted">
+                      {player.last_played_at ? formatDate(player.last_played_at) : '--'}
                     </td>
                     <td className="py-2 px-2 text-right text-text-muted">{formatDate(player.created_at)}</td>
                     <td className="py-2 px-2 text-center">
@@ -464,7 +475,7 @@ export function CommunityTab({ token }: { token: string }) {
                   {/* Detail panel (inline expand) */}
                   {selectedPlayerId === player.id && (
                     <tr>
-                      <td colSpan={7} className="p-0">
+                      <td colSpan={9} className="p-0">
                         <PlayerDetailPanel detail={playerDetail} loading={detailLoading} token={token} />
                       </td>
                     </tr>

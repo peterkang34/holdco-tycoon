@@ -200,10 +200,13 @@ export interface SignUpMetrics {
 export interface CommunityPlayer {
   id: string;
   display_name: string | null;
+  email: string | null;
   initials: string;
   total_games: number;
   best_grade: string | null;
   best_adjusted_fev: number;
+  achievements_count: number;
+  last_played_at: string | null;
   created_at: string;
   is_anonymous: boolean;
 }

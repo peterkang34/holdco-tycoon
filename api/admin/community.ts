@@ -32,6 +32,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Build a map of user_id → is_anonymous for player browser
     const anonMap = new Map<string, boolean>();
+    const emailMap = new Map<string, string>();
 
     // Paginate through all users (Supabase caps at 1000 per page)
     let authPage = 1;
@@ -57,6 +58,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         const isAnon = user.is_anonymous === true;
         anonMap.set(user.id, isAnon);
+        if (user.email) emailMap.set(user.id, user.email);
 
         if (isAnon) {
           anonymousAccounts++;
@@ -121,7 +123,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const statsCol = sort === 'best_grade' ? 'best_score' : sort;
       const { data: statsRows, error: statsError } = await supabaseAdmin
         .from('player_stats')
-        .select('player_id, total_games, best_score, best_adjusted_fev, grade_distribution')
+        .select('player_id, total_games, best_score, best_adjusted_fev, grade_distribution, earned_achievement_ids')
         .order(statsCol, { ascending: order === 'asc' })
         .range((page - 1) * pageSize, page * pageSize - 1);
 
@@ -139,7 +141,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (playerIds.length > 0) {
         const { data: profiles } = await supabaseAdmin
           .from('player_profiles')
-          .select('id, display_name, initials, created_at')
+          .select('id, display_name, initials, created_at, last_played_at')
           .in('id', playerIds);
         for (const p of profiles || []) {
           profilesById.set(p.id, p);
@@ -151,7 +153,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       let profileQuery = supabaseAdmin
         .from('player_profiles')
-        .select('id, display_name, initials, created_at')
+        .select('id, display_name, initials, created_at, last_played_at')
         .order(sortCol, { ascending: order === 'asc' })
         .range((page - 1) * pageSize, page * pageSize - 1);
 
@@ -175,7 +177,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (playerIds.length > 0) {
         const { data: statsRows } = await supabaseAdmin
           .from('player_stats')
-          .select('player_id, total_games, best_adjusted_fev, grade_distribution')
+          .select('player_id, total_games, best_adjusted_fev, grade_distribution, earned_achievement_ids')
           .in('player_id', playerIds);
 
         if (statsRows) {
@@ -218,10 +220,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return {
           id: p.id,
           display_name: p.display_name,
+          email: emailMap.get(id) ?? null,
           initials: p.initials || '??',
           total_games: gameCountMap.get(id) ?? stats?.total_games ?? 0,
           best_grade: deriveBestGrade(stats?.grade_distribution ?? null),
           best_adjusted_fev: stats?.best_adjusted_fev ?? 0,
+          achievements_count: Array.isArray(stats?.earned_achievement_ids) ? stats.earned_achievement_ids.length : 0,
+          last_played_at: p.last_played_at ?? null,
           created_at: p.created_at,
           is_anonymous: anonMap.get(id) ?? false,
         };
