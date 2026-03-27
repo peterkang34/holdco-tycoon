@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useGameStore } from '../../hooks/useGame';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { calculateEnterpriseValue, calculateFounderEquityValue } from '../../engine/scoring';
@@ -39,6 +39,17 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
   const integratedPlatforms = useGameStore((s) => s.integratedPlatforms);
   const isLoggedIn = useIsLoggedIn();
   const openAccountModal = useAuthStore((s) => s.openAccountModal);
+
+  // Signup intercept modal — shown to anonymous users before starting real game
+  const [showSignupIntercept, setShowSignupIntercept] = useState(false);
+
+  const handleStartClick = useCallback(() => {
+    if (isLoggedIn) {
+      onStartRealGame();
+    } else {
+      setShowSignupIntercept(true);
+    }
+  }, [isLoggedIn, onStartRealGame]);
 
   const stats = useMemo(() => {
     const state = useGameStore.getState();
@@ -321,7 +332,7 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
           You've earned your MBA. Now go build a real holdco.
         </p>
         <button
-          onClick={onStartRealGame}
+          onClick={handleStartClick}
           className="btn-primary w-full text-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400"
         >
           Start Building Your Holdco
@@ -333,6 +344,78 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
           Replay Business School
         </button>
       </div>
+
+      {/* ══ SIGNUP INTERCEPT MODAL (anonymous users only) ══ */}
+      {showSignupIntercept && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+            onClick={() => setShowSignupIntercept(false)}
+          />
+
+          {/* Modal */}
+          <div className="relative w-full max-w-md rounded-lg border border-amber-700/30 bg-gradient-to-b from-[#1a1408] via-[#141008] to-[#1a1408] shadow-2xl shadow-amber-900/20 overflow-hidden">
+
+            {/* Decorative top bar */}
+            <div className="h-1 bg-gradient-to-r from-transparent via-amber-500/40 to-transparent" />
+
+            <div className="px-6 py-6 sm:px-8 sm:py-7">
+              {/* Header */}
+              <div className="text-center mb-5">
+                <span className="text-3xl block mb-2 select-none">&#127891;</span>
+                <h3
+                  className="text-lg sm:text-xl text-amber-300 tracking-wide mb-1"
+                  style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}
+                >
+                  Before You Build...
+                </h3>
+                <p className="text-sm text-amber-200/50">
+                  A free account unlocks the full experience
+                </p>
+              </div>
+
+              {/* Benefit bullets */}
+              <div className="space-y-2.5 mb-6">
+                {[
+                  { icon: '\u{1F4CA}', text: 'Track your game history and personal records' },
+                  { icon: '\u{1F3C6}', text: 'Earn achievements and prestige titles' },
+                  { icon: '\u{1F513}', text: 'Unlock prestige sectors (Media, Fintech, Aerospace)' },
+                  { icon: '\u{1F4D6}', text: 'Review AI strategy debriefs after each game' },
+                  { icon: '\u{1F3AF}', text: 'Compete on the global leaderboard' },
+                ].map((item) => (
+                  <div key={item.text} className="flex items-start gap-3">
+                    <span className="text-base leading-6 shrink-0 select-none">{item.icon}</span>
+                    <span className="text-sm text-amber-100/70 leading-snug">{item.text}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Primary CTA */}
+              <button
+                onClick={() => {
+                  setShowSignupIntercept(false);
+                  openAccountModal('create');
+                }}
+                className="w-full min-h-[48px] rounded-lg text-base font-semibold bg-amber-600 hover:bg-amber-500 text-white transition-colors mb-3"
+              >
+                Create Free Account
+              </button>
+
+              {/* Secondary — skip */}
+              <button
+                onClick={() => {
+                  setShowSignupIntercept(false);
+                  onStartRealGame();
+                }}
+                className="w-full py-2 text-sm text-amber-400/60 hover:text-amber-300/80 transition-colors"
+              >
+                Continue without an account
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
