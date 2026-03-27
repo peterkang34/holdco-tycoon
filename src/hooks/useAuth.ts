@@ -36,6 +36,9 @@ interface AuthState {
   closeClaimModal: () => void;
   openPrivacyModal: () => void;
   closePrivacyModal: () => void;
+  showTermsModal: boolean;
+  openTermsModal: () => void;
+  closeTermsModal: () => void;
   openDeleteModal: () => void;
   closeDeleteModal: () => void;
   incrementNudgeDismissals: () => void;
@@ -70,6 +73,9 @@ export const useAuthStore = create<AuthState>()(
       closeClaimModal: () => set({ showClaimModal: false }),
       openPrivacyModal: () => set({ showPrivacyModal: true }),
       closePrivacyModal: () => set({ showPrivacyModal: false }),
+      showTermsModal: false,
+      openTermsModal: () => set({ showTermsModal: true }),
+      closeTermsModal: () => set({ showTermsModal: false }),
       openDeleteModal: () => set({ showDeleteModal: true }),
       closeDeleteModal: () => set({ showDeleteModal: false }),
       openCelebrationModal: (data) => set({ showCelebrationModal: true, celebrationData: data }),

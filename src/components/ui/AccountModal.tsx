@@ -174,6 +174,13 @@ export function AccountModal() {
             By continuing, you agree to our{' '}
             <button
               type="button"
+              onClick={() => { closeAccountModal(); useAuthStore.getState().openTermsModal(); }}
+              className="underline text-accent cursor-pointer"
+            >
+              Terms of Service
+            </button>{' '}and{' '}
+            <button
+              type="button"
               onClick={() => { closeAccountModal(); useAuthStore.getState().openPrivacyModal(); }}
               className="underline text-accent cursor-pointer"
             >

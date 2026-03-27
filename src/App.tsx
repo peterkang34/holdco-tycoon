@@ -20,6 +20,7 @@ import { AccountModal } from './components/ui/AccountModal';
 import { StatsModal } from './components/ui/StatsModal';
 import { ClaimGamesModal } from './components/ui/ClaimGamesModal';
 import { PrivacyPolicyModal } from './components/ui/PrivacyPolicyModal';
+import { TermsOfServiceModal } from './components/ui/TermsOfServiceModal';
 import { DeleteAccountModal } from './components/ui/DeleteAccountModal';
 import { StrategyLibraryModal } from './components/ui/StrategyLibraryModal';
 import { CelebrationModal } from './components/ui/CelebrationModal';
@@ -36,11 +37,10 @@ function App() {
   const [isGoTest, setIsGoTest] = useState(window.location.hash.startsWith('#/go-test'));
   const [isBsTest, setIsBsTest] = useState(window.location.hash === '#/bs-test');
 
-  // Open privacy modal if URL hash is #/privacy
+  // Open legal modals if URL hash matches
   useEffect(() => {
-    if (window.location.hash === '#/privacy') {
-      useAuthStore.getState().openPrivacyModal();
-    }
+    if (window.location.hash === '#/privacy') useAuthStore.getState().openPrivacyModal();
+    if (window.location.hash === '#/terms') useAuthStore.getState().openTermsModal();
   }, []);
 
   useEffect(() => {
@@ -49,9 +49,8 @@ function App() {
       setIsFoTest(window.location.hash === '#/fo-test');
       setIsGoTest(window.location.hash.startsWith('#/go-test'));
       setIsBsTest(window.location.hash === '#/bs-test');
-      if (window.location.hash === '#/privacy') {
-        useAuthStore.getState().openPrivacyModal();
-      }
+      if (window.location.hash === '#/privacy') useAuthStore.getState().openPrivacyModal();
+      if (window.location.hash === '#/terms') useAuthStore.getState().openTermsModal();
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
@@ -561,6 +560,7 @@ function App() {
       <StatsModal />
       <ClaimGamesModal />
       <PrivacyPolicyModal />
+      <TermsOfServiceModal />
       <DeleteAccountModal />
       <StrategyLibraryModal />
       <CelebrationModal />
