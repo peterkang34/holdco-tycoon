@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useGameStore } from '../../hooks/useGame';
+import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { calculateEnterpriseValue, calculateFounderEquityValue } from '../../engine/scoring';
 import { BS_CHECKLIST_INFO, BS_TOTAL_CHECKLIST_ITEMS } from '../../data/businessSchool';
 import { submitGameCompletion } from '../../services/completionApi';
@@ -35,6 +36,8 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
   const businessSchoolState = useGameStore((s) => s.businessSchoolState);
   const totalDebt = useGameStore((s) => s.totalDebt);
   const integratedPlatforms = useGameStore((s) => s.integratedPlatforms);
+  const isLoggedIn = useIsLoggedIn();
+  const openAccountModal = useAuthStore((s) => s.openAccountModal);
 
   const stats = useMemo(() => {
     const state = useGameStore.getState();
@@ -271,6 +274,27 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
           </div>
         </div>
       </div>
+
+      {/* ══ SAVE YOUR DIPLOMA — signup nudge (anonymous only) ══ */}
+      {!isLoggedIn && (
+        <div className="w-full max-w-xl mt-6">
+          <div className="rounded-lg border border-amber-600/20 bg-amber-950/20 px-5 py-4 flex flex-col sm:flex-row items-center gap-3 sm:gap-4">
+            <div className="shrink-0 text-amber-500/60 text-2xl select-none">&#127891;</div>
+            <div className="flex-1 text-center sm:text-left">
+              <p className="text-sm text-amber-300/90 font-medium">Save your diploma</p>
+              <p className="text-xs text-amber-200/40 mt-0.5">
+                Create a free account to keep your MBA, track achievements, and compete on the leaderboard.
+              </p>
+            </div>
+            <button
+              onClick={() => openAccountModal('create')}
+              className="shrink-0 min-h-[44px] px-5 rounded-lg text-sm font-medium bg-amber-600/20 text-amber-300 border border-amber-600/30 hover:bg-amber-600/30 hover:border-amber-500/40 transition-colors"
+            >
+              Sign Up (Free)
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ══ BELOW THE DIPLOMA — CTAs ══ */}
       <div className="w-full max-w-md mt-8 flex flex-col gap-3">
