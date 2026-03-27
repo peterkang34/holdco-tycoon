@@ -740,6 +740,39 @@ function BSchoolTab({ token }: { token: string }) {
         />
       </div>
 
+      {/* Signup Conversion */}
+      {stats.signupConversion && (
+        <div>
+          <SectionHeader title="Signup Conversion (from B-School)" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <MetricCard label="Logged In at Completion" value={stats.signupConversion.loggedInAtCompletion ?? 0} />
+            <MetricCard label="Anonymous at Completion" value={stats.signupConversion.anonymousAtCompletion ?? 0} />
+            <MetricCard label="Signup Rate" value={`${stats.signupConversion.conversionRate ?? 0}%`} />
+            <MetricCard label="Unknown Auth Status" value={stats.signupConversion.unknownAuthStatus ?? 0} />
+          </div>
+        </div>
+      )}
+
+      {/* B-School Grad Engagement */}
+      {stats.bsGradEngagement && stats.bsGradEngagement.playersWithRealGames > 0 && (
+        <div>
+          <SectionHeader title="B-School Grad Engagement (Real Games)" />
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <MetricCard label="Grads Playing Real Games" value={stats.bsGradEngagement.playersWithRealGames} />
+            <MetricCard label="Avg Games Played" value={stats.bsGradEngagement.avgGamesPlayed ?? 0} />
+            <MetricCard label="Avg Score" value={stats.bsGradEngagement.avgScore ?? 0} />
+            <MetricCard label="Avg Best FEV" value={stats.bsGradEngagement.avgBestFev >= 1000 ? `$${(stats.bsGradEngagement.avgBestFev / 1000).toFixed(1)}M` : `$${stats.bsGradEngagement.avgBestFev ?? 0}K`} />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+            <MetricCard label="Score Trend" value={stats.bsGradEngagement.avgScoreTrend != null ? `${stats.bsGradEngagement.avgScoreTrend > 0 ? '+' : ''}${stats.bsGradEngagement.avgScoreTrend}` : '--'} />
+            <MetricCard
+              label="Grade Distribution"
+              value={Object.entries(stats.bsGradEngagement.gradeDistribution || {}).filter(([, v]) => (v as number) > 0).map(([g, c]) => `${g}: ${c}`).join(', ') || '--'}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Completions by day chart (simple text for now) */}
       {stats.completionsByDay?.length > 0 && (
         <div>
@@ -767,6 +800,7 @@ function BSchoolTab({ token }: { token: string }) {
                   <th className="py-2 px-2 text-right text-text-muted font-medium">Checklist</th>
                   <th className="py-2 px-2 text-center text-text-muted font-medium">Platform</th>
                   <th className="py-2 px-2 text-right text-text-muted font-medium">FEV</th>
+                  <th className="py-2 px-2 text-center text-text-muted font-medium">Auth</th>
                   <th className="py-2 px-2 text-right text-text-muted font-medium">Device</th>
                   <th className="py-2 px-2 text-right text-text-muted font-medium">Date</th>
                 </tr>
@@ -783,6 +817,15 @@ function BSchoolTab({ token }: { token: string }) {
                     <td className="py-2 px-2 text-center">{c.platformForged ? '✓' : '--'}</td>
                     <td className="py-2 px-2 text-right font-mono text-text-secondary">
                       {c.founderEquityValue >= 1000 ? `$${(c.founderEquityValue / 1000).toFixed(1)}M` : `$${c.founderEquityValue}K`}
+                    </td>
+                    <td className="py-2 px-2 text-center">
+                      {c.isLoggedIn === true ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-medium">Verified</span>
+                      ) : c.isLoggedIn === false ? (
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-400 font-medium">Anon</span>
+                      ) : (
+                        <span className="text-text-muted">--</span>
+                      )}
                     </td>
                     <td className="py-2 px-2 text-right text-text-muted">{c.device || '--'}</td>
                     <td className="py-2 px-2 text-right text-text-muted">{formatDate(c.date)}</td>

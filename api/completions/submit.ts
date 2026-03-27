@@ -70,6 +70,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         platformForged: body.platformForged === true,
         businessCount: typeof body.businessCount === 'number' ? Math.round(body.businessCount) : 0,
         device: ['desktop', 'mobile', 'tablet'].includes(body.device) ? body.device : undefined,
+        isLoggedIn: body.isLoggedIn === true,
+        playerId: typeof body.playerId === 'string' ? body.playerId.slice(0, 36) : null,
         date: new Date().toISOString(),
       };
       await kv.zadd('holdco:bschool_completions', { score: Date.now(), member: JSON.stringify(bsRecord) });

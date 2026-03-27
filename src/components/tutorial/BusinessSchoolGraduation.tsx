@@ -38,6 +38,7 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
   const totalDebt = useGameStore((s) => s.totalDebt);
   const integratedPlatforms = useGameStore((s) => s.integratedPlatforms);
   const isLoggedIn = useIsLoggedIn();
+  const playerId = useAuthStore((s) => s.player?.id);
   const openAccountModal = useAuthStore((s) => s.openAccountModal);
 
   // Signup intercept modal — shown to anonymous users before starting real game
@@ -105,6 +106,8 @@ export function BusinessSchoolGraduation({ onStartRealGame, onReplay }: Business
         difficulty: 'easy',
         duration: 'quick',
         totalRounds: 2,
+        isLoggedIn,
+        playerId: playerId ?? undefined,
       });
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

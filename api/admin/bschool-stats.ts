@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import { verifyAdminToken } from '../_lib/adminAuth.js';
+import { supabaseAdmin } from '../_lib/supabase.js';
 
 /**
  * GET /api/admin/bschool-stats
@@ -66,8 +67,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       platformForged: c.platformForged,
       founderEquityValue: c.founderEquityValue,
       device: c.device,
+      isLoggedIn: c.isLoggedIn ?? null,
+      playerId: c.playerId ?? null,
       date: c.date,
     }));
+
+    // ── Signup Conversion & Engagement Analytics ──
+    const loggedInAtCompletion = completions.filter((c: any) => c.isLoggedIn === true).length;
+    const anonymousAtCompletion = completions.filter((c: any) => c.isLoggedIn === false).length;
+    // Some legacy records won't have isLoggedIn field
+    const unknownAuthStatus = totalCompletions - loggedInAtCompletion - anonymousAtCompletion;
+
+    // Engagement: for players with playerId, look up their stats
+    const playerIds = [...new Set(completions.map((c: any) => c.playerId).filter(Boolean))] as string[];
+    let bsGradEngagement = {
+      playersWithRealGames: 0,
+      avgGamesPlayed: 0,
+      avgScore: 0,
+      avgBestFev: 0,
+      gradeDistribution: {} as Record<string, number>,
+      avgScoreTrend: null as number | null,
+    };
+
+    if (playerIds.length > 0 && supabaseAdmin) {
+      try {
+        const { data: stats } = await supabaseAdmin
+          .from('player_stats')
+          .select('player_id, total_games, avg_score, best_adjusted_fev, grade_distribution, score_trend')
+          .in('player_id', playerIds.slice(0, 200));
+
+        if (stats && stats.length > 0) {
+          const withGames = stats.filter((s: any) => s.total_games > 0);
+          bsGradEngagement.playersWithRealGames = withGames.length;
+          if (withGames.length > 0) {
+            bsGradEngagement.avgGamesPlayed = Math.round(
+              (withGames.reduce((sum: number, s: any) => sum + (s.total_games || 0), 0) / withGames.length) * 10
+            ) / 10;
+            const scoredPlayers = withGames.filter((s: any) => s.avg_score > 0);
+            if (scoredPlayers.length > 0) {
+              bsGradEngagement.avgScore = Math.round(
+                scoredPlayers.reduce((sum: number, s: any) => sum + s.avg_score, 0) / scoredPlayers.length
+              );
+              bsGradEngagement.avgBestFev = Math.round(
+                scoredPlayers.reduce((sum: number, s: any) => sum + (s.best_adjusted_fev || 0), 0) / scoredPlayers.length
+              );
+            }
+            // Aggregate grade distribution
+            const gradeDist: Record<string, number> = {};
+            for (const s of withGames) {
+              const gd = s.grade_distribution as Record<string, number> | null;
+              if (!gd) continue;
+              for (const [grade, count] of Object.entries(gd)) {
+                gradeDist[grade] = (gradeDist[grade] || 0) + (count as number);
+              }
+            }
+            bsGradEngagement.gradeDistribution = gradeDist;
+            // Score trend (avg across players with trends)
+            const trendPlayers = withGames.filter((s: any) => s.score_trend != null);
+            if (trendPlayers.length > 0) {
+              bsGradEngagement.avgScoreTrend = Math.round(
+                (trendPlayers.reduce((sum: number, s: any) => sum + s.score_trend, 0) / trendPlayers.length) * 10
+              ) / 10;
+            }
+          }
+        }
+      } catch { /* non-critical — engagement data is supplementary */ }
+    }
 
     return res.status(200).json({
       totalCompletions,
@@ -80,6 +145,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       deviceBreakdown,
       completionsByDay,
       recentCompletions,
+      // Signup conversion
+      signupConversion: {
+        loggedInAtCompletion,
+        anonymousAtCompletion,
+        unknownAuthStatus,
+        conversionRate: anonymousAtCompletion + loggedInAtCompletion > 0
+          ? Math.round((loggedInAtCompletion / (anonymousAtCompletion + loggedInAtCompletion)) * 100) : 0,
+      },
+      // B-School grad engagement in real games
+      bsGradEngagement,
     });
   } catch (error) {
     console.error('B-School stats error:', error);
