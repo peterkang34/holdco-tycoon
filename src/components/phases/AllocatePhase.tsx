@@ -88,9 +88,9 @@ interface AllocatePhaseProps {
   intrinsicValuePerShare: number;
   lastEventType?: string;
   onAcquire: (deal: Deal, structure: DealStructure) => void;
-  onAcquireTuckIn: (deal: Deal, structure: DealStructure, platformId: string) => void;
-  onMergeBusinesses: (businessId1: string, businessId2: string, newName: string) => void;
-  onDesignatePlatform: (businessId: string) => void;
+  onAcquireTuckIn?: (deal: Deal, structure: DealStructure, platformId: string) => void;
+  onMergeBusinesses?: (businessId1: string, businessId2: string, newName: string) => void;
+  onDesignatePlatform?: (businessId: string) => void;
   onUnlockSharedService: (serviceType: SharedServiceType) => void;
   onDeactivateSharedService: (serviceType: SharedServiceType) => void;
   onPayDebt: (amount: number) => void;
@@ -925,7 +925,7 @@ export function AllocatePhase({
                     if (acquiringRef.current) return;
                     acquiringRef.current = true;
                     if (selectedTuckInPlatform) {
-                      onAcquireTuckIn(selectedDeal, structure, selectedTuckInPlatform);
+                      onAcquireTuckIn?.(selectedDeal, structure, selectedTuckInPlatform);
                     } else {
                       onAcquire(selectedDeal, structure);
                     }
@@ -1587,7 +1587,7 @@ export function AllocatePhase({
                   business={business}
                   onSell={() => setSellConfirmBusiness(business)}
                   onImprove={() => setSelectedBusinessForImprovement(business)}
-                  onDesignatePlatform={!business.isPlatform ? () => onDesignatePlatform(business.id) : undefined}
+                  onDesignatePlatform={!business.isPlatform && onDesignatePlatform ? () => onDesignatePlatform(business.id) : undefined}
 
                   onShowRollUpGuide={() => setShowRollUpGuide(true)}
                   isPlatform={business.isPlatform}
@@ -3498,7 +3498,7 @@ export function AllocatePhase({
                     <button
                       onClick={() => {
                         if (mergeSelection.first && mergeSelection.second && mergeName.trim()) {
-                          onMergeBusinesses(mergeSelection.first.id, mergeSelection.second.id, mergeName.trim());
+                          onMergeBusinesses?.(mergeSelection.first.id, mergeSelection.second.id, mergeName.trim());
                           setShowMergeModal(false);
                           setMergeSelection({ first: null, second: null });
                           setMergeName('');
