@@ -46,19 +46,28 @@ function randomFundName(): string {
   return `${prefix} ${geo} ${suffix} Fund I`;
 }
 
+import { BSCHOOL_COMPLETED_KEY } from '../tutorial/BusinessSchoolGraduation';
+
+function hasBSchoolCompleted(): boolean {
+  try { return localStorage.getItem(BSCHOOL_COMPLETED_KEY) === 'true'; } catch { return false; }
+}
+
 interface IntroScreenProps {
   onStart: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty, duration: GameDuration, seed?: number) => void;
   onStartFund: (fundName: string) => void;
+  onStartBusinessSchool?: (holdcoName: string) => void;
   challengeData?: ChallengeParams | null;
 }
 
-export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreenProps) {
+export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, challengeData }: IntroScreenProps) {
   const isChallenge = !!challengeData;
   const isLoggedIn = useIsLoggedIn();
   const openStatsModal = useAuthStore((s) => s.openStatsModal);
-  const [step, setStep] = useState<'mode' | 'setup' | 'fund_setup'>(isChallenge ? 'setup' : 'mode');
+  const [step, setStep] = useState<'mode' | 'setup' | 'fund_setup' | 'bschool_setup'>(isChallenge ? 'setup' : 'mode');
   const [holdcoName, setHoldcoName] = useState('');
   const [fundName, setFundName] = useState('');
+  const [bschoolName, setBschoolName] = useState('My First Holdco');
+  const bschoolCompleted = hasBSchoolCompleted();
   const [selectedSector, setSelectedSector] = useState<SectorId | 'random'>('random');
   const [selectedDifficulty, setSelectedDifficulty] = useState<GameDifficulty>(challengeData?.difficulty ?? 'easy');
   const [selectedDuration, setSelectedDuration] = useState<GameDuration>(challengeData?.duration ?? 'quick');
@@ -307,6 +316,40 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
                 Continue →
               </button>
 
+              {/* ═══ Business School — learn fundamentals ═══ */}
+              {onStartBusinessSchool && (
+                <>
+                  <div className="relative my-5">
+                    <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
+                    <div className="relative flex justify-center"><span className="bg-bg-secondary px-3 text-xs text-text-muted">or learn the fundamentals first</span></div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowNameError(false);
+                      setStep('bschool_setup');
+                    }}
+                    className="w-full p-4 rounded-lg border border-emerald-500/30 bg-gradient-to-r from-emerald-500/5 to-transparent hover:border-emerald-500/50 transition-all text-left"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-lg">🎓</span>
+                          <span className="font-bold text-emerald-400">Business School</span>
+                          {bschoolCompleted && (
+                            <span className="text-emerald-400/80 text-sm">✓ Completed</span>
+                          )}
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300">2yr Guided</span>
+                        </div>
+                        <p className="text-xs text-text-muted">Learn the playbook in 2 guided years. Buy, improve, sell, and forge a platform. Leave with a Holdco MBA.</p>
+                      </div>
+                      <span className="text-text-muted text-lg">→</span>
+                    </div>
+                  </button>
+                </>
+              )}
+
               {/* ═══ Fund Manager — separate mode ═══ */}
               <div className="relative my-5">
                 <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-white/10" /></div>
@@ -334,6 +377,105 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
                   <span className="text-text-muted text-lg">→</span>
                 </div>
               </button>
+            </div>
+          </>
+        ) : step === 'bschool_setup' ? (
+          <>
+            {/* ═══ B-SCHOOL SETUP ═══ */}
+            <div className="card p-6 border-emerald-500/20">
+              <div className="flex items-center justify-between mb-5">
+                <button
+                  type="button"
+                  onClick={() => setStep('mode')}
+                  className="text-sm text-text-muted hover:text-text-secondary transition-colors min-h-[44px] min-w-[44px] flex items-center"
+                >
+                  ← Back
+                </button>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm">🎓</span>
+                  <span className="text-sm font-medium text-emerald-400">Business School</span>
+                </div>
+              </div>
+
+              {/* Intro copy */}
+              <div className="text-center mb-5">
+                <h2 className="text-xl font-bold text-text-primary mb-2">The Holdco Playbook in 2 Years</h2>
+                <p className="text-sm text-text-secondary leading-relaxed">
+                  You inherit a 3-business portfolio and $6M in cash.
+                </p>
+              </div>
+
+              {/* Starting portfolio summary */}
+              <div className="rounded-lg border border-white/10 bg-white/5 p-3 mb-4 text-left">
+                <div className="text-xs font-bold text-text-muted tracking-wider mb-2">YOUR STARTING PORTFOLIO</div>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">🔧 Plumbing Services (Q3)</span>
+                    <span className="text-text-primary font-medium">$1.2M EBITDA</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">⚡ Electrical Services (Q3)</span>
+                    <span className="text-text-primary font-medium">$800K EBITDA</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-text-secondary">💼 IT Staffing (Q3)</span>
+                    <span className="text-text-primary font-medium">$1.0M EBITDA</span>
+                  </div>
+                  <div className="border-t border-white/10 pt-1.5 mt-1.5 flex justify-between">
+                    <span className="text-text-muted">Cash on hand</span>
+                    <span className="text-emerald-400 font-medium">$6.0M</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Holdco name + CTA (above fold on mobile) */}
+              <label className="block text-left mb-2 text-sm text-text-muted">
+                Name your holding company
+              </label>
+              <input
+                type="text"
+                value={bschoolName}
+                onChange={(e) => setBschoolName(e.target.value)}
+                placeholder="My First Holdco"
+                className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-emerald-500 transition-colors mb-4"
+                maxLength={30}
+              />
+
+              <button
+                type="button"
+                onClick={() => {
+                  const name = bschoolName.trim() || 'My First Holdco';
+                  onStartBusinessSchool?.(name);
+                }}
+                disabled={!bschoolName.trim()}
+                className="btn-primary w-full text-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 mb-5"
+              >
+                Start Business School →
+              </button>
+
+              {/* Curriculum preview (below the fold on mobile — supplementary) */}
+              <div className="rounded-lg border border-white/10 bg-white/5 p-4 text-left">
+                <div className="text-xs font-bold text-text-muted tracking-wider mb-3">WHAT YOU'LL LEARN</div>
+                <div className="mb-3">
+                  <div className="text-xs font-bold text-emerald-400/80 tracking-wider mb-2">YEAR 1 — BUILD THE PLATFORM</div>
+                  <div className="space-y-1.5 text-sm text-text-secondary">
+                    <div className="flex items-start gap-2"><span className="text-emerald-400/40 mt-0.5">○</span> Collect cash flow from your businesses</div>
+                    <div className="flex items-start gap-2"><span className="text-emerald-400/40 mt-0.5">○</span> Improve a business and sell a non-core one</div>
+                    <div className="flex items-start gap-2"><span className="text-emerald-400/40 mt-0.5">○</span> Acquire two HVAC businesses using different debt structures</div>
+                    <div className="flex items-start gap-2"><span className="text-emerald-400/40 mt-0.5">○</span> Activate M&A Sourcing for better deal flow</div>
+                    <div className="flex items-start gap-2"><span className="text-emerald-400/40 mt-0.5">○</span> Forge an integrated Home Services platform</div>
+                  </div>
+                </div>
+                <div>
+                  <div className="text-xs font-bold text-emerald-400/80 tracking-wider mb-2">YEAR 2 — OPTIMIZE & EXIT</div>
+                  <div className="space-y-1.5 text-sm text-text-secondary">
+                    <div className="flex items-start gap-2"><span className="text-emerald-400/40 mt-0.5">○</span> Raise equity and execute an LBO acquisition</div>
+                    <div className="flex items-start gap-2"><span className="text-emerald-400/40 mt-0.5">○</span> Unlock a shared service and pay down debt</div>
+                    <div className="flex items-start gap-2"><span className="text-emerald-400/40 mt-0.5">○</span> Make a shareholder distribution</div>
+                    <div className="flex items-start gap-2"><span className="text-emerald-400/40 mt-0.5">○</span> Sell the platform for a massive exit</div>
+                  </div>
+                </div>
+              </div>
             </div>
           </>
         ) : step === 'fund_setup' ? (
@@ -603,7 +745,7 @@ export function IntroScreen({ onStart, onStartFund, challengeData }: IntroScreen
         )}
 
         {/* Challenge a Friend (only in normal flow, not fund setup) */}
-        {!isChallenge && step !== 'fund_setup' && (
+        {!isChallenge && step !== 'fund_setup' && step !== 'bschool_setup' && (
           <div className="mt-4">
             <button
               onClick={() => setShowChallengeCreator(!showChallengeCreator)}

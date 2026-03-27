@@ -494,6 +494,39 @@ export interface FamilyOfficeState {
   legacyScore?: LegacyScore;      // kept for display (grade, MOIC, etc.)
 }
 
+// ── Business School Mode ──
+
+export type BusinessSchoolChecklistItemId =
+  // Year 1: Build the Platform
+  | 'bs_collect_1'       // Collect cash flow
+  | 'bs_improve'         // Improve BrightSpark Electrical
+  | 'bs_sell'            // Sell the IT Staffing business
+  | 'bs_acquire_sn'      // Acquire HVAC via seller note
+  | 'bs_acquire_bd'      // Acquire HVAC via bank debt
+  | 'bs_ma_sourcing'     // Activate M&A Sourcing
+  | 'bs_forge_platform'  // Forge Multi-Trade Home Services Platform
+  | 'bs_end_year_1'      // End Year 1
+  // Year 2: Optimize & Exit
+  | 'bs_collect_2'       // Collect cash flow (see debt service)
+  | 'bs_equity'          // Issue equity
+  | 'bs_acquire_lbo'     // Execute an LBO acquisition
+  | 'bs_shared_service'  // Unlock a shared service (Procurement)
+  | 'bs_pay_debt'        // Pay down debt early
+  | 'bs_distribute'      // Make a shareholder distribution
+  | 'bs_sell_platform';  // Sell the platform for a massive exit
+
+export interface BusinessSchoolChecklist {
+  items: Record<BusinessSchoolChecklistItemId, boolean>;
+  completedCount: number;
+}
+
+export interface BusinessSchoolState {
+  isActive: boolean;
+  checklist: BusinessSchoolChecklist;
+  curatedDealsR1: Deal[];
+  curatedDealsR2: Deal[];
+}
+
 // ── PE Fund Manager Mode ──
 
 export interface FundCashFlow {
@@ -654,6 +687,10 @@ export interface GameState {
   dealInflationState: DealInflationState;
   ipoState: IPOState | null;
   familyOfficeState: FamilyOfficeState | null;
+
+  // Business School Mode
+  isBusinessSchoolMode?: boolean;
+  businessSchoolState?: BusinessSchoolState | null;
 
   // PE Fund Manager Mode
   isFundManagerMode?: boolean;

@@ -33,6 +33,7 @@ import { MIN_OPCOS_FOR_SHARED_SERVICES } from '../../data/sharedServices';
 import { buildChallengeUrl, copyToClipboard } from '../../utils/challenge';
 import { AccountBadge } from '../ui/AccountBadge';
 import { VideoModal, TUTORIAL_VIDEO_ID } from '../ui/VideoModal';
+import { BusinessSchoolChecklist } from '../tutorial/BusinessSchoolChecklist';
 
 // ── Mobile Nav Overflow Menu ──────────────────────────────────────
 function NavOverflowMenu({ hasReports, onReports, onManual, onVideo, onFeedback, onTutorial, onReset }: {
@@ -272,6 +273,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     declineIPO,
     isFamilyOfficeMode,
     isFundManagerMode,
+    isBusinessSchoolMode,
     fundName,
     familyOfficeState,
     distributeToLPs,
@@ -720,8 +722,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     showUndoToast(`Turnaround started for ${biz?.name ?? 'business'}`, snap, 'Program in progress — results at completion');
   }, [startTurnaroundProgram, businesses]);
 
-  // Show tutorial on new game start or first visit
+  // Show tutorial on new game start or first visit (skip in Business School — the mode IS the tutorial)
   useEffect(() => {
+    if (isBusinessSchoolMode) return;
     if (showTutorial) {
       setShowInstructions(true);
     } else {
@@ -1160,7 +1163,11 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             <h1 className="text-base sm:text-xl font-bold truncate max-w-[120px] sm:max-w-none">
               {isFamilyOfficeMode ? `${holdcoName} Family Office` : holdcoName}
             </h1>
-            {isFamilyOfficeMode ? (
+            {isBusinessSchoolMode ? (
+              <span className="text-xs px-1.5 sm:px-2 py-0.5 rounded whitespace-nowrap bg-emerald-500/20 text-emerald-400">
+                🎓 B-School
+              </span>
+            ) : isFamilyOfficeMode ? (
               <span className="text-xs px-1.5 sm:px-2 py-0.5 rounded whitespace-nowrap bg-amber-500/20 text-amber-400">
                 FO {round}/{maxRounds}
               </span>
@@ -1357,9 +1364,24 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         onMetricClick={setDrilldownMetric}
       />
 
+      {/* Business School mobile checklist bar (below 768px) */}
+      {isBusinessSchoolMode && (
+        <div className="md:hidden">
+          <BusinessSchoolChecklist />
+        </div>
+      )}
+
       {/* Phase Content */}
-      <div className="flex-1 overflow-auto">
-        {renderPhase()}
+      <div className="flex-1 overflow-auto flex">
+        <div className="flex-1 min-w-0">
+          {renderPhase()}
+        </div>
+        {/* Business School desktop checklist sidebar (768px+) */}
+        {isBusinessSchoolMode && (
+          <div className="hidden md:block">
+            <BusinessSchoolChecklist />
+          </div>
+        )}
       </div>
 
       {/* Annual Reports Modal */}

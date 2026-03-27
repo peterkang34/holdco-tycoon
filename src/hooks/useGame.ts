@@ -113,6 +113,18 @@ import {
   FUND_MANAGER_CONFIG,
   TURNAROUND_CEILING_BONUS,
 } from '../data/gameConfig';
+import {
+  BS_STARTING_CASH,
+  BS_MAX_ROUNDS,
+  BS_DIFFICULTY,
+  BS_DURATION,
+  createBSStartingBusinesses,
+  createBSRound1Deals,
+  createBSRound2Deals,
+  createInitialBSState,
+  markChecklistItem,
+  getBSEvent,
+} from '../data/businessSchool';
 
 /**
  * Check if a deal requires LPAC approval (cumulative deal value in platform exceeds 25% of committed capital).
@@ -338,6 +350,7 @@ interface GameStore extends GameState {
 
   // Actions
   startGame: (holdcoName: string, startingSector: SectorId | undefined, difficulty?: GameDifficulty, duration?: GameDuration, seed?: number, isFundManagerMode?: boolean, fundName?: string) => void;
+  startBusinessSchool: (holdcoName: string) => void;
   resetGame: () => void;
 
   // Phase transitions
@@ -545,6 +558,9 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   familyOfficeState: null,
   isFamilyOfficeMode: false,
   nextAcquisitionHeatReduction: 0,
+  // Business School Mode defaults
+  isBusinessSchoolMode: false,
+  businessSchoolState: null,
   // PE Fund Manager Mode defaults
   isFundManagerMode: false,
   fundName: '',
@@ -692,6 +708,61 @@ export const useGameStore = create<GameStore>()(
 
         // Fire telemetry (fire-and-forget)
         trackGameStart(difficulty, duration, startingSector, maxRounds, seed != null);
+      },
+
+      startBusinessSchool: (holdcoName: string) => {
+        resetBusinessIdCounter();
+        resetUsedNames();
+
+        const gameSeed = generateRandomSeed();
+        const businesses = createBSStartingBusinesses();
+        const r1Deals = createBSRound1Deals();
+        const r2Deals = createBSRound2Deals();
+        const totalInvested = businesses.reduce((s, b) => s + b.acquisitionPrice, 0);
+
+        const newState: GameState = {
+          ...initialState,
+          holdcoName,
+          seed: gameSeed,
+          difficulty: BS_DIFFICULTY,
+          duration: BS_DURATION,
+          maxRounds: BS_MAX_ROUNDS,
+          round: 1,
+          phase: 'collect',
+          businesses,
+          cash: BS_STARTING_CASH,
+          totalDebt: 0,
+          totalInvestedCapital: totalInvested,
+          founderShares: 1000,
+          sharesOutstanding: 1000,
+          initialRaiseAmount: BS_STARTING_CASH + totalInvested,
+          initialOwnershipPct: 1.0,
+          holdcoDebtStartRound: 0,
+          holdcoLoanBalance: 0,
+          holdcoLoanRate: 0,
+          holdcoLoanRoundsRemaining: 0,
+          sharedServices: initializeSharedServices(),
+          dealPipeline: r1Deals,
+          maSourcing: { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 },
+          turnaroundTier: 0 as any,
+          activeTurnarounds: [],
+          founderDistributionsReceived: 0,
+          isChallenge: false,
+          dealInflationState: { crisisResetRoundsRemaining: 0 },
+          ipoState: null,
+          familyOfficeState: null,
+          isBusinessSchoolMode: true,
+          businessSchoolState: createInitialBSState(r1Deals, r2Deals),
+        };
+
+        set({
+          ...newState,
+          metrics: calculateMetrics(newState),
+          focusBonus: calculateSectorFocusBonus(newState.businesses),
+          yearChronicle: null,
+        });
+
+        trackGameStart(BS_DIFFICULTY, BS_DURATION, undefined, BS_MAX_ROUNDS, false, 'business_school');
       },
 
       resetGame: () => {
@@ -972,7 +1043,8 @@ export const useGameStore = create<GameStore>()(
           oilShockRoundsRemaining: decrementedOilShock,
           dealInflationState: decrementedDealInflation,
         };
-        const event = generateEvent(stateForEventGen, roundStreams.events);
+        // Business School: curated events (bull market Y1, quiet year Y2) instead of random
+        const event = state.isBusinessSchoolMode ? getBSEvent(state.round) : generateEvent(stateForEventGen, roundStreams.events);
 
         // Generate guaranteed proSports event if player owns a franchise
         // Uses cosmetic stream fork to avoid disturbing the event RNG
@@ -1183,6 +1255,13 @@ export const useGameStore = create<GameStore>()(
           }
         }
 
+        // Business School: mark collect checklist item
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          const collectItem = state.round === 1 ? 'bs_collect_1' as const : 'bs_collect_2' as const;
+          const updated = markChecklistItem(state.businessSchoolState, collectItem);
+          if (updated) gameState.businessSchoolState = updated;
+        }
+
         set({
           ...gameState,
           eventHistory: event ? [...state.eventHistory, event] : state.eventHistory,
@@ -1232,6 +1311,28 @@ export const useGameStore = create<GameStore>()(
         const dealInflationAdder = state.isFamilyOfficeMode
           ? FO_DEAL_INFLATION
           : calculateDealInflation(state.round, state.duration, state.dealInflationState);
+
+        // Business School: serve curated deals instead of random pipeline
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          const curatedDeals = state.round === 1
+            ? state.businessSchoolState.curatedDealsR1
+            : state.businessSchoolState.curatedDealsR2;
+
+          set({
+            ...state,
+            phase: 'allocate' as GamePhase,
+            dealPipeline: curatedDeals,
+            acquisitionsThisRound: 0,
+            lastAcquisitionResult: null,
+            lastIntegrationOutcome: null,
+            debtPaymentThisRound: 0,
+            cashBeforeDebtPayments: state.cash,
+            currentEvent: null,
+            metrics: calculateMetrics(state as GameState),
+            focusBonus,
+          });
+          return;
+        }
 
         // Generate new deals with M&A focus, portfolio synergies, and affordability
         // Collect owned pro sports sub-types for uniqueness filtering
@@ -1612,6 +1713,13 @@ export const useGameStore = create<GameStore>()(
           // Just recompute totalDebt for consistency
           const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
 
+          // Business School: mark end year 1 checklist item
+          let bsEndYearUpdate = {};
+          if (state.isBusinessSchoolMode && state.businessSchoolState && state.round === 1) {
+            const updated = markChecklistItem(state.businessSchoolState, 'bs_end_year_1');
+            if (updated) bsEndYearUpdate = { businessSchoolState: updated };
+          }
+
           set({
             businesses: updatedBusinesses,
             round: newRound,
@@ -1636,6 +1744,7 @@ export const useGameStore = create<GameStore>()(
             lastAcquisitionResult: null,
             lastIntegrationOutcome: null,
             ipoState: updatedIPOState,
+            ...bsEndYearUpdate,
             // PE Fund Manager LP state
             ...(state.isFundManagerMode ? {
               lpSatisfactionScore: updatedLPSatisfaction,
@@ -1872,6 +1981,28 @@ export const useGameStore = create<GameStore>()(
           ? { lpCommentary: [...(state.lpCommentary || []), dealComment] }
           : {};
 
+        // Business School: detect which acquire checklist item to mark
+        // Maps structure types to their checklist items; all_cash/earnout/rollover fall through
+        // to mark the first incomplete acquire item so players aren't stuck
+        let bsUpdate = {};
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          const bs = state.businessSchoolState;
+          let itemId: 'bs_acquire_sn' | 'bs_acquire_bd' | 'bs_acquire_lbo' | null = null;
+          if (structure.type === 'seller_note') itemId = 'bs_acquire_sn';
+          else if (structure.type === 'bank_debt') itemId = 'bs_acquire_bd';
+          else if (structure.type === 'seller_note_bank_debt') itemId = 'bs_acquire_lbo';
+          else {
+            // All-cash or other structure: mark the first incomplete acquire item
+            if (!bs.checklist.items.bs_acquire_sn) itemId = 'bs_acquire_sn';
+            else if (!bs.checklist.items.bs_acquire_bd) itemId = 'bs_acquire_bd';
+            else if (!bs.checklist.items.bs_acquire_lbo) itemId = 'bs_acquire_lbo';
+          }
+          if (itemId) {
+            const updated = markChecklistItem(bs, itemId);
+            if (updated) bsUpdate = { businessSchoolState: updated };
+          }
+        }
+
         set({
           cash: state.cash - structure.cashRequired,
           totalDebt: newTotalDebt,
@@ -1884,6 +2015,7 @@ export const useGameStore = create<GameStore>()(
           // PE Fund: track equity capital deployed from fund (cash check, not total EV)
           ...(state.isFundManagerMode ? { totalCapitalDeployed: (state.totalCapitalDeployed || 0) + structure.cashRequired } : {}),
           ...dealCommentary,
+          ...bsUpdate,
           actionsThisRound: [
             ...state.actionsThisRound,
             {
@@ -1904,6 +2036,7 @@ export const useGameStore = create<GameStore>()(
       // Acquire a tuck-in and fold it into an existing platform
       acquireTuckIn: (deal: Deal, structure: DealStructure, targetPlatformId: string) => {
         const state = get();
+        if (state.isBusinessSchoolMode) return; // Blocked in B-School
 
         // Guard: pro sports teams cannot be tuck-ins or tucked into
         if (deal.business.sectorId === 'proSports') return;
@@ -2232,6 +2365,7 @@ export const useGameStore = create<GameStore>()(
       // Merge two owned businesses into one larger platform
       mergeBusinesses: (businessId1: string, businessId2: string, newName: string) => {
         const state = get();
+        if (state.isBusinessSchoolMode) return; // Blocked in B-School
 
         const biz1 = state.businesses.find(b => b.id === businessId1 && b.status === 'active');
         const biz2 = state.businesses.find(b => b.id === businessId2 && b.status === 'active');
@@ -2492,6 +2626,7 @@ export const useGameStore = create<GameStore>()(
       // Designate an existing business as a platform
       designatePlatform: (businessId: string) => {
         const state = get();
+        if (state.isBusinessSchoolMode) return; // Blocked in B-School
         const business = state.businesses.find(b => b.id === businessId && b.status === 'active');
         if (!business) {
           useToastStore.getState().addToast({ message: 'Action failed: business no longer available', type: 'warning' });
@@ -2690,6 +2825,13 @@ export const useGameStore = create<GameStore>()(
           }
         }
 
+        // Business School: mark improve checklist item
+        let bsImproveUpdate = {};
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          const updated = markChecklistItem(state.businessSchoolState, 'bs_improve');
+          if (updated) bsImproveUpdate = { businessSchoolState: updated };
+        }
+
         const improveState = {
           ...state,
           cash: state.cash - cost,
@@ -2698,6 +2840,7 @@ export const useGameStore = create<GameStore>()(
         };
         set({
           ...improveState,
+          ...bsImproveUpdate,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'improve', round: state.round, details: { businessId, improvementType, cost } },
@@ -2729,8 +2872,16 @@ export const useGameStore = create<GameStore>()(
           totalInvestedCapital: state.totalInvestedCapital + service.unlockCost,
           sharedServices: updatedServices,
         };
+        // Business School: mark shared service checklist item
+        let bsSharedUpdate = {};
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          const updated = markChecklistItem(state.businessSchoolState, 'bs_shared_service');
+          if (updated) bsSharedUpdate = { businessSchoolState: updated };
+        }
+
         set({
           ...unlockState,
+          ...bsSharedUpdate,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'unlock_shared_service', round: state.round, details: { serviceType } },
@@ -2768,6 +2919,13 @@ export const useGameStore = create<GameStore>()(
         const newHoldcoLoanBalance = state.holdcoLoanBalance - actualPayment;
         const newTotalDebt = computeTotalDebt(state.businesses, newHoldcoLoanBalance);
 
+        // Business School: mark pay debt checklist item
+        let bsPayDebtUpdate1 = {};
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          const updated = markChecklistItem(state.businessSchoolState, 'bs_pay_debt');
+          if (updated) bsPayDebtUpdate1 = { businessSchoolState: updated };
+        }
+
         const payDebtState = {
           ...state,
           cash: state.cash - actualPayment,
@@ -2776,6 +2934,7 @@ export const useGameStore = create<GameStore>()(
         };
         set({
           ...payDebtState,
+          ...bsPayDebtUpdate1,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'pay_debt', round: state.round, details: { amount: actualPayment } },
@@ -2802,6 +2961,13 @@ export const useGameStore = create<GameStore>()(
         });
         const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
 
+        // Business School: mark pay debt checklist item
+        let bsPayDebtUpdate2 = {};
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          const updated = markChecklistItem(state.businessSchoolState, 'bs_pay_debt');
+          if (updated) bsPayDebtUpdate2 = { businessSchoolState: updated };
+        }
+
         const payBankDebtState = {
           ...state,
           cash: state.cash - actualPayment,
@@ -2810,6 +2976,7 @@ export const useGameStore = create<GameStore>()(
         };
         set({
           ...payBankDebtState,
+          ...bsPayDebtUpdate2,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'pay_debt', round: state.round, details: { amount: actualPayment, businessId, bankDebt: true } },
@@ -2883,8 +3050,16 @@ export const useGameStore = create<GameStore>()(
           issueState.ipoState.stockPrice = calculateStockPrice(issueState);
         }
 
+        // Business School: mark equity checklist item
+        let bsEquityUpdate = {};
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          const updated = markChecklistItem(state.businessSchoolState, 'bs_equity');
+          if (updated) bsEquityUpdate = { businessSchoolState: updated };
+        }
+
         set({
           ...issueState,
+          ...bsEquityUpdate,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'issue_equity', round: state.round, details: { amount, newShares, newOwnership: newFounderOwnership, discount, sentimentPenalty } },
@@ -2895,6 +3070,7 @@ export const useGameStore = create<GameStore>()(
 
       buybackShares: (amount: number) => {
         const state = get();
+        if (state.isBusinessSchoolMode) return; // Blocked in B-School
         if (state.isFamilyOfficeMode) return; // No buybacks in FO mode
         if (state.isFundManagerMode) return; // No public shares in fund mode
         if (state.cash < amount) return;
@@ -2985,6 +3161,13 @@ export const useGameStore = create<GameStore>()(
         // Track founder's portion of distribution incrementally (at current ownership %)
         const founderPortion = Math.round(amount * (state.founderShares / state.sharesOutstanding));
 
+        // Business School: mark distribute checklist item
+        let bsDistributeUpdate = {};
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          const updated = markChecklistItem(state.businessSchoolState, 'bs_distribute');
+          if (updated) bsDistributeUpdate = { businessSchoolState: updated };
+        }
+
         const distributeState = {
           ...state,
           cash: state.cash - amount,
@@ -2993,6 +3176,7 @@ export const useGameStore = create<GameStore>()(
         };
         set({
           ...distributeState,
+          ...bsDistributeUpdate,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'distribute', round: state.round, details: { amount, founderPortion } },
@@ -3144,6 +3328,16 @@ export const useGameStore = create<GameStore>()(
         const soldIdsForTurnarounds = new Set([businessId, ...boltOnIds]);
         const updatedTurnarounds = cleanupTurnaroundsForSoldBusinesses(state.activeTurnarounds, soldIdsForTurnarounds);
 
+        // Business School: mark sell checklist item (bs_sell only for the B2B staffing business, bs_sell_platform handled separately)
+        let bsSellUpdate = {};
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          // Only mark bs_sell when selling a non-homeServices business (the IT Staffing company)
+          if (business.sectorId !== 'homeServices') {
+            const updated = markChecklistItem(state.businessSchoolState, 'bs_sell');
+            if (updated) bsSellUpdate = { businessSchoolState: updated };
+          }
+        }
+
         const sellState = {
           ...state,
           cash: state.cash + playerProceeds,
@@ -3156,6 +3350,7 @@ export const useGameStore = create<GameStore>()(
         };
         set({
           ...sellState,
+          ...bsSellUpdate,
           exitedBusinesses: [
             ...state.exitedBusinesses,
             { ...business, status: 'sold' as const, exitPrice, exitRound: state.round },
@@ -4309,6 +4504,7 @@ export const useGameStore = create<GameStore>()(
 
       executeIPO: () => {
         const state = get();
+        if (state.isBusinessSchoolMode) return; // Blocked in B-School
         if (state.isFamilyOfficeMode) return; // No IPO in FO mode
         const { eligible, reasons } = checkIPOEligibility(state);
         if (!eligible) {
@@ -4566,6 +4762,13 @@ export const useGameStore = create<GameStore>()(
           lastUpgradeRound: state.round,
         };
 
+        // Business School: mark M&A sourcing checklist item
+        let bsMaUpdate = {};
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          const updated = markChecklistItem(state.businessSchoolState, 'bs_ma_sourcing');
+          if (updated) bsMaUpdate = { businessSchoolState: updated };
+        }
+
         const upgradeState = {
           ...state,
           cash: state.cash - cost,
@@ -4577,6 +4780,7 @@ export const useGameStore = create<GameStore>()(
         };
         set({
           ...upgradeState,
+          ...bsMaUpdate,
           actionsThisRound: [
             ...state.actionsThisRound,
             { type: 'upgrade_ma_sourcing' as const, round: state.round, details: { fromTier: currentTier, toTier: nextTier, cost } },
@@ -5340,11 +5544,19 @@ export const useGameStore = create<GameStore>()(
           };
         });
 
+        // Business School: mark forge platform checklist item
+        let bsForgeUpdate = {};
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          const updated = markChecklistItem(state.businessSchoolState, 'bs_forge_platform');
+          if (updated) bsForgeUpdate = { businessSchoolState: updated };
+        }
+
         set({
           businesses: updatedBusinesses,
           integratedPlatforms: [...state.integratedPlatforms, platform],
           cash: state.cash - integrationCost,
           totalInvestedCapital: state.totalInvestedCapital + integrationCost,
+          ...bsForgeUpdate,
           actionsThisRound: [
             ...state.actionsThisRound,
             {
@@ -5528,6 +5740,13 @@ export const useGameStore = create<GameStore>()(
           .filter(b => allSoldIds.has(b.id))
           .map(b => ({ ...b, status: 'sold' as const, exitPrice: constituents.find(c => c.id === b.id) ? Math.round(totalExitPrice / constituents.length) : 0, exitRound: state.round }));
 
+        // Business School: mark sell platform checklist item
+        let bsSellPlatUpdate = {};
+        if (state.isBusinessSchoolMode && state.businessSchoolState) {
+          const updated = markChecklistItem(state.businessSchoolState, 'bs_sell_platform');
+          if (updated) bsSellPlatUpdate = { businessSchoolState: updated };
+        }
+
         const newTotalDebt = computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance);
         const sellState = {
           ...state,
@@ -5541,6 +5760,7 @@ export const useGameStore = create<GameStore>()(
         };
         set({
           ...sellState,
+          ...bsSellPlatUpdate,
           exitedBusinesses: [...state.exitedBusinesses, ...exitedEntries],
           actionsThisRound: [
             ...state.actionsThisRound,
@@ -5567,6 +5787,7 @@ export const useGameStore = create<GameStore>()(
 
       unlockTurnaroundTier: () => {
         const state = get();
+        if (state.isBusinessSchoolMode) return; // Blocked in B-School
         if (state.isFamilyOfficeMode) return; // No turnaround unlocks in FO mode
         if (state.phase !== 'allocate') return;
 
@@ -5594,6 +5815,7 @@ export const useGameStore = create<GameStore>()(
 
       startTurnaroundProgram: (businessId: string, programId: string) => {
         const state = get();
+        if (state.isBusinessSchoolMode) return; // Blocked in B-School
         if (state.isFamilyOfficeMode) return; // No turnarounds in FO mode
         if (state.phase !== 'allocate') return;
 
@@ -5843,7 +6065,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v40', // v40: IPO Transparency — totalShareFundedDeals
+      name: 'holdco-tycoon-save-v41', // v41: Business School Mode
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -5910,6 +6132,9 @@ export const useGameStore = create<GameStore>()(
         familyOfficeState: state.familyOfficeState,
         isFamilyOfficeMode: state.isFamilyOfficeMode,
         nextAcquisitionHeatReduction: state.nextAcquisitionHeatReduction,
+        // Business School Mode
+        isBusinessSchoolMode: state.isBusinessSchoolMode,
+        businessSchoolState: state.businessSchoolState,
         // PE Fund Manager Mode
         isFundManagerMode: state.isFundManagerMode,
         fundName: state.fundName,
@@ -5998,6 +6223,9 @@ export const useGameStore = create<GameStore>()(
             }
             if ((state as any).ipoState === undefined) (state as any).ipoState = null;
             if ((state as any).familyOfficeState === undefined) (state as any).familyOfficeState = null;
+            // Backfill Business School Mode
+            if ((state as any).isBusinessSchoolMode === undefined) (state as any).isBusinessSchoolMode = false;
+            if ((state as any).businessSchoolState === undefined) (state as any).businessSchoolState = null;
             // Restore business ID counter to avoid collisions after save/load
             if (Array.isArray(state.businesses)) {
               restoreBusinessIdCounter(state.businesses);

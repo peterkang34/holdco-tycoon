@@ -4,6 +4,7 @@ import { useGameStore, getFinalScore, getPostGameInsights, getEnterpriseValue, g
 import { IntroScreen, writeBestGrade } from './components/screens/IntroScreen';
 import { GameScreen } from './components/screens/GameScreen';
 import { GameOverScreen } from './components/screens/GameOverScreen';
+import { BusinessSchoolGraduation } from './components/tutorial/BusinessSchoolGraduation';
 import { FamilyOfficeScreen } from './components/screens/FamilyOfficeScreen';
 import { ScoreboardScreen } from './components/screens/ScoreboardScreen';
 import { PlaybookScreen } from './components/screens/PlaybookScreen';
@@ -24,19 +25,22 @@ import { CelebrationModal } from './components/ui/CelebrationModal';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { setupGoTest, getGoTestVariant } from './utils/goTestSetup';
 import { syncAchievementsFromServer } from './hooks/useUnlocks';
+import { createBSStartingBusinesses, createBSRound1Deals, createBSRound2Deals, createInitialBSState, BS_STARTING_CASH } from './data/businessSchool';
 
-type Screen = 'intro' | 'game' | 'gameOver' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard' | 'playbook';
+type Screen = 'intro' | 'game' | 'gameOver' | 'graduation' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard' | 'playbook';
 
 function App() {
   const [isAdmin, setIsAdmin] = useState(window.location.hash === '#/admin');
   const [isFoTest, setIsFoTest] = useState(window.location.hash === '#/fo-test');
   const [isGoTest, setIsGoTest] = useState(window.location.hash.startsWith('#/go-test'));
+  const [isBsTest, setIsBsTest] = useState(window.location.hash === '#/bs-test');
 
   useEffect(() => {
     const onHash = () => {
       setIsAdmin(window.location.hash === '#/admin');
       setIsFoTest(window.location.hash === '#/fo-test');
       setIsGoTest(window.location.hash.startsWith('#/go-test'));
+      setIsBsTest(window.location.hash === '#/bs-test');
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
@@ -102,6 +106,7 @@ function App() {
     startFamilyOffice,
     completeFamilyOffice,
     startGame,
+    startBusinessSchool,
     resetGame,
   } = useGameStore();
 
@@ -159,6 +164,31 @@ function App() {
       setScreen('gameOver');
       return;
     }
+    // #/bs-test shortcut — mock B-School completion and show graduation screen
+    if (isBsTest) {
+      const bsBusinesses = createBSStartingBusinesses();
+      const checklist = createInitialBSState(createBSRound1Deals(), createBSRound2Deals());
+      // Mark most items complete for display
+      const items = { ...checklist.checklist.items };
+      for (const key of Object.keys(items)) items[key as keyof typeof items] = true;
+      checklist.checklist = { items, completedCount: 15 };
+      useGameStore.setState({
+        holdcoName: 'Apex Holdings',
+        round: 2,
+        maxRounds: 2,
+        gameOver: true,
+        isBusinessSchoolMode: true,
+        businessSchoolState: checklist,
+        businesses: bsBusinesses,
+        cash: BS_STARTING_CASH + 5000,
+        totalDebt: 3500,
+        founderShares: 920,
+        sharesOutstanding: 1000,
+        integratedPlatforms: [{ id: 'test', name: 'Multi-Trade Home Services', recipeId: 'home_multi_trade', constituentBusinessIds: ['bs_biz_b', 'bs_biz_c'], forgedInRound: 1, sectorIds: ['homeServices'], bonuses: { marginBoost: 0.04, growthBoost: 0.03, multipleExpansion: 1.5, recessionResistanceReduction: 0.8 } }],
+      });
+      setScreen('graduation');
+      return;
+    }
     const currentState = useGameStore.getState();
     if (holdcoName && round > 0 && !gameOver) {
       // Both normal games and FO-mode games resume at GameScreen
@@ -194,12 +224,18 @@ function App() {
     setScreen('game');
   };
 
+  const handleStartBusinessSchool = (holdcoName: string) => {
+    startBusinessSchool(holdcoName);
+    setIsNewGame(true);
+    setScreen('game');
+  };
+
   const handleGameOver = () => {
     window.scrollTo(0, 0);
     const state = useGameStore.getState();
 
     // Write best grade for unlock gate
-    if (!state.isFundManagerMode && !state.isFamilyOfficeMode) {
+    if (!state.isFundManagerMode && !state.isFamilyOfficeMode && !state.isBusinessSchoolMode) {
       try {
         const score = state.isFundManagerMode ? calculatePEFundScore(state) : calculateFinalScore(state);
         writeBestGrade(score.grade);
@@ -210,6 +246,12 @@ function App() {
     if (state.isFamilyOfficeMode) {
       completeFamilyOffice();
       setScreen('familyOfficeResults');
+      return;
+    }
+
+    // Business School mode — route to graduation screen
+    if (state.isBusinessSchoolMode) {
+      setScreen('graduation');
       return;
     }
 
@@ -377,6 +419,7 @@ function App() {
         <IntroScreen
           onStart={handleStart}
           onStartFund={handleStartFund}
+          onStartBusinessSchool={handleStartBusinessSchool}
           challengeData={challengeData}
         />
       )}
@@ -454,6 +497,25 @@ function App() {
           onPlayAgain={handlePlayAgain}
           onQuickRematch={handleQuickRematch}
         /></ErrorBoundary>
+      )}
+      {screen === 'graduation' && (
+        <BusinessSchoolGraduation
+          onStartRealGame={() => {
+            resetGame();
+            setChallengeData(null);
+            setIncomingResult(null);
+            setScreen('intro');
+          }}
+          onReplay={() => {
+            const prevName = useGameStore.getState().holdcoName || 'My First Holdco';
+            resetGame();
+            setChallengeData(null);
+            setIncomingResult(null);
+            startBusinessSchool(prevName);
+            setIsNewGame(true);
+            setScreen('game');
+          }}
+        />
       )}
       {screen === 'familyOfficeResults' && (
         <FamilyOfficeScreen onComplete={handleFamilyOfficeResultsComplete} />

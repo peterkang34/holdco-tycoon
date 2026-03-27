@@ -1075,6 +1075,30 @@ function migrateV39ToV40(): void {
   }
 }
 
+// --- v40 → v41: adds Business School mode fields ---
+
+function migrateV40ToV41(): void {
+  const v40Key = 'holdco-tycoon-save-v40';
+  const v41Key = 'holdco-tycoon-save-v41';
+  if (localStorage.getItem(v41Key)) return;
+  try {
+    const raw = localStorage.getItem(v40Key);
+    if (!raw) return;
+    const v40Data = JSON.parse(raw);
+    if (!v40Data?.state) return;
+    if (v40Data.state.isBusinessSchoolMode === undefined) {
+      v40Data.state.isBusinessSchoolMode = false;
+    }
+    if (v40Data.state.businessSchoolState === undefined) {
+      v40Data.state.businessSchoolState = null;
+    }
+    localStorage.setItem(v41Key, JSON.stringify(v40Data));
+    localStorage.removeItem(v40Key);
+  } catch (e) {
+    console.error('v40→v41 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -1111,4 +1135,5 @@ export function runAllMigrations(): void {
   migrateV37ToV38();
   migrateV38ToV39();
   migrateV39ToV40();
+  migrateV40ToV41();
 }
