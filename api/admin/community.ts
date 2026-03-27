@@ -188,16 +188,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // Live game counts from game_history (source of truth — player_stats can be stale)
+    // Live game counts + achievement IDs from game_history (source of truth — player_stats can be stale)
+    const achievementMap = new Map<string, Set<string>>();
     if (playerIds.length > 0) {
       const { data: gameRows } = await supabaseAdmin
         .from('game_history')
-        .select('player_id')
+        .select('player_id, strategy')
         .in('player_id', playerIds)
         .range(0, 4999);
 
       for (const row of gameRows || []) {
         gameCountMap.set(row.player_id, (gameCountMap.get(row.player_id) || 0) + 1);
+        // Collect achievement IDs from strategy JSON (most reliable source)
+        const strategy = row.strategy as Record<string, unknown> | null;
+        const storedIds = strategy?.earnedAchievementIds;
+        if (Array.isArray(storedIds)) {
+          if (!achievementMap.has(row.player_id)) achievementMap.set(row.player_id, new Set());
+          const set = achievementMap.get(row.player_id)!;
+          for (const id of storedIds) {
+            if (typeof id === 'string') set.add(id);
+          }
+        }
       }
     }
 
@@ -225,7 +236,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           total_games: gameCountMap.get(id) ?? stats?.total_games ?? 0,
           best_grade: deriveBestGrade(stats?.grade_distribution ?? null),
           best_adjusted_fev: stats?.best_adjusted_fev ?? 0,
-          achievements_count: Array.isArray(stats?.earned_achievement_ids) ? stats.earned_achievement_ids.length : 0,
+          achievements_count: Math.max(
+            Array.isArray(stats?.earned_achievement_ids) ? stats.earned_achievement_ids.length : 0,
+            achievementMap.get(id)?.size ?? 0,
+          ),
           last_played_at: p.last_played_at ?? null,
           created_at: p.created_at,
           is_anonymous: anonMap.get(id) ?? false,
