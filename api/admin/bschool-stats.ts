@@ -16,7 +16,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     // Get all B-School completions from KV (sorted set, most recent first)
-    const completionsRaw = await kv.zrange('holdco:bschool_completions', 0, -1, { rev: true });
+    let completionsRaw: unknown[];
+    try {
+      completionsRaw = await kv.zrange('holdco:bschool_completions', 0, -1, { rev: true }) || [];
+    } catch {
+      completionsRaw = []; // Key may not exist yet
+    }
     const completions = (completionsRaw || []).map((raw: unknown) => {
       try {
         return typeof raw === 'string' ? JSON.parse(raw) : raw;

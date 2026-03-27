@@ -701,8 +701,11 @@ function BSchoolTab({ token }: { token: string }) {
 
   useEffect(() => {
     fetch('/api/admin/bschool-stats', { headers: { Authorization: `Bearer ${token}` } })
-      .then(r => r.json())
-      .then(setStats)
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(data => setStats(data?.error ? null : data))
       .catch(() => setStats(null))
       .finally(() => setLoading(false));
   }, [token]);
@@ -721,16 +724,16 @@ function BSchoolTab({ token }: { token: string }) {
 
       {/* Key metrics */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <MetricCard label="Total Completions" value={stats.totalCompletions} />
-        <MetricCard label="Full Completions (15/15)" value={stats.fullCompletions} />
-        <MetricCard label="Completion Rate" value={`${stats.fullCompletionRate}%`} />
-        <MetricCard label="Avg Checklist" value={`${stats.avgChecklistCompleted}/15`} />
+        <MetricCard label="Total Completions" value={stats.totalCompletions ?? 0} />
+        <MetricCard label="Full Completions (15/15)" value={stats.fullCompletions ?? 0} />
+        <MetricCard label="Completion Rate" value={`${stats.fullCompletionRate ?? 0}%`} />
+        <MetricCard label="Avg Checklist" value={`${stats.avgChecklistCompleted ?? 0}/15`} />
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <MetricCard label="Platform Forged" value={stats.platformForgedCount} />
-        <MetricCard label="Platform Rate" value={`${stats.platformForgedRate}%`} />
-        <MetricCard label="Partial Completions" value={stats.partialCompletions} />
+        <MetricCard label="Platform Forged" value={stats.platformForgedCount ?? 0} />
+        <MetricCard label="Platform Rate" value={`${stats.platformForgedRate ?? 0}%`} />
+        <MetricCard label="Partial Completions" value={stats.partialCompletions ?? 0} />
         <MetricCard
           label="Device Split"
           value={Object.entries(stats.deviceBreakdown || {}).map(([d, c]) => `${d}: ${c}`).join(', ') || '--'}
