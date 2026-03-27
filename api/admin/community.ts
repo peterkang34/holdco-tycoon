@@ -33,6 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Build a map of user_id → is_anonymous for player browser
     const anonMap = new Map<string, boolean>();
     const emailMap = new Map<string, string>();
+    const providerMap = new Map<string, string>();
 
     // Paginate through all users (Supabase caps at 1000 per page)
     let authPage = 1;
@@ -59,6 +60,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const isAnon = user.is_anonymous === true;
         anonMap.set(user.id, isAnon);
         if (user.email) emailMap.set(user.id, user.email);
+        if (!isAnon) providerMap.set(user.id, (user.app_metadata?.provider as string) || 'email');
 
         if (isAnon) {
           anonymousAccounts++;
@@ -242,6 +244,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           ),
           last_played_at: p.last_played_at ?? null,
           created_at: p.created_at,
+          auth_provider: providerMap.get(id) ?? null,
           is_anonymous: anonMap.get(id) ?? false,
         };
       })

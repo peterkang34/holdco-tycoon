@@ -17,6 +17,7 @@ const COLUMNS: { key: SortField | string; label: string; className?: string }[] 
   { key: 'best_grade', label: 'Grade', className: 'text-center' },
   { key: 'best_adjusted_fev', label: 'Best FEV', className: 'text-right' },
   { key: 'achievements_count', label: 'Achievements', className: 'text-right' },
+  { key: 'auth_provider', label: 'Auth' },
   { key: 'last_played_at', label: 'Last Played', className: 'text-right' },
   { key: 'created_at', label: 'Joined', className: 'text-right' },
 ];
@@ -471,6 +472,17 @@ export function CommunityTab({ token }: { token: string }) {
                     <td className="py-2 px-2 text-right font-mono text-text-secondary">
                       {player.achievements_count > 0 ? player.achievements_count : '--'}
                     </td>
+                    <td className="py-2 px-2">
+                      {player.auth_provider ? (
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                          player.auth_provider === 'google' ? 'bg-blue-500/20 text-blue-400' : 'bg-emerald-500/20 text-emerald-400'
+                        }`}>
+                          {player.auth_provider === 'google' ? 'Google' : 'Email'}
+                        </span>
+                      ) : (
+                        <span className="text-text-muted">--</span>
+                      )}
+                    </td>
                     <td className="py-2 px-2 text-right text-text-muted">
                       {player.last_played_at ? formatDate(player.last_played_at) : '--'}
                     </td>
@@ -489,7 +501,7 @@ export function CommunityTab({ token }: { token: string }) {
                   {/* Detail panel (inline expand) */}
                   {selectedPlayerId === player.id && (
                     <tr>
-                      <td colSpan={9} className="p-0">
+                      <td colSpan={10} className="p-0">
                         <PlayerDetailPanel detail={playerDetail} loading={detailLoading} token={token} />
                       </td>
                     </tr>

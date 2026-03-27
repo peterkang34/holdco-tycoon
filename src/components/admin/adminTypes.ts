@@ -206,6 +206,7 @@ export interface CommunityPlayer {
   best_grade: string | null;
   best_adjusted_fev: number;
   achievements_count: number;
+  auth_provider: string | null;
   last_played_at: string | null;
   created_at: string;
   is_anonymous: boolean;
