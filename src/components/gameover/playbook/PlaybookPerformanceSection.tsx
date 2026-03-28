@@ -50,7 +50,7 @@ function FEVChart({ data, isPE }: { data: PlaybookData['performance']['metricsTi
       <svg
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-48 md:h-56"
-        preserveAspectRatio="none"
+        preserveAspectRatio="xMidYMid meet"
         onMouseLeave={() => setHoveredIdx(null)}
       >
         <defs>
@@ -72,8 +72,8 @@ function FEVChart({ data, isPE }: { data: PlaybookData['performance']['metricsTi
             y1={padY + chartH * (1 - pct)}
             x2={padX + chartW}
             y2={padY + chartH * (1 - pct)}
-            stroke="rgba(255,255,255,0.05)"
-            strokeWidth="0.15"
+            stroke="rgba(255,255,255,0.08)"
+            strokeWidth="0.2"
           />
         ))}
 
@@ -81,7 +81,7 @@ function FEVChart({ data, isPE }: { data: PlaybookData['performance']['metricsTi
         <path d={areaPath} fill="url(#pbFevArea)" />
 
         {/* Line */}
-        <path d={linePath} fill="none" stroke="url(#pbFevLine)" strokeWidth="0.6" strokeLinecap="round" strokeLinejoin="round" />
+        <path d={linePath} fill="none" stroke="url(#pbFevLine)" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
 
         {/* Hover targets (invisible wider hit areas) */}
         {points.map((p, i) => (
@@ -98,7 +98,7 @@ function FEVChart({ data, isPE }: { data: PlaybookData['performance']['metricsTi
 
         {/* Hovered dot */}
         {hovered && (
-          <circle cx={hovered.x} cy={hovered.y} r="0.8" fill="#10b981" />
+          <circle cx={hovered.x} cy={hovered.y} r="1.2" fill="#10b981" />
         )}
       </svg>
 
