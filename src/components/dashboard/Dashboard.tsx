@@ -323,28 +323,27 @@ export function Dashboard({
       {/* Status Badges */}
       <div className="flex flex-wrap gap-1 sm:gap-2 mt-3 sm:mt-4">
         {/* Fund mode: LP Satisfaction gauge */}
-        {isFundManagerMode && (
-          <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full flex items-center gap-1.5 ${
-            lpSatisfactionScore >= 70 ? 'bg-green-500/20 text-green-400' :
-            lpSatisfactionScore >= 40 ? 'bg-yellow-500/20 text-yellow-400' :
-            'bg-red-500/20 text-red-400'
-          }`}
-          title={`LP Satisfaction: ${lpSatisfactionScore}/100. Above 70 = LPAC auto-approves. Below 15 = termination threat.`}>
-            LP Mood: {lpSatisfactionScore >= 70 ? 'Satisfied' : lpSatisfactionScore >= 40 ? 'Cautious' : 'Unhappy'}
-            <span className="inline-flex items-center">
-              <span className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden inline-block align-middle">
-                <span
-                  className={`h-full block rounded-full transition-all duration-500 ${
-                    lpSatisfactionScore >= 70 ? 'bg-green-400' :
-                    lpSatisfactionScore >= 40 ? 'bg-yellow-400' :
-                    'bg-red-400'
-                  }`}
-                  style={{ width: `${lpSatisfactionScore}%` }}
-                />
+        {isFundManagerMode && (() => {
+          const s = lpSatisfactionScore;
+          const tier = s >= 80 ? { label: 'Delighted', bg: 'bg-emerald-500/20', text: 'text-emerald-400', bar: 'bg-emerald-400' }
+            : s >= 70 ? { label: 'Satisfied', bg: 'bg-green-500/20', text: 'text-green-400', bar: 'bg-green-400' }
+            : s >= 40 ? { label: 'Cautious', bg: 'bg-yellow-500/20', text: 'text-yellow-400', bar: 'bg-yellow-400' }
+            : s >= 20 ? { label: 'At Risk', bg: 'bg-orange-500/20', text: 'text-orange-400', bar: 'bg-orange-400' }
+            : { label: 'Critical', bg: 'bg-red-500/20', text: 'text-red-400', bar: 'bg-red-400' };
+          return (
+            <span
+              className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full flex items-center gap-1.5 ${tier.bg} ${tier.text}`}
+              title={`LP Satisfaction: ${s}/100. 80+ = Delighted (achievement tier). 70+ = LPAC auto-approves. Below 20 = grade capped at C. Below 15 = termination threat.`}
+            >
+              LP: {s}/100 — {tier.label}
+              <span className="inline-flex items-center">
+                <span className="w-12 h-1.5 bg-white/10 rounded-full overflow-hidden inline-block align-middle">
+                  <span className={`h-full block rounded-full transition-all duration-500 ${tier.bar}`} style={{ width: `${s}%` }} />
+                </span>
               </span>
             </span>
-          </span>
-        )}
+          );
+        })()}
         {/* Fund mode: deployment pace badge (Years 1-5) */}
         {isFundManagerMode && round <= 5 && (
           <span className={`text-[10px] sm:text-xs px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-full ${

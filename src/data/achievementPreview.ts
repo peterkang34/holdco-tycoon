@@ -399,7 +399,7 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
   {
     id: 'lp_whisperer',
     name: 'LP Whisperer',
-    description: 'End a PE fund with 80%+ LP satisfaction (10/10 score).',
+    description: 'End a PE fund with your LPs Delighted (80+ satisfaction).',
     emoji: '🗣️',
     category: 'mode',
     rarity: 'epic',
