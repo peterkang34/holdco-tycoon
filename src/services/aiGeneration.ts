@@ -387,6 +387,16 @@ interface GameAnalysisInput {
   totalInvestedCapital: number;
   equityRaisesUsed: number;
   sharedServicesActive: number;
+  // PE Fund mode (optional)
+  isFundManagerMode?: boolean;
+  fundName?: string;
+  fundSize?: number;
+  peScore?: any;
+  carryWaterfall?: any;
+  lpSatisfactionScore?: number;
+  lpCommentary?: any[];
+  totalCapitalDeployed?: number;
+  lpDistributions?: number;
 }
 
 export async function generateGameAnalysis(input: GameAnalysisInput): Promise<AIGameAnalysis | null> {
@@ -476,6 +486,18 @@ export async function generateGameAnalysis(input: GameAnalysisInput): Promise<AI
         difficulty: input.difficulty,
         founderEquityValue: input.founderEquityValue,
         founderOwnership: input.founderOwnership,
+        // PE Fund mode data (passthrough)
+        ...(input.isFundManagerMode ? {
+          isFundManagerMode: true,
+          fundName: input.fundName,
+          fundSize: input.fundSize,
+          peScore: input.peScore,
+          carryWaterfall: input.carryWaterfall,
+          lpSatisfactionScore: input.lpSatisfactionScore,
+          lpCommentary: input.lpCommentary,
+          totalCapitalDeployed: input.totalCapitalDeployed,
+          lpDistributions: input.lpDistributions,
+        } : {}),
       }),
     });
 
