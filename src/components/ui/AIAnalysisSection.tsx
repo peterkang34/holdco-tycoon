@@ -5,7 +5,7 @@ import {
   generateFallbackAnalysis,
   checkAIStatus,
 } from '../../services/aiGeneration';
-import { GameState, ScoreBreakdown, Business } from '../../engine/types';
+import { GameState, ScoreBreakdown, PEScoreBreakdown, CarryWaterfall, LPComment, Business } from '../../engine/types';
 
 interface AIAnalysisSectionProps {
   holdcoName: string;
@@ -23,6 +23,16 @@ interface AIAnalysisSectionProps {
   difficulty?: string;
   founderEquityValue?: number;
   founderOwnership?: number;
+  // PE Fund mode data
+  isFundManagerMode?: boolean;
+  fundName?: string;
+  fundSize?: number;
+  peScore?: PEScoreBreakdown | null;
+  carryWaterfall?: CarryWaterfall | null;
+  lpSatisfactionScore?: number;
+  lpCommentary?: LPComment[];
+  totalCapitalDeployed?: number;
+  lpDistributions?: number;
 }
 
 export function AIAnalysisSection({
@@ -41,6 +51,15 @@ export function AIAnalysisSection({
   difficulty,
   founderEquityValue,
   founderOwnership,
+  isFundManagerMode,
+  fundName,
+  fundSize,
+  peScore,
+  carryWaterfall,
+  lpSatisfactionScore,
+  lpCommentary,
+  totalCapitalDeployed,
+  lpDistributions,
 }: AIAnalysisSectionProps) {
   const [analysis, setAnalysis] = useState<AIGameAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -76,6 +95,18 @@ export function AIAnalysisSection({
         totalInvestedCapital,
         equityRaisesUsed,
         sharedServicesActive,
+        // PE Fund mode data
+        ...(isFundManagerMode ? {
+          isFundManagerMode: true,
+          fundName,
+          fundSize,
+          peScore,
+          carryWaterfall,
+          lpSatisfactionScore,
+          lpCommentary: lpCommentary?.slice(-10), // Last 10 LP comments
+          totalCapitalDeployed,
+          lpDistributions,
+        } : {}),
       };
 
       try {

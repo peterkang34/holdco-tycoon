@@ -963,6 +963,15 @@ export function GameOverScreen({
             difficulty={difficulty}
             founderEquityValue={founderEquityValue}
             founderOwnership={enterpriseValue > 0 ? founderEquityValue / enterpriseValue : 1}
+            isFundManagerMode={isFundManagerMode}
+            fundName={fundName}
+            fundSize={useGameStore.getState().fundSize}
+            peScore={peScore}
+            carryWaterfall={carryWaterfallData}
+            lpSatisfactionScore={lpSatisfactionScore ?? undefined}
+            lpCommentary={useGameStore.getState().lpCommentary ?? undefined}
+            totalCapitalDeployed={useGameStore.getState().totalCapitalDeployed}
+            lpDistributions={lpDistributions ?? undefined}
           />
 
           {/* Section 8: Score Breakdown + Grade (demoted) */}
