@@ -845,8 +845,8 @@ export function AllocatePhase({
                   You have {formatMoney(cash)} — shortfall: <span className="text-warning font-mono">{formatMoney(Math.max(0, minCashForDeal - cash))}</span>
                 </p>
               </div>
-              {/* In-modal equity raise (hidden in FO mode) */}
-              {isFamilyOfficeMode ? (
+              {/* In-modal equity raise (hidden in FO and PE Fund modes — fund size is fixed) */}
+              {(isFamilyOfficeMode || isFundManagerMode) ? (
                 <div className="border border-white/10 bg-white/5 rounded-lg p-4">
                   <p className="text-sm text-text-secondary">
                     Not enough cash for this deal. Consider selling a business or choosing a smaller deal.
@@ -1045,8 +1045,8 @@ export function AllocatePhase({
               ))}
             </div>
 
-            {/* Scenario B: Collapsible equity raise (hidden in FO mode — no equity raises) */}
-            {!isFamilyOfficeMode && (() => {
+            {/* Scenario B: Collapsible equity raise (hidden in FO and PE Fund modes) */}
+            {!isFamilyOfficeMode && !isFundManagerMode && (() => {
               if (raiseBlocked || atOwnershipFloor) return null;
               const parsedAmount = parseInt(modalEquityAmount) || 0;
               const internalAmount = Math.round(parsedAmount / 1000);
