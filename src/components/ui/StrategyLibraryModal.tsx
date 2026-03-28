@@ -75,7 +75,7 @@ export function StrategyLibraryModal() {
   const handleViewPlaybook = async (entry: PlaybookIndexEntry) => {
     setLoadingPlaybook(true);
     try {
-      const res = await fetch(`/api/player/playbook/${entry.shareId}`);
+      const res = await fetch(`/api/player/playbook/${entry.shareId}?v=2`);
       if (!res.ok) throw new Error('Not found');
       const data = await res.json();
       setViewingPlaybook(data.playbook);

@@ -43,8 +43,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(404).json({ error: 'Playbook not found' });
     }
 
-    // Cache immutable playbook for 24 hours
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    // Cache playbook for 1 hour (reduced from 24h to allow debrief backfills to propagate)
+    res.setHeader('Cache-Control', 'public, max-age=3600');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
 
     // Extract aiDebrief from strategy if present (PE fund debriefs)
