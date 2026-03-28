@@ -459,7 +459,7 @@ export function GameOverScreen({
       bSchoolCompleted: (() => { try { return localStorage.getItem('holdco-tycoon-bschool-completed') === 'true'; } catch { return false; } })(),
     };
     return ACHIEVEMENT_PREVIEW.filter(a => a.check(ctx));
-  }, [strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions, lpDistributions, founderEquityValue, difficulty, duration, bankruptRound, isFundManagerMode, carryWaterfallData]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions, lpDistributions, founderEquityValue, difficulty, duration, bankruptRound, hasRestructured, isFundManagerMode, carryWaterfallData, lpSatisfactionScore, metrics.cashConversion]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Capture pre-existing achievements BEFORE saving, then persist
   const preSaveIdsRef = useRef<Set<string> | null>(null);
