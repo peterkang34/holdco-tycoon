@@ -5188,7 +5188,7 @@ export const useGameStore = create<GameStore>()(
           // Clearance — just pay legal costs
           const newState = { ...state, cash: state.cash - cost, currentEvent: null };
           set({ ...newState, metrics: calculateMetrics(newState) });
-          useToastStore.getState().addToast({ message: 'Antitrust clearance granted! Legal costs only.', type: 'success' });
+          useToastStore.getState().addToast({ message: `Antitrust clearance granted! You keep all businesses. Legal costs: ${formatMoney(cost)}.`, type: 'success' });
         } else {
           // Forced divestiture at 80%
           const targetId = state.currentEvent.affectedBusinessId;
