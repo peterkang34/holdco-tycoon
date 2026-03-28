@@ -34,7 +34,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { data: game, error } = await supabaseAdmin
       .from('game_history')
-      .select('playbook, initials, completed_at')
+      .select('playbook, strategy, initials, completed_at')
       .eq('playbook_share_id', shareId)
       .not('playbook', 'is', null)
       .single();
@@ -47,10 +47,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.setHeader('Cache-Control', 'public, max-age=86400');
     res.setHeader('X-Robots-Tag', 'noindex, nofollow');
 
+    // Extract aiDebrief from strategy if present (PE fund debriefs)
+    const aiDebrief = game.strategy?.aiDebrief ?? null;
+
     return res.status(200).json({
       playbook: game.playbook,
       playerInitials: game.initials,
       completedAt: game.completed_at,
+      aiDebrief,
     });
   } catch (err) {
     console.error('Playbook read error:', err);

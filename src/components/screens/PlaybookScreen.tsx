@@ -14,6 +14,7 @@ interface PlaybookScreenProps {
  */
 export function PlaybookScreen({ shareId, onBack }: PlaybookScreenProps) {
   const [playbook, setPlaybook] = useState<PlaybookData | null>(null);
+  const [aiDebrief, setAIDebrief] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -30,6 +31,7 @@ export function PlaybookScreen({ shareId, onBack }: PlaybookScreenProps) {
       .then(data => {
         if (!cancelled) {
           setPlaybook(data.playbook);
+          setAIDebrief(data.aiDebrief ?? null);
           setLoading(false);
         }
       })
@@ -91,6 +93,7 @@ export function PlaybookScreen({ shareId, onBack }: PlaybookScreenProps) {
         isOpen={true}
         onClose={onBack}
         playbook={playbook}
+        aiDebrief={aiDebrief}
       />
     </div>
   );

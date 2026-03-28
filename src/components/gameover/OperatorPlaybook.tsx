@@ -9,14 +9,16 @@ import { PlaybookOperationsSection } from './playbook/PlaybookOperationsSection'
 import { PlaybookExitsSection } from './playbook/PlaybookExitsSection';
 import { PlaybookPerformanceSection } from './playbook/PlaybookPerformanceSection';
 import { PlaybookRealityCheck } from './playbook/PlaybookRealityCheck';
+import { PlaybookAIDebrief } from './playbook/PlaybookAIDebrief';
 
 interface OperatorPlaybookProps {
   isOpen: boolean;
   onClose: () => void;
   playbook: PlaybookData;
+  aiDebrief?: any;
 }
 
-export function OperatorPlaybook({ isOpen, onClose, playbook }: OperatorPlaybookProps) {
+export function OperatorPlaybook({ isOpen, onClose, playbook, aiDebrief }: OperatorPlaybookProps) {
   const { thesis } = playbook;
   const isBankrupt = thesis.isBankrupt;
   const isMinimal = playbook.isMinimal;
@@ -48,6 +50,7 @@ export function OperatorPlaybook({ isOpen, onClose, playbook }: OperatorPlaybook
           <>
             <PlaybookCapitalSection capital={playbook.capital} />
             <PlaybookRealityCheck realityCheck={playbook.realityCheck} />
+            {aiDebrief && <PlaybookAIDebrief aiDebrief={aiDebrief} />}
           </>
         ) : (
           <>
@@ -154,6 +157,9 @@ export function OperatorPlaybook({ isOpen, onClose, playbook }: OperatorPlaybook
                 )}
               </div>
             )}
+
+            {/* AI Strategy Debrief (if stored) */}
+            {aiDebrief && <PlaybookAIDebrief aiDebrief={aiDebrief} />}
 
             {/* Reality Check footer */}
             <PlaybookRealityCheck realityCheck={playbook.realityCheck} />

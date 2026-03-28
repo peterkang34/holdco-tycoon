@@ -49,6 +49,7 @@ export function StrategyLibraryModal() {
 
   // Playbook viewer
   const [viewingPlaybook, setViewingPlaybook] = useState<PlaybookData | null>(null);
+  const [viewingAIDebrief, setViewingAIDebrief] = useState<any>(null);
   const [loadingPlaybook, setLoadingPlaybook] = useState(false);
 
   const fetchLibrary = useCallback(async () => {
@@ -78,6 +79,7 @@ export function StrategyLibraryModal() {
       if (!res.ok) throw new Error('Not found');
       const data = await res.json();
       setViewingPlaybook(data.playbook);
+      setViewingAIDebrief(data.aiDebrief ?? null);
     } catch {
       // Fallback: couldn't load
     } finally {
@@ -208,8 +210,9 @@ export function StrategyLibraryModal() {
       {viewingPlaybook && (
         <OperatorPlaybook
           isOpen={!!viewingPlaybook}
-          onClose={() => setViewingPlaybook(null)}
+          onClose={() => { setViewingPlaybook(null); setViewingAIDebrief(null); }}
           playbook={viewingPlaybook}
+          aiDebrief={viewingAIDebrief}
         />
       )}
     </>
