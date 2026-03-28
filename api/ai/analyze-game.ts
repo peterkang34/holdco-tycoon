@@ -117,7 +117,7 @@ Generate a JSON response with these fields:
 
 Write like you're addressing a GP at their annual meeting. Be direct, analytical, reference actual numbers from the fund. Compare to real PE benchmarks. Respond ONLY with valid JSON.`;
 
-      const result = await callAnthropic(pePrompt, 1200);
+      const result = await callAnthropic(pePrompt, 1200, undefined, 15000);
       if (!result.content) {
         return res.status(502).json({ error: result.error || 'AI service temporarily unavailable' });
       }

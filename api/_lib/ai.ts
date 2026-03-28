@@ -41,9 +41,10 @@ export async function callAnthropic(
   prompt: string,
   maxTokens: number,
   systemMessage?: string,
+  timeoutMs: number = 8000,
 ): Promise<{ content: string | null; error?: string }> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8000);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const messages: Array<{ role: string; content: string }> = [
