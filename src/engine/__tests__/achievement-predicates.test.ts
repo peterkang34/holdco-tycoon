@@ -624,11 +624,11 @@ describe('Achievement Predicates', () => {
 
   describe('lp_whisperer', () => {
     const ach = getAchievement('lp_whisperer');
-    it('triggers at exactly 90 LP satisfaction', () => {
-      expect(ach.check(createCtx({ isFundManagerMode: true, lpSatisfaction: 90 }))).toBe(true);
+    it('triggers at exactly 80 LP satisfaction (10/10 PE score threshold)', () => {
+      expect(ach.check(createCtx({ isFundManagerMode: true, lpSatisfaction: 80 }))).toBe(true);
     });
-    it('fails at 89', () => {
-      expect(ach.check(createCtx({ isFundManagerMode: true, lpSatisfaction: 89 }))).toBe(false);
+    it('fails at 79', () => {
+      expect(ach.check(createCtx({ isFundManagerMode: true, lpSatisfaction: 79 }))).toBe(false);
     });
     it('fails outside fund manager mode', () => {
       expect(ach.check(createCtx({ isFundManagerMode: false, lpSatisfaction: 95 }))).toBe(false);

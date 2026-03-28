@@ -399,12 +399,12 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
   {
     id: 'lp_whisperer',
     name: 'LP Whisperer',
-    description: 'End a PE fund with 90%+ LP satisfaction.',
+    description: 'End a PE fund with 80%+ LP satisfaction (10/10 score).',
     emoji: '🗣️',
     category: 'mode',
     rarity: 'epic',
     check: (ctx) =>
-      ctx.isFundManagerMode && (ctx.lpSatisfaction ?? 0) >= 90,
+      ctx.isFundManagerMode && (ctx.lpSatisfaction ?? 0) >= 80,
   },
   {
     id: 'hard_mode_hero',

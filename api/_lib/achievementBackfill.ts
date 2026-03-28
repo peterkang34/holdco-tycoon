@@ -146,8 +146,8 @@ function evaluateGameAchievements(game: Record<string, unknown>): string[] {
     // carry_king: $20M+ carry in PE mode
     if (isFundManager && carryEarned >= 20_000) earned.push('carry_king');
 
-    // lp_whisperer: 90%+ LP satisfaction in PE mode
-    if (isFundManager && lpSatisfaction >= 90) earned.push('lp_whisperer');
+    // lp_whisperer: 80%+ LP satisfaction in PE mode (80+ = 10/10 on PE score)
+    if (isFundManager && lpSatisfaction >= 80) earned.push('lp_whisperer');
 
     // shared_services_maven: all 3 SS active + 5 businesses
     if (sharedServicesActive >= 3 && activeCount >= 5) earned.push('shared_services_maven');
