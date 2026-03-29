@@ -139,13 +139,12 @@ export function initAuthListener(): (() => void) | undefined {
         } catch { /* ignore parse errors */ }
       }
 
-      // On initial load for verified users, auto-link once (catches stale-token submissions)
+      // On initial load for verified users, auto-link (catches OAuth redirects and stale-token submissions)
       if (event === 'INITIAL_SESSION' && !isAnonymous) {
-        const flag = `holdco-autolink-done:${user.id}`;
-        if (!localStorage.getItem(flag)) {
-          localStorage.setItem(flag, '1');
-          fireAutoLink();
-        }
+        // Always fire auto-link for verified users on session init — it's idempotent
+        // and ensures player_profiles row exists (critical for Google OAuth redirects
+        // where the anonymous→verified upgrade happens across a page reload)
+        fireAutoLink();
       }
     }
 
