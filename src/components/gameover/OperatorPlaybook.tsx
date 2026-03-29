@@ -76,6 +76,9 @@ export function OperatorPlaybook({ isOpen, onClose, playbook, aiDebrief }: Opera
               peFund={playbook.peFund}
             />
 
+            {/* Strategy Debrief (positioned after Performance, before addendums) */}
+            {aiDebrief && <PlaybookAIDebrief aiDebrief={aiDebrief} />}
+
             {/* Family Office addendum */}
             {playbook.familyOffice && (
               <div className="border-t border-white/10 pt-5">
@@ -157,9 +160,6 @@ export function OperatorPlaybook({ isOpen, onClose, playbook, aiDebrief }: Opera
                 )}
               </div>
             )}
-
-            {/* AI Strategy Debrief (if stored) */}
-            {aiDebrief && <PlaybookAIDebrief aiDebrief={aiDebrief} />}
 
             {/* Reality Check footer */}
             <PlaybookRealityCheck realityCheck={playbook.realityCheck} />

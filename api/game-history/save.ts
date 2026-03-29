@@ -93,7 +93,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         'turnaroundsFailed', 'maSourcingTier', 'sharedServicesActive', 'rolloverEquityCount', 'totalDebt',
         'activeCount', 'peakActiveCount', 'recessionAcquisitionCount', 'lpSatisfaction', 'isBankrupt',
         'sellerNotesTotal', 'earnedAchievementIds', 'isFundManager', 'fundName', 'carryEarned', 'netIrr',
-        'grossMoic', 'smartExitMoic']) {
+        'grossMoic', 'smartExitMoic', 'aiDebrief']) {
         if (s[key] !== undefined) validStrategy[key] = s[key];
       }
     }

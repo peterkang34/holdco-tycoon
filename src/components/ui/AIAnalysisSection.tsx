@@ -33,6 +33,7 @@ interface AIAnalysisSectionProps {
   lpCommentary?: LPComment[];
   totalCapitalDeployed?: number;
   lpDistributions?: number;
+  onDebriefGenerated?: (debrief: AIGameAnalysis) => void;
 }
 
 export function AIAnalysisSection({
@@ -60,6 +61,7 @@ export function AIAnalysisSection({
   lpCommentary,
   totalCapitalDeployed,
   lpDistributions,
+  onDebriefGenerated,
 }: AIAnalysisSectionProps) {
   const [analysis, setAnalysis] = useState<AIGameAnalysis | null>(null);
   const [loading, setLoading] = useState(true);
@@ -116,6 +118,7 @@ export function AIAnalysisSection({
           if (aiAnalysis) {
             setAnalysis(aiAnalysis);
             setIsAI(true);
+            onDebriefGenerated?.(aiAnalysis);
           } else {
             setAnalysis(generateFallbackAnalysis(input));
             setIsAI(false);

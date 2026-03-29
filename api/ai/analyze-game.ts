@@ -148,7 +148,26 @@ Write like you're addressing a GP at their annual meeting. Be direct, analytical
     const scoreBalanceSheetHealth = typeof score.balanceSheetHealth === 'number' ? score.balanceSheetHealth : 0;
     const scoreStrategicDiscipline = typeof score.strategicDiscipline === 'number' ? score.strategicDiscipline : 0;
 
-    const prompt = `You are an experienced investment advisor reviewing a player's ${totalRounds}-year holding company simulation game. The player runs a holdco (not a PE fund) — never use the term "private equity firm". Analyze their performance and provide personalized, actionable feedback.
+    // Mode-specific context — grounded in real capital allocator frameworks (ILTB podcast research)
+    const isNormal = rawDifficulty === 'normal';
+    const isQuick = totalRounds <= 10;
+    const MODE_ADDENDA: Record<string, string> = {
+      easy_quick: `MODE CONTEXT — Easy Quick (10-Year Sprint, $20M institutional capital, 80% ownership):
+This tests speed of deployment and capital efficiency over a compressed horizon. The strategic model is TransDigm's flywheel: $25M of primary equity became $35B — it never required another dollar. Nick Howley built the base EBITDA in 4-5 years through operational optimization, then did all subsequent acquisitions with debt. Similarly, IMC/Golden Corral (Connor Leonard, ILTB Ep 64) deployed $50K into a capital-light franchise, then used the FCF as permanent capital to acquire 8 businesses — "the same way Berkshire uses insurance float." Evaluate how quickly they built the flywheel. Did idle cash sit too long? Did they achieve escape velocity within the 10-year window? A great 10-year holdco builder deploys fast, improves operations immediately, and builds a portfolio with enough organic momentum to compound beyond the game window.`,
+
+      easy_standard: `MODE CONTEXT — Easy Standard (20-Year Compounder, $20M institutional capital, 80% ownership):
+The model here is Constellation Software and Permanent Equity. Mark Leonard started CSU with C$25M in 1995 and compounded at 30%+ for 20 years through disciplined small acquisitions — never raised additional equity. Brent Beshore at Permanent Equity (ILTB Ep 10) calls it "cultivating a disaster-resistant compound interest machine" — harvest excess capital from existing investments, pull it together for the next acquisition, default to no and force yourself into the yes column. Will Thorndike (ILTB Ep 288) emphasizes "revenue quality and capital efficiency" as the predictors of sustainable compounding: low churn businesses with high return on tangible capital. Evaluate the full 20-year arc: did they compound or plateau? Did margin drift erode second-decade returns? Did they use the full toolkit (IPO, Family Office, platforms)? The best 20-year holdco builders achieve escape velocity where FCF generation outpaces deployment needs.`,
+
+      normal_quick: `MODE CONTEXT — Normal Quick (10-Year Bootstrapped Sprint, $5M start + $3M debt, 100% ownership):
+This mirrors the search fund model and Shore Capital's approach. Search funds (ILTB Ep 33) target mid-30s IRRs by acquiring $1-2M EBITDA businesses with minimal capital. Justin Ishbia at Shore Capital (ILTB Ep 357) built a system around microcap acquisitions: $3.5M average EBITDA, 7.5x entry multiples, 2x leverage, achieving 7x gross MOIC and 72% gross IRR across 586 acquisitions. His philosophy: "Main Street, not Wall Street — if we get 1-2 things right, 3x the money. If we get 4-5 right, 5-7x. Everything right, 20x." With only $5M and starting debt, every dollar of idle cash and every point of leverage matters. Evaluate their deleveraging arc, capital efficiency relative to starting equity, and whether they created disproportionate value from a constrained capital base.`,
+
+      normal_standard: `MODE CONTEXT — Normal Standard (20-Year Self-Funded Marathon, $5M start + $3M debt, 100% ownership):
+This is the hardest mode, mirroring Chenmark Capital's journey. Trish and James Higgins (ILTB Ep 28) left institutional finance to buy a landscaping company in Maine with their own capital — "everyone said we were quitting AQR to run a snowplow." Their philosophy: "We're earning the right to take risk for the first 10 years" by building a portfolio of durable "bait shop" businesses — small, differentiated, high-return niches that generate steady FCF. "There are 200,000+ businesses in our revenue range with owners contemplating retirement." They believe in diversification as portfolio theory applied to small businesses, with a "very long-term vision — we all expect it's the last job we'll ever have." The defining question for this mode: did the player make the phase transition from survival/deleveraging to compounder, and when? The best self-funded holdco operators endure 5+ years of modest returns before the compounding flywheel takes hold.`,
+    };
+    const modeKey = `${isNormal ? 'normal' : 'easy'}_${isQuick ? 'quick' : 'standard'}`;
+    const modeContext = MODE_ADDENDA[modeKey] || '';
+
+    const prompt = `You are an experienced investment advisor reviewing a player's ${totalRounds}-year holding company simulation game. The player runs a holdco (not a PE fund) — never use the term "private equity firm". Analyze their performance and provide personalized, actionable feedback grounded in real-world capital allocation wisdom.
 
 GAME RESULTS:
 - Holdco Name: ${holdcoName}
@@ -159,6 +178,8 @@ GAME RESULTS:
 - Founder Equity Value: ${formatMoneyForPrompt(founderEquityValue)} (founder's share of NAV)
 - Enterprise Value: ${formatMoneyForPrompt(enterpriseValue)} (total portfolio value)
 - Founder Ownership: ${founderOwnership}
+
+${modeContext}
 
 SCORE BREAKDOWN:
 - Value Creation (FEV / Capital): ${scoreValueCreation}/20
@@ -193,16 +214,16 @@ TRAJECTORY:
 - Final Leverage: ${finalLeverage}x Net Debt/EBITDA
 
 Generate a JSON response with these fields:
-1. "overallAssessment" - 2-3 sentences summarizing their performance, mentioning specific strengths and weaknesses
-2. "keyStrengths" - Array of 2-3 specific things they did well (be concrete, reference their actual numbers)
-3. "areasForImprovement" - Array of 2-3 specific areas where they could improve (be constructive and specific)
+1. "overallAssessment" - 2-3 sentences summarizing their performance through the lens of the MODE CONTEXT above. Reference the real-world operators and frameworks mentioned. Be specific about their actual numbers.
+2. "keyStrengths" - Array of 2-3 specific things they did well. Connect to the real-world analogies where relevant (e.g., "Like CSU's discipline of never raising equity..." or "This mirrors Shore Capital's approach to...").
+3. "areasForImprovement" - Array of 2-3 constructive, specific areas. Reference what the real-world operators would have done differently.
 4. "specificLessons" - Array of 2-3 objects with:
    - "observation": What pattern you noticed in their play
-   - "lesson": The PE/holdco principle this relates to
-   - "reference": Optional book/investor quote (Buffett, Munger, Mark Leonard, etc.)
-5. "whatIfScenario" - 1-2 sentences describing an alternative path that might have improved their outcome
+   - "lesson": The holdco principle this relates to, grounded in the MODE CONTEXT frameworks
+   - "reference": A specific quote or concept from the operators mentioned (Thorndike, Beshore, Ishbia, Chenmark, Leonard, etc.)
+5. "whatIfScenario" - 1-2 sentences describing an alternative strategy path, referencing a real-world operator's approach
 
-Be direct and specific. Reference their actual numbers. Don't be generic. Respond ONLY with valid JSON.`;
+Be direct, analytical, and grounded in real capital allocation wisdom. Reference their actual numbers. Respond ONLY with valid JSON.`;
 
     const result = await callAnthropic(prompt, 1000);
 

@@ -15,7 +15,7 @@ export function PlaybookAIDebrief({ aiDebrief }: PlaybookAIDebriefProps) {
 
   return (
     <div className="mt-6 pt-4 border-t border-white/5">
-      <p className="text-xs font-bold tracking-widest text-purple-400/60 mb-3 uppercase">AI Strategy Debrief</p>
+      <p className="text-xs font-bold tracking-widest text-purple-400/60 mb-3 uppercase">Strategy Debrief</p>
 
       {/* Overall Assessment */}
       <p className="text-sm text-text-secondary leading-relaxed mb-4">

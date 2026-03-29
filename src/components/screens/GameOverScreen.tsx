@@ -161,6 +161,7 @@ export function GameOverScreen({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState(false);
   const [leaderboardTab, setLeaderboardTab] = useState<import('../ui/LeaderboardModal').LeaderboardTab>(isFundManagerMode ? 'pe' : 'overall');
+  const [liveDebrief, setLiveDebrief] = useState<any>(null);
 
   // ── Challenge State ──
   const [challengeCopied, setChallengeCopied] = useState(false);
@@ -1019,6 +1020,19 @@ export function GameOverScreen({
             lpCommentary={useGameStore.getState().lpCommentary ?? undefined}
             totalCapitalDeployed={useGameStore.getState().totalCapitalDeployed}
             lpDistributions={lpDistributions ?? undefined}
+            onDebriefGenerated={(debrief) => {
+              setLiveDebrief(debrief);
+              // Persist debrief to game_history.strategy.aiDebrief
+              saveGameHistory({
+                holdcoName: isFundManagerMode ? (fundName || 'PE Fund') : holdcoName,
+                seed, score: isFundManagerMode ? (peScore?.total ?? 0) : score.total,
+                grade: isFundManagerMode ? (peScore?.grade ?? 'F') : score.grade,
+                difficulty, duration, totalRounds: maxRounds,
+                enterpriseValue: Math.round(enterpriseValue),
+                founderEquityValue: Math.round(founderEquityValue),
+                strategy: { aiDebrief: debrief },
+              });
+            }}
           />
 
           {/* Section 8: Score Breakdown + Grade (demoted) */}
@@ -1085,6 +1099,7 @@ export function GameOverScreen({
           isOpen={showPlaybook}
           onClose={() => setShowPlaybook(false)}
           playbook={playbookData}
+          aiDebrief={liveDebrief}
         />
       )}
 
