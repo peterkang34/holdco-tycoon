@@ -17,6 +17,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const sort = String(req.query.sort || 'created_at');
     const order = String(req.query.order || 'desc') === 'asc' ? 'asc' : 'desc';
     const search = String(req.query.search || '').trim();
+    const statusFilter = String(req.query.status || 'all'); // 'all' | 'verified' | 'anonymous'
 
     // ── Sign-up metrics via auth.admin.listUsers ──
     const now = new Date();
@@ -108,10 +109,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const statsSorts = ['total_games', 'best_adjusted_fev', 'best_grade'];
     const isStatsSort = statsSorts.includes(sort);
 
-    // Count total players (with search filter)
+    // Build status-filtered ID set (when filtering by verified/anonymous)
+    let statusFilterIds: string[] | null = null;
+    if (statusFilter === 'verified') {
+      statusFilterIds = [...anonMap.entries()].filter(([, isAnon]) => !isAnon).map(([id]) => id);
+    } else if (statusFilter === 'anonymous') {
+      statusFilterIds = [...anonMap.entries()].filter(([, isAnon]) => isAnon).map(([id]) => id);
+    }
+
+    // Count total players (with search + status filter)
     let countQuery = supabaseAdmin.from('player_profiles').select('id', { count: 'exact', head: true });
     if (search) {
       countQuery = countQuery.or(`display_name.ilike.%${search}%,initials.ilike.%${search}%`);
+    }
+    if (statusFilterIds) {
+      // For small sets (verified), use .in(); for large sets (anonymous), this may be slow but works
+      countQuery = countQuery.in('id', statusFilterIds.length > 0 ? statusFilterIds : ['00000000-0000-0000-0000-000000000000']);
     }
     const { count: totalPlayers } = await countQuery;
 
@@ -123,11 +136,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (isStatsSort && !search) {
       // Sort via player_stats table, then fetch matching profiles
       const statsCol = sort === 'best_grade' ? 'best_score' : sort;
-      const { data: statsRows, error: statsError } = await supabaseAdmin
+      let statsQuery = supabaseAdmin
         .from('player_stats')
         .select('player_id, total_games, best_score, best_adjusted_fev, grade_distribution, earned_achievement_ids')
         .order(statsCol, { ascending: order === 'asc' })
         .range((page - 1) * pageSize, page * pageSize - 1);
+      if (statusFilterIds) {
+        statsQuery = statsQuery.in('player_id', statusFilterIds.length > 0 ? statusFilterIds : ['00000000-0000-0000-0000-000000000000']);
+      }
+      const { data: statsRows, error: statsError } = await statsQuery;
 
       if (statsError) {
         console.error('Player stats sort query error:', statsError);
@@ -161,6 +178,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (search) {
         profileQuery = profileQuery.or(`display_name.ilike.%${search}%,initials.ilike.%${search}%`);
+      }
+      if (statusFilterIds) {
+        profileQuery = profileQuery.in('id', statusFilterIds.length > 0 ? statusFilterIds : ['00000000-0000-0000-0000-000000000000']);
       }
 
       const { data: profiles, error: profileError } = await profileQuery;

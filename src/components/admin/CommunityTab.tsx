@@ -48,7 +48,7 @@ export function CommunityTab({ token }: { token: string }) {
   const [order, setOrder] = useState<'asc' | 'desc'>('desc');
   const [search, setSearch] = useState('');
   const [searchInput, setSearchInput] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'anonymous'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'verified' | 'anonymous'>('verified');
 
   // Player detail panel
   const [selectedPlayerId, setSelectedPlayerId] = useState<string | null>(null);
@@ -84,6 +84,7 @@ export function CommunityTab({ token }: { token: string }) {
         sort,
         order,
         ...(search && { search }),
+        ...(statusFilter !== 'all' && { status: statusFilter }),
       });
       const res = await fetch(`/api/admin/community?${params}`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -95,7 +96,7 @@ export function CommunityTab({ token }: { token: string }) {
     } finally {
       setLoading(false);
     }
-  }, [token, page, sort, order, search]);
+  }, [token, page, sort, order, search, statusFilter]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -297,7 +298,7 @@ export function CommunityTab({ token }: { token: string }) {
           <div className="flex gap-2">
             <select
               value={statusFilter}
-              onChange={e => setStatusFilter(e.target.value as 'all' | 'verified' | 'anonymous')}
+              onChange={e => { setStatusFilter(e.target.value as 'all' | 'verified' | 'anonymous'); setPage(1); }}
               className="text-xs bg-bg-primary border border-border rounded px-2 py-1 text-text-secondary focus:outline-none focus:border-accent"
             >
               <option value="all">All Players</option>
@@ -424,11 +425,7 @@ export function CommunityTab({ token }: { token: string }) {
               </tr>
             </thead>
             <tbody>
-              {data.players.filter(player =>
-                statusFilter === 'all' ? true
-                : statusFilter === 'verified' ? !player.is_anonymous
-                : player.is_anonymous
-              ).map(player => (
+              {data.players.map(player => (
                 <Fragment key={player.id}>
                   <tr
                     onClick={() => {
