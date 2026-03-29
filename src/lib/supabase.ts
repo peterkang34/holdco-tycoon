@@ -139,12 +139,35 @@ export function initAuthListener(): (() => void) | undefined {
         } catch { /* ignore parse errors */ }
       }
 
-      // On initial load for verified users, auto-link (catches OAuth redirects and stale-token submissions)
+      // On initial load for verified users, auto-link + celebration (catches OAuth redirects)
       if (event === 'INITIAL_SESSION' && !isAnonymous) {
-        // Always fire auto-link for verified users on session init — it's idempotent
-        // and ensures player_profiles row exists (critical for Google OAuth redirects
-        // where the anonymous→verified upgrade happens across a page reload)
-        fireAutoLink();
+        // Fire auto-link (idempotent) — ensures player_profiles row exists
+        // Also trigger celebration if this looks like an anonymous→verified upgrade
+        // (e.g., Google OAuth redirect where wasAnonymous was true from persisted store)
+        if (wasAnonymous) {
+          // Same celebration flow as SIGNED_IN/USER_UPDATED upgrade path
+          (async () => {
+            const gamesLinked = await fireAutoLink();
+            await syncAchievementsFromServer();
+            const achievementCount = getEarnedAchievementIds().length;
+            if (achievementCount > 0 || gamesLinked > 0) {
+              store.openCelebrationModal({ achievementCount, gamesLinked });
+            }
+          })();
+
+          // Check localStorage for claimable leaderboard entries
+          try {
+            const localEntries = localStorage.getItem('holdco-tycoon-leaderboard');
+            if (localEntries) {
+              const entries = JSON.parse(localEntries);
+              if (Array.isArray(entries) && entries.length > 0) {
+                store.openClaimModal();
+              }
+            }
+          } catch { /* ignore parse errors */ }
+        } else {
+          fireAutoLink();
+        }
       }
     }
 

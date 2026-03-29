@@ -32,19 +32,23 @@ import { syncAchievementsFromServer } from './hooks/useUnlocks';
 type Screen = 'intro' | 'game' | 'gameOver' | 'graduation' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard' | 'playbook';
 
 function App() {
-  const [isAdmin, setIsAdmin] = useState(window.location.hash === '#/admin');
-  const [isFoTest, setIsFoTest] = useState(window.location.hash === '#/fo-test');
-  const [isGoTest, setIsGoTest] = useState(window.location.hash.startsWith('#/go-test'));
-  const [isBsTest, setIsBsTest] = useState(window.location.hash === '#/bs-test');
+  // Skip hash routing when OAuth callback is in progress (access_token in hash)
+  const isOAuthCallback = window.location.hash.includes('access_token=');
+  const [isAdmin, setIsAdmin] = useState(!isOAuthCallback && window.location.hash === '#/admin');
+  const [isFoTest, setIsFoTest] = useState(!isOAuthCallback && window.location.hash === '#/fo-test');
+  const [isGoTest, setIsGoTest] = useState(!isOAuthCallback && window.location.hash.startsWith('#/go-test'));
+  const [isBsTest, setIsBsTest] = useState(!isOAuthCallback && window.location.hash === '#/bs-test');
 
   // Open legal modals if URL hash matches
   useEffect(() => {
+    if (isOAuthCallback) return;
     if (window.location.hash === '#/privacy') useAuthStore.getState().openPrivacyModal();
     if (window.location.hash === '#/terms') useAuthStore.getState().openTermsModal();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onHash = () => {
+      if (window.location.hash.includes('access_token=')) return; // OAuth callback — skip routing
       setIsAdmin(window.location.hash === '#/admin');
       setIsFoTest(window.location.hash === '#/fo-test');
       setIsGoTest(window.location.hash.startsWith('#/go-test'));

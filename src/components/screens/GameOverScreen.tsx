@@ -10,7 +10,7 @@ import { DIFFICULTY_CONFIG, RESTRUCTURING_FEV_PENALTY } from '../../data/gameCon
 import { getOutcomeReactions } from '../../data/lpCommentary';
 import { createRngStreams } from '../../engine/rng';
 import { trackGameComplete, trackChallengeCreate, trackChallengeShare, type GameCompleteSnapshot } from '../../services/telemetry';
-import { submitGameCompletion } from '../../services/completionApi';
+import { submitGameCompletion, saveGameHistory } from '../../services/completionApi';
 import {
   type ChallengeParams,
   type PlayerResult,
@@ -549,6 +549,53 @@ export function GameOverScreen({
         })(),
         endingCashConversion: Math.round(metrics.cashConversion * 1000) / 1000,
         earnedAchievementIds: earnedAchievements.length > 0 ? earnedAchievements.map(a => a.id) : undefined,
+      },
+    });
+
+    // Auto-save to game_history for all authenticated players (fire-and-forget)
+    saveGameHistory({
+      holdcoName: isFundManagerMode ? (fundName || 'PE Fund') : holdcoName,
+      seed,
+      score: gameScore,
+      grade: gameGrade,
+      difficulty,
+      duration,
+      totalRounds: maxRounds,
+      enterpriseValue: Math.round(enterpriseValue),
+      founderEquityValue: Math.round(founderEquityValue),
+      founderPersonalWealth: Math.round(founderPersonalWealth),
+      businessCount: businesses.filter(b => b.status === 'active').length,
+      totalRevenue: Math.round(metrics.totalRevenue ?? 0),
+      avgEbitdaMargin: Math.round((metrics.avgEbitdaMargin ?? 0) * 1000) / 1000,
+      hasRestructured,
+      familyOfficeCompleted: !!familyOfficeState?.legacyScore,
+      legacyGrade: familyOfficeState?.legacyScore?.grade,
+      foMultiplier: foMultiplier > 1.0 ? foMultiplier : undefined,
+      strategy: {
+        scoreBreakdown: isFundManagerMode
+          ? (peScore ? { valueCreation: peScore.valueCreation, fcfShareGrowth: 0, portfolioRoic: 0, capitalDeployment: peScore.deploymentDiscipline, balanceSheetHealth: peScore.riskManagement, strategicDiscipline: 0 } : undefined)
+          : { valueCreation: score.valueCreation, fcfShareGrowth: score.fcfShareGrowth, portfolioRoic: score.portfolioRoic, capitalDeployment: score.capitalDeployment, balanceSheetHealth: score.balanceSheetHealth, strategicDiscipline: score.strategicDiscipline },
+        archetype: strategyData.archetype,
+        sophisticationScore: strategyData.sophisticationScore,
+        sectorIds: strategyData.sectorIds,
+        dealStructureTypes: strategyData.dealStructureTypes,
+        platformsForged: strategyData.platformsForged,
+        totalAcquisitions: strategyData.totalAcquisitions,
+        totalSells: strategyData.totalSells,
+        peakLeverage: Math.round(strategyData.peakLeverage * 10) / 10,
+        totalDistributions: Math.round(isFundManagerMode ? (lpDistributions || 0) : totalDistributions),
+        totalDebt: Math.round(totalDebt),
+        activeCount: strategyData.activeCount,
+        peakActiveCount: strategyData.peakActiveCount,
+        sharedServicesActive: strategyData.sharedServicesActive,
+        isBankrupt: !!bankruptRound,
+        lpSatisfaction: isFundManagerMode ? (lpSatisfactionScore ?? undefined) : undefined,
+        earnedAchievementIds: earnedAchievements.length > 0 ? earnedAchievements.map(a => a.id) : undefined,
+        isFundManager: isFundManagerMode || undefined,
+        fundName: isFundManagerMode ? fundName : undefined,
+        carryEarned: isFundManagerMode ? carryWaterfallData?.carry : undefined,
+        netIrr: isFundManagerMode ? carryWaterfallData?.netIrr : undefined,
+        grossMoic: isFundManagerMode ? carryWaterfallData?.grossMoic : undefined,
       },
     });
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

@@ -360,45 +360,75 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // --- Dual-write to Postgres (game_history + stats) ---
     if (playerId && supabaseAdmin) {
-      // Insert game_history row
+      // Check if auto-save already created a row for this game (match by player + score + grade + difficulty + no leaderboard yet)
+      let existingRowId: string | null = null;
       try {
-        await supabaseAdmin.from('game_history').insert({
-          player_id: playerId,
-          holdco_name: holdcoName.trim(),
-          initials,
-          difficulty: validDifficulty,
-          duration: validDuration,
-          enterprise_value: Math.round(enterpriseValue),
-          founder_equity_value: validFEV,
-          founder_personal_wealth: validPersonalWealth,
-          adjusted_fev: adjustedFEV,
-          score,
-          grade,
-          submitted_multiplier: multiplier,
-          business_count: businessCount,
-          total_revenue: typeof totalRevenue === 'number' ? Math.round(totalRevenue) : null,
-          avg_ebitda_margin: typeof avgEbitdaMargin === 'number' ? Math.round(avgEbitdaMargin * 1000) / 1000 : null,
-          has_restructured: hasRestructured === true,
-          family_office_completed: familyOfficeCompleted === true,
-          legacy_grade: typeof legacyGrade === 'string' && ['Enduring','Influential','Established','Fragile'].includes(legacyGrade) ? legacyGrade : null,
-          fo_multiplier: validFoMultiplier,
-          strategy: validStrategy || null,
-          ...(validStrategy?.scoreBreakdown ? {
-            score_value_creation: validStrategy.scoreBreakdown.valueCreation,
-            score_fcf_share_growth: validStrategy.scoreBreakdown.fcfShareGrowth,
-            score_portfolio_roic: validStrategy.scoreBreakdown.portfolioRoic,
-            score_capital_deployment: validStrategy.scoreBreakdown.capitalDeployment,
-            score_balance_sheet: validStrategy.scoreBreakdown.balanceSheetHealth,
-            score_strategic_discipline: validStrategy.scoreBreakdown.strategicDiscipline,
-          } : {}),
-          leaderboard_entry_id: id,
-          completed_at: entryDate,
-          // Operator's Playbook
-          ...(validPlaybook ? { playbook: validPlaybook } : {}),
-          ...(playbookShareId ? { playbook_share_id: playbookShareId } : {}),
-        });
+        const { data: existing } = await supabaseAdmin
+          .from('game_history')
+          .select('id')
+          .eq('player_id', playerId)
+          .eq('score', score)
+          .eq('grade', grade)
+          .eq('difficulty', validDifficulty)
+          .is('leaderboard_entry_id', null)
+          .order('completed_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        existingRowId = existing?.id ?? null;
+      } catch { /* proceed to insert */ }
+
+      try {
+        if (existingRowId) {
+          // Auto-save row exists — enrich it with leaderboard data
+          await supabaseAdmin.from('game_history')
+            .update({
+              leaderboard_entry_id: id,
+              initials,
+              holdco_name: holdcoName.trim(),
+              ...(validPlaybook ? { playbook: validPlaybook } : {}),
+              ...(playbookShareId ? { playbook_share_id: playbookShareId } : {}),
+            })
+            .eq('id', existingRowId);
+        } else {
+          // No auto-save row — insert fresh (original behavior)
+          await supabaseAdmin.from('game_history').insert({
+            player_id: playerId,
+            holdco_name: holdcoName.trim(),
+            initials,
+            difficulty: validDifficulty,
+            duration: validDuration,
+            enterprise_value: Math.round(enterpriseValue),
+            founder_equity_value: validFEV,
+            founder_personal_wealth: validPersonalWealth,
+            adjusted_fev: adjustedFEV,
+            score,
+            grade,
+            submitted_multiplier: multiplier,
+            business_count: businessCount,
+            total_revenue: typeof totalRevenue === 'number' ? Math.round(totalRevenue) : null,
+            avg_ebitda_margin: typeof avgEbitdaMargin === 'number' ? Math.round(avgEbitdaMargin * 1000) / 1000 : null,
+            has_restructured: hasRestructured === true,
+            family_office_completed: familyOfficeCompleted === true,
+            legacy_grade: typeof legacyGrade === 'string' && ['Enduring','Influential','Established','Fragile'].includes(legacyGrade) ? legacyGrade : null,
+            fo_multiplier: validFoMultiplier,
+            strategy: validStrategy || null,
+            ...(validStrategy?.scoreBreakdown ? {
+              score_value_creation: validStrategy.scoreBreakdown.valueCreation,
+              score_fcf_share_growth: validStrategy.scoreBreakdown.fcfShareGrowth,
+              score_portfolio_roic: validStrategy.scoreBreakdown.portfolioRoic,
+              score_capital_deployment: validStrategy.scoreBreakdown.capitalDeployment,
+              score_balance_sheet: validStrategy.scoreBreakdown.balanceSheetHealth,
+              score_strategic_discipline: validStrategy.scoreBreakdown.strategicDiscipline,
+            } : {}),
+            leaderboard_entry_id: id,
+            completed_at: entryDate,
+            // Operator's Playbook
+            ...(validPlaybook ? { playbook: validPlaybook } : {}),
+            ...(playbookShareId ? { playbook_share_id: playbookShareId } : {}),
+          });
+        }
       } catch (err) {
-        console.error('game_history insert failed:', err);
+        console.error('game_history insert/update failed:', err);
       }
 
       // Update pre-computed stats (non-blocking)

@@ -7,26 +7,19 @@ import { useToastStore } from '../../hooks/useToast';
 export function AccountModal() {
   const { showAccountModal, accountModalMode, closeAccountModal } = useAuthStore();
   const addToast = useToastStore((s) => s.addToast);
+  // Read isAnonymous synchronously from auth store (avoids async race condition)
+  const isAnonymous = useAuthStore((s) => s.player?.isAnonymous ?? null);
 
   const [mode, setMode] = useState<'create' | 'signin'>('create');
   const [email, setEmail] = useState('');
   const [emailSent, setEmailSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isAnonymous, setIsAnonymous] = useState<boolean | null>(null);
 
   // Sync mode from store when modal opens
   useEffect(() => {
     if (showAccountModal) setMode(accountModalMode);
   }, [showAccountModal, accountModalMode]);
-
-  // Pre-fetch session state when modal opens so OAuth click stays synchronous
-  useEffect(() => {
-    if (!showAccountModal || !supabase) return;
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setIsAnonymous(session?.user?.is_anonymous ?? null);
-    }).catch(() => { setIsAnonymous(null); });
-  }, [showAccountModal]);
 
   if (!supabase) return null;
 
