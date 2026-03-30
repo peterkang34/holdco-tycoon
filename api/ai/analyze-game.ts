@@ -225,7 +225,7 @@ Generate a JSON response with these fields:
 
 Be direct, analytical, and grounded in real capital allocation wisdom. Reference their actual numbers. Respond ONLY with valid JSON.`;
 
-    const result = await callAnthropic(prompt, 1000);
+    const result = await callAnthropic(prompt, 1000, undefined, 15000);
 
     if (!result.content) {
       return res.status(502).json({ error: result.error || 'AI service temporarily unavailable' });
