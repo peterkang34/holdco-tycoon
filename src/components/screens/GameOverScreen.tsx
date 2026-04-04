@@ -491,9 +491,13 @@ export function GameOverScreen({
     const gameGrade = isFundManagerMode ? (peScore?.grade ?? 'F') : score.grade;
     const completionId = `${seed}-${difficulty}-${duration}-${isFundManagerMode ? 'pe' : 'hc'}-${gameScore}-${gameGrade}`;
 
+    // Get player initials for the completion feed (auth store, not user-typed)
+    const playerInitials = useAuthStore.getState().player?.initials;
+
     submitGameCompletion({
       completionId,
       holdcoName: isFundManagerMode ? (fundName || 'PE Fund') : holdcoName,
+      initials: playerInitials || undefined,
       enterpriseValue: Math.round(enterpriseValue),
       founderEquityValue: Math.round(founderEquityValue),
       score: gameScore,
