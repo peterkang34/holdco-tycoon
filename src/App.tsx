@@ -32,11 +32,11 @@ import { syncAchievementsFromServer } from './hooks/useUnlocks';
 type Screen = 'intro' | 'game' | 'gameOver' | 'graduation' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard' | 'playbook';
 
 function App() {
-  // OAuth callback: Supabase returns access_token in hash after Google sign-in.
+  // Auth callback: Supabase returns tokens in hash after Google OAuth or magic link.
+  // Detect both: access_token= (OAuth implicit) and type=magiclink (email verification).
   // Let Supabase process it, then clean the URL and reload to intro screen.
-  if (window.location.hash.includes('access_token=')) {
-    // Supabase auto-processes the hash token on client init.
-    // Clean up the hash after a short delay to let auth complete.
+  const hashStr = window.location.hash;
+  if (hashStr.includes('access_token=') || hashStr.includes('type=magiclink') || hashStr.includes('type=recovery')) {
     setTimeout(() => {
       window.location.hash = '';
       window.location.reload();
