@@ -32,19 +32,28 @@ import { syncAchievementsFromServer } from './hooks/useUnlocks';
 type Screen = 'intro' | 'game' | 'gameOver' | 'graduation' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard' | 'playbook';
 
 function App() {
-  // Skip hash routing when OAuth callback is in progress (access_token in hash)
-  const isOAuthCallback = window.location.hash.includes('access_token=');
-  const [isAdmin, setIsAdmin] = useState(!isOAuthCallback && window.location.hash === '#/admin');
-  const [isFoTest, setIsFoTest] = useState(!isOAuthCallback && window.location.hash === '#/fo-test');
-  const [isGoTest, setIsGoTest] = useState(!isOAuthCallback && window.location.hash.startsWith('#/go-test'));
-  const [isBsTest, setIsBsTest] = useState(!isOAuthCallback && window.location.hash === '#/bs-test');
+  // OAuth callback: Supabase returns access_token in hash after Google sign-in.
+  // Let Supabase process it, then clean the URL and reload to intro screen.
+  if (window.location.hash.includes('access_token=')) {
+    // Supabase auto-processes the hash token on client init.
+    // Clean up the hash after a short delay to let auth complete.
+    setTimeout(() => {
+      window.location.hash = '';
+      window.location.reload();
+    }, 1500);
+    return <div className="min-h-screen bg-bg-primary" />;
+  }
+
+  const [isAdmin, setIsAdmin] = useState(window.location.hash === '#/admin');
+  const [isFoTest, setIsFoTest] = useState(window.location.hash === '#/fo-test');
+  const [isGoTest, setIsGoTest] = useState(window.location.hash.startsWith('#/go-test'));
+  const [isBsTest, setIsBsTest] = useState(window.location.hash === '#/bs-test');
 
   // Open legal modals if URL hash matches
   useEffect(() => {
-    if (isOAuthCallback) return;
     if (window.location.hash === '#/privacy') useAuthStore.getState().openPrivacyModal();
     if (window.location.hash === '#/terms') useAuthStore.getState().openTermsModal();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     const onHash = () => {
