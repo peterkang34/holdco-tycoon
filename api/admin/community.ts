@@ -117,13 +117,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       statusFilterIds = [...anonMap.entries()].filter(([, isAnon]) => isAnon).map(([id]) => id);
     }
 
+    // Recount verified/anonymous using only users that have a player_profiles row
+    // (auth.users may have orphans without profiles — metrics should match the table)
+    const { data: allProfileIds } = await supabaseAdmin
+      .from('player_profiles')
+      .select('id')
+      .limit(10000);
+    const profileIdSet = new Set((allProfileIds || []).map((p: any) => p.id));
+
+    // Recalculate verified/anonymous counts scoped to profiles that exist
+    let verifiedWithProfile = 0;
+    let anonymousWithProfile = 0;
+    for (const [id, isAnon] of anonMap.entries()) {
+      if (!profileIdSet.has(id)) continue;
+      if (isAnon) anonymousWithProfile++;
+      else verifiedWithProfile++;
+    }
+    verifiedAccounts = verifiedWithProfile;
+    anonymousAccounts = anonymousWithProfile;
+    totalAccounts = verifiedWithProfile + anonymousWithProfile;
+
     // Count total players (with search + status filter)
     let countQuery = supabaseAdmin.from('player_profiles').select('id', { count: 'exact', head: true });
     if (search) {
       countQuery = countQuery.or(`display_name.ilike.%${search}%,initials.ilike.%${search}%`);
     }
     if (statusFilterIds) {
-      // For small sets (verified), use .in(); for large sets (anonymous), this may be slow but works
+      // Re-filter statusFilterIds to only include users with profiles
+      statusFilterIds = statusFilterIds.filter(id => profileIdSet.has(id));
       countQuery = countQuery.in('id', statusFilterIds.length > 0 ? statusFilterIds : ['00000000-0000-0000-0000-000000000000']);
     }
     const { count: totalPlayers } = await countQuery;
