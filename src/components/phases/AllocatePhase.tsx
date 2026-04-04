@@ -398,17 +398,18 @@ export function AllocatePhase({
   }, [dealPipeline]);
 
   const filteredSortedDeals = useMemo(() => {
-    let deals = dealPipeline.filter(deal => showPassedDeals || !passedDealIdSet.has(deal.id));
+    // Guard against malformed deals after save rehydration
+    let deals = dealPipeline.filter(deal => deal && deal.business && (showPassedDeals || !passedDealIdSet.has(deal.id)));
 
     // Apply filters
     if (dealFilters.length > 0) {
-      deals = deals.filter(deal => {
-        // Group filters by type, then OR within group, AND between groups
-        const sectorFilters = dealFilters.filter(f => f.startsWith('sector:'));
-        const heatFilters = dealFilters.filter(f => f.startsWith('heat:'));
-        const qualityFilters = dealFilters.filter(f => f.startsWith('quality:'));
-        const hasAffordable = dealFilters.includes('affordable');
+      // Pre-compute filter groups once (not per-deal)
+      const sectorFilters = dealFilters.filter(f => f.startsWith('sector:'));
+      const heatFilters = dealFilters.filter(f => f.startsWith('heat:'));
+      const qualityFilters = dealFilters.filter(f => f.startsWith('quality:'));
+      const hasAffordable = dealFilters.includes('affordable');
 
+      deals = deals.filter(deal => {
         if (sectorFilters.length > 0 && !sectorFilters.some(f => deal.business.sectorId === f.slice(7))) return false;
         if (heatFilters.length > 0 && !heatFilters.some(f => deal.heat === f.slice(5))) return false;
         if (qualityFilters.length > 0 && !qualityFilters.some(f => {
@@ -424,18 +425,18 @@ export function AllocatePhase({
     // Sort
     return [...deals].sort((a, b) => {
       switch (dealSort) {
-        case 'freshness': return a.freshness - b.freshness;
-        case 'price_low': return a.effectivePrice - b.effectivePrice;
-        case 'price_high': return b.effectivePrice - a.effectivePrice;
-        case 'ebitda': return b.business.ebitda - a.business.ebitda;
-        case 'quality': return b.business.qualityRating - a.business.qualityRating;
+        case 'freshness': return (a.freshness || 0) - (b.freshness || 0);
+        case 'price_low': return (a.effectivePrice || 0) - (b.effectivePrice || 0);
+        case 'price_high': return (b.effectivePrice || 0) - (a.effectivePrice || 0);
+        case 'ebitda': return (b.business.ebitda || 0) - (a.business.ebitda || 0);
+        case 'quality': return (b.business.qualityRating || 0) - (a.business.qualityRating || 0);
         case 'heat': {
-          const heatOrder = { cold: 0, warm: 1, hot: 2, contested: 3 };
-          return heatOrder[b.heat] - heatOrder[a.heat];
+          const heatOrder: Record<string, number> = { cold: 0, warm: 1, hot: 2, contested: 3 };
+          return (heatOrder[b.heat] ?? 0) - (heatOrder[a.heat] ?? 0);
         }
         case 'multiple': {
-          const aMultiple = a.effectivePrice / a.business.ebitda;
-          const bMultiple = b.effectivePrice / b.business.ebitda;
+          const aMultiple = a.business.ebitda > 0 ? a.effectivePrice / a.business.ebitda : 999;
+          const bMultiple = b.business.ebitda > 0 ? b.effectivePrice / b.business.ebitda : 999;
           return aMultiple - bMultiple;
         }
         default: return 0;
