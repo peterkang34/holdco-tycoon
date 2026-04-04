@@ -559,6 +559,7 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   isFamilyOfficeMode: false,
   nextAcquisitionHeatReduction: 0,
   // Business School Mode defaults
+  unlockedSectorIds: [],
   isBusinessSchoolMode: false,
   businessSchoolState: null,
   // PE Fund Manager Mode defaults
@@ -625,6 +626,7 @@ export const useGameStore = create<GameStore>()(
             activeTurnarounds: [],
             founderDistributionsReceived: 0,
             isChallenge: false, // Force off for fund mode
+            unlockedSectorIds: getUnlockedSectorIds(useAuthStore.getState().player?.isAnonymous ?? true),
             dealInflationState: { crisisResetRoundsRemaining: 0 },
             ipoState: null,
             familyOfficeState: null,
@@ -694,6 +696,7 @@ export const useGameStore = create<GameStore>()(
           activeTurnarounds: [],
           founderDistributionsReceived: 0,
           isChallenge: seed != null,
+          unlockedSectorIds: unlockedSectorIds, // Snapshot at game start — never re-evaluate from auth
           dealInflationState: { crisisResetRoundsRemaining: 0 },
           ipoState: null,
           familyOfficeState: null,
@@ -751,6 +754,7 @@ export const useGameStore = create<GameStore>()(
           dealInflationState: { crisisResetRoundsRemaining: 0 },
           ipoState: null,
           familyOfficeState: null,
+          unlockedSectorIds: [], // B-School uses curated deals, no prestige sectors
           isBusinessSchoolMode: true,
           businessSchoolState: createInitialBSState(r1Deals, r2Deals),
         };
@@ -1360,7 +1364,7 @@ export const useGameStore = create<GameStore>()(
           state.isFamilyOfficeMode ?? false,
           state.difficulty,
           ownedProSportsSubTypes,
-          state.isChallenge ? [] : getUnlockedSectorIds(useAuthStore.getState().player?.isAnonymous ?? true),
+          state.unlockedSectorIds ?? [],
           state.isChallenge,
         );
 
@@ -6133,6 +6137,7 @@ export const useGameStore = create<GameStore>()(
         isFamilyOfficeMode: state.isFamilyOfficeMode,
         nextAcquisitionHeatReduction: state.nextAcquisitionHeatReduction,
         // Business School Mode
+        unlockedSectorIds: state.unlockedSectorIds,
         isBusinessSchoolMode: state.isBusinessSchoolMode,
         businessSchoolState: state.businessSchoolState,
         // PE Fund Manager Mode
@@ -6223,6 +6228,13 @@ export const useGameStore = create<GameStore>()(
             }
             if ((state as any).ipoState === undefined) (state as any).ipoState = null;
             if ((state as any).familyOfficeState === undefined) (state as any).familyOfficeState = null;
+            // Backfill unlocked sectors — derive from portfolio if not set
+            if (!(state as any).unlockedSectorIds) {
+              const portfolioSectors = (state.businesses || []).map((b: any) => b.sectorId);
+              const pipelineSectors = (state.dealPipeline || []).map((d: any) => d.business?.sectorId).filter(Boolean);
+              const prestigeIds = new Set(['mediaEntertainment', 'fintech', 'aerospace', 'privateCredit']);
+              (state as any).unlockedSectorIds = [...new Set([...portfolioSectors, ...pipelineSectors])].filter((s: string) => prestigeIds.has(s));
+            }
             // Backfill Business School Mode
             if ((state as any).isBusinessSchoolMode === undefined) (state as any).isBusinessSchoolMode = false;
             if ((state as any).businessSchoolState === undefined) (state as any).businessSchoolState = null;

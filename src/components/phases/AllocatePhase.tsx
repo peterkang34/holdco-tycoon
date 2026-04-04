@@ -30,8 +30,8 @@ import { calculateExitValuation, calculateAnnualFcf, calculatePortfolioTax, calc
 import { capGrowthRate } from '../../engine/helpers';
 import { getSubTypeAffinity, getSizeRatioTier } from '../../engine/businesses';
 import { SECTORS } from '../../data/sectors';
-import { getUnlockedSectorIds } from '../../hooks/useUnlocks';
-import { useAuthStore } from '../../hooks/useAuth';
+// getUnlockedSectorIds removed — prestige sectors now snapshotted in game state (unlockedSectorIds)
+// useAuthStore removed — prestige sectors now read from game state, not auth
 import { useGameStore } from '../../hooks/useGame';
 import { BS_YEAR_1_ITEMS, BS_YEAR_2_ITEMS, BS_CHECKLIST_INFO } from '../../data/businessSchool';
 import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES, MA_SOURCING_CONFIG, getMASourcingUpgradeCost, getMASourcingAnnualCost } from '../../data/sharedServices';
@@ -222,7 +222,6 @@ export function AllocatePhase({
   managementFeesCollected = 0,
   onDistributeToLPs,
 }: AllocatePhaseProps) {
-  const isAnonymous = useAuthStore((s) => s.player?.isAnonymous ?? true);
   const isBusinessSchoolMode = useGameStore((s) => s.isBusinessSchoolMode);
   const businessSchoolState = useGameStore((s) => s.businessSchoolState);
   const isMobile = useIsMobile();
@@ -1686,7 +1685,7 @@ export function AllocatePhase({
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   >
                     <option value="">Any Sector</option>
-                    {getAvailableSectors(isFamilyOfficeMode, getUnlockedSectorIds(isAnonymous)).map(sector => (
+                    {getAvailableSectors(isFamilyOfficeMode, useGameStore.getState().unlockedSectorIds ?? []).map(sector => (
                       <option key={sector.id} value={sector.id}>
                         {sector.emoji} {sector.name}
                       </option>

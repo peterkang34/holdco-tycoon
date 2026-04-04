@@ -688,6 +688,9 @@ export interface GameState {
   ipoState: IPOState | null;
   familyOfficeState: FamilyOfficeState | null;
 
+  // Prestige sector snapshot — captured at game start, never re-evaluated from auth
+  unlockedSectorIds?: SectorId[];
+
   // Business School Mode
   isBusinessSchoolMode?: boolean;
   businessSchoolState?: BusinessSchoolState | null;
