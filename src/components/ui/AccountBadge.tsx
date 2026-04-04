@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
-import { supabase, initAnonymousAuth, fetchWithAuth } from '../../lib/supabase';
+import { supabase, fetchWithAuth } from '../../lib/supabase';
 import { useToastStore } from '../../hooks/useToast';
 import { ProfileModal } from './ProfileModal';
 
@@ -78,7 +78,8 @@ export function AccountBadge() {
     setShowDropdown(false);
     if (supabase) {
       await supabase.auth.signOut();
-      await initAnonymousAuth();
+      // Clean reload ensures fresh anonymous session + clean UI state
+      window.location.href = window.location.pathname;
     }
   };
 

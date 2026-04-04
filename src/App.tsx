@@ -33,21 +33,29 @@ type Screen = 'intro' | 'game' | 'gameOver' | 'graduation' | 'familyOffice' | 'f
 
 function App() {
   // Auth callback: Supabase returns tokens in hash after Google OAuth or magic link.
-  // Detect both: access_token= (OAuth implicit) and type=magiclink (email verification).
-  // Let Supabase process it, then clean the URL and reload to intro screen.
-  const hashStr = window.location.hash;
-  if (hashStr.includes('access_token=') || hashStr.includes('type=magiclink') || hashStr.includes('type=recovery')) {
-    setTimeout(() => {
-      window.location.hash = '';
-      window.location.reload();
-    }, 1500);
-    return <div className="min-h-screen bg-bg-primary" />;
-  }
+  // Detect callback params, let Supabase process them, then redirect cleanly.
+  const [authCallbackPending, setAuthCallbackPending] = useState(() => {
+    const h = window.location.hash;
+    return h.includes('access_token=') || h.includes('type=magiclink') || h.includes('type=recovery');
+  });
 
-  const [isAdmin, setIsAdmin] = useState(window.location.hash === '#/admin');
-  const [isFoTest, setIsFoTest] = useState(window.location.hash === '#/fo-test');
-  const [isGoTest, setIsGoTest] = useState(window.location.hash.startsWith('#/go-test'));
-  const [isBsTest, setIsBsTest] = useState(window.location.hash === '#/bs-test');
+  useEffect(() => {
+    if (authCallbackPending) {
+      // Supabase auto-processes hash tokens on client init.
+      // Wait for processing, then clean URL and show intro screen.
+      const timer = setTimeout(() => {
+        // Replace the hash URL with a clean one (no reload needed)
+        window.history.replaceState(null, '', window.location.pathname);
+        setAuthCallbackPending(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [authCallbackPending]);
+
+  const [isAdmin, setIsAdmin] = useState(!authCallbackPending && window.location.hash === '#/admin');
+  const [isFoTest, setIsFoTest] = useState(!authCallbackPending && window.location.hash === '#/fo-test');
+  const [isGoTest, setIsGoTest] = useState(!authCallbackPending && window.location.hash.startsWith('#/go-test'));
+  const [isBsTest, setIsBsTest] = useState(!authCallbackPending && window.location.hash === '#/bs-test');
 
   // Open legal modals if URL hash matches
   useEffect(() => {
@@ -433,6 +441,11 @@ function App() {
         )}
       </div>
     );
+  }
+
+  // Show blank loading screen while auth callback is being processed
+  if (authCallbackPending) {
+    return <div className="min-h-screen bg-bg-primary" />;
   }
 
   return (
