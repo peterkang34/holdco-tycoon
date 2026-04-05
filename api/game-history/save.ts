@@ -65,7 +65,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const completionId = `${playerId}-${seed ?? 0}-${difficulty}-${duration}-${score}-${grade}`;
 
     // --- Compute adjusted FEV ---
-    const FEV_CAP = 100_000_000; // $100B in thousands — generous ceiling
+    const FEV_CAP = 10_000_000_000; // $10T in thousands
     const rawFev = typeof body.founderEquityValue === 'number' ? Math.round(body.founderEquityValue) : 0;
     const fev = Math.min(Math.max(rawFev, 0), FEV_CAP);
     const multiplier = DIFFICULTY_MULTIPLIER[difficulty] ?? 1.0;
@@ -74,7 +74,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const adjustedFEV = Math.round(fev * multiplier * (hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0) * foMultiplier);
 
     // --- Extract optional fields ---
-    const enterpriseValue = typeof body.enterpriseValue === 'number' ? Math.min(Math.round(body.enterpriseValue), FEV_CAP * 2) : 0;
+    const enterpriseValue = typeof body.enterpriseValue === 'number' ? Math.min(Math.round(body.enterpriseValue), 20_000_000_000) : 0;
     const personalWealth = typeof body.founderPersonalWealth === 'number' ? Math.round(body.founderPersonalWealth) : null;
     const businessCount = typeof body.businessCount === 'number' ? Math.min(30, Math.max(0, Math.round(body.businessCount))) : 0;
     const totalRevenue = typeof body.totalRevenue === 'number' ? Math.round(body.totalRevenue) : null;

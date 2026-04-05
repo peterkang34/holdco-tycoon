@@ -85,9 +85,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'holdcoName contains invalid characters' });
     }
 
-    // enterpriseValue: number, 0 ≤ EV ≤ 200,000,000 ($200B in thousands — generous ceiling)
-    if (typeof enterpriseValue !== 'number' || enterpriseValue < 0 || enterpriseValue > 200_000_000) {
-      return res.status(400).json({ error: 'enterpriseValue must be between 0 and 200,000,000' });
+    // enterpriseValue: number, 0 ≤ EV ≤ 20,000,000,000 ($20T in thousands — 2x FEV cap)
+    if (typeof enterpriseValue !== 'number' || enterpriseValue < 0 || enterpriseValue > 20_000_000_000) {
+      return res.status(400).json({ error: 'enterpriseValue must be between 0 and 20,000,000,000' });
     }
 
     // score: integer, 0 ≤ score ≤ 100
@@ -122,8 +122,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // duration: valid duration
     const validDuration = typeof duration === 'string' && (VALID_DURATIONS as readonly string[]).includes(duration) ? duration : 'standard';
 
-    // founderEquityValue: number, 0 ≤ FEV ≤ 100,000,000 ($100B in thousands — generous ceiling for any mode)
-    const FEV_CAP = 100_000_000; // $100B — even a perfect 20yr game maxes around $10-20B
+    // founderEquityValue: number, 0 ≤ FEV ≤ 10,000,000,000 ($10T in thousands)
+    const FEV_CAP = 10_000_000_000;
     const validFEV = typeof founderEquityValue === 'number' && founderEquityValue >= 0 && founderEquityValue <= FEV_CAP
       ? Math.round(founderEquityValue) : Math.round(Math.min(enterpriseValue, FEV_CAP));
 
