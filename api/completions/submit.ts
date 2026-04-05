@@ -64,7 +64,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (body.isBusinessSchool === true) {
       const bsRecord = {
         holdcoName: typeof body.holdcoName === 'string' ? body.holdcoName.trim().slice(0, 50) : 'Unknown',
-        founderEquityValue: typeof body.founderEquityValue === 'number' ? Math.round(body.founderEquityValue) : 0,
+        founderEquityValue: typeof body.founderEquityValue === 'number' ? Math.min(Math.round(body.founderEquityValue), 100_000_000) : 0,
         checklistCompleted: typeof body.checklistCompleted === 'number' ? body.checklistCompleted : 0,
         checklistTotal: typeof body.checklistTotal === 'number' ? body.checklistTotal : 15,
         platformForged: body.platformForged === true,
@@ -132,8 +132,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       completionId,
       holdcoName,
       initials: typeof body.initials === 'string' && /^[A-Z]{2,4}$/.test(body.initials) ? body.initials : undefined,
-      enterpriseValue: typeof body.enterpriseValue === 'number' ? Math.round(body.enterpriseValue) : 0,
-      founderEquityValue: typeof body.founderEquityValue === 'number' ? Math.round(body.founderEquityValue) : 0,
+      enterpriseValue: typeof body.enterpriseValue === 'number' ? Math.min(Math.round(body.enterpriseValue), 200_000_000) : 0,
+      founderEquityValue: typeof body.founderEquityValue === 'number' ? Math.min(Math.round(body.founderEquityValue), 100_000_000) : 0,
       score,
       grade,
       businessCount: typeof body.businessCount === 'number' ? Math.min(30, Math.max(0, Math.round(body.businessCount))) : 0,

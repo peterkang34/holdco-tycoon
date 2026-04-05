@@ -85,9 +85,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'holdcoName contains invalid characters' });
     }
 
-    // enterpriseValue: number, 0 ≤ EV ≤ 100,000,000,000 ($100T)
-    if (typeof enterpriseValue !== 'number' || enterpriseValue < 0 || enterpriseValue > 100000000000) {
-      return res.status(400).json({ error: 'enterpriseValue must be between 0 and 100,000,000,000' });
+    // enterpriseValue: number, 0 ≤ EV ≤ 200,000,000 ($200B in thousands — generous ceiling)
+    if (typeof enterpriseValue !== 'number' || enterpriseValue < 0 || enterpriseValue > 200_000_000) {
+      return res.status(400).json({ error: 'enterpriseValue must be between 0 and 200,000,000' });
     }
 
     // score: integer, 0 ≤ score ≤ 100

@@ -16,7 +16,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const pageSize = Math.min(100, Math.max(1, parseInt(String(req.query.pageSize)) || 25));
     const sort = String(req.query.sort || 'created_at');
     const order = String(req.query.order || 'desc') === 'asc' ? 'asc' : 'desc';
-    const search = String(req.query.search || '').trim();
+    // Sanitize search: strip PostgREST-special chars to prevent ilike injection
+    const search = String(req.query.search || '').trim().replace(/[,().%_\\]/g, '');
     const statusFilter = String(req.query.status || 'all'); // 'all' | 'verified' | 'anonymous'
 
     // ── Sign-up metrics via auth.admin.listUsers ──
@@ -119,11 +120,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Recount verified/anonymous using only users that have a player_profiles row
     // (auth.users may have orphans without profiles — metrics should match the table)
-    const { data: allProfileIds } = await supabaseAdmin
-      .from('player_profiles')
-      .select('id')
-      .limit(10000);
-    const profileIdSet = new Set((allProfileIds || []).map((p: any) => p.id));
+    // Use IN query with auth user IDs to avoid fetching all profiles
+    const allAuthIds = [...anonMap.keys()];
+    const profileIdSet = new Set<string>();
+    // Batch check in chunks of 500 to stay within PostgREST limits
+    for (let i = 0; i < allAuthIds.length; i += 500) {
+      const batch = allAuthIds.slice(i, i + 500);
+      const { data: existing } = await supabaseAdmin
+        .from('player_profiles')
+        .select('id')
+        .in('id', batch);
+      for (const row of existing || []) profileIdSet.add(row.id);
+    }
 
     // Recalculate verified/anonymous counts scoped to profiles that exist
     let verifiedWithProfile = 0;

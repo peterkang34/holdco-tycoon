@@ -118,7 +118,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         created_at: now,
         updated_at: now,
       }, { onConflict: 'id', ignoreDuplicates: true });
-    } catch { /* best effort — profile may already exist */ }
+    } catch (err) { console.error('game-history profile upsert failed:', err); }
 
     // --- Initials: prefer client-sent, fallback to profile, then 'AA' ---
     const clientInitials = typeof body.initials === 'string'
