@@ -122,12 +122,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // duration: valid duration
     const validDuration = typeof duration === 'string' && (VALID_DURATIONS as readonly string[]).includes(duration) ? duration : 'standard';
 
-    // founderEquityValue: number, 0 ≤ FEV ≤ 100,000,000,000 ($100T)
-    const validFEV = typeof founderEquityValue === 'number' && founderEquityValue >= 0 && founderEquityValue <= 100000000000
-      ? Math.round(founderEquityValue) : Math.round(enterpriseValue);
+    // founderEquityValue: number, 0 ≤ FEV ≤ 100,000,000 ($100B in thousands — generous ceiling for any mode)
+    const FEV_CAP = 100_000_000; // $100B — even a perfect 20yr game maxes around $10-20B
+    const validFEV = typeof founderEquityValue === 'number' && founderEquityValue >= 0 && founderEquityValue <= FEV_CAP
+      ? Math.round(founderEquityValue) : Math.round(Math.min(enterpriseValue, FEV_CAP));
 
-    // founderPersonalWealth: number, 0 ≤ PW ≤ 100,000,000,000 ($100T)
-    const validPersonalWealth = typeof founderPersonalWealth === 'number' && founderPersonalWealth >= 0 && founderPersonalWealth <= 100000000000
+    // founderPersonalWealth: number, 0 ≤ PW ≤ same cap
+    const validPersonalWealth = typeof founderPersonalWealth === 'number' && founderPersonalWealth >= 0 && founderPersonalWealth <= FEV_CAP
       ? Math.round(founderPersonalWealth) : 0;
 
     // --- Plausibility Checks (holdco mode only — PE uses different scoring) ---
@@ -250,18 +251,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const entryDate = new Date().toISOString();
 
     if (playerId && supabaseAdmin) {
-      // Ensure player_profile exists (create if new, never overwrite existing initials/public_id)
+      // Ensure player_profile exists and sync initials from user-typed input
       const publicId = randomUUID().replace(/-/g, '').slice(0, 12);
       try {
+        // Create profile if new (ignoreDuplicates so we don't overwrite public_id)
         await supabaseAdmin.from('player_profiles').upsert({
           id: playerId,
           initials,
           public_id: publicId,
+          created_at: entryDate,
           updated_at: entryDate,
           last_played_at: entryDate,
         }, { onConflict: 'id', ignoreDuplicates: true });
 
-        // Always update last_played_at + sync initials to latest submission
+        // ALWAYS sync initials + last_played_at (the upsert above skips on conflict,
+        // so this separate update ensures user-typed initials override the 'AA' default)
         await supabaseAdmin.from('player_profiles')
           .update({ initials, last_played_at: entryDate, updated_at: entryDate })
           .eq('id', playerId);

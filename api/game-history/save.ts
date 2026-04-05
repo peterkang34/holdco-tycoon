@@ -65,14 +65,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const completionId = `${playerId}-${seed ?? 0}-${difficulty}-${duration}-${score}-${grade}`;
 
     // --- Compute adjusted FEV ---
-    const fev = typeof body.founderEquityValue === 'number' ? Math.round(body.founderEquityValue) : 0;
+    const FEV_CAP = 100_000_000; // $100B in thousands — generous ceiling
+    const rawFev = typeof body.founderEquityValue === 'number' ? Math.round(body.founderEquityValue) : 0;
+    const fev = Math.min(Math.max(rawFev, 0), FEV_CAP);
     const multiplier = DIFFICULTY_MULTIPLIER[difficulty] ?? 1.0;
     const hasRestructured = body.hasRestructured === true;
     const foMultiplier = typeof body.foMultiplier === 'number' && body.foMultiplier >= 1.0 && body.foMultiplier <= 1.5 ? body.foMultiplier : 1.0;
     const adjustedFEV = Math.round(fev * multiplier * (hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0) * foMultiplier);
 
     // --- Extract optional fields ---
-    const enterpriseValue = typeof body.enterpriseValue === 'number' ? Math.round(body.enterpriseValue) : 0;
+    const enterpriseValue = typeof body.enterpriseValue === 'number' ? Math.min(Math.round(body.enterpriseValue), FEV_CAP * 2) : 0;
     const personalWealth = typeof body.founderPersonalWealth === 'number' ? Math.round(body.founderPersonalWealth) : null;
     const businessCount = typeof body.businessCount === 'number' ? Math.min(30, Math.max(0, Math.round(body.businessCount))) : 0;
     const totalRevenue = typeof body.totalRevenue === 'number' ? Math.round(body.totalRevenue) : null;
@@ -105,16 +107,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // --- Extract score breakdown dimensions ---
     const scoreBreakdown = validStrategy?.scoreBreakdown as Record<string, number> | undefined;
 
-    // --- Initials: use profile initials as fallback (from trigger-created profile) ---
-    let initials = 'AA';
+    // --- Ensure player_profiles row exists (defensive — trigger was dropped) ---
+    const now = new Date().toISOString();
     try {
-      const { data: profile } = await supabaseAdmin
-        .from('player_profiles')
-        .select('initials')
-        .eq('id', playerId)
-        .single();
-      if (profile?.initials) initials = profile.initials;
-    } catch { /* use default */ }
+      const publicId = randomUUID().replace(/-/g, '').slice(0, 12);
+      await supabaseAdmin.from('player_profiles').upsert({
+        id: playerId,
+        initials: 'AA',
+        public_id: publicId,
+        created_at: now,
+        updated_at: now,
+      }, { onConflict: 'id', ignoreDuplicates: true });
+    } catch { /* best effort — profile may already exist */ }
+
+    // --- Initials: prefer client-sent, fallback to profile, then 'AA' ---
+    const clientInitials = typeof body.initials === 'string'
+      && /^[A-Z]{2,4}$/.test(body.initials) ? body.initials : null;
+    let initials = clientInitials || 'AA';
+    if (!clientInitials) {
+      try {
+        const { data: profile } = await supabaseAdmin
+          .from('player_profiles')
+          .select('initials')
+          .eq('id', playerId)
+          .single();
+        if (profile?.initials && profile.initials !== 'AA') initials = profile.initials;
+      } catch { /* use default */ }
+    }
 
     // --- Insert game_history row ---
     const row: Record<string, unknown> = {
