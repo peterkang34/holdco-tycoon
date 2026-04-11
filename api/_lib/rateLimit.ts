@@ -19,27 +19,35 @@ export function getClientIp(req: VercelRequest): string {
 }
 
 /**
+ * Generic rate limit check.
+ * Returns true if rate-limited (caller should 429).
+ */
+export async function checkRateLimit(
+  req: VercelRequest,
+  opts: { namespace: string; maxRequests: number; windowSeconds?: number }
+): Promise<boolean> {
+  const ip = getClientIp(req);
+  const key = `ratelimit:${opts.namespace}:${ip}`;
+  const window = opts.windowSeconds ?? 60;
+
+  try {
+    const count = await kv.incr(key);
+    if (count === 1) {
+      await kv.expire(key, window);
+    }
+    return count > opts.maxRequests;
+  } catch {
+    return false; // Fail-open
+  }
+}
+
+/**
  * Rate limit check for AI endpoints.
  * 10 requests per minute per IP.
  * Returns true if rate-limited.
  */
 export async function checkAIRateLimit(req: VercelRequest): Promise<boolean> {
-  const ip = getClientIp(req);
-  const key = `ratelimit:ai:${ip}`;
-
-  try {
-    // Use a sliding window counter: increment and check
-    const count = await kv.incr(key);
-
-    // Set TTL on first request in window
-    if (count === 1) {
-      await kv.expire(key, 60);
-    }
-
-    return count > 10; // Max 10 requests per 60 seconds
-  } catch {
-    return false; // Fail-open
-  }
+  return checkRateLimit(req, { namespace: 'ai', maxRequests: 10 });
 }
 
 /**

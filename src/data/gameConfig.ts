@@ -413,7 +413,6 @@ export const FAMILY_OFFICE_MIN_COMPOSITE_GRADE = 'B';
 export const FAMILY_OFFICE_MIN_Q4_BUSINESSES = 3;
 export const FAMILY_OFFICE_MIN_LONG_HELD = 2;
 export const FAMILY_OFFICE_ROUNDS = 5;
-export const FAMILY_OFFICE_SUCCESSION_ROUND = 3; // kept for migration compat
 
 // FO V2 — Real holdco mechanics
 export const FO_PHILANTHROPY_RATE = 0.25;
@@ -529,7 +528,6 @@ export const EARLY_GAME_AFFORDABLE_THRESHOLD = 2; // cash multiplier for afforda
 export const FILLER_TAX_STRATEGY_COST_MIN = 200;
 export const FILLER_TAX_STRATEGY_COST_MAX = 350;
 export const FILLER_TAX_STRATEGY_MARGIN_BOOST = 0.01; // +1ppt permanent
-export const FILLER_TAX_STRATEGY_DURATION = 2; // kept for save compat — boost is actually permanent
 export const FILLER_TAX_STRATEGY_WRITEOFF = 50; // $50K
 
 export const FILLER_CONFERENCE_COST_MIN = 100;

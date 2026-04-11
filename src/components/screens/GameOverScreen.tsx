@@ -247,10 +247,10 @@ export function GameOverScreen({
 
     const resolvedTurnarounds = allActions.filter(a => a.type === 'turnaround_resolved');
     const turnaroundsSucceeded = resolvedTurnarounds.filter(a => {
-      const outcome = (a.details as any)?.outcome;
+      const outcome = a.details?.outcome;
       return outcome === 'success' || outcome === 'partial';
     }).length;
-    const turnaroundsFailed = resolvedTurnarounds.filter(a => (a.details as any)?.outcome === 'failure').length;
+    const turnaroundsFailed = resolvedTurnarounds.filter(a => a.details?.outcome === 'failure').length;
 
     const peakLeverage = metricsHistory.length > 0
       ? Math.max(...metricsHistory.map(m => m.metrics.netDebtToEbitda))
@@ -270,14 +270,14 @@ export function GameOverScreen({
 
     const dealStructureTypes: Record<string, number> = {};
     for (const a of allActions) {
-      if (acquireTypes.has(a.type) && (a.details as any)?.dealStructure) {
-        const st = String((a.details as any).dealStructure);
+      if (acquireTypes.has(a.type) && a.details?.dealStructure) {
+        const st = String(a.details.dealStructure);
         dealStructureTypes[st] = (dealStructureTypes[st] || 0) + 1;
       }
     }
 
     const rolloverEquityCount = allActions.filter(a =>
-      acquireTypes.has(a.type) && (a.details as any)?.dealStructure === 'rollover_equity'
+      acquireTypes.has(a.type) && a.details?.dealStructure === 'rollover_equity'
     ).length;
 
     const activeCount = businesses.filter(b => b.status === 'active').length;

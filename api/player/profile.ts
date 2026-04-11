@@ -1,11 +1,19 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
+import { checkRateLimit } from '../_lib/rateLimit.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const playerId = await getPlayerIdFromToken(req);
   if (!playerId) return res.status(401).json({ error: 'Unauthorized' });
   if (!supabaseAdmin) return res.status(503).json({ error: 'Database unavailable' });
+
+  // Rate limit: reads 30/min, writes 10/min
+  const rlNamespace = req.method === 'PUT' ? 'player-profile-write' : 'player-profile-read';
+  const rlMax = req.method === 'PUT' ? 10 : 30;
+  if (await checkRateLimit(req, { namespace: rlNamespace, maxRequests: rlMax })) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
 
   if (req.method === 'GET') {
     const { data, error } = await supabaseAdmin

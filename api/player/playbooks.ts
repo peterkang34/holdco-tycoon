@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
+import { checkRateLimit } from '../_lib/rateLimit.js';
 
 /**
  * GET /api/player/playbooks
@@ -9,6 +10,10 @@ import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
  */
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  if (await checkRateLimit(req, { namespace: 'player-playbooks', maxRequests: 30 })) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
 
   if (!supabaseAdmin) return res.status(503).json({ error: 'Service temporarily unavailable' });
 

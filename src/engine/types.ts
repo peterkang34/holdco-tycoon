@@ -22,8 +22,6 @@ export type SectorId =
   | 'aerospace'
   | 'proSports';
 
-export type SectorFocusGroup = SectorId;
-
 export type GameDifficulty = 'easy' | 'normal';
 export type GameDuration = 'standard' | 'quick';  // 20 or 10 rounds
 
@@ -63,7 +61,7 @@ export interface SectorDefinition {
   recessionSensitivity: number; // multiplier
   oilShockSensitivity?: number; // multiplier for oil shock margin/revenue impact
   sharedServicesBenefit: number; // 0.5-1.5x
-  sectorFocusGroup: SectorFocusGroup[];
+  sectorFocusGroup: SectorId[];
   subTypes: string[];
   subTypeGroups: number[]; // Parallel to subTypes — same group number = operationally related
   baseRevenue: [number, number];        // [min, max] in $k
@@ -305,7 +303,7 @@ export interface ActiveTurnaround {
 }
 
 export interface SectorFocusBonus {
-  focusGroup: SectorFocusGroup;
+  focusGroup: SectorId;
   tier: SectorFocusTier;
   opcoCount: number;
 }

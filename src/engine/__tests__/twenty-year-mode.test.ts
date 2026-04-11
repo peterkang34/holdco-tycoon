@@ -52,7 +52,6 @@ import {
   FAMILY_OFFICE_MIN_Q4_BUSINESSES,
   FAMILY_OFFICE_MIN_LONG_HELD,
   FAMILY_OFFICE_ROUNDS,
-  FAMILY_OFFICE_SUCCESSION_ROUND,
   EQUITY_DILUTION_STEP,
   EQUITY_DILUTION_FLOOR,
   EQUITY_BUYBACK_COOLDOWN,
@@ -759,7 +758,6 @@ describe('Family Office Constants Validation', () => {
 
   it('should have correct round values', () => {
     expect(FAMILY_OFFICE_ROUNDS).toBe(5);
-    expect(FAMILY_OFFICE_SUCCESSION_ROUND).toBe(3);
   });
 });
 

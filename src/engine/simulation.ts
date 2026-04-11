@@ -7,7 +7,6 @@ import {
   ExitValuation,
   IntegratedPlatform,
   SectorFocusBonus,
-  SectorFocusGroup,
   SectorFocusTier,
   OperationalImprovementType,
   Metrics,
@@ -628,7 +627,7 @@ export function calculateSectorFocusBonus(businesses: Business[]): SectorFocusBo
   else tier = 1;
 
   return {
-    focusGroup: maxGroup as SectorFocusGroup, // M-2: Proper type cast instead of `as any`
+    focusGroup: maxGroup as SectorId,
     tier,
     opcoCount: maxCount,
   };

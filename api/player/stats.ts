@@ -2,6 +2,7 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { computePlayerAchievements } from '../_lib/achievementBackfill.js';
+import { checkRateLimit } from '../_lib/rateLimit.js';
 
 const EMPTY_STATS = {
   total_games: 0,
@@ -18,6 +19,10 @@ const EMPTY_STATS = {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+
+  if (await checkRateLimit(req, { namespace: 'player-stats', maxRequests: 30 })) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
 
   if (!supabaseAdmin) return res.status(503).json({ error: 'Service temporarily unavailable' });
   const playerId = await getPlayerIdFromToken(req);

@@ -622,7 +622,7 @@ export const useGameStore = create<GameStore>()(
             dealPipeline: initialDealPipeline,
             maSourcing: { tier: PE_FUND_CONFIG.startingMaSourcingTier as MASourcingTier, active: true, unlockedRound: 1, lastUpgradeRound: 0 },
             maxAcquisitionsPerRound: 3,
-            turnaroundTier: 0 as any,
+            turnaroundTier: 0,
             activeTurnarounds: [],
             founderDistributionsReceived: 0,
             isChallenge: false, // Force off for fund mode
@@ -6172,79 +6172,83 @@ export const useGameStore = create<GameStore>()(
       onRehydrateStorage: () => (state) => {
         if (state && state.holdcoName) {
           try {
+            // Old saves may be missing fields added in later versions.
+            // Cast once here to avoid 28+ individual `as any` casts below.
+            const s = state as unknown as Record<string, unknown>;
+
             // Backwards compat: game mode fields
-            if (!(state as any).difficulty) (state as any).difficulty = 'easy';
-            if (!(state as any).duration) (state as any).duration = 'standard';
-            if (!(state as any).maxRounds) (state as any).maxRounds = 20;
+            if (!s.difficulty) s.difficulty = 'easy';
+            if (!s.duration) s.duration = 'standard';
+            if (!s.maxRounds) s.maxRounds = 20;
             // Backfill seed for pre-v25 saves
-            if (!(state as any).seed) (state as any).seed = generateRandomSeed();
+            if (!s.seed) s.seed = generateRandomSeed();
             // Backfill isChallenge for pre-existing saves
-            if ((state as any).isChallenge === undefined) (state as any).isChallenge = false;
-            if ((state as any).founderDistributionsReceived === undefined) {
-              (state as any).founderDistributionsReceived = Math.round(
+            if (s.isChallenge === undefined) s.isChallenge = false;
+            if (s.founderDistributionsReceived === undefined) {
+              s.founderDistributionsReceived = Math.round(
                 (state.totalDistributions || 0) * (state.founderShares / (state.sharesOutstanding || 1))
               );
             }
             // Backfill isFamilyOfficeMode
-            if ((state as any).isFamilyOfficeMode === undefined) (state as any).isFamilyOfficeMode = false;
+            if (s.isFamilyOfficeMode === undefined) s.isFamilyOfficeMode = false;
             // Backfill integratedPlatforms
-            if (!(state as any).integratedPlatforms) (state as any).integratedPlatforms = [];
+            if (!s.integratedPlatforms) s.integratedPlatforms = [];
             // Backfill turnaround fields
-            if ((state as any).turnaroundTier === undefined) (state as any).turnaroundTier = 0;
-            if (!(state as any).activeTurnarounds) (state as any).activeTurnarounds = [];
+            if (s.turnaroundTier === undefined) s.turnaroundTier = 0;
+            if (!s.activeTurnarounds) s.activeTurnarounds = [];
             // Cap table invariant enforcement
-            if (!state.sharesOutstanding || state.sharesOutstanding <= 0) (state as any).sharesOutstanding = 1000;
-            if (!state.founderShares || state.founderShares <= 0) (state as any).founderShares = state.sharesOutstanding;
-            if (state.founderShares > state.sharesOutstanding) (state as any).founderShares = state.sharesOutstanding;
+            if (!state.sharesOutstanding || state.sharesOutstanding <= 0) s.sharesOutstanding = 1000;
+            if (!state.founderShares || state.founderShares <= 0) s.founderShares = state.sharesOutstanding;
+            if (state.founderShares > state.sharesOutstanding) s.founderShares = state.sharesOutstanding;
             // Backwards compat: initialize maSourcing if missing
             if (!state.maSourcing) {
-              (state as any).maSourcing = { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 };
+              s.maSourcing = { tier: 0, active: false, unlockedRound: 0, lastUpgradeRound: 0 };
             }
             // Backwards compat: initialize maFocus.subType if missing
             if (state.maFocus && state.maFocus.subType === undefined) {
-              (state as any).maFocus = { ...state.maFocus, subType: null };
+              s.maFocus = { ...state.maFocus, subType: null };
             }
             // Backwards compat: deal heat fields
             if (state.acquisitionsThisRound === undefined) {
-              (state as any).acquisitionsThisRound = 0;
+              s.acquisitionsThisRound = 0;
             }
             if (state.maxAcquisitionsPerRound === undefined) {
-              const tier = state.maSourcing?.tier ?? 0;
-              (state as any).maxAcquisitionsPerRound = getMaxAcquisitions(tier as any);
+              const tier = (state.maSourcing?.tier ?? 0) as MASourcingTier;
+              s.maxAcquisitionsPerRound = getMaxAcquisitions(tier);
             }
             if (state.lastAcquisitionResult === undefined) {
-              (state as any).lastAcquisitionResult = null;
+              s.lastAcquisitionResult = null;
             }
-            if ((state as any).lastIntegrationOutcome === undefined) {
-              (state as any).lastIntegrationOutcome = null;
+            if (s.lastIntegrationOutcome === undefined) {
+              s.lastIntegrationOutcome = null;
             }
             // Backwards compat: initialize passedDealIds if missing
             if (!Array.isArray(state.passedDealIds)) {
-              (state as any).passedDealIds = [];
+              s.passedDealIds = [];
             }
             // Backwards compat: 20-year mode fields
-            if (!(state as any).dealInflationState) {
-              (state as any).dealInflationState = { crisisResetRoundsRemaining: 0 };
+            if (!s.dealInflationState) {
+              s.dealInflationState = { crisisResetRoundsRemaining: 0 };
             }
-            if ((state as any).ipoState === undefined) (state as any).ipoState = null;
-            if ((state as any).familyOfficeState === undefined) (state as any).familyOfficeState = null;
+            if (s.ipoState === undefined) s.ipoState = null;
+            if (s.familyOfficeState === undefined) s.familyOfficeState = null;
             // Backfill unlocked sectors — derive from portfolio if not set
-            if (!(state as any).unlockedSectorIds) {
+            if (!s.unlockedSectorIds) {
               const portfolioSectors = (state.businesses || []).map((b: any) => b.sectorId);
               const pipelineSectors = (state.dealPipeline || []).map((d: any) => d.business?.sectorId).filter(Boolean);
               const prestigeIds = new Set(['mediaEntertainment', 'fintech', 'aerospace', 'privateCredit']);
-              (state as any).unlockedSectorIds = [...new Set([...portfolioSectors, ...pipelineSectors])].filter((s: string) => prestigeIds.has(s));
+              s.unlockedSectorIds = [...new Set([...portfolioSectors, ...pipelineSectors])].filter((sid: string) => prestigeIds.has(sid));
             }
             // Backfill Business School Mode
-            if ((state as any).isBusinessSchoolMode === undefined) (state as any).isBusinessSchoolMode = false;
-            if ((state as any).businessSchoolState === undefined) (state as any).businessSchoolState = null;
+            if (s.isBusinessSchoolMode === undefined) s.isBusinessSchoolMode = false;
+            if (s.businessSchoolState === undefined) s.businessSchoolState = null;
             // Restore business ID counter to avoid collisions after save/load
             if (Array.isArray(state.businesses)) {
               restoreBusinessIdCounter(state.businesses);
             }
             // Ensure pipeline deals have heat fields
             if (Array.isArray(state.dealPipeline)) {
-              (state as any).dealPipeline = state.dealPipeline.map((d: any) => ({
+              s.dealPipeline = state.dealPipeline.map((d: any) => ({
                 ...d,
                 heat: d.heat ?? 'warm',
                 effectivePrice: d.effectivePrice ?? d.askingPrice,

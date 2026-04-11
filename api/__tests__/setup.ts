@@ -36,6 +36,7 @@ vi.mock('../_lib/playerAuth.js', () => ({
 
 vi.mock('../_lib/rateLimit.js', () => ({
   getClientIp: vi.fn(),
+  checkRateLimit: vi.fn(),
   isBodyTooLarge: vi.fn(),
 }));
 
@@ -49,7 +50,7 @@ vi.mock('../_lib/playerStats.js', () => ({
 import { kv } from '@vercel/kv';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
-import { getClientIp, isBodyTooLarge } from '../_lib/rateLimit.js';
+import { getClientIp, checkRateLimit, isBodyTooLarge } from '../_lib/rateLimit.js';
 import { updatePlayerStats, updateGlobalStats } from '../_lib/playerStats.js';
 
 beforeEach(() => {
@@ -72,6 +73,7 @@ beforeEach(() => {
 
   // Rate limit — default: not limited
   vi.mocked(getClientIp).mockReturnValue('127.0.0.1');
+  vi.mocked(checkRateLimit).mockResolvedValue(false);
   vi.mocked(isBodyTooLarge).mockReturnValue(false);
 
   // Stats helpers — default: no-op

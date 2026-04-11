@@ -490,7 +490,7 @@ function buildPlaybookUnsafe(input: PlaybookBuilderInput): PlaybookData {
         legacyGrade: familyOfficeState.legacyScore.grade,
         philanthropyAmount: Math.round(familyOfficeState.philanthropyDeduction),
         foRounds: 5, // FO is always 5 rounds
-        hasRestructuredDuringFo: false, // TODO: track this in FO state
+        hasRestructuredDuringFo: false, // FO penalty uses global hasRestructured flag; FO-specific tracking not needed
       },
     } : {}),
 

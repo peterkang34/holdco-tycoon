@@ -1,4 +1,4 @@
-import { SectorId, AIGeneratedContent, QualityRating, Business, ScoreBreakdown, SellerArchetype, EventType } from '../engine/types';
+import { SectorId, AIGeneratedContent, QualityRating, Business, ScoreBreakdown, SellerArchetype, EventType, PEScoreBreakdown, CarryWaterfall, LPComment } from '../engine/types';
 import { SECTORS } from '../data/sectors';
 
 // Cache the AI status to avoid repeated requests
@@ -391,10 +391,10 @@ interface GameAnalysisInput {
   isFundManagerMode?: boolean;
   fundName?: string;
   fundSize?: number;
-  peScore?: any;
-  carryWaterfall?: any;
+  peScore?: PEScoreBreakdown | null;
+  carryWaterfall?: CarryWaterfall | null;
   lpSatisfactionScore?: number;
-  lpCommentary?: any[];
+  lpCommentary?: LPComment[] | null;
   totalCapitalDeployed?: number;
   lpDistributions?: number;
 }
