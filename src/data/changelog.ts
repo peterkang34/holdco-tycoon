@@ -13,6 +13,96 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'April 10, 2026',
+    title: 'Stability & Polish',
+    sections: [
+      {
+        heading: 'Bug Fixes',
+        items: [
+          'Fixed deal sort/filter freezing when pipeline contained malformed deals.',
+          'Fixed prestige sector unlocks being revoked mid-game if auth state changed. Unlocks are now snapshotted at game start.',
+          'Fixed FEV/fund value chart lines not rendering in strategy debriefs.',
+          'Fixed LP Whisperer achievement threshold (90 → 80) to align with 10/10 PE score.',
+          'Fixed equity raise option incorrectly appearing in PE Fund mode deal modal.',
+          'Fixed achievement triggers missing dependency updates for LP satisfaction and restructuring state.',
+          'Raised FEV validation cap to $10T — legitimate late-game holdcos were hitting the old $100B ceiling.',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'April 1, 2026',
+    title: 'Accounts & Sign-In',
+    sections: [
+      {
+        heading: 'Google Sign-In',
+        items: [
+          'Sign in with Google — one-click account creation and login.',
+          'Magic link email sign-in still available as an alternative.',
+          'Anonymous game progress is automatically preserved when you create an account.',
+        ],
+      },
+      {
+        heading: 'Auto-Save',
+        items: [
+          'Every game is now automatically saved to your history — no action needed.',
+          'Your strategy playbook, score, and debrief are preserved even if you close the tab mid-game.',
+        ],
+      },
+      {
+        heading: 'Legal',
+        items: [
+          'Added Privacy Policy and Terms of Service (accessible from the start screen or via #/privacy and #/terms).',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 28, 2026',
+    title: 'Strategy Debriefs & PE Analysis',
+    sections: [
+      {
+        heading: 'Smarter Strategy Debriefs',
+        items: [
+          'Strategy debriefs are now tailored to your game mode — holdco, PE fund, and bankrupt games each get mode-specific analysis.',
+          'PE Fund debriefs analyze MOIC, IRR, carry waterfall, LP satisfaction trajectory, and capital deployment pacing.',
+          'Debriefs reference real capital allocator frameworks from Invest Like the Best podcast episodes.',
+          'Previously generated debriefs now appear in your strategy library and public playbook links.',
+        ],
+      },
+      {
+        heading: 'PE Fund Mode',
+        items: [
+          'LP satisfaction score is now visible during gameplay with a 5-tier mood indicator (Delighted → Critical).',
+        ],
+      },
+    ],
+  },
+  {
+    date: 'March 24, 2026',
+    title: 'Business School Mode',
+    sections: [
+      {
+        heading: 'Learn the Ropes',
+        items: [
+          'New Business School mode — a guided 2-year tutorial that teaches holdco fundamentals step by step.',
+          '15-step checklist walks you through your first acquisition, operational improvements, shared services, and more.',
+          'Curated deals and events designed to teach without overwhelming. Emerald-themed UI.',
+          'Earn the B-School Graduate achievement on completion.',
+          'Graduation diploma with performance summary and nudge to create an account.',
+        ],
+      },
+      {
+        heading: 'Quality of Life',
+        items: [
+          'Quick rematch button on game over — restart with the same settings in one click.',
+          '"Try this next" suggestions after each game based on what you haven\'t tried yet.',
+          'Enriched drilldown tables with attribution columns showing where value came from.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'March 21, 2026',
     title: 'Growth & Retention Update',
     sections: [

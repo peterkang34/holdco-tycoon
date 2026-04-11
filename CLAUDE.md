@@ -182,6 +182,7 @@ research/                   # GIT-TRACKED — external research
 4. Update `CLAUDE.md` if new patterns, gotchas, or key files added
 5. Update `UserManualModal.tsx` if game mechanics changed
 6. Update `mechanicsCopy.ts` if mechanic behavior changed (add old description to `BANNED_COPY_PATTERNS`)
+7. Update `src/data/changelog.ts` if any player-facing changes (new features, UX changes, bug fixes players would notice)
 
 ### Phase 3: COMMIT & DEPLOY
 7. Stage specific files (not `git add .`), commit with descriptive message, push
