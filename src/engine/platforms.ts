@@ -58,10 +58,17 @@ export function checkPlatformEligibility(
         b => b.sectorId === recipe.sectorId && recipe.requiredSubTypes.includes(b.subType)
       );
     } else if (recipe.crossSectorIds) {
-      // Cross-sector: businesses must be in one of the cross-sector IDs
-      matchingBusinesses = availableBusinesses.filter(
-        b => recipe.crossSectorIds!.includes(b.sectorId) && recipe.requiredSubTypes.includes(b.subType)
-      );
+      if (recipe.skipCrossSectorCheck) {
+        // Custom-validated: match ANY business with a qualifying sub-type (not restricted to crossSectorIds)
+        matchingBusinesses = availableBusinesses.filter(
+          b => recipe.requiredSubTypes.includes(b.subType)
+        );
+      } else {
+        // Standard cross-sector: businesses must be in one of the cross-sector IDs
+        matchingBusinesses = availableBusinesses.filter(
+          b => recipe.crossSectorIds!.includes(b.sectorId) && recipe.requiredSubTypes.includes(b.subType)
+        );
+      }
     } else {
       continue;
     }
@@ -85,6 +92,12 @@ export function checkPlatformEligibility(
     if (recipe.sectorId) {
       sectorEbitda = activeBusinesses
         .filter(b => b.sectorId === recipe.sectorId)
+        .reduce((sum, b) => sum + b.ebitda, 0);
+    } else if (recipe.skipCrossSectorCheck) {
+      // Custom-validated: sum EBITDA from all sectors represented by matching businesses
+      const matchingSectors = new Set(matchingBusinesses.map(b => b.sectorId));
+      sectorEbitda = activeBusinesses
+        .filter(b => matchingSectors.has(b.sectorId))
         .reduce((sum, b) => sum + b.ebitda, 0);
     } else {
       sectorEbitda = activeBusinesses
@@ -143,9 +156,15 @@ export function checkNearEligiblePlatforms(
         b => b.sectorId === recipe.sectorId && recipe.requiredSubTypes.includes(b.subType)
       );
     } else if (recipe.crossSectorIds) {
-      matchingBusinesses = availableBusinesses.filter(
-        b => recipe.crossSectorIds!.includes(b.sectorId) && recipe.requiredSubTypes.includes(b.subType)
-      );
+      if (recipe.skipCrossSectorCheck) {
+        matchingBusinesses = availableBusinesses.filter(
+          b => recipe.requiredSubTypes.includes(b.subType)
+        );
+      } else {
+        matchingBusinesses = availableBusinesses.filter(
+          b => recipe.crossSectorIds!.includes(b.sectorId) && recipe.requiredSubTypes.includes(b.subType)
+        );
+      }
     } else {
       continue;
     }
