@@ -225,6 +225,7 @@ export function AllocatePhase({
 }: AllocatePhaseProps) {
   const isBusinessSchoolMode = useGameStore((s) => s.isBusinessSchoolMode);
   const businessSchoolState = useGameStore((s) => s.businessSchoolState);
+  const hasCrossSectorRecipeUnlock = useGameStore((s) => s.unlockedMechanics?.crossSectorSaasServices ?? false);
   const isMobile = useIsMobile();
   const [videoBannerDismissed, setVideoBannerDismissed] = useState(() => localStorage.getItem('holdco-video-banner-dismissed') === 'true');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -1579,7 +1580,7 @@ export function AllocatePhase({
             )}
 
             {/* Locked Cross-Sector Recipe — achievement-gated */}
-            {!useGameStore.getState().unlockedMechanics?.crossSectorSaasServices && activeBusinesses.length >= 3 && (
+            {!hasCrossSectorRecipeUnlock && activeBusinesses.length >= 3 && (
               <div className="card bg-gray-500/5 border-gray-500/20 mb-6 opacity-60">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-lg">🔒</span>
