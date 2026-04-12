@@ -11,6 +11,7 @@ type ManualSection =
   | 'financial'
   | 'distress'
   | 'platforms'
+  | 'synergies'
   | 'turnarounds'
   | 'shared-services'
   | 'selling'
@@ -36,6 +37,7 @@ const SECTIONS: SectionDef[] = [
   { id: 'financial', label: 'Financial Management', shortLabel: 'Finance' },
   { id: 'distress', label: 'Distress & Covenants', shortLabel: 'Distress' },
   { id: 'platforms', label: 'Platform Building', shortLabel: 'Platforms' },
+  { id: 'synergies', label: 'Portfolio Synergies', shortLabel: 'Synergies' },
   { id: 'turnarounds', label: 'Turnaround Programs', shortLabel: 'Turnaround' },
   { id: 'shared-services', label: 'Shared Services', shortLabel: 'Services' },
   { id: 'selling', label: 'Selling & Exit', shortLabel: 'Exit' },
@@ -843,6 +845,71 @@ function PlatformsContent() {
         deals, not to existing debt, seller notes, or earn-outs. Look for the <em>Synergy</em> label
         next to bank debt rates in deal structures.
       </P>
+    </>
+  );
+}
+
+function SynergiesContent() {
+  return (
+    <>
+      <SectionTitle>Portfolio Synergies</SectionTitle>
+      <P>
+        As your portfolio grows, certain combinations of businesses create operational synergies that
+        boost performance. These bonuses are computed automatically each round based on your active portfolio.
+      </P>
+
+      <SubHeading>Route Density (Distribution)</SubHeading>
+      <P>
+        When you own 2 or more distribution businesses with adjacent sub-types (same operational group),
+        they share warehouse space, delivery routes, and fleet management. Adjacent sub-types are determined
+        by the distribution sector&apos;s sub-type groups:
+      </P>
+      <DataTable
+        headers={['Group', 'Sub-Types']}
+        rows={[
+          ['Industrial', 'Industrial / MRO Supply, Building Materials'],
+          ['Food & Logistics', 'Food & Bev Distribution, Janitorial / Facilities Supply'],
+          ['Specialty', 'Specialty / Niche, Last-Mile Delivery'],
+        ]}
+      />
+      <P>
+        Qualifying distribution businesses receive <strong>+2% margin</strong> and <strong>-15% capex</strong>.
+        No achievement required &mdash; activates automatically.
+      </P>
+
+      <SubHeading>Sub-Type Specialization</SubHeading>
+      <P>
+        Owning multiple businesses of the same sub-type builds deep operational expertise. The base tier
+        activates for all players; enhanced tiers require the Sector Specialist achievement.
+      </P>
+      <DataTable
+        headers={['Tier', 'Requirement', 'Margin', 'Growth', 'Integration']}
+        rows={[
+          ['Base', '3+ same sub-type', '+0.75%', '—', '+4%'],
+          ['Enhanced I', '2+ same (Sector Specialist)', '+0.75%', '+0.5%', '+4%'],
+          ['Enhanced II', '3+ same (Sector Specialist)', '+1.5%', '+1%', '+8%'],
+        ]}
+      />
+      <P>
+        Margin bonus is capped at +1.5% regardless of stacking. Businesses beyond 5 of the same sub-type
+        provide no additional benefit.
+      </P>
+
+      <SubHeading>Vertical SaaS + Services Recipe</SubHeading>
+      <P>
+        The most powerful cross-sector platform recipe. Combine 1 SaaS business with 2 or more services
+        businesses from the same vertical (e.g., SaaS + 2 home services companies). The integration creates
+        a flywheel where technology makes services stickier and services make software essential.
+      </P>
+      <BulletList items={[
+        '+5% margin, +3% growth, +2.0x exit multiple expansion',
+        'Requires $10M+ combined sector EBITDA (scaled by difficulty/duration)',
+        '28% integration cost (higher than most recipes — reflects cross-sector complexity)',
+      ]} />
+      <HighlightBox variant="info">
+        <strong>Unlock:</strong> Earn the Vertical Integrator achievement (forge a platform, acquire businesses
+        in 3+ sectors, finish with a B grade or better) or earn 14 total achievements.
+      </HighlightBox>
     </>
   );
 }
@@ -1822,6 +1889,7 @@ const SECTION_CONTENT: Record<ManualSection, () => React.ReactElement> = {
   'financial': FinancialContent,
   'distress': DistressContent,
   'platforms': PlatformsContent,
+  'synergies': SynergiesContent,
   'turnarounds': TurnaroundsContent,
   'shared-services': SharedServicesContent,
   'selling': SellingContent,

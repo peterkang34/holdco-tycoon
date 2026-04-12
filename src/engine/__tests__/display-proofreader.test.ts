@@ -115,8 +115,20 @@ import {
   LENDING_SYNERGY_MAX_REDUCTION,
   LENDING_SYNERGY_MIN_RATE,
   LENDING_SYNERGY_CRISIS_MULTIPLIER,
+  ROUTE_DENSITY_MARGIN_BOOST,
+  ROUTE_DENSITY_CAPEX_REDUCTION,
+  ROUTE_DENSITY_MIN_ADJACENT,
+  SUBTYPE_SPEC_BASE_MARGIN,
+  SUBTYPE_SPEC_BASE_INTEGRATION,
+  SUBTYPE_SPEC_ENHANCED_T2_MARGIN,
+  SUBTYPE_SPEC_ENHANCED_T2_GROWTH,
+  SUBTYPE_SPEC_ENHANCED_T2_INTEGRATION,
+  SUBTYPE_SPEC_COUNT_CAP,
+  SUBTYPE_SPEC_MARGIN_CAP,
+  CROSS_SAAS_SERVICES_ACHIEVEMENT_GATE,
 } from '../../data/gameConfig';
 import { TURNAROUND_PROGRAMS, TURNAROUND_TIER_CONFIG, SECTOR_QUALITY_CEILINGS, DEFAULT_QUALITY_CEILING } from '../../data/turnaroundPrograms';
+import { PLATFORM_RECIPES } from '../../data/platformRecipes';
 import {
   DEBT_LABELS,
   DEBT_EXPLAINER,
@@ -2006,6 +2018,58 @@ describe('Display Proofreader', () => {
       const sim = readComponent('engine/simulation.ts');
       expect(sim).toContain('competitivePositionPremium');
       expect(sim).toContain('COMPETITIVE_POSITION_PREMIUM');
+    });
+  });
+
+  // ══════════════════════════════════════════════════════════════════
+  // PORTFOLIO SYNERGIES
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Portfolio Synergies constants', () => {
+    it('Route Density constants are calibrated', () => {
+      expect(ROUTE_DENSITY_MARGIN_BOOST).toBe(0.02);
+      expect(ROUTE_DENSITY_CAPEX_REDUCTION).toBe(0.15);
+      expect(ROUTE_DENSITY_MIN_ADJACENT).toBe(2);
+    });
+
+    it('Sub-Type Specialization constants are calibrated', () => {
+      expect(SUBTYPE_SPEC_BASE_MARGIN).toBe(0.0075);
+      expect(SUBTYPE_SPEC_BASE_INTEGRATION).toBe(0.04);
+      expect(SUBTYPE_SPEC_ENHANCED_T2_MARGIN).toBe(0.015);
+      expect(SUBTYPE_SPEC_ENHANCED_T2_GROWTH).toBe(0.01);
+      expect(SUBTYPE_SPEC_ENHANCED_T2_INTEGRATION).toBe(0.08);
+      expect(SUBTYPE_SPEC_COUNT_CAP).toBe(5);
+      expect(SUBTYPE_SPEC_MARGIN_CAP).toBe(0.015);
+    });
+
+    it('Cross-Sector SaaS+Services achievement gate is set', () => {
+      expect(CROSS_SAAS_SERVICES_ACHIEVEMENT_GATE).toBe(14);
+    });
+
+    it('UserManualModal documents Portfolio Synergies (Strategy B)', () => {
+      const manual = readComponent('components/ui/UserManualModal.tsx');
+      expect(manual).toContain('Portfolio Synergies');
+      expect(manual).toContain('Route Density');
+      expect(manual).toContain('Sub-Type Specialization');
+      expect(manual).toContain('Vertical SaaS + Services');
+    });
+
+    it('portfolioBonuses.ts exports calculation functions (Strategy B)', () => {
+      const bonuses = readComponent('engine/portfolioBonuses.ts');
+      expect(bonuses).toContain('calculateRouteDensityBonus');
+      expect(bonuses).toContain('calculateSubTypeSpecBonus');
+      expect(bonuses).toContain('getSubTypeSpecIntegrationBoost');
+    });
+
+    it('cross-sector SaaS+Services recipe has correct bonuses', () => {
+      const recipe = PLATFORM_RECIPES.find(r => r.id === 'cross_saas_services_vertical');
+      expect(recipe).toBeDefined();
+      expect(recipe!.bonuses.marginBoost).toBe(0.05);
+      expect(recipe!.bonuses.growthBoost).toBe(0.03);
+      expect(recipe!.bonuses.multipleExpansion).toBe(2.0);
+      expect(recipe!.integrationCostFraction).toBe(0.28);
+      expect(recipe!.skipCrossSectorCheck).toBe(true);
+      expect(recipe!.customValidator).toBeDefined();
     });
   });
 

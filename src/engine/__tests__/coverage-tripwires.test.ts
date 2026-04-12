@@ -82,7 +82,7 @@ describe('Coverage Tripwires — Engine Function Coverage', () => {
     'simulation.ts', 'ipo.ts', 'distress.ts', 'businesses.ts',
     'platforms.ts', 'scoring.ts', 'turnarounds.ts', 'familyOffice.ts',
     'affordability.ts', 'deals.ts', 'buyers.ts', 'helpers.ts',
-    'drilldownComputations.ts',
+    'drilldownComputations.ts', 'portfolioBonuses.ts',
   ];
 
   // Functions that depend on browser APIs (localStorage) or are internal plumbing
