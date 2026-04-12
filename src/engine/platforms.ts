@@ -46,8 +46,8 @@ export function checkPlatformEligibility(
   const eligible: { recipe: PlatformRecipe; eligibleBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number }[] = [];
 
   for (const recipe of PLATFORM_RECIPES) {
-    // Skip already forged
-    if (alreadyForgedIds.has(recipe.id)) continue;
+    // Skip already forged (unless allowMultipleForges — e.g., one per vertical)
+    if (alreadyForgedIds.has(recipe.id) && !recipe.allowMultipleForges) continue;
 
     // Find businesses that match this recipe's required sub-types
     let matchingBusinesses: Business[];
@@ -85,7 +85,7 @@ export function checkPlatformEligibility(
     }
 
     // Custom validator for complex constraints (e.g., cross-sector SaaS+Services)
-    if (recipe.customValidator && !recipe.customValidator(matchingBusinesses)) continue;
+    if (recipe.customValidator && !recipe.customValidator(matchingBusinesses, existingPlatforms)) continue;
 
     // Calculate sector EBITDA (all active businesses in relevant sectors, not just matching ones)
     let sectorEbitda: number;
@@ -145,8 +145,8 @@ export function checkNearEligiblePlatforms(
   const nearEligible: { recipe: PlatformRecipe; matchingBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number; qualityBlockers: Business[] }[] = [];
 
   for (const recipe of PLATFORM_RECIPES) {
-    // Skip already forged
-    if (alreadyForgedIds.has(recipe.id)) continue;
+    // Skip already forged (unless allowMultipleForges)
+    if (alreadyForgedIds.has(recipe.id) && !recipe.allowMultipleForges) continue;
 
     // Find businesses that match this recipe's required sub-types (including Q1/Q2)
     let matchingBusinesses: Business[];
@@ -181,7 +181,7 @@ export function checkNearEligiblePlatforms(
     }
 
     // Custom validator for complex constraints
-    if (recipe.customValidator && !recipe.customValidator(matchingBusinesses)) continue;
+    if (recipe.customValidator && !recipe.customValidator(matchingBusinesses, existingPlatforms)) continue;
 
     // Calculate sector EBITDA (all active businesses in relevant sectors)
     let sectorEbitda: number;
@@ -239,13 +239,20 @@ export function calculateIntegrationCost(
 export function forgePlatform(
   recipe: PlatformRecipe,
   selectedBusinessIds: string[],
-  round: number
+  round: number,
+  selectedBusinesses?: Business[],
 ): IntegratedPlatform {
-  const id = `platform_${recipe.id}_r${round}`;
+  // For multi-forge recipes, derive sectorIds from actual selected businesses
+  let sectorIds: SectorId[];
+  if (recipe.allowMultipleForges && selectedBusinesses) {
+    sectorIds = [...new Set(selectedBusinesses.map(b => b.sectorId))] as SectorId[];
+  } else {
+    sectorIds = recipe.sectorId ? [recipe.sectorId] : (recipe.crossSectorIds || []);
+  }
 
-  const sectorIds: SectorId[] = recipe.sectorId
-    ? [recipe.sectorId]
-    : (recipe.crossSectorIds || []);
+  // Unique ID: include sector list for multi-forge to avoid collisions
+  const idSuffix = recipe.allowMultipleForges ? `_${sectorIds.sort().join('-')}` : '';
+  const id = `platform_${recipe.id}_r${round}${idSuffix}`;
 
   return {
     id,

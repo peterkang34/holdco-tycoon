@@ -926,7 +926,8 @@ export interface PlatformRecipe {
   description: string;
   realWorldExample?: string;
   skipCrossSectorCheck?: boolean;     // bypass "all crossSectorIds represented" — use with customValidator
-  customValidator?: (businesses: Business[]) => boolean;  // stricter eligibility beyond standard sub-type matching
+  customValidator?: (businesses: Business[], existingPlatforms?: IntegratedPlatform[]) => boolean;  // stricter eligibility beyond standard sub-type matching
+  allowMultipleForges?: boolean;      // can forge this recipe more than once (e.g., one per vertical)
 }
 
 export interface IntegratedPlatform {

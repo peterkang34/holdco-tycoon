@@ -1,4 +1,4 @@
-import type { Business, PlatformRecipe } from '../engine/types';
+import type { Business, IntegratedPlatform, PlatformRecipe } from '../engine/types';
 
 export const PLATFORM_RECIPES: PlatformRecipe[] = [
   // ═══ WITHIN-SECTOR PLATFORMS ═══
@@ -692,12 +692,28 @@ export const PLATFORM_RECIPES: PlatformRecipe[] = [
     integrationCostFraction: 0.28,
     description: 'Vertical SaaS product embedded in a services workflow. Technology makes services stickier, services make software essential.',
     realWorldExample: 'ServiceTitan + home services, Toast + restaurants, Veeva + pharma services',
-    customValidator: (businesses: Business[]) => {
+    allowMultipleForges: true,
+    customValidator: (businesses: Business[], existingPlatforms?: IntegratedPlatform[]) => {
       const hasSaas = businesses.some(b => b.sectorId === 'saas');
       if (!hasSaas) return false;
       const nonSaas = businesses.filter(b => b.sectorId !== 'saas');
+
+      // Find verticals already forged in existing platforms of this recipe
+      const forgedVerticals = new Set<string>();
+      if (existingPlatforms) {
+        for (const p of existingPlatforms) {
+          if (p.recipeId !== 'cross_saas_services_vertical') continue;
+          // The vertical is the non-SaaS sector in the platform
+          for (const sid of p.sectorIds) {
+            if (sid !== 'saas') forgedVerticals.add(sid);
+          }
+        }
+      }
+
+      // Need 2+ from the same non-SaaS sector that hasn't already been forged
       const sectorCounts: Record<string, number> = {};
       for (const b of nonSaas) {
+        if (forgedVerticals.has(b.sectorId)) continue; // skip already-forged verticals
         sectorCounts[b.sectorId] = (sectorCounts[b.sectorId] || 0) + 1;
       }
       return Object.values(sectorCounts).some(c => c >= 2);

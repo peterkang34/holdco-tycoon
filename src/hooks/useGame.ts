@@ -5569,7 +5569,7 @@ export const useGameStore = create<GameStore>()(
 
         trackFeatureUsed('platform_forge', state.round);
 
-        const platform = forgePlatform(recipe, businessIds, state.round);
+        const platform = forgePlatform(recipe, businessIds, state.round, selectedBusinesses);
 
         const costPerConstituent = Math.round(integrationCost / businessIds.length);
         const updatedBusinesses = state.businesses.map(b => {
