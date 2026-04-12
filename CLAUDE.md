@@ -98,8 +98,8 @@ Spawn via Agent tool (background). Always include:
 - Deployed: https://game.holdcoguide.com | GitHub: `peterkang34/holdco-tycoon`
 
 ## Architecture
-- **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts
-- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v41`
+- **Engine**: Pure TypeScript in `src/engine/` — simulation.ts, businesses.ts, scoring.ts, deals.ts, distress.ts, types.ts, portfolioBonuses.ts
+- **State**: Zustand store in `src/hooks/useGame.ts`, persisted as `holdco-tycoon-save-v42`
 - **Tests**: Vitest — ~3000 tests across 54 suites (incl. display-proofreader, playtest system, structural parity/exhaustiveness/tripwires); API integration tests in `api/__tests__/`
 - **Game Over Screen**: `GameOverScreen.tsx` is a ~500-line orchestrator importing 13 child components from `src/components/gameover/`
 - **Test Shortcuts**: `#/fo-test` (Family Office), `#/go-test` (Game Over — variants: `?v=holdco|pe|bankrupt|pe-bankrupt`), `#/bs-test` (Business School graduation)
@@ -137,11 +137,12 @@ research/                   # GIT-TRACKED — external research
 
 ## Key Files
 - `src/hooks/useGame.ts` — Zustand store (game actions, state transitions, ~6200 lines)
-- `src/hooks/migrations.ts` — Save migration logic (current: v41)
+- `src/hooks/migrations.ts` — Save migration logic (current: v42)
+- `src/engine/portfolioBonuses.ts` — Portfolio synergies: route density, sub-type specialization, integration boost
 - `src/data/businessSchool.ts` — Business School mode config, businesses, deals, checklist
 - `src/data/gameConfig.ts` — Game constants and configuration
-- `src/data/achievementPreview.ts` — 34 achievement definitions with pure predicate checks
-- `src/data/platformRecipes.ts` — 51 integrated platform recipes
+- `src/data/achievementPreview.ts` — 35 achievement definitions with pure predicate checks
+- `src/data/platformRecipes.ts` — 52 integrated platform recipes (incl. achievement-gated Vertical SaaS+Services)
 - `src/engine/types.ts` — All type definitions including BusinessSchoolState, PEScoreBreakdown, CarryWaterfall
 - `src/components/screens/GameScreen.tsx` — Main game screen (phase routing)
 - `src/components/phases/AllocatePhase.tsx` — Capital allocation (~3900 lines)

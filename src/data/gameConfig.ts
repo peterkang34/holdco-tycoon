@@ -578,6 +578,32 @@ export function getOwnershipImprovementModifier(priorOwnershipCount: number): nu
 
 export const COMPETITIVE_POSITION_PREMIUM = 0.2; // +0.2x exit multiple for market leaders
 
+// ── Distribution Route Density ──
+export const ROUTE_DENSITY_MARGIN_BOOST = 0.02;      // +2% margin
+export const ROUTE_DENSITY_CAPEX_REDUCTION = 0.15;    // -15% capex
+export const ROUTE_DENSITY_MIN_ADJACENT = 2;           // 2+ adjacent-sub-type distribution businesses
+
+// ── Sub-Type Specialization ──
+export const SUBTYPE_SPEC_BASE_MARGIN = 0.0075;        // +0.75% base (no achievement)
+export const SUBTYPE_SPEC_BASE_INTEGRATION = 0.04;     // +4% integration success
+export const SUBTYPE_SPEC_BASE_MIN_COUNT = 3;           // 3+ same sub-type for base
+
+export const SUBTYPE_SPEC_ENHANCED_T1_MARGIN = 0.0075;  // +0.75% (2+ same, after Sector Specialist)
+export const SUBTYPE_SPEC_ENHANCED_T1_GROWTH = 0.005;   // +0.5% growth
+export const SUBTYPE_SPEC_ENHANCED_T1_INTEGRATION = 0.04;
+export const SUBTYPE_SPEC_ENHANCED_T1_MIN_COUNT = 2;
+
+export const SUBTYPE_SPEC_ENHANCED_T2_MARGIN = 0.015;   // +1.5% (3+ same, after Sector Specialist)
+export const SUBTYPE_SPEC_ENHANCED_T2_GROWTH = 0.01;    // +1% growth
+export const SUBTYPE_SPEC_ENHANCED_T2_INTEGRATION = 0.08;
+export const SUBTYPE_SPEC_ENHANCED_T2_MIN_COUNT = 3;
+
+export const SUBTYPE_SPEC_COUNT_CAP = 5;                 // hard cap — no benefit beyond 5
+export const SUBTYPE_SPEC_MARGIN_CAP = 0.015;            // +1.5% ceiling regardless of stacking
+
+// ── Cross-Sector SaaS+Services Achievement Gate ──
+export const CROSS_SAAS_SERVICES_ACHIEVEMENT_GATE = 14;
+
 // Type helpers for consumers
 export type DifficultyConfig = typeof DIFFICULTY_CONFIG;
 export type DurationConfig = typeof DURATION_CONFIG;

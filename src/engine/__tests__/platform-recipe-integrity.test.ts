@@ -49,7 +49,10 @@ describe('Platform Recipe Sub-Type Cross-Reference', () => {
   it('every cross-sector recipe has valid crossSectorIds', () => {
     for (const recipe of crossSectorRecipes) {
       expect(recipe.crossSectorIds, `Recipe ${recipe.id} missing crossSectorIds`).toBeDefined();
-      expect(recipe.crossSectorIds!.length).toBeGreaterThanOrEqual(2);
+      // Recipes with skipCrossSectorCheck use customValidator — may have fewer crossSectorIds
+      if (!recipe.skipCrossSectorCheck) {
+        expect(recipe.crossSectorIds!.length).toBeGreaterThanOrEqual(2);
+      }
       for (const sectorId of recipe.crossSectorIds!) {
         expect(SECTORS[sectorId], `Recipe ${recipe.id} has unknown crossSectorId: ${sectorId}`).toBeDefined();
       }
@@ -58,6 +61,8 @@ describe('Platform Recipe Sub-Type Cross-Reference', () => {
 
   it('every cross-sector requiredSubType exists in one of its crossSectorIds', () => {
     for (const recipe of crossSectorRecipes) {
+      // Recipes with skipCrossSectorCheck may reference sub-types from sectors beyond crossSectorIds
+      if (recipe.skipCrossSectorCheck) continue;
       const allSubTypes = recipe.crossSectorIds!.flatMap(sid => SECTORS[sid].subTypes);
       for (const subType of recipe.requiredSubTypes) {
         expect(

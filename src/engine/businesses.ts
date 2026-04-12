@@ -624,6 +624,7 @@ export function determineIntegrationOutcome(
   subTypeAffinity?: SubTypeAffinity,
   sizeRatioTier?: SizeRatioTier,
   isMerger?: boolean,
+  subTypeSpecBoost?: number, // Sub-type specialization integration bonus
 ): IntegrationOutcome {
   let successProbability = 0.6; // Base 60% chance
 
@@ -669,6 +670,11 @@ export function determineIntegrationOutcome(
       !!hasSharedServices,
       bothHighQuality,
     );
+  }
+
+  // Sub-type specialization bonus — same sub-type teams integrate better
+  if (subTypeSpecBoost && subTypeSpecBoost > 0) {
+    successProbability += subTypeSpecBoost;
   }
 
   // Roll the dice

@@ -69,7 +69,9 @@ import {
   calculateComplexityCost,
 } from '../engine/simulation';
 import { executeDealStructure } from '../engine/deals';
-import { getUnlockedSectorIds } from './useUnlocks';
+import { getUnlockedSectorIds, getEarnedAchievementIds } from './useUnlocks';
+import { calculateRouteDensityBonus, calculateSubTypeSpecBonus, getSubTypeSpecIntegrationBoost } from '../engine/portfolioBonuses';
+import { ROUTE_DENSITY_CAPEX_REDUCTION, CROSS_SAAS_SERVICES_ACHIEVEMENT_GATE } from '../data/gameConfig';
 import { useAuthStore } from './useAuth';
 import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue, calculateFounderEquityValue, calculateFounderPersonalWealth } from '../engine/scoring';
 import { getDistressRestrictions } from '../engine/distress';
@@ -627,6 +629,13 @@ export const useGameStore = create<GameStore>()(
             founderDistributionsReceived: 0,
             isChallenge: false, // Force off for fund mode
             unlockedSectorIds: getUnlockedSectorIds(useAuthStore.getState().player?.isAnonymous ?? true),
+            unlockedMechanics: (() => {
+              const earned = getEarnedAchievementIds();
+              return {
+                enhancedSubTypeSpec: earned.includes('sector_specialist'),
+                crossSectorSaasServices: earned.includes('vertical_integrator') || earned.length >= CROSS_SAAS_SERVICES_ACHIEVEMENT_GATE,
+              };
+            })(),
             dealInflationState: { crisisResetRoundsRemaining: 0 },
             ipoState: null,
             familyOfficeState: null,
@@ -697,6 +706,13 @@ export const useGameStore = create<GameStore>()(
           founderDistributionsReceived: 0,
           isChallenge: seed != null,
           unlockedSectorIds: unlockedSectorIds, // Snapshot at game start — never re-evaluate from auth
+          unlockedMechanics: (() => {
+            const earned = getEarnedAchievementIds();
+            return {
+              enhancedSubTypeSpec: earned.includes('sector_specialist'),
+              crossSectorSaasServices: earned.includes('vertical_integrator') || earned.length >= CROSS_SAAS_SERVICES_ACHIEVEMENT_GATE,
+            };
+          })(),
           dealInflationState: { crisisResetRoundsRemaining: 0 },
           ipoState: null,
           familyOfficeState: null,
@@ -755,6 +771,7 @@ export const useGameStore = create<GameStore>()(
           ipoState: null,
           familyOfficeState: null,
           unlockedSectorIds: [], // B-School uses curated deals, no prestige sectors
+          unlockedMechanics: { enhancedSubTypeSpec: false, crossSectorSaasServices: false },
           isBusinessSchoolMode: true,
           businessSchoolState: createInitialBSState(r1Deals, r2Deals),
         };
@@ -825,13 +842,15 @@ export const useGameStore = create<GameStore>()(
 
         // Use holdcoLoanRate + penalty for tax deduction (matches actual interest paid)
         const totalDeductibleCosts = sharedServicesCost + maSourcingCost + managementFee;
+        const collectRouteDensity = calculateRouteDensityBonus(state.businesses);
         const annualFcf = calculatePortfolioFcf(
           state.businesses.filter(b => b.status === 'active'),
           sharedBenefits.capexReduction,
           sharedBenefits.cashConversionBonus,
           state.holdcoLoanBalance,
           state.holdcoLoanRate + distressRestrictions.interestPenalty,
-          totalDeductibleCosts
+          totalDeductibleCosts,
+          (b) => (collectRouteDensity && b.sectorId === 'distribution') ? ROUTE_DENSITY_CAPEX_REDUCTION : 0,
         );
 
         // Holdco loan P&I (replaces old holdco interest-only)
@@ -1459,11 +1478,25 @@ export const useGameStore = create<GameStore>()(
           : uniqueSectors >= 4 ? 0.04
           : 0;
 
+        // Portfolio synergies — route density and sub-type specialization
+        const routeDensity = calculateRouteDensityBonus(state.businesses);
+        const subTypeSpec = calculateSubTypeSpecBonus(
+          state.businesses,
+          state.unlockedMechanics?.enhancedSubTypeSpec ?? false,
+        );
+
         // Apply organic growth to all businesses
         const updatedBusinesses = state.businesses.map(b => {
           if (b.status !== 'active') return b;
           const sector = SECTORS[b.sectorId];
           const maxFocusCount = Math.max(...sector.sectorFocusGroup.map(fg => focusGroupCounts[fg] || 0));
+
+          // Compute per-business portfolio bonuses
+          const marginBoost =
+            (subTypeSpec && b.subType === subTypeSpec.subType ? subTypeSpec.marginBoost : 0)
+            + (routeDensity && b.sectorId === 'distribution' ? routeDensity.marginBoost : 0);
+          const growthBoost = subTypeSpec && b.subType === subTypeSpec.subType ? subTypeSpec.growthBoost : 0;
+
           return applyOrganicGrowth(
             b,
             sharedBenefits.growthBonus,
@@ -1477,6 +1510,7 @@ export const useGameStore = create<GameStore>()(
             roundStreams.simulation,
             state.duration,
             sharedBenefits.hasMarketingBrand,
+            (marginBoost || growthBoost) ? { marginBoost, growthBoost } : undefined,
           );
         });
 
@@ -2128,7 +2162,8 @@ export const useGameStore = create<GameStore>()(
           const hasSharedServicesSF = state.sharedServices.filter(s => s.active).length > 0;
           const subTypeAffinitySF = getSubTypeAffinity(platform.sectorId, platform.subType, deal.business.subType);
           const { tier: sizeRatioTierSF, ratio: sizeRatioSF } = getSizeRatioTier(deal.business.ebitda, platform.ebitda);
-          const outcomeSF = determineIntegrationOutcome(deal.business, platform, hasSharedServicesSF, subTypeAffinitySF, sizeRatioTierSF);
+          const specBoostSF = getSubTypeSpecIntegrationBoost(deal.business.subType, state.businesses, state.unlockedMechanics?.enhancedSubTypeSpec ?? false);
+          const outcomeSF = determineIntegrationOutcome(deal.business, platform, hasSharedServicesSF, subTypeAffinitySF, sizeRatioTierSF, false, specBoostSF);
           const synergiesSF = calculateSynergies(outcomeSF, deal.business.ebitda, true, subTypeAffinitySF, sizeRatioTierSF);
           const boltOnIdSF = generateBusinessId();
           const boltOnBusinessSF: Business = {
@@ -2210,7 +2245,8 @@ export const useGameStore = create<GameStore>()(
         const { tier: sizeRatioTier, ratio: sizeRatio } = getSizeRatioTier(deal.business.ebitda, platform.ebitda);
 
         // Determine integration outcome
-        const outcome = determineIntegrationOutcome(deal.business, platform, hasSharedServices, subTypeAffinity, sizeRatioTier);
+        const specBoost = getSubTypeSpecIntegrationBoost(deal.business.subType, state.businesses, state.unlockedMechanics?.enhancedSubTypeSpec ?? false);
+        const outcome = determineIntegrationOutcome(deal.business, platform, hasSharedServices, subTypeAffinity, sizeRatioTier, false, specBoost);
         const synergies = calculateSynergies(outcome, deal.business.ebitda, true, subTypeAffinity, sizeRatioTier);
 
         // Create the bolt-on business record
@@ -2411,7 +2447,8 @@ export const useGameStore = create<GameStore>()(
         const mergerBalanceRatio = smallerEbitda > 0 ? largerEbitda / smallerEbitda : 99;
 
         // Integration outcome for merger (with isMerger flag for softer penalties)
-        const outcome = determineIntegrationOutcome(biz2, biz1, hasSharedServices, subTypeAffinity, mergerSizeRatioTier, true);
+        const mergerSpecBoost = getSubTypeSpecIntegrationBoost(biz2.subType, state.businesses, state.unlockedMechanics?.enhancedSubTypeSpec ?? false);
+        const outcome = determineIntegrationOutcome(biz2, biz1, hasSharedServices, subTypeAffinity, mergerSizeRatioTier, true, mergerSpecBoost);
         // Synergy base: smaller EBITDA (prevents combined-EBITDA exploit)
         const synergies = calculateSynergies(outcome, smallerEbitda, false, subTypeAffinity, mergerSizeRatioTier, true);
 
@@ -5518,6 +5555,9 @@ export const useGameStore = create<GameStore>()(
         const recipe = getRecipeById(recipeId);
         if (!recipe) return;
 
+        // Achievement-gated recipe check
+        if (recipe.id === 'cross_saas_services_vertical' && !state.unlockedMechanics?.crossSectorSaasServices) return;
+
         const selectedBusinesses = state.businesses.filter(b => businessIds.includes(b.id));
         if (selectedBusinesses.length === 0) return;
 
@@ -6069,7 +6109,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v41', // v41: Business School Mode
+      name: 'holdco-tycoon-save-v42', // v42: Portfolio Synergies (route density, sub-type spec, cross-sector recipe)
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -6242,6 +6282,10 @@ export const useGameStore = create<GameStore>()(
             // Backfill Business School Mode
             if (s.isBusinessSchoolMode === undefined) s.isBusinessSchoolMode = false;
             if (s.businessSchoolState === undefined) s.businessSchoolState = null;
+            // Backfill Portfolio Synergies unlock state
+            if (s.unlockedMechanics === undefined) {
+              s.unlockedMechanics = { enhancedSubTypeSpec: false, crossSectorSaasServices: false };
+            }
             // Restore business ID counter to avoid collisions after save/load
             if (Array.isArray(state.businesses)) {
               restoreBusinessIdCounter(state.businesses);

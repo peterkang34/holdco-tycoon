@@ -1,4 +1,4 @@
-import type { PlatformRecipe } from '../engine/types';
+import type { Business, PlatformRecipe } from '../engine/types';
 
 export const PLATFORM_RECIPES: PlatformRecipe[] = [
   // ═══ WITHIN-SECTOR PLATFORMS ═══
@@ -656,6 +656,52 @@ export const PLATFORM_RECIPES: PlatformRecipe[] = [
     integrationCostFraction: 0.25,
     description: 'Precision manufacturing serving both commercial aerospace and defense programs. Dual-use capabilities.',
     realWorldExample: 'Parker Hannifin, Howmet Aerospace, Hexcel',
+  },
+
+  // ═══ ACHIEVEMENT-GATED CROSS-SECTOR PLATFORMS ═══
+
+  {
+    id: 'cross_saas_services_vertical',
+    name: 'Vertical SaaS + Services Platform',
+    sectorId: null,
+    crossSectorIds: ['saas'],
+    skipCrossSectorCheck: true,
+    requiredSubTypes: [
+      // SaaS
+      'Vertical-Market SaaS', 'Horizontal SaaS', 'Dev Tools / Infrastructure', 'Micro-SaaS Product', 'Security / Compliance SaaS', 'Marketplace / Platform',
+      // Home Services
+      'HVAC Services', 'Plumbing Services', 'Electrical Services', 'Pest Control', 'Roofing / Exterior Services', 'Landscaping / Lawn Care',
+      // Healthcare
+      'Physician Group / Multi-Specialty Practice', 'Dental Practice Group', 'Ophthalmology / Specialty Care', 'Home Health / Hospice', 'Behavioral Health', 'Veterinary Services', 'Physical Therapy / Rehab',
+      // B2B Services
+      'IT Managed Services (MSP)', 'Finance / Accounting Services', 'HR / Staffing', 'Consulting / Advisory', 'Data / Analytics Services', 'Legal Services', 'Marketing Operations',
+      // Auto Services
+      'Tire & Wheel', 'Collision / Body', 'Quick Lube / Maintenance', 'Fleet Services', 'Transmission / Drivetrain', 'Auto Glass / Detailing', 'Car Wash',
+      // Environmental
+      'Commercial Waste Collection', 'Residential Hauling', 'Recycling & Materials Recovery', 'Environmental Remediation', 'Portable Sanitation', 'Industrial Waste Management',
+      // Restaurant
+      'QSR / Fast Casual Franchise', 'Casual Dining', 'Coffee / Beverage Concept', 'Ghost Kitchen / Delivery-First', 'Specialty Food Concept', 'Catering / Events', 'Bakery / Dessert Concept',
+      // Education
+      'Online Learning Platform', 'Vocational / Trade School', 'Corporate Training', 'Test Prep / Tutoring', 'Childcare / Early Education', 'Coding Bootcamp',
+      // Industrial
+      'Precision Parts / Components', 'Aerospace Aftermarket', 'Specialty Instruments / Testing', 'Engineered Products', 'Packaging / Containers', 'Contract Manufacturing / CNC Machining', 'Metal Fabrication',
+    ],
+    minSubTypes: 2,
+    baseEbitdaThreshold: 10000,
+    bonuses: { marginBoost: 0.05, growthBoost: 0.03, multipleExpansion: 2.0, recessionResistanceReduction: 0.75 },
+    integrationCostFraction: 0.28,
+    description: 'Vertical SaaS product embedded in a services workflow. Technology makes services stickier, services make software essential.',
+    realWorldExample: 'ServiceTitan + home services, Toast + restaurants, Veeva + pharma services',
+    customValidator: (businesses: Business[]) => {
+      const hasSaas = businesses.some(b => b.sectorId === 'saas');
+      if (!hasSaas) return false;
+      const nonSaas = businesses.filter(b => b.sectorId !== 'saas');
+      const sectorCounts: Record<string, number> = {};
+      for (const b of nonSaas) {
+        sectorCounts[b.sectorId] = (sectorCounts[b.sectorId] || 0) + 1;
+      }
+      return Object.values(sectorCounts).some(c => c >= 2);
+    },
   },
 ];
 

@@ -176,6 +176,29 @@ export const TURNAROUND_LABELS = {
   },
 } as const;
 
+export const PORTFOLIO_SYNERGY_LABELS = {
+  routeDensity: {
+    name: 'Route Density',
+    behavior: 'Distribution businesses with adjacent sub-types share routes and warehouses',
+    bonuses: '+2% margin, -15% capex for qualifying distribution businesses',
+    requirement: '2+ distribution businesses with adjacent sub-types (same group)',
+  },
+  subTypeSpec: {
+    name: 'Sub-Type Specialization',
+    behavior: 'Owning multiple businesses of the same sub-type builds operational expertise',
+    baseBonuses: '+0.75% margin, +4% integration success',
+    enhancedBonuses: '+1.5% margin, +1% growth, +8% integration success',
+    requirement: '3+ same sub-type (base), 2+ same sub-type with Sector Specialist (enhanced)',
+  },
+  crossSaasServices: {
+    name: 'Vertical SaaS + Services Platform',
+    behavior: 'SaaS product embedded in a services workflow — technology makes services stickier',
+    bonuses: '+5% margin, +3% growth, +2.0x exit multiple',
+    requirement: '1 SaaS + 2 same-vertical services businesses, $10M+ sector EBITDA',
+    unlock: 'Vertical Integrator achievement or 14 total achievements',
+  },
+} as const;
+
 export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   pattern: RegExp;
   reason: string;

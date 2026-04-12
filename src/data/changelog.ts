@@ -13,6 +13,41 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'April 11, 2026',
+    title: 'Portfolio Synergies',
+    sections: [
+      {
+        heading: 'Route Density',
+        items: [
+          'Distribution businesses now earn a Route Density bonus when you own 2+ businesses with adjacent sub-types.',
+          '+2% margin and -15% capex for qualifying distribution businesses. Shared warehouses and overlapping routes drive real efficiency.',
+        ],
+      },
+      {
+        heading: 'Sub-Type Specialization',
+        items: [
+          'Own 3+ businesses of the same sub-type to earn a specialization bonus: +0.75% margin and +4% integration success.',
+          'Earn the Sector Specialist achievement to unlock enhanced tiers with growth bonuses and stronger integration rates.',
+          'Rewards going deep in a niche — the "HVAC king" strategy is now mechanically supported.',
+        ],
+      },
+      {
+        heading: 'Vertical SaaS + Services Recipe',
+        items: [
+          'New cross-sector platform recipe: combine a SaaS business with 2+ services businesses in the same vertical.',
+          '+5% margin, +3% growth, +2.0x exit multiple — the most powerful cross-sector recipe in the game.',
+          'Unlocks after earning the Vertical Integrator achievement or 14 total achievements.',
+        ],
+      },
+      {
+        heading: 'New Achievement',
+        items: [
+          'Vertical Integrator (rare): Forge a platform, acquire businesses in 3+ sectors, and finish with a B grade or better.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'April 10, 2026',
     title: 'Stability & Polish',
     sections: [

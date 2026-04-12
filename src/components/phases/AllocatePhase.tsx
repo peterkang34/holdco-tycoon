@@ -49,6 +49,7 @@ import { checkIPOEligibility } from '../../engine/ipo';
 import type { IPOState } from '../../engine/types';
 import { DEBT_LABELS, DEBT_EXPLAINER } from '../../data/mechanicsCopy';
 import { useIsMobile } from '../../hooks/useMediaQuery';
+import { PortfolioBonuses } from './PortfolioBonuses';
 import { CardListControls } from '../ui/CardListControls';
 import { Modal } from '../ui/Modal';
 
@@ -1364,6 +1365,9 @@ export function AllocatePhase({
                 );
               })}
 
+            {/* Portfolio Synergies — passive bonuses from portfolio composition */}
+            <PortfolioBonuses businesses={businesses} isMobile={isMobile} />
+
             {/* Active Integrated Platforms */}
             {integratedPlatforms.length > 0 && (
               <div className="card bg-purple-500/5 border-purple-500/30 mb-6">
@@ -1571,6 +1575,23 @@ export function AllocatePhase({
                     );
                   })}
                 </div>
+              </div>
+            )}
+
+            {/* Locked Cross-Sector Recipe — achievement-gated */}
+            {!useGameStore.getState().unlockedMechanics?.crossSectorSaasServices && activeBusinesses.length >= 3 && (
+              <div className="card bg-gray-500/5 border-gray-500/20 mb-6 opacity-60">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">🔒</span>
+                  <h3 className="font-bold text-text-muted text-sm">Vertical SaaS + Services</h3>
+                  <span className="text-xs bg-purple-500/15 text-purple-400 px-2 py-0.5 rounded">Cross-Sector Recipe</span>
+                </div>
+                <p className="text-xs text-text-muted mb-2">
+                  Embed SaaS into a services vertical for +5% margin, +3% growth, +2.0x exit multiple.
+                </p>
+                <p className="text-xs text-text-muted italic">
+                  Unlock: Forge a platform across 3+ sectors with a B grade, or earn 14 total achievements.
+                </p>
               </div>
             )}
 

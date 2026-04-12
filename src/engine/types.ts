@@ -308,6 +308,21 @@ export interface SectorFocusBonus {
   opcoCount: number;
 }
 
+export interface RouteDensityBonus {
+  marginBoost: number;
+  capexReduction: number;
+  adjacentCount: number;
+}
+
+export interface SubTypeSpecBonus {
+  tier: 'base' | 'enhanced_t1' | 'enhanced_t2';
+  subType: string;
+  count: number;
+  marginBoost: number;
+  growthBoost: number;
+  integrationBoost: number;
+}
+
 export type MASourcingTier = 0 | 1 | 2 | 3;
 
 export interface MASourcingState {
@@ -689,6 +704,12 @@ export interface GameState {
   // Prestige sector snapshot — captured at game start, never re-evaluated from auth
   unlockedSectorIds?: SectorId[];
 
+  // Mechanic unlock snapshot — captured at game start from earned achievements
+  unlockedMechanics?: {
+    enhancedSubTypeSpec: boolean;      // Sector Specialist earned → enhanced sub-type specialization tiers
+    crossSectorSaasServices: boolean;  // Vertical Integrator earned OR 14+ achievements → cross-sector recipe
+  };
+
   // Business School Mode
   isBusinessSchoolMode?: boolean;
   businessSchoolState?: BusinessSchoolState | null;
@@ -904,6 +925,8 @@ export interface PlatformRecipe {
   integrationCostFraction: number;    // fraction of combined EBITDA (e.g., 0.20 = 20%)
   description: string;
   realWorldExample?: string;
+  skipCrossSectorCheck?: boolean;     // bypass "all crossSectorIds represented" — use with customValidator
+  customValidator?: (businesses: Business[]) => boolean;  // stricter eligibility beyond standard sub-type matching
 }
 
 export interface IntegratedPlatform {

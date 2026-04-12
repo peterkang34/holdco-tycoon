@@ -355,8 +355,8 @@ describe('checkPlatformEligibility', () => {
 // ── Recipe Data Integrity ──
 
 describe('Platform recipe data integrity', () => {
-  it('should have exactly 51 recipes (40 within-sector + 11 cross-sector)', () => {
-    expect(PLATFORM_RECIPES).toHaveLength(51);
+  it('should have exactly 52 recipes (40 within-sector + 12 cross-sector)', () => {
+    expect(PLATFORM_RECIPES).toHaveLength(52);
   });
 
   it('every recipe should have a unique id', () => {
@@ -383,6 +383,8 @@ describe('Platform recipe data integrity', () => {
     const crossSector = PLATFORM_RECIPES.filter(r => r.sectorId === null);
     for (const recipe of crossSector) {
       expect(recipe.crossSectorIds).toBeDefined();
+      // Recipes with skipCrossSectorCheck + customValidator may reference sub-types beyond crossSectorIds
+      if (recipe.skipCrossSectorCheck) continue;
       const allSubTypes = recipe.crossSectorIds!.flatMap(sid => SECTORS[sid].subTypes);
       for (const subType of recipe.requiredSubTypes) {
         expect(
@@ -443,12 +445,15 @@ describe('Platform recipe data integrity', () => {
     }
   });
 
-  it('cross-sector recipes (sectorId: null) must have crossSectorIds defined with >= 2 sectors', () => {
+  it('cross-sector recipes (sectorId: null) must have crossSectorIds defined', () => {
     const crossSector = PLATFORM_RECIPES.filter(r => r.sectorId === null);
-    expect(crossSector).toHaveLength(11);
+    expect(crossSector).toHaveLength(12);
     for (const recipe of crossSector) {
       expect(recipe.crossSectorIds).toBeDefined();
-      expect(recipe.crossSectorIds!.length).toBeGreaterThanOrEqual(2);
+      // Recipes with skipCrossSectorCheck use customValidator instead of standard multi-sector check
+      if (!recipe.skipCrossSectorCheck) {
+        expect(recipe.crossSectorIds!.length).toBeGreaterThanOrEqual(2);
+      }
     }
   });
 

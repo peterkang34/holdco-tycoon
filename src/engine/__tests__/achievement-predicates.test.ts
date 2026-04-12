@@ -114,8 +114,8 @@ function getAchievement(id: string) {
 // ── Tests ───────────────────────────────────────────────────────────────────
 
 describe('Achievement Predicates', () => {
-  it('should have 34 achievement definitions', () => {
-    expect(ACHIEVEMENT_PREVIEW.length).toBe(34);
+  it('should have 35 achievement definitions', () => {
+    expect(ACHIEVEMENT_PREVIEW.length).toBe(35);
   });
 
   // ── Milestones ──
@@ -444,6 +444,46 @@ describe('Achievement Predicates', () => {
     });
     it('fails with 2 successes', () => {
       expect(ach.check(createCtx({ strategyData: { turnaroundsSucceeded: 2 } } as any))).toBe(false);
+    });
+  });
+
+  describe('vertical_integrator', () => {
+    const ach = getAchievement('vertical_integrator');
+    it('triggers with platform forged, 3+ sectors, B grade', () => {
+      expect(ach.check(createCtx({
+        strategyData: { platformsForged: 1, allTimeSectorCount: 3 },
+        score: { grade: 'B' },
+      } as any))).toBe(true);
+    });
+    it('triggers with A grade', () => {
+      expect(ach.check(createCtx({
+        strategyData: { platformsForged: 1, allTimeSectorCount: 4 },
+        score: { grade: 'A' },
+      } as any))).toBe(true);
+    });
+    it('triggers with S grade', () => {
+      expect(ach.check(createCtx({
+        strategyData: { platformsForged: 2, allTimeSectorCount: 3 },
+        score: { grade: 'S' },
+      } as any))).toBe(true);
+    });
+    it('fails without platform', () => {
+      expect(ach.check(createCtx({
+        strategyData: { platformsForged: 0, allTimeSectorCount: 3 },
+        score: { grade: 'B' },
+      } as any))).toBe(false);
+    });
+    it('fails with only 2 sectors', () => {
+      expect(ach.check(createCtx({
+        strategyData: { platformsForged: 1, allTimeSectorCount: 2 },
+        score: { grade: 'B' },
+      } as any))).toBe(false);
+    });
+    it('fails with C grade', () => {
+      expect(ach.check(createCtx({
+        strategyData: { platformsForged: 1, allTimeSectorCount: 3 },
+        score: { grade: 'C' },
+      } as any))).toBe(false);
     });
   });
 

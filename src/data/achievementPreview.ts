@@ -161,6 +161,7 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
     emoji: '🎯',
     category: 'feat',
     rarity: 'uncommon',
+    unlockHint: 'Unlocks enhanced Sub-Type Specialization bonuses',
     check: (ctx) =>
       ctx.strategyData.sectorIds.length === 1 && ctx.strategyData.activeCount >= 3,
   },
@@ -310,6 +311,19 @@ export const ACHIEVEMENT_PREVIEW: AchievementDef[] = [
     category: 'mastery',
     rarity: 'rare',
     check: (ctx) => ctx.strategyData.turnaroundsSucceeded >= 3,
+  },
+  {
+    id: 'vertical_integrator',
+    name: 'Vertical Integrator',
+    description: 'Forge a platform, acquire businesses in 3+ different sectors, and finish with a B grade or better.',
+    emoji: '🧬',
+    category: 'mastery',
+    rarity: 'rare',
+    unlockHint: 'Unlocks the Vertical SaaS + Services cross-sector recipe',
+    check: (ctx) =>
+      ctx.strategyData.platformsForged >= 1 &&
+      ctx.strategyData.allTimeSectorCount >= 3 &&
+      ['S', 'A', 'B'].includes(ctx.score.grade),
   },
 
   // ── Creative Play ──

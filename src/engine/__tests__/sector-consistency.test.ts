@@ -139,6 +139,8 @@ describe('Platform Recipe Sub-Type Integrity', () => {
     for (const recipe of PLATFORM_RECIPES) {
       if (recipe.sectorId !== null) continue;
       if (!recipe.crossSectorIds) continue;
+      // Recipes with skipCrossSectorCheck use customValidator and may reference broader sub-types
+      if (recipe.skipCrossSectorCheck) continue;
       const validSubTypes = new Set<string>();
       for (const sectorId of recipe.crossSectorIds) {
         for (const st of getAllSubTypesForSector(sectorId)) {

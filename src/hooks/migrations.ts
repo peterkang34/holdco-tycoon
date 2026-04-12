@@ -1099,6 +1099,30 @@ function migrateV40ToV41(): void {
   }
 }
 
+// --- v41 → v42: adds Portfolio Synergies mechanic unlock state ---
+
+function migrateV41ToV42(): void {
+  const v41Key = 'holdco-tycoon-save-v41';
+  const v42Key = 'holdco-tycoon-save-v42';
+  if (localStorage.getItem(v42Key)) return;
+  try {
+    const raw = localStorage.getItem(v41Key);
+    if (!raw) return;
+    const v41Data = JSON.parse(raw);
+    if (!v41Data?.state) return;
+    if (v41Data.state.unlockedMechanics === undefined) {
+      v41Data.state.unlockedMechanics = {
+        enhancedSubTypeSpec: false,
+        crossSectorSaasServices: false,
+      };
+    }
+    localStorage.setItem(v42Key, JSON.stringify(v41Data));
+    localStorage.removeItem(v41Key);
+  } catch (e) {
+    console.error('v41→v42 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -1136,4 +1160,5 @@ export function runAllMigrations(): void {
   migrateV38ToV39();
   migrateV39ToV40();
   migrateV40ToV41();
+  migrateV41ToV42();
 }

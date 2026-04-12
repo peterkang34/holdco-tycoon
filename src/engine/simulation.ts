@@ -30,6 +30,8 @@ import {
   generateValuationCommentary,
 } from './buyers';
 import { calculateDistressLevel, getDistressRestrictions } from './distress';
+import { calculateRouteDensityBonus } from './portfolioBonuses';
+import { ROUTE_DENSITY_CAPEX_REDUCTION } from '../data/gameConfig';
 import { getMASourcingAnnualCost } from '../data/sharedServices';
 import {
   clampMargin,
@@ -421,13 +423,16 @@ export function calculatePortfolioFcf(
   sharedServicesCashConversionBonus: number = 0,
   holdcoDebt: number = 0,
   holdcoInterestRate: number = 0,
-  sharedServicesCost: number = 0
+  sharedServicesCost: number = 0,
+  perBusinessCapexBonus?: (b: Business) => number,
 ): number {
   const preTaxFcf = businesses
     .filter(b => b.status === 'active')
     .reduce(
-      (total, b) =>
-        total + calculateAnnualFcf(b, sharedServicesCapexReduction, sharedServicesCashConversionBonus),
+      (total, b) => {
+        const bizCapexReduction = sharedServicesCapexReduction + (perBusinessCapexBonus?.(b) ?? 0);
+        return total + calculateAnnualFcf(b, bizCapexReduction, sharedServicesCashConversionBonus);
+      },
       0
     );
 
@@ -670,6 +675,7 @@ export function applyOrganicGrowth(
   rng?: SeededRng,
   duration?: GameDuration, // For integration drag decay rate
   hasMarketingBrand?: boolean, // Sector-specific bonus only when marketing_brand is active
+  portfolioBonuses?: { marginBoost?: number; growthBoost?: number }, // Route density + sub-type specialization
 ): Business {
   const sector = SECTORS[business.sectorId];
 
@@ -702,6 +708,11 @@ export function applyOrganicGrowth(
   // Diversification bonus
   if (diversificationBonus && diversificationBonus > 0) {
     revenueGrowth += diversificationBonus;
+  }
+
+  // Portfolio synergies growth bonus (sub-type specialization)
+  if (portfolioBonuses?.growthBoost) {
+    revenueGrowth += portfolioBonuses.growthBoost;
   }
 
   // Competitive position modifier: leaders grow faster, commoditized face headwinds
@@ -750,6 +761,13 @@ export function applyOrganicGrowth(
     }
 
     newMargin = clampMargin(business.ebitdaMargin + marginChange);
+  }
+
+  // Portfolio synergies margin boost (route density + sub-type specialization)
+  // Applied as a post-drift additive clamped to sector ceiling — does NOT compound in drift calc
+  if (portfolioBonuses?.marginBoost) {
+    const sectorMaxMargin = sector.baseMargin[1];
+    newMargin = Math.min(newMargin + portfolioBonuses.marginBoost, sectorMaxMargin + portfolioBonuses.marginBoost);
   }
 
   // --- Derive EBITDA ---
@@ -2321,13 +2339,15 @@ export function calculateMetrics(state: GameState): Metrics {
 
   // Total FCF (annual): EBITDA - CapEx - Tax (with penalty in tax shield)
   // Pass holdcoLoanRate + interestPenalty so tax shield matches actual interest paid
+  const metricsRouteDensity = calculateRouteDensityBonus(state.businesses);
   const totalFcf = calculatePortfolioFcf(
     activeBusinesses,
     sharedServicesBenefits.capexReduction,
     sharedServicesBenefits.cashConversionBonus,
     holdcoLoanBalance,
     holdcoLoanRate + interestPenalty,
-    totalDeductibleCosts
+    totalDeductibleCosts,
+    (b) => (metricsRouteDensity && b.sectorId === 'distribution') ? ROUTE_DENSITY_CAPEX_REDUCTION : 0,
   );
 
   // Portfolio tax breakdown for NOPAT calculation (with penalty for accurate shield)

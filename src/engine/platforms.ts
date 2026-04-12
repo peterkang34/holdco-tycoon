@@ -70,12 +70,15 @@ export function checkPlatformEligibility(
     const distinctSubTypes = new Set(matchingBusinesses.map(b => b.subType));
     if (distinctSubTypes.size < recipe.minSubTypes) continue;
 
-    // For cross-sector, require at least 1 business from each sector
-    if (recipe.crossSectorIds) {
+    // For cross-sector, require at least 1 business from each sector (unless skipCrossSectorCheck)
+    if (recipe.crossSectorIds && !recipe.skipCrossSectorCheck) {
       const sectorsRepresented = new Set(matchingBusinesses.map(b => b.sectorId));
       const allSectorsPresent = recipe.crossSectorIds.every(s => sectorsRepresented.has(s));
       if (!allSectorsPresent) continue;
     }
+
+    // Custom validator for complex constraints (e.g., cross-sector SaaS+Services)
+    if (recipe.customValidator && !recipe.customValidator(matchingBusinesses)) continue;
 
     // Calculate sector EBITDA (all active businesses in relevant sectors, not just matching ones)
     let sectorEbitda: number;
@@ -151,12 +154,15 @@ export function checkNearEligiblePlatforms(
     const distinctSubTypes = new Set(matchingBusinesses.map(b => b.subType));
     if (distinctSubTypes.size < recipe.minSubTypes) continue;
 
-    // For cross-sector, require at least 1 business from each sector
-    if (recipe.crossSectorIds) {
+    // For cross-sector, require at least 1 business from each sector (unless skipCrossSectorCheck)
+    if (recipe.crossSectorIds && !recipe.skipCrossSectorCheck) {
       const sectorsRepresented = new Set(matchingBusinesses.map(b => b.sectorId));
       const allSectorsPresent = recipe.crossSectorIds.every(s => sectorsRepresented.has(s));
       if (!allSectorsPresent) continue;
     }
+
+    // Custom validator for complex constraints
+    if (recipe.customValidator && !recipe.customValidator(matchingBusinesses)) continue;
 
     // Calculate sector EBITDA (all active businesses in relevant sectors)
     let sectorEbitda: number;
@@ -331,11 +337,14 @@ export function checkPlatformDissolution(
   const distinctSubTypes = new Set(constituents.map(b => b.subType));
   if (distinctSubTypes.size < recipe.minSubTypes) return true;
 
-  // Cross-sector recipes: verify all required sectors still represented
-  if (recipe.crossSectorIds) {
+  // Cross-sector recipes: verify all required sectors still represented (unless skipCrossSectorCheck)
+  if (recipe.crossSectorIds && !recipe.skipCrossSectorCheck) {
     const sectorsRepresented = new Set(constituents.map(b => b.sectorId));
     if (!recipe.crossSectorIds.every(s => sectorsRepresented.has(s))) return true;
   }
+
+  // Custom validator — re-check complex constraints after constituent change
+  if (recipe.customValidator && !recipe.customValidator(constituents)) return true;
 
   return false;
 }

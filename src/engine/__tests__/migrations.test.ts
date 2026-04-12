@@ -424,8 +424,8 @@ describe('runAllMigrations', () => {
 
     // v9 should be consumed
     expect(localStorageMock.getItem('holdco-tycoon-save-v9')).toBeNull();
-    // Final v41 should exist (chain goes through all migrations including v40→v41)
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v41')!);
+    // Final v42 should exist (chain goes through all migrations including v41→v42)
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v42')!);
     expect(result.state.difficulty).toBe('easy');
     expect(result.state.maxRounds).toBe(20);
     expect(result.state.founderDistributionsReceived).toBeDefined();
@@ -489,6 +489,8 @@ describe('runAllMigrations', () => {
     // v37→v38 fields (Turnaround System Overhaul)
     expect(result.state.businesses[0].ceilingMasteryBonus).toBe(false);
     expect(result.state.businesses[0].qualityImprovedTiers).toBe(0);
+    // v41→v42 fields (Portfolio Synergies)
+    expect(result.state.unlockedMechanics).toEqual({ enhancedSubTypeSpec: false, crossSectorSaasServices: false });
   });
 
   it('should be safe to call multiple times (idempotent)', () => {
