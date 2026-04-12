@@ -6282,9 +6282,16 @@ export const useGameStore = create<GameStore>()(
             // Backfill Business School Mode
             if (s.isBusinessSchoolMode === undefined) s.isBusinessSchoolMode = false;
             if (s.businessSchoolState === undefined) s.businessSchoolState = null;
-            // Backfill Portfolio Synergies unlock state
-            if (s.unlockedMechanics === undefined) {
-              s.unlockedMechanics = { enhancedSubTypeSpec: false, crossSectorSaasServices: false };
+            // Backfill Portfolio Synergies unlock state — retroactively evaluate from earned achievements
+            {
+              const um = s.unlockedMechanics as { enhancedSubTypeSpec?: boolean; crossSectorSaasServices?: boolean } | undefined;
+              if (!um || (!um.enhancedSubTypeSpec && !um.crossSectorSaasServices)) {
+                const earned = getEarnedAchievementIds();
+                s.unlockedMechanics = {
+                  enhancedSubTypeSpec: earned.includes('sector_specialist'),
+                  crossSectorSaasServices: earned.includes('vertical_integrator') || earned.length >= CROSS_SAAS_SERVICES_ACHIEVEMENT_GATE,
+                };
+              }
             }
             // Restore business ID counter to avoid collisions after save/load
             if (Array.isArray(state.businesses)) {
