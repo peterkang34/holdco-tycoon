@@ -28,31 +28,10 @@ export interface MonthData {
   returningBreakdown: Record<string, number>;
   durationDistribution: Record<string, number>;
   pageViews: number;
-  viewsByDevice: Record<string, number>;
   startByNth: Record<string, number>;
   completeByNth: Record<string, number>;
-  archetypeDistribution: Record<string, number>;
-  antiPatternDistribution: Record<string, number>;
   sophisticationDistribution: Record<string, number>;
-  dealStructureDistribution: Record<string, number>;
-  platformsForgedDistribution: Record<string, number>;
-  endingSubTypes: Record<string, number>;
-  endingEbitdaSum: number;
-  endingEbitdaCount: number;
-  endingConstruction: Record<string, number>;
   challengeMetrics: ChallengeMetrics;
-  featureAdoption: Record<string, number>;
-  eventChoices: Record<string, number>;
-  // New Phase 1 counters
-  scoreDimSums: Record<string, number>;
-  scoreDimCounts: Record<string, number>;
-  antiPatternByGrade: Record<string, number>;
-  archetypeByGrade: Record<string, number>;
-}
-
-export interface CohortRow {
-  cohortWeek: string;
-  weekData: Record<string, number>;
 }
 
 export interface LeaderboardEntryAdmin {
@@ -142,13 +121,10 @@ export interface AnalyticsData {
   recentEntries: LeaderboardEntryAdmin[];
   completionEntries: GameCompletionAdmin[];
   activityFeed: ActivityEvent[];
-  cohortRetention: CohortRow[];
 }
 
 export interface Totals {
   allConfig: Record<string, number>;
-  allSectors: Record<string, number>;
-  allGrades: Record<string, number>;
   allFev: Record<string, number>;
   allAbandon: Record<string, number>;
   allRounds: Record<string, number>;
@@ -157,20 +133,7 @@ export interface Totals {
   allDeviceAbandon: Record<string, number>;
   allReturning: Record<string, number>;
   allDuration: Record<string, number>;
-  allFeatures: Record<string, number>;
-  allChoices: Record<string, number>;
-  allArchetypes: Record<string, number>;
-  allAntiPatterns: Record<string, number>;
   allSophistication: Record<string, number>;
-  allStructures: Record<string, number>;
-  allEndingSubTypes: Record<string, number>;
-  allEndingConstruction: Record<string, number>;
-  avgEndingEbitda: number;
-  // New Phase 1 aggregates
-  allScoreDimSums: Record<string, number>;
-  allScoreDimCounts: Record<string, number>;
-  allAntiPatternByGrade: Record<string, number>;
-  allArchetypeByGrade: Record<string, number>;
   totalUnique: number;
   totalViews: number;
   completionRate: string;
@@ -181,7 +144,6 @@ export interface Totals {
   mobileSharePct: string;
   totalChallenge: ChallengeMetrics;
   avgSessionDuration: string;
-  newVsReturning: string;
   visitStartRate: string;
   secondGameRate: string;
 }
@@ -240,12 +202,3 @@ export interface DayData {
   uniquePlayers: number;
 }
 
-// Re-export for component props
-export interface MiniTrendProps {
-  label: string;
-  data: { month: string; value: number }[];
-}
-
-export interface SectionHeaderProps {
-  title: string;
-}

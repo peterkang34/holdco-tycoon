@@ -492,12 +492,13 @@ export function GameOverScreen({
     const completionId = `${seed}-${difficulty}-${duration}-${isFundManagerMode ? 'pe' : 'hc'}-${gameScore}-${gameGrade}`;
 
     // Get player initials for the completion feed (auth store, not user-typed)
+    // Filter out 'AA' — it's the database default, not a real player choice
     const playerInitials = useAuthStore.getState().player?.initials;
 
     submitGameCompletion({
       completionId,
       holdcoName: isFundManagerMode ? (fundName || 'PE Fund') : holdcoName,
-      initials: playerInitials || undefined,
+      initials: (playerInitials && playerInitials !== 'AA') ? playerInitials : undefined,
       enterpriseValue: Math.round(enterpriseValue),
       founderEquityValue: Math.round(founderEquityValue),
       score: gameScore,

@@ -75,7 +75,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── Signup Conversion & Engagement Analytics ──
     const loggedInAtCompletion = completions.filter((c: any) => c.isLoggedIn === true).length;
     const anonymousAtCompletion = completions.filter((c: any) => c.isLoggedIn === false).length;
-    // Some legacy records won't have isLoggedIn field
     const unknownAuthStatus = totalCompletions - loggedInAtCompletion - anonymousAtCompletion;
 
     // Engagement: for players with playerId, look up their stats
@@ -89,7 +88,72 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       avgScoreTrend: null as number | null,
     };
 
+    // ── B-School → Sign-Up Conversion Tracking ──
+    // Cross-reference playerIds from completions against current auth state.
+    // If a player was anonymous at B-School completion but is now verified, that's a conversion.
+    interface ConversionRecord {
+      holdcoName: string;
+      bschoolDate: string;
+      checklistCompleted: number;
+      checklistTotal: number;
+      platformForged: boolean;
+      email: string;
+      signupDate: string;
+      provider: string;
+    }
+    const conversions: ConversionRecord[] = [];
+
     if (playerIds.length > 0 && supabaseAdmin) {
+      // Look up auth state for all B-School players (batch via getUserById)
+      // Only check players who were anonymous at completion or have unknown auth
+      const anonCompletions = completions.filter(
+        (c: any) => c.playerId && (c.isLoggedIn === false || c.isLoggedIn == null)
+      );
+      const anonPlayerIds = [...new Set(anonCompletions.map((c: any) => c.playerId))] as string[];
+
+      // Batch lookup — cap at 100 to avoid timeouts
+      const authLookups = anonPlayerIds.slice(0, 100).map(async (pid) => {
+        try {
+          const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(pid);
+          return user;
+        } catch { return null; }
+      });
+      const authUsers = (await Promise.all(authLookups)).filter(Boolean);
+
+      // Build map of playerId → verified user data
+      const verifiedMap = new Map<string, { email: string; signupDate: string; provider: string }>();
+      for (const user of authUsers) {
+        if (!user || user.is_anonymous) continue;
+        // Find when they got their verified identity
+        const identity = user.identities?.find((i: any) => i.provider !== 'anonymous');
+        const signupDate = identity?.created_at || user.updated_at || user.created_at;
+        verifiedMap.set(user.id, {
+          email: user.email || '(no email)',
+          signupDate,
+          provider: (user.app_metadata?.provider as string) || 'email',
+        });
+      }
+
+      // Match completions to conversions
+      for (const c of anonCompletions) {
+        const verified = verifiedMap.get(c.playerId);
+        if (verified) {
+          conversions.push({
+            holdcoName: c.holdcoName || 'Unknown',
+            bschoolDate: c.date,
+            checklistCompleted: c.checklistCompleted ?? 0,
+            checklistTotal: c.checklistTotal ?? 15,
+            platformForged: c.platformForged === true,
+            email: verified.email,
+            signupDate: verified.signupDate,
+            provider: verified.provider,
+          });
+        }
+      }
+      // Sort by signup date descending
+      conversions.sort((a, b) => new Date(b.signupDate).getTime() - new Date(a.signupDate).getTime());
+
+      // ── Engagement stats ──
       try {
         const { data: stats } = await supabaseAdmin
           .from('player_stats')
@@ -112,7 +176,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 scoredPlayers.reduce((sum: number, s: any) => sum + (s.best_adjusted_fev || 0), 0) / scoredPlayers.length
               );
             }
-            // Aggregate grade distribution
             const gradeDist: Record<string, number> = {};
             for (const s of withGames) {
               const gd = s.grade_distribution as Record<string, number> | null;
@@ -122,7 +185,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
               }
             }
             bsGradEngagement.gradeDistribution = gradeDist;
-            // Score trend (avg across players with trends)
             const trendPlayers = withGames.filter((s: any) => s.score_trend != null);
             if (trendPlayers.length > 0) {
               bsGradEngagement.avgScoreTrend = Math.round(
@@ -153,6 +215,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         conversionRate: anonymousAtCompletion + loggedInAtCompletion > 0
           ? Math.round((loggedInAtCompletion / (anonymousAtCompletion + loggedInAtCompletion)) * 100) : 0,
       },
+      // B-School → Sign-Up conversions (which session led to whose sign-up)
+      conversions,
       // B-School grad engagement in real games
       bsGradEngagement,
     });

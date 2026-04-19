@@ -1,29 +1,20 @@
 import { useState, useEffect, useMemo } from 'react';
 import { AdminLogin } from './AdminLogin';
-import { AdminBarChart } from './AdminBarChart';
 import { FeedbackTab } from './FeedbackTab';
 import { CommunityTab } from './CommunityTab';
 import { OverviewTab } from './OverviewTab';
-import { BalanceTab } from './BalanceTab';
-import { MiniTrend, SectionHeader, HorizontalBar, DonutChart, FunnelStep } from './adminShared';
+import { SectionHeader } from './adminShared';
 import { MetricCard } from '../ui/MetricCard';
-import { SECTORS } from '../../data/sectors';
 import type { AnalyticsData, Totals, DayData } from './adminTypes';
 
 // ── Tab Configuration ────────────────────────────────────────
 
-type TabId = 'overview' | 'funnel' | 'retention' | 'engagement' | 'balance' | 'challenge' | 'devices' | 'feedback' | 'community' | 'bschool';
+type TabId = 'overview' | 'community' | 'bschool' | 'feedback';
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
-  { id: 'funnel', label: 'Funnel' },
-  { id: 'retention', label: 'Retention' },
-  { id: 'engagement', label: 'Engagement' },
-  { id: 'balance', label: 'Strategy & Balance' },
-  { id: 'challenge', label: 'Challenge' },
-  { id: 'devices', label: 'Devices' },
-  { id: 'feedback', label: 'Feedback' },
   { id: 'community', label: 'Community' },
   { id: 'bschool', label: 'B-School' },
+  { id: 'feedback', label: 'Feedback' },
 ];
 
 // ── Health Alerts ─────────────────────────────────────────────
@@ -32,7 +23,7 @@ function HealthAlerts({ data }: { data: AnalyticsData }) {
   const alerts: { level: 'warning' | 'danger'; message: string }[] = [];
   const months = data.months;
 
-  // Ghost town: weekly uniques dropped >30%
+  // Ghost town: uniques dropped >30%
   if (months.length >= 2 && months[1].uniquePlayers > 0) {
     const dropPct = ((months[1].uniquePlayers - months[0].uniquePlayers) / months[1].uniquePlayers) * 100;
     if (dropPct > 30) {
@@ -46,35 +37,6 @@ function HealthAlerts({ data }: { data: AnalyticsData }) {
     const completionRate = currentMonth.completed / currentMonth.started;
     if (completionRate < 0.4) {
       alerts.push({ level: 'warning', message: `Completion rate is ${(completionRate * 100).toFixed(0)}% — below 40% threshold` });
-    }
-  }
-
-  // Mobile divergence
-  if (currentMonth) {
-    const mobileStarts = currentMonth.deviceBreakdown['mobile'] || 0;
-    const mobileCompletes = currentMonth.deviceComplete['mobile'] || 0;
-    const desktopStarts = currentMonth.deviceBreakdown['desktop'] || 0;
-    const desktopCompletes = currentMonth.deviceComplete['desktop'] || 0;
-    if (mobileStarts > 5 && desktopStarts > 5) {
-      const mobileRate = mobileCompletes / mobileStarts;
-      const desktopRate = desktopCompletes / desktopStarts;
-      const diff = Math.abs(mobileRate - desktopRate) * 100;
-      if (diff > 20) {
-        alerts.push({ level: 'warning', message: `Mobile/desktop completion rate differs by ${diff.toFixed(0)}ppt` });
-      }
-    }
-  }
-
-  // Dominant strategy
-  if (currentMonth) {
-    const archetypes = currentMonth.archetypeDistribution;
-    const total = Object.values(archetypes).reduce((s, v) => s + v, 0);
-    if (total > 10) {
-      const topPct = Math.max(...Object.values(archetypes)) / total;
-      if (topPct > 0.6) {
-        const topArchetype = Object.entries(archetypes).sort((a, b) => b[1] - a[1])[0]?.[0];
-        alerts.push({ level: 'danger', message: `"${topArchetype}" is ${(topPct * 100).toFixed(0)}% of completed games — dominant strategy` });
-      }
     }
   }
 
@@ -136,24 +98,16 @@ export function AdminDashboard() {
 
   const totals: Totals = useMemo(() => {
     if (!data) return {
-      allConfig: EMPTY_RECORD, allSectors: EMPTY_RECORD, allGrades: EMPTY_RECORD,
-      allFev: EMPTY_RECORD, allAbandon: EMPTY_RECORD, allRounds: EMPTY_RECORD,
+      allConfig: EMPTY_RECORD, allFev: EMPTY_RECORD, allAbandon: EMPTY_RECORD, allRounds: EMPTY_RECORD,
       allDevice: EMPTY_RECORD, allDeviceComplete: EMPTY_RECORD, allDeviceAbandon: EMPTY_RECORD,
-      allReturning: EMPTY_RECORD, allDuration: EMPTY_RECORD, allFeatures: EMPTY_RECORD,
-      allChoices: EMPTY_RECORD, allArchetypes: EMPTY_RECORD, allAntiPatterns: EMPTY_RECORD,
-      allSophistication: EMPTY_RECORD, allStructures: EMPTY_RECORD,
-      allEndingSubTypes: EMPTY_RECORD, allEndingConstruction: EMPTY_RECORD, avgEndingEbitda: 0,
-      allScoreDimSums: EMPTY_RECORD, allScoreDimCounts: EMPTY_RECORD,
-      allAntiPatternByGrade: EMPTY_RECORD, allArchetypeByGrade: EMPTY_RECORD,
+      allReturning: EMPTY_RECORD, allDuration: EMPTY_RECORD, allSophistication: EMPTY_RECORD,
       totalUnique: 0, totalViews: 0, completionRate: '0%', avgFev: 0, topFev: 0,
       normalPct: '0%', quickPct: '0%', mobileSharePct: '0%',
       totalChallenge: { created: 0, shared: 0, joined: 0, started: 0, completed: 0, scoreboardViews: 0 },
-      avgSessionDuration: '—', newVsReturning: '—', visitStartRate: '—', secondGameRate: '—',
+      avgSessionDuration: '—', visitStartRate: '—', secondGameRate: '—',
     };
 
     const allConfig: Record<string, number> = {};
-    const allSectors: Record<string, number> = {};
-    const allGrades: Record<string, number> = {};
     const allFev: Record<string, number> = {};
     const allAbandon: Record<string, number> = {};
     const allRounds: Record<string, number> = {};
@@ -162,23 +116,9 @@ export function AdminDashboard() {
     const allDeviceAbandon: Record<string, number> = {};
     const allReturning: Record<string, number> = {};
     const allDuration: Record<string, number> = {};
-    const allFeatures: Record<string, number> = {};
-    const allChoices: Record<string, number> = {};
-    const allArchetypes: Record<string, number> = {};
-    const allAntiPatterns: Record<string, number> = {};
     const allSophistication: Record<string, number> = {};
-    const allStructures: Record<string, number> = {};
-    const allEndingSubTypes: Record<string, number> = {};
-    const allEndingConstruction: Record<string, number> = {};
-    // New Phase 1 aggregates
-    const allScoreDimSums: Record<string, number> = {};
-    const allScoreDimCounts: Record<string, number> = {};
-    const allAntiPatternByGrade: Record<string, number> = {};
-    const allArchetypeByGrade: Record<string, number> = {};
     let totalUnique = 0;
     let totalViews = 0;
-    let ebitdaTotalSum = 0;
-    let ebitdaTotalCount = 0;
     const totalChallenge = { created: 0, shared: 0, joined: 0, started: 0, completed: 0, scoreboardViews: 0 };
 
     const merge = (target: Record<string, number>, source: Record<string, number>) => {
@@ -189,8 +129,6 @@ export function AdminDashboard() {
       totalUnique += m.uniquePlayers;
       totalViews += m.pageViews;
       merge(allConfig, m.configBreakdown);
-      merge(allSectors, m.sectorBreakdown);
-      merge(allGrades, m.gradeDistribution);
       merge(allFev, m.fevDistribution);
       merge(allAbandon, m.abandonByRound);
       merge(allRounds, m.roundDistribution);
@@ -199,27 +137,15 @@ export function AdminDashboard() {
       merge(allDeviceAbandon, m.deviceAbandon);
       merge(allReturning, m.returningBreakdown);
       merge(allDuration, m.durationDistribution);
-      merge(allFeatures, m.featureAdoption);
-      merge(allChoices, m.eventChoices);
-      merge(allArchetypes, m.archetypeDistribution);
-      merge(allAntiPatterns, m.antiPatternDistribution);
-      merge(allSophistication, m.sophisticationDistribution);
-      merge(allStructures, m.dealStructureDistribution);
-      merge(allEndingSubTypes, m.endingSubTypes);
-      merge(allEndingConstruction, m.endingConstruction);
-      // New Phase 1 counters
-      if (m.scoreDimSums) merge(allScoreDimSums, m.scoreDimSums);
-      if (m.scoreDimCounts) merge(allScoreDimCounts, m.scoreDimCounts);
-      if (m.antiPatternByGrade) merge(allAntiPatternByGrade, m.antiPatternByGrade);
-      if (m.archetypeByGrade) merge(allArchetypeByGrade, m.archetypeByGrade);
-      ebitdaTotalSum += m.endingEbitdaSum;
-      ebitdaTotalCount += m.endingEbitdaCount;
-      totalChallenge.created += m.challengeMetrics.created;
-      totalChallenge.shared += m.challengeMetrics.shared;
-      totalChallenge.joined += m.challengeMetrics.joined;
-      totalChallenge.started += m.challengeMetrics.started;
-      totalChallenge.completed += m.challengeMetrics.completed;
-      totalChallenge.scoreboardViews += m.challengeMetrics.scoreboardViews;
+      if (m.sophisticationDistribution) merge(allSophistication, m.sophisticationDistribution);
+      if (m.challengeMetrics) {
+        totalChallenge.created += m.challengeMetrics.created;
+        totalChallenge.shared += m.challengeMetrics.shared;
+        totalChallenge.joined += m.challengeMetrics.joined;
+        totalChallenge.started += m.challengeMetrics.started;
+        totalChallenge.completed += m.challengeMetrics.completed;
+        totalChallenge.scoreboardViews += m.challengeMetrics.scoreboardViews;
+      }
     }
 
     const completionRate = data.allTime.started > 0
@@ -237,8 +163,7 @@ export function AdminDashboard() {
     };
     let fevSum = 0, fevCount = 0;
     for (const [bucket, count] of Object.entries(allFev)) {
-      const mid = bucketMidpoints[bucket] || 0;
-      fevSum += mid * count;
+      fevSum += (bucketMidpoints[bucket] || 0) * count;
       fevCount += count;
     }
     const avgFev = fevCount > 0 ? Math.round(fevSum / fevCount) : 0;
@@ -266,12 +191,6 @@ export function AdminDashboard() {
     }
     const avgSessionDuration = durCount > 0 ? `${Math.round(durSum / durCount)}m` : '—';
 
-    const newPlayers = allReturning['new'] || 0;
-    const returningPlayers = allReturning['returning'] || 0;
-    const newVsReturning = (newPlayers + returningPlayers) > 0
-      ? `${Math.round(newPlayers / (newPlayers + returningPlayers) * 100)}% new`
-      : '—';
-
     const visitStartRate = totalViews > 0
       ? ((data.allTime.started / totalViews) * 100).toFixed(0) + '%'
       : '—';
@@ -284,76 +203,13 @@ export function AdminDashboard() {
       ? ((secondGameStarts / firstGameStarts) * 100).toFixed(0) + '%'
       : '—';
 
-    const avgEndingEbitda = ebitdaTotalCount > 0 ? Math.round(ebitdaTotalSum / ebitdaTotalCount) : 0;
-
     return {
-      allConfig, allSectors, allGrades, allFev, allAbandon, allRounds,
-      allDevice, allDeviceComplete, allDeviceAbandon, allReturning, allDuration,
-      allFeatures, allChoices, allArchetypes, allAntiPatterns, allSophistication, allStructures,
-      allEndingSubTypes, allEndingConstruction, avgEndingEbitda,
-      allScoreDimSums, allScoreDimCounts, allAntiPatternByGrade, allArchetypeByGrade,
+      allConfig, allFev, allAbandon, allRounds,
+      allDevice, allDeviceComplete, allDeviceAbandon, allReturning, allDuration, allSophistication,
       totalUnique, totalViews, completionRate, avgFev, topFev, normalPct, quickPct,
-      mobileSharePct, totalChallenge, avgSessionDuration, newVsReturning, visitStartRate, secondGameRate,
+      mobileSharePct, totalChallenge, avgSessionDuration, visitStartRate, secondGameRate,
     };
   }, [data]);
-
-  const sectorItems = useMemo(() =>
-    Object.entries(totals.allSectors).map(([id, count]) => ({
-      label: SECTORS[id]?.name || id,
-      value: count,
-      color: SECTORS[id]?.color,
-      emoji: SECTORS[id]?.emoji,
-    })), [totals.allSectors]);
-
-  const abandonItems = useMemo(() =>
-    Object.entries(totals.allAbandon).map(([round, count]) => ({
-      label: `Year ${round}`,
-      value: count,
-      color: '#ef4444',
-    })).sort((a, b) => parseInt(a.label.split(' ')[1]) - parseInt(b.label.split(' ')[1])), [totals.allAbandon]);
-
-  const roundItems = useMemo(() =>
-    Object.entries(totals.allRounds).map(([round, count]) => ({
-      label: `Year ${round}`,
-      value: count,
-    })).sort((a, b) => parseInt(a.label.split(' ')[1]) - parseInt(b.label.split(' ')[1])), [totals.allRounds]);
-
-  const configItems = useMemo(() =>
-    Object.entries(totals.allConfig).map(([key, count]) => {
-      const [diff, dur] = key.split(':');
-      return {
-        label: `${diff === 'normal' ? 'Normal' : 'Easy'} / ${dur === 'quick' ? '10yr' : '20yr'}`,
-        value: count,
-        color: diff === 'normal' ? '#f59e0b' : 'var(--color-accent)',
-      };
-    }), [totals.allConfig]);
-
-  const gradeItems = useMemo(() =>
-    ['S', 'A', 'B', 'C', 'D', 'F'].map(g => ({
-      label: g,
-      value: totals.allGrades[g] || 0,
-    })), [totals.allGrades]);
-
-  const fevItems = useMemo(() => {
-    const order = [
-      '0-5000', '5000-10000', '10000-20000', '20000-50000',
-      '100000+', '100000-200000', '200000-500000', '500000+',
-      '0-10000', '10000-50000', '50000-100000',
-      '100000-250000', '250000-500000', '500000-1000000',
-      '1000000-2500000', '2500000+',
-    ];
-    const labels: Record<string, string> = {
-      '0-5000': '$0-5M (old)', '5000-10000': '$5-10M (old)', '10000-20000': '$10-20M (old)',
-      '20000-50000': '$20-50M (old)', '100000+': '$100M+ (old)',
-      '100000-200000': '$100-200M (old)', '200000-500000': '$200-500M (old)', '500000+': '$500M+ (old)',
-      '0-10000': '$0-10M', '10000-50000': '$10-50M', '50000-100000': '$50-100M',
-      '100000-250000': '$100-250M', '250000-500000': '$250-500M', '500000-1000000': '$500M-1B',
-      '1000000-2500000': '$1-2.5B', '2500000+': '$2.5B+',
-    };
-    return order
-      .map(k => ({ label: labels[k] || k, value: totals.allFev[k] || 0 }))
-      .filter(item => item.value > 0 || !item.label.includes('(old)'));
-  }, [totals.allFev]);
 
   const handleLogout = () => {
     sessionStorage.removeItem('admin_token');
@@ -430,266 +286,12 @@ export function AdminDashboard() {
       {/* Health Alerts (shown on overview) */}
       {activeTab === 'overview' && <HealthAlerts data={data} />}
 
-      {/* ═══════ OVERVIEW TAB ═══════ */}
       {activeTab === 'overview' && (
         <OverviewTab data={data} totals={totals} avgSophistication={avgSophistication} kFactor={kFactor} dailyData={dailyData} />
       )}
-
-      {/* ═══════ FUNNEL TAB ═══════ */}
-      {activeTab === 'funnel' && (
-        <>
-          <div className="card p-4 mb-4">
-            <SectionHeader title="Player Funnel (All Time)" />
-            <div className="space-y-2">
-              <FunnelStep label="Page Views" value={totals.totalViews} maxValue={totals.totalViews} />
-              <FunnelStep label="Games Started" value={data.allTime.started} maxValue={totals.totalViews || data.allTime.started} />
-              <FunnelStep label="Reached Year 3" value={Object.entries(totals.allRounds).filter(([r]) => parseInt(r) >= 3).reduce((s, [, v]) => s + v, 0) + Object.entries(totals.allAbandon).filter(([r]) => parseInt(r) >= 3).reduce((s, [, v]) => s + v, 0)} maxValue={data.allTime.started} color="#60a5fa" />
-              <FunnelStep label="Reached Year 5" value={Object.entries(totals.allRounds).filter(([r]) => parseInt(r) >= 5).reduce((s, [, v]) => s + v, 0) + Object.entries(totals.allAbandon).filter(([r]) => parseInt(r) >= 5).reduce((s, [, v]) => s + v, 0)} maxValue={data.allTime.started} color="#a78bfa" />
-              <FunnelStep label="Completed" value={data.allTime.completed} maxValue={data.allTime.started} color="#34d399" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            <AdminBarChart title="Abandonment by Round" items={abandonItems} />
-            <div className="card p-4">
-              <SectionHeader title="New vs Returning" />
-              <DonutChart items={[
-                { label: 'New', value: totals.allReturning['new'] || 0, color: 'var(--color-accent)' },
-                { label: 'Returning', value: totals.allReturning['returning'] || 0, color: '#f59e0b' },
-              ]} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <AdminBarChart title="Rounds Reached (Completed Games)" items={roundItems} />
-            <AdminBarChart title="Difficulty / Duration" items={configItems} />
-          </div>
-        </>
-      )}
-
-      {/* ═══════ RETENTION TAB ═══════ */}
-      {activeTab === 'retention' && (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-            <MetricCard label="New vs Returning" value={totals.newVsReturning} />
-            <MetricCard label="2nd Game Rate" value={totals.secondGameRate} />
-            <MetricCard label="Unique Players" value={totals.totalUnique} />
-            <MetricCard label="Avg Session" value={totals.avgSessionDuration} />
-          </div>
-
-          {/* Cohort Retention Table */}
-          {data.cohortRetention && data.cohortRetention.length > 0 && (
-            <div className="card p-4 mb-4 overflow-x-auto">
-              <SectionHeader title="Weekly Cohort Retention" />
-              <table className="w-full text-[11px] min-w-[600px]">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-1.5 pr-2 text-text-muted">Cohort</th>
-                    {data.cohortRetention.map(row => (
-                      <th key={row.cohortWeek} className="text-center py-1.5 px-1 text-text-muted">{row.cohortWeek.slice(5)}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.cohortRetention.map(row => {
-                    const cohortSize = row.weekData[row.cohortWeek] || 0;
-                    return (
-                      <tr key={row.cohortWeek} className="border-b border-border/30">
-                        <td className="py-1 pr-2 font-mono text-text-secondary">{row.cohortWeek.slice(5)}</td>
-                        {data.cohortRetention.map(col => {
-                          const active = row.weekData[col.cohortWeek] || 0;
-                          const pct = cohortSize > 0 ? (active / cohortSize) * 100 : 0;
-                          const bg = pct >= 60 ? 'bg-success/30' : pct >= 30 ? 'bg-warning/20' : pct > 0 ? 'bg-danger/10' : '';
-                          return (
-                            <td key={col.cohortWeek} className={`text-center py-1 px-1 font-mono ${bg}`}>
-                              {active > 0 ? `${active}` : '·'}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              <p className="text-[10px] text-text-muted mt-2">Cell values = unique players active in that week from that cohort</p>
-            </div>
-          )}
-
-          <div className="card p-4">
-            <SectionHeader title="New vs Returning (Monthly)" />
-            <MiniTrend
-              label="Returning Players"
-              data={[...data.months].reverse().map(m => ({ month: m.month, value: m.returningBreakdown['returning'] || 0 }))}
-            />
-          </div>
-        </>
-      )}
-
-      {/* ═══════ ENGAGEMENT TAB ═══════ */}
-      {activeTab === 'engagement' && (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            <div className="card p-4">
-              <SectionHeader title="Session Duration Distribution" />
-              <HorizontalBar
-                items={['<5m', '5-15m', '15-30m', '30-60m', '60m+'].map(b => ({
-                  label: b,
-                  value: totals.allDuration[b] || 0,
-                }))}
-              />
-            </div>
-
-            <div className="card p-4">
-              <SectionHeader title="Feature Adoption (sorted ascending)" />
-              <HorizontalBar
-                items={Object.entries(totals.allFeatures)
-                  .map(([f, v]) => ({ label: f.replace(/_/g, ' '), value: v }))
-                  .sort((a, b) => a.value - b.value)}
-                colorFn={() => '#60a5fa'}
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
-            <div className="card p-4">
-              <SectionHeader title="Sophistication Score Distribution" />
-              <HorizontalBar
-                items={['0-19', '20-39', '40-59', '60-79', '80-100'].map(b => ({
-                  label: b,
-                  value: totals.allSophistication[b] || 0,
-                }))}
-                colorFn={(l) => l === '80-100' ? '#facc15' : l.startsWith('6') ? '#34d399' : 'var(--color-accent)'}
-              />
-            </div>
-
-            <AdminBarChart title="Sector Popularity" items={sectorItems} />
-          </div>
-
-          {Object.keys(totals.allChoices).length > 0 && (
-            <div className="card p-4">
-              <SectionHeader title="Event Choice Distribution" />
-              <HorizontalBar
-                items={Object.entries(totals.allChoices)
-                  .map(([k, v]) => ({ label: k.replace(/_/g, ' ').replace(':', ' -> '), value: v }))
-                  .sort((a, b) => b.value - a.value)
-                  .slice(0, 20)}
-              />
-            </div>
-          )}
-        </>
-      )}
-
-      {/* ═══════ STRATEGY & BALANCE TAB ═══════ */}
-      {activeTab === 'balance' && (
-        <BalanceTab data={data} totals={totals} sectorItems={sectorItems} gradeItems={gradeItems} fevItems={fevItems} />
-      )}
-
-      {/* ═══════ CHALLENGE TAB ═══════ */}
-      {activeTab === 'challenge' && (
-        <>
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-            <MetricCard label="Created" value={totals.totalChallenge.created} />
-            <MetricCard label="Shared" value={totals.totalChallenge.shared} />
-            <MetricCard label="Joined" value={totals.totalChallenge.joined} />
-            <MetricCard label="Started" value={totals.totalChallenge.started} />
-            <MetricCard label="Completed" value={totals.totalChallenge.completed} />
-            <MetricCard label="k-factor" value={kFactor} status={Number(kFactor) > 1 ? 'positive' : 'neutral'} />
-          </div>
-
-          <div className="card p-4 mb-4">
-            <SectionHeader title="Challenge Viral Funnel" />
-            <div className="space-y-2">
-              <FunnelStep label="Created" value={totals.totalChallenge.created} maxValue={totals.totalChallenge.created} />
-              <FunnelStep label="Shared" value={totals.totalChallenge.shared} maxValue={totals.totalChallenge.created || 1} color="#60a5fa" />
-              <FunnelStep label="Joined (page view)" value={totals.totalChallenge.joined} maxValue={totals.totalChallenge.created || 1} color="#a78bfa" />
-              <FunnelStep label="Started" value={totals.totalChallenge.started} maxValue={totals.totalChallenge.created || 1} color="#f59e0b" />
-              <FunnelStep label="Completed" value={totals.totalChallenge.completed} maxValue={totals.totalChallenge.created || 1} color="#34d399" />
-              <FunnelStep label="Scoreboard Views" value={totals.totalChallenge.scoreboardViews} maxValue={totals.totalChallenge.created || 1} color="#facc15" />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <MiniTrend
-              label="Challenges Created / mo"
-              data={[...data.months].reverse().map(m => ({ month: m.month, value: m.challengeMetrics.created }))}
-            />
-            <MiniTrend
-              label="Challenge Completions / mo"
-              data={[...data.months].reverse().map(m => ({ month: m.month, value: m.challengeMetrics.completed }))}
-            />
-          </div>
-        </>
-      )}
-
-      {/* ═══════ DEVICES TAB ═══════ */}
-      {activeTab === 'devices' && (
-        <>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
-            <div className="card p-4">
-              <SectionHeader title="Starts by Device" />
-              <DonutChart items={[
-                { label: 'Desktop', value: totals.allDevice['desktop'] || 0, color: 'var(--color-accent)' },
-                { label: 'Mobile', value: totals.allDevice['mobile'] || 0, color: '#f59e0b' },
-                { label: 'Tablet', value: totals.allDevice['tablet'] || 0, color: '#a78bfa' },
-              ]} />
-            </div>
-            <div className="card p-4">
-              <SectionHeader title="Completions by Device" />
-              <DonutChart items={[
-                { label: 'Desktop', value: totals.allDeviceComplete['desktop'] || 0, color: 'var(--color-accent)' },
-                { label: 'Mobile', value: totals.allDeviceComplete['mobile'] || 0, color: '#f59e0b' },
-                { label: 'Tablet', value: totals.allDeviceComplete['tablet'] || 0, color: '#a78bfa' },
-              ]} />
-            </div>
-            <div className="card p-4">
-              <SectionHeader title="Abandons by Device" />
-              <DonutChart items={[
-                { label: 'Desktop', value: totals.allDeviceAbandon['desktop'] || 0, color: 'var(--color-accent)' },
-                { label: 'Mobile', value: totals.allDeviceAbandon['mobile'] || 0, color: '#f59e0b' },
-                { label: 'Tablet', value: totals.allDeviceAbandon['tablet'] || 0, color: '#a78bfa' },
-              ]} />
-            </div>
-          </div>
-
-          <div className="card p-4 mb-4">
-            <SectionHeader title="Completion Rate by Device" />
-            <div className="grid grid-cols-3 gap-4">
-              {['desktop', 'mobile', 'tablet'].map(d => {
-                const starts = totals.allDevice[d] || 0;
-                const completes = totals.allDeviceComplete[d] || 0;
-                const rate = starts > 0 ? ((completes / starts) * 100).toFixed(1) + '%' : '—';
-                return (
-                  <div key={d} className="text-center">
-                    <p className="text-2xl font-bold text-text-primary">{rate}</p>
-                    <p className="text-xs text-text-muted capitalize">{d}</p>
-                    <p className="text-[10px] text-text-muted">{completes}/{starts}</p>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="card p-4">
-            <SectionHeader title="Page Views by Device (Monthly)" />
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {['desktop', 'mobile', 'tablet'].map(d => (
-                <MiniTrend
-                  key={d}
-                  label={`${d} views`}
-                  data={[...data.months].reverse().map(m => ({ month: m.month, value: m.viewsByDevice[d] || 0 }))}
-                />
-              ))}
-            </div>
-          </div>
-        </>
-      )}
-
-      {/* ═══════ FEEDBACK TAB ═══════ */}
-      {activeTab === 'feedback' && <FeedbackTab token={token!} />}
-
-      {/* ═══════ COMMUNITY TAB ═══════ */}
       {activeTab === 'community' && <CommunityTab token={token!} />}
       {activeTab === 'bschool' && <BSchoolTab token={token!} />}
+      {activeTab === 'feedback' && <FeedbackTab token={token!} />}
     </div>
   );
 }
@@ -748,7 +350,49 @@ function BSchoolTab({ token }: { token: string }) {
             <MetricCard label="Logged In at Completion" value={stats.signupConversion.loggedInAtCompletion ?? 0} />
             <MetricCard label="Anonymous at Completion" value={stats.signupConversion.anonymousAtCompletion ?? 0} />
             <MetricCard label="Signup Rate" value={`${stats.signupConversion.conversionRate ?? 0}%`} />
-            <MetricCard label="Unknown Auth Status" value={stats.signupConversion.unknownAuthStatus ?? 0} />
+            <MetricCard label="Conversions Tracked" value={stats.conversions?.length ?? 0} status={stats.conversions?.length > 0 ? 'positive' : 'neutral'} />
+          </div>
+        </div>
+      )}
+
+      {/* B-School → Sign-Up Conversions (which session led to whose sign-up) */}
+      {stats.conversions?.length > 0 && (
+        <div>
+          <SectionHeader title="B-School → Sign-Up Conversions" />
+          <p className="text-[10px] text-text-muted mb-2">Players who were anonymous during B-School and later created an account</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="py-2 px-2 text-left text-text-muted font-medium">B-School Holdco</th>
+                  <th className="py-2 px-2 text-right text-text-muted font-medium">Checklist</th>
+                  <th className="py-2 px-2 text-center text-text-muted font-medium">Platform</th>
+                  <th className="py-2 px-2 text-left text-text-muted font-medium">Email</th>
+                  <th className="py-2 px-2 text-center text-text-muted font-medium">Provider</th>
+                  <th className="py-2 px-2 text-right text-text-muted font-medium">B-School Date</th>
+                  <th className="py-2 px-2 text-right text-text-muted font-medium">Sign-Up Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                {stats.conversions.map((c: any, i: number) => (
+                  <tr key={i} className="border-b border-border/30">
+                    <td className="py-2 px-2 text-text-primary">{c.holdcoName}</td>
+                    <td className="py-2 px-2 text-right font-mono text-text-secondary">
+                      <span className={c.checklistCompleted >= c.checklistTotal ? 'text-emerald-400' : ''}>
+                        {c.checklistCompleted}/{c.checklistTotal}
+                      </span>
+                    </td>
+                    <td className="py-2 px-2 text-center">{c.platformForged ? '✓' : '--'}</td>
+                    <td className="py-2 px-2 text-text-primary font-mono text-xs">{c.email}</td>
+                    <td className="py-2 px-2 text-center">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium">{c.provider}</span>
+                    </td>
+                    <td className="py-2 px-2 text-right text-text-muted">{formatDate(c.bschoolDate)}</td>
+                    <td className="py-2 px-2 text-right text-text-muted">{formatDate(c.signupDate)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

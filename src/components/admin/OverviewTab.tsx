@@ -310,7 +310,7 @@ export function OverviewTab({ data, totals, avgSophistication, kFactor, dailyDat
                   const modeLabel = isPE ? 'PE' : `${c.difficulty === 'normal' ? 'H' : 'E'}/${c.duration === 'quick' ? '10' : '20'}`;
                   const dateObj = new Date(c.date);
                   const timeAgo = getTimeAgo(dateObj);
-                  const resolvedInitials = c.initials || leaderboardInitials.get(c.completionId) || null;
+                  const resolvedInitials = (c.initials && c.initials !== 'AA' ? c.initials : null) || leaderboardInitials.get(c.completionId) || null;
                   const hasStrategy = !!c.strategy?.scoreBreakdown;
                   const isExpanded = expandedCompletionRow === i;
                   return (
