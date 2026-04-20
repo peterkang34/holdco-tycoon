@@ -153,8 +153,8 @@ Output a single JSON object matching this TypeScript shape:
   isFeatured: false,
   seed: number,          // any positive integer
   difficulty: "easy" | "normal",
-  duration: "quick" | "standard",
-  maxRounds: number,     // integer in [3, 30]
+  duration: "quick" | "standard",   // "quick" = 10-year feel, "standard" = 20-year feel
+  maxRounds: number,     // integer, HARD CAP [3, 30]. NEVER output values outside this range.
   startingCash: number,  // in thousands ($K), >= 0
   startingDebt: number,  // >= 0
   founderShares: number,
@@ -194,7 +194,23 @@ Rules:
 - If unsure about a field, omit it rather than guessing.
 - configVersion is always ${CURRENT_SCENARIO_CONFIG_VERSION}.
 - Default isActive: false and isFeatured: false — the admin reviews before activating.
-- Dates should be set to start today (current date) and end 30-60 days later unless the description says otherwise.`;
+- Dates should be set to start today (current date) and end 30-60 days later unless the description says otherwise.
+
+maxRounds rules (CRITICAL — prior outputs have failed validation here):
+- maxRounds MUST be an integer between 3 and 30 inclusive. Values outside this range FAIL validation and waste the admin's time.
+- If the description says "N-year" or "N years" (e.g., "10-year roll-up", "15 years of recession"), set maxRounds = N. Do NOT inflate.
+- If N > 30, CAP at 30 — do not output 40, 50, or higher. The cap is non-negotiable.
+- If N < 3, use 3. The floor is non-negotiable.
+- If the description gives no duration hint, default to 10 (matches duration: "quick") or 20 (matches "standard").
+
+duration / maxRounds consistency:
+- duration: "quick" pairs with maxRounds ≤ 10.
+- duration: "standard" pairs with maxRounds > 10 (typically 15-30).
+- The two fields should agree; don't set duration: "standard" with maxRounds: 10.
+
+rankingMetric rules:
+- Non-PE scenarios (no fundStructure) MUST use rankingMetric: "fev". Other values (moic, irr, gpCarry, cashOnCash) are PE-only and will fail validation.
+- If the description mentions "PE fund", "carry", "MOIC", "IRR", "LPs", or "fund manager" → include fundStructure AND set rankingMetric to one of moic / irr / gpCarry / cashOnCash.`;
 }
 
 function buildUserPrompt(description: string): string {
