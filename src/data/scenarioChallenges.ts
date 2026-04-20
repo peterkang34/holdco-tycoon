@@ -27,7 +27,7 @@ import type {
   QualityRating,
   EventType,
 } from '../engine/types';
-import { SECTORS } from './sectors';
+import { SECTORS } from './sectors.js';
 
 // ── Version & bounds ──────────────────────────────────────────────────────
 

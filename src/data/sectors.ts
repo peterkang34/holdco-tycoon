@@ -1,4 +1,4 @@
-import { SectorDefinition, SectorId } from '../engine/types';
+import type { SectorDefinition, SectorId } from '../engine/types.js';
 
 // All EBITDA values are in thousands (so 1500 = $1.5M, 15000 = $15M)
 // Scaled to realistic holdco acquisition targets ($1M-$10M+ EBITDA businesses)

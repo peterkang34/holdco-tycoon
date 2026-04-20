@@ -1021,7 +1021,7 @@ export interface LeaderboardEntry {
 // Utility types
 export type Range = [number, number];
 
-export { randomInRange, randomInt, formatMoney, formatPercent, formatMultiple } from './utils';
+export { randomInRange, randomInt, formatMoney, formatPercent, formatMultiple } from './utils.js';
 
 export function pickRandom<T>(array: T[], rng?: import('./rng').SeededRng): T | undefined {
   if (array.length === 0) return undefined;
