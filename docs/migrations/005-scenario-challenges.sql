@@ -53,3 +53,17 @@ COMMENT ON COLUMN scenarios_archive.config_json IS
 
 COMMENT ON COLUMN scenarios_archive.final_leaderboard_json IS
   'Top 50 entries (by raw FEV or configured ranking metric) frozen at archival time. No further writes after this point.';
+
+-- ── RLS ──
+--
+-- All access to scenarios_archive goes through server endpoints (cron writer +
+-- /api/scenario-challenges/{list,leaderboard} readers) that use the service
+-- role key via supabaseAdmin. Anon + authenticated clients never talk to this
+-- table directly — enable RLS and add only the service-role policy so PostgREST
+-- blocks public access. Matches pattern in 001-player-accounts.sql.
+
+ALTER TABLE scenarios_archive ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Service role full access"
+  ON scenarios_archive FOR ALL
+  USING (auth.jwt() ->> 'role' = 'service_role');
