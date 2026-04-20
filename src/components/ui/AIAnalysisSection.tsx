@@ -33,6 +33,9 @@ interface AIAnalysisSectionProps {
   lpCommentary?: LPComment[];
   totalCapitalDeployed?: number;
   lpDistributions?: number;
+  // Scenario Challenge mode — when true, AI debrief is skipped entirely
+  // (scenarios have pre-written narrative; AI debrief is for emergent holdco/PE).
+  isScenarioChallengeMode?: boolean;
   onDebriefGenerated?: (debrief: AIGameAnalysis) => void;
 }
 
@@ -61,6 +64,7 @@ export function AIAnalysisSection({
   lpCommentary,
   totalCapitalDeployed,
   lpDistributions,
+  isScenarioChallengeMode,
   onDebriefGenerated,
 }: AIAnalysisSectionProps) {
   const [analysis, setAnalysis] = useState<AIGameAnalysis | null>(null);
@@ -68,6 +72,15 @@ export function AIAnalysisSection({
   const [isAI, setIsAI] = useState(false);
 
   useEffect(() => {
+    // Scenario Challenge mode: no AI debrief. Scenarios have pre-written narrative;
+    // AI debrief is designed for emergent holdco/PE strategy, not pre-scripted puzzles.
+    // This also saves the per-completion Haiku cost.
+    if (isScenarioChallengeMode) {
+      setLoading(false);
+      setAnalysis(null);
+      return;
+    }
+
     async function fetchAnalysis() {
       setLoading(true);
 
@@ -149,7 +162,11 @@ export function AIAnalysisSection({
     totalInvestedCapital,
     equityRaisesUsed,
     sharedServicesActive,
+    isScenarioChallengeMode,
   ]);
+
+  // Scenario Challenge mode: render nothing (no AI debrief section at all).
+  if (isScenarioChallengeMode) return null;
 
   if (loading) {
     return (

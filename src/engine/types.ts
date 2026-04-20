@@ -583,6 +583,150 @@ export interface PEScoreBreakdown {
   gradeTitle: string;
 }
 
+// ── PE Fund Structure (parameterized for scenarios + Fund Manager mode) ──
+
+/**
+ * Economic parameters for a PE-style game mode. Populated by `startFundManagerMode`
+ * (traditional_pe defaults) or `startScenarioChallenge` (scenario config override).
+ *
+ * All 11 legacy `PE_FUND_CONFIG` reads in the engine are being migrated to read
+ * from `state.fundStructure` instead (see Step 1.5 of the scenario-challenges plan).
+ */
+export interface FundStructure {
+  committedCapital: number;           // dollars in thousands, e.g., 100_000 for $100M
+  mgmtFeePercent: number;             // annual fee as decimal, e.g., 0.02 for 2%
+  hurdleRate: number;                 // preferred return as decimal, e.g., 0.08 for 8%
+  carryRate: number;                  // GP share above hurdle, e.g., 0.20 for 20%
+  forcedLiquidationYear?: number;     // round of forced exit; defaults to maxRounds
+  forcedLiquidationDiscount: number;  // sale-price multiplier on forced liquidation, e.g., 0.90 = 10% haircut
+}
+
+// ── Scenario Challenge Mode ──
+
+/** Ranking metric for scenario leaderboards — admin-selectable per scenario. */
+export type RankingMetric = 'fev' | 'moic' | 'irr' | 'gpCarry' | 'cashOnCash';
+
+/** Feature-gate keys an admin can flip to disable in a scenario. */
+export type DisabledFeatureKey =
+  | 'improveBusiness'
+  | 'equityRaise'
+  | 'buybackShares'
+  | 'distributions'
+  | 'payDownDebt'
+  | 'sellBusiness'
+  | 'restructure'
+  | 'familyOffice'
+  | 'sharedServices'
+  | 'platformForge'
+  | 'turnaround'
+  | 'maSourcing'
+  | 'ipo';
+
+export type DisabledFeatures = Partial<Record<DisabledFeatureKey, boolean>>;
+
+/** M&A sourcing behavior in a scenario — overrides normal unlock flow. */
+export type MaSourcingMode = 'disabled' | 'random' | 'sector_focus';
+
+/** Per-event visual identity. */
+export interface ScenarioTheme {
+  emoji: string;
+  color: string;
+  era?: string;
+}
+
+/** Starting business config — only override fields, defaults filled by factory. */
+export interface StartingBusinessConfig {
+  name: string;
+  sectorId: SectorId;
+  subType?: string;
+  ebitda: number;                     // in thousands
+  multiple: number;
+  quality: QualityRating;             // 1=distressed, 5=premium
+  status?: 'active' | 'distressed';
+  ebitdaMargin?: number;
+  backstory?: string;
+}
+
+/** A curated deal in a scenario — only non-default fields stored. */
+export interface CuratedDeal {
+  name: string;
+  sectorId: SectorId;
+  subType?: string;
+  ebitda: number;
+  multiple: number;
+  quality: QualityRating;
+  status?: 'active' | 'distressed';
+  ebitdaMargin?: number;
+  backstory?: string;
+}
+
+/** A forced event at a specific round — overrides normal RNG event generation. */
+export interface ForcedEvent {
+  type: EventType;
+  customTitle?: string;
+  customDescription?: string;
+  /** Required when `type === 'sector_consolidation_boom'` — which sector the boom targets. */
+  consolidationSectorId?: SectorId;
+}
+
+/** Full scenario challenge configuration. Stored in KV + main Zustand save. */
+export interface ScenarioChallengeConfig {
+  // Identity & schedule
+  id: string;
+  name: string;
+  tagline: string;
+  description: string;
+  configVersion: number;              // schema version for migration (start at 1)
+  theme: ScenarioTheme;
+  startDate: string;                  // ISO 8601
+  endDate: string;                    // ISO 8601
+  isActive: boolean;                  // playable via direct URL
+  isFeatured: boolean;                // shown on home screen banner
+
+  // Game parameters
+  seed: number;                       // fixed — deterministic for all players
+  difficulty: GameDifficulty;
+  duration: GameDuration;             // explicit; NOT derived from maxRounds
+  maxRounds: number;                  // any positive integer ∈ [3, 30]
+  startingCash: number;
+  startingDebt: number;
+  founderShares: number;
+  sharesOutstanding: number;
+
+  // Starting portfolio (empty = capital-only start)
+  startingBusinesses: StartingBusinessConfig[];
+
+  // Curated content (per round — missing rounds use normal seeded RNG)
+  curatedDeals?: Record<number, CuratedDeal[]>;
+  forcedEvents?: Record<number, ForcedEvent>;
+
+  // Feature controls
+  disabledFeatures?: DisabledFeatures;
+  allowedSectors?: SectorId[];
+  allowedSubTypes?: string[];
+  maSourcingMode?: MaSourcingMode;
+  startingMaSourcingTier?: MASourcingTier;
+  maxAcquisitionsPerRound?: number;
+  startingInterestRate?: number;       // 0..0.25 — starting value only; events mutate normally
+
+  // Scoring
+  rankingMetric: RankingMetric;       // required; 'fev' for holdco, PE options for fundStructure scenarios
+
+  // PE Phase A — optional fund structure (presence implies scenario runs in PE mode)
+  fundStructure?: FundStructure;
+
+  // AI flavor (persisted at design time, not runtime)
+  scenarioNarrative?: string;
+  businessBackstories?: Record<string, string>;
+  roundNarratives?: Record<number, string>;
+}
+
+/** Result of `validateScenarioConfig` — admin UI surfaces both errors and warnings. */
+export interface ScenarioValidationResult {
+  errors: string[];
+  warnings: string[];
+}
+
 export interface GameState {
   // Meta
   holdcoName: string;
@@ -717,7 +861,7 @@ export interface GameState {
   // PE Fund Manager Mode
   isFundManagerMode?: boolean;
   fundName?: string;
-  fundSize?: number;                    // committed capital ($K)
+  fundSize?: number;                    // committed capital ($K) — legacy, preserved for migration
   managementFeesCollected?: number;     // cumulative fees deducted
   lpSatisfactionScore?: number;         // hidden 0-100
   lpCommentary?: LPComment[];           // historical LP comments
@@ -725,6 +869,16 @@ export interface GameState {
   totalCapitalDeployed?: number;        // cumulative equity capital deployed from fund (cash checks only, excl. leverage)
   lpDistributions?: number;             // cumulative cash distributed to LPs
   dpiMilestones?: { half: boolean; full: boolean };  // one-time DPI milestone flags
+
+  // PE Fund Structure (parameterized — populated by startFundManagerMode or startScenarioChallenge)
+  // Single source of truth for PE economic constants; replaces scattered PE_FUND_CONFIG reads.
+  fundStructure?: FundStructure;
+
+  // Scenario Challenge Mode
+  isScenarioChallengeMode?: boolean;
+  scenarioChallengeId?: string;
+  scenarioChallengeConfig?: ScenarioChallengeConfig | null;
+  isAdminPreview?: boolean;             // admin test-play — submissions skipped
 }
 
 export type GameActionType =

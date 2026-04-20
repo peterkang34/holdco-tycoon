@@ -63,6 +63,14 @@ import {
 } from '../../../data/gameConfig';
 import { getQualityImprovementChance } from '../../turnarounds';
 import { initializeSharedServices, getMASourcingAnnualCost } from '../../../data/sharedServices';
+import {
+  getAnnualMgmtFee,
+  getCarryRate,
+  getCommittedCapital,
+  getDefaultFundStructure,
+  getForcedLiquidationDiscount,
+  getHurdleReturn,
+} from '../../../data/fundStructure';
 import { getTurnaroundTierAnnualCost, getProgramById, getQualityCeiling } from '../../../data/turnaroundPrograms';
 import { SECTORS } from '../../../data/sectors';
 import { resetUsedNames } from '../../../data/names';
@@ -215,6 +223,8 @@ function initializeGameState(config: {
       isFundManagerMode: true,
       fundName: 'Playtest Capital Partners',
       fundSize: PE_FUND_CONFIG.fundSize,
+      // Step 1.5: simulator populates fundStructure so helpers resolve correctly
+      fundStructure: getDefaultFundStructure(),
       managementFeesCollected: 0,
       lpSatisfactionScore: PE_FUND_CONFIG.lpSatisfactionStart,
       lpDistributions: 0,
@@ -476,7 +486,7 @@ function simulateCollectToEvent(state: GameState, coverage: PlaytestCoverage): G
 
   // PE Fund Mode: management fee deduction
   if (state.isFundManagerMode) {
-    const mgmtFee = PE_FUND_CONFIG.annualManagementFee;
+    const mgmtFee = getAnnualMgmtFee(state);
     newCash -= mgmtFee;
     coverage.record('management_fee_deducted', state.round);
   }
@@ -1287,7 +1297,7 @@ function simulateAllocatePhase(
 
     // LPAC gate: check if any acquisition exceeded concentration limit
     const activeAfter = gameState.businesses.filter(b => b.status === 'active');
-    const fundSize = gameState.fundSize ?? PE_FUND_CONFIG.fundSize;
+    const fundSize = getCommittedCapital(gameState);
     const maxConcentration = fundSize * PE_FUND_CONFIG.maxConcentration;
     for (const b of activeAfter) {
       if (b.acquisitionPrice > maxConcentration) {
@@ -1309,7 +1319,7 @@ function simulateAllocatePhase(
     // Update management fees collected
     gameState = {
       ...gameState,
-      managementFeesCollected: (gameState.managementFeesCollected ?? 0) + PE_FUND_CONFIG.annualManagementFee,
+      managementFeesCollected: (gameState.managementFeesCollected ?? 0) + getAnnualMgmtFee(gameState),
     };
   }
 
@@ -1480,23 +1490,24 @@ function simulateEndRound(state: GameState, coverage: PlaytestCoverage): GameSta
       exitMultiplePenalty: 0,
     } as GameState;
   } else {
-    // PE Fund Mode: forced liquidation — sell all businesses at 0.90x discount
+    // PE Fund Mode: forced liquidation — sale-price multiplier per the fund structure
     if (state.isFundManagerMode) {
       let liquidationCash = state.cash;
+      const liqDiscount = getForcedLiquidationDiscount(state);
       const liquidatedBiz = updatedBusinesses.map(b => {
         if (b.status !== 'active') return b;
         const valuation = calculateExitValuation(b, state.round);
-        const discountedProceeds = Math.round(valuation.netProceeds * PE_FUND_CONFIG.forcedLiquidationDiscount);
+        const discountedProceeds = Math.round(valuation.netProceeds * liqDiscount);
         liquidationCash += Math.max(0, discountedProceeds);
         return { ...b, status: 'sold' as const, exitPrice: discountedProceeds, exitRound: state.round };
       });
       coverage.record('forced_liquidation', state.round);
 
-      // Calculate carry
+      // Calculate carry via fund structure's hurdle/carry parameters
       const totalReturned = (state.lpDistributions ?? 0) + liquidationCash;
-      const hurdleReturn = PE_FUND_CONFIG.hurdleReturn;
+      const hurdleReturn = getHurdleReturn(state);
       const carryEarned = totalReturned > hurdleReturn
-        ? Math.round((totalReturned - hurdleReturn) * PE_FUND_CONFIG.carryRate)
+        ? Math.round((totalReturned - hurdleReturn) * getCarryRate(state))
         : 0;
       if (carryEarned > 0) {
         coverage.record('carry_earned', state.round);

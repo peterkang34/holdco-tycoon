@@ -1123,6 +1123,56 @@ function migrateV41ToV42(): void {
   }
 }
 
+// --- v42 → v43: Scenario Challenge mode fields + parameterized PE fundStructure ---
+// Step 1.5 backfills `fundStructure` for existing PE Fund Manager saves so engine
+// helpers (`getCarryRate`, `getHurdleReturn`, etc.) resolve against a populated
+// traditional_pe structure instead of falling back via optional-chain at every read.
+// Also backfills scenario-mode fields for any save (scenarios default to not active).
+
+function migrateV42ToV43(): void {
+  const v42Key = 'holdco-tycoon-save-v42';
+  const v43Key = 'holdco-tycoon-save-v43';
+  if (localStorage.getItem(v43Key)) return;
+  try {
+    const raw = localStorage.getItem(v42Key);
+    if (!raw) return;
+    const v42Data = JSON.parse(raw);
+    if (!v42Data?.state) return;
+
+    // Scenario Challenge mode defaults
+    if (v42Data.state.isScenarioChallengeMode === undefined) {
+      v42Data.state.isScenarioChallengeMode = false;
+    }
+    if (v42Data.state.isAdminPreview === undefined) {
+      v42Data.state.isAdminPreview = false;
+    }
+
+    // PE Fund Manager saves get fundStructure backfilled to traditional_pe.
+    // Hardcoded inline rather than importing from data modules to keep this migration
+    // file free of non-migration dependencies (consistent with prior migrations).
+    //
+    // IMPORTANT: keep in sync with FUND_STRUCTURE_PRESETS.traditional_pe in
+    // src/data/scenarioChallenges.ts. Drift is guarded by the parity test
+    // `src/engine/__tests__/fund-structure.test.ts` → 'migration v42→v43 literal
+    // matches traditional_pe preset', which fails if the two diverge.
+    if (v42Data.state.isFundManagerMode === true && !v42Data.state.fundStructure) {
+      v42Data.state.fundStructure = {
+        committedCapital: 100_000,
+        mgmtFeePercent: 0.02,
+        hurdleRate: 0.08,
+        carryRate: 0.20,
+        forcedLiquidationYear: 10,
+        forcedLiquidationDiscount: 0.90,
+      };
+    }
+
+    localStorage.setItem(v43Key, JSON.stringify(v42Data));
+    localStorage.removeItem(v42Key);
+  } catch (e) {
+    console.error('v42→v43 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -1161,4 +1211,5 @@ export function runAllMigrations(): void {
   migrateV39ToV40();
   migrateV40ToV41();
   migrateV41ToV42();
+  migrateV42ToV43();
 }

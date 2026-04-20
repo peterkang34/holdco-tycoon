@@ -42,6 +42,7 @@ import {
   ScoreBreakdownSection,
   PlayAgainSection,
   OperatorPlaybook,
+  ScenarioChallengeResultSection,
 } from '../gameover';
 
 /** Heuristic archetype classification based on game actions */
@@ -144,6 +145,11 @@ export function GameOverScreen({
   const familyOfficeState = useGameStore(s => s.familyOfficeState);
   const lpSatisfactionScore = useGameStore(s => s.lpSatisfactionScore);
   const lpDistributions = useGameStore(s => s.lpDistributions);
+  // Scenario Challenge mode — threaded through save/submit + suppresses AI debrief
+  const isScenarioChallengeMode = useGameStore(s => s.isScenarioChallengeMode);
+  const scenarioChallengeId = useGameStore(s => s.scenarioChallengeId);
+  const scenarioChallengeConfig = useGameStore(s => s.scenarioChallengeConfig);
+  const isAdminPreview = useGameStore(s => s.isAdminPreview);
   const isReallyLoggedIn = useIsLoggedIn();
   // Force anonymous mode on test pages so signup CTAs are visible
   const isTestMode = window.location.hash.includes('go-test') || window.location.hash.includes('fo-test');
@@ -489,12 +495,19 @@ export function GameOverScreen({
 
     const gameScore = isFundManagerMode ? (peScore?.total ?? 0) : score.total;
     const gameGrade = isFundManagerMode ? (peScore?.grade ?? 'F') : score.grade;
-    const completionId = `${seed}-${difficulty}-${duration}-${isFundManagerMode ? 'pe' : 'hc'}-${gameScore}-${gameGrade}`;
+    // Completion id includes maxRounds + scenarioChallengeId so scenarios with identical
+    // seed/difficulty/duration/score/grade don't dedup against each other (Ultraplan C1).
+    const completionId = `${seed}-${difficulty}-${duration}-${maxRounds}-${isFundManagerMode ? 'pe' : 'hc'}-${gameScore}-${gameGrade}-${scenarioChallengeId ?? 'none'}`;
 
     // Get player initials for the completion feed (auth store, not user-typed)
     // Filter out 'AA' — it's the database default, not a real player choice
     const playerInitials = useAuthStore.getState().player?.initials;
 
+    // Dual-write to `/api/completions` is intentional for scenarios (Dara 3D M2):
+    // this feeds the player's profile history + admin analytics, NOT the global
+    // leaderboard. The `scenarioChallengeId` + `isAdminPreview` tags let the server
+    // route scenario rows to scenario-tagged analytics surfaces without polluting
+    // the global leaderboard (which uses /api/leaderboard/submit, rejected for scenarios).
     submitGameCompletion({
       completionId,
       holdcoName: isFundManagerMode ? (fundName || 'PE Fund') : holdcoName,
@@ -508,6 +521,9 @@ export function GameOverScreen({
       duration,
       totalRounds: maxRounds,
       hasRestructured,
+      // Scenario Challenge tagging (Step 2)
+      ...(scenarioChallengeId ? { scenarioChallengeId } : {}),
+      ...(isAdminPreview ? { isAdminPreview: true } : {}),
       isFundManager: isFundManagerMode || undefined,
       fundName: isFundManagerMode ? fundName : undefined,
       netIrr: isFundManagerMode ? carryWaterfallData?.netIrr : undefined,
@@ -577,6 +593,9 @@ export function GameOverScreen({
       familyOfficeCompleted: !!familyOfficeState?.legacyScore,
       legacyGrade: familyOfficeState?.legacyScore?.grade,
       foMultiplier: foMultiplier > 1.0 ? foMultiplier : undefined,
+      // Scenario Challenge tagging (Step 2)
+      ...(scenarioChallengeId ? { scenarioChallengeId } : {}),
+      ...(isAdminPreview ? { isAdminPreview: true } : {}),
       strategy: {
         scoreBreakdown: isFundManagerMode
           ? (peScore ? { valueCreation: peScore.valueCreation, fcfShareGrowth: 0, portfolioRoic: 0, capitalDeployment: peScore.deploymentDiscipline, balanceSheetHealth: peScore.riskManagement, strategicDiscipline: 0 } : undefined)
@@ -709,7 +728,9 @@ export function GameOverScreen({
     try {
       const gameScore = isFundManagerMode ? (peScore?.total ?? 0) : score.total;
       const gameGrade = isFundManagerMode ? (peScore?.grade ?? 'F') : score.grade;
-      const completionId = `${seed}-${difficulty}-${duration}-${isFundManagerMode ? 'pe' : 'hc'}-${gameScore}-${gameGrade}`;
+      // Completion id includes maxRounds + scenarioChallengeId so scenarios with identical
+    // seed/difficulty/duration/score/grade don't dedup against each other (Ultraplan C1).
+    const completionId = `${seed}-${difficulty}-${duration}-${maxRounds}-${isFundManagerMode ? 'pe' : 'hc'}-${gameScore}-${gameGrade}-${scenarioChallengeId ?? 'none'}`;
       const entry = await saveToLeaderboard(
         {
           holdcoName: isFundManagerMode ? (fundName || 'PE Fund') : holdcoName,
@@ -921,7 +942,39 @@ export function GameOverScreen({
       )}
 
       {/* ── Section 1.5: Leaderboard Save (immediately after hero, high visibility) ── */}
-      {!isBankruptcy && (
+      {/* Scenario Challenges have their own scenario-specific leaderboard — never submit */}
+      {/* to the global leaderboard (plan Section 4). Guard prevents 15-round scenarios */}
+      {/* from hitting api/leaderboard/submit, which 400s on non-10/20 totalRounds. */}
+      {!isBankruptcy && isScenarioChallengeMode && scenarioChallengeConfig && (
+        <ScenarioChallengeResultSection
+          config={scenarioChallengeConfig}
+          holdcoName={isFundManagerMode ? (fundName || 'PE Fund') : holdcoName}
+          isAdminPreview={!!isAdminPreview}
+          enterpriseValue={enterpriseValue}
+          founderEquityValue={founderEquityValue}
+          founderPersonalWealth={founderPersonalWealth}
+          score={isFundManagerMode ? (peScore?.total ?? 0) : score.total}
+          grade={isFundManagerMode ? (peScore?.grade ?? 'F') : score.grade}
+          businessCount={activeBusinesses.length}
+          difficulty={difficulty}
+          duration={duration}
+          grossMoic={isFundManagerMode ? carryWaterfallData?.grossMoic : undefined}
+          netIrr={isFundManagerMode ? carryWaterfallData?.netIrr : undefined}
+          carryEarned={isFundManagerMode ? carryWaterfallData?.carry : undefined}
+          strategy={{
+            archetype: strategyData.archetype,
+            sophisticationScore: strategyData.sophisticationScore,
+            sectorIds: strategyData.sectorIds,
+            totalAcquisitions: strategyData.totalAcquisitions,
+            totalSells: strategyData.totalSells,
+            platformsForged: strategyData.platformsForged,
+            earnedAchievementIds: earnedAchievements.length > 0 ? earnedAchievements.map(a => a.id) : undefined,
+          }}
+          isLoggedIn={isLoggedIn}
+          onSignUp={() => openAccountModal()}
+        />
+      )}
+      {!isBankruptcy && !isScenarioChallengeMode && (
         <LeaderboardSaveInput
           canMakeLeaderboard={canMakeLeaderboard}
           potentialRank={potentialRank}
@@ -957,20 +1010,23 @@ export function GameOverScreen({
             />
           )}
 
-          {/* Section 4b: Global Leaderboard */}
-          <GameOverLeaderboard
-            allEntries={leaderboard}
-            loading={leaderboardLoading}
-            error={leaderboardError}
-            onRetry={handleRetryLeaderboard}
-            savedEntryId={savedEntryId}
-            activeTab={leaderboardTab}
-            onTabChange={setLeaderboardTab}
-            showWealth={leaderboardTab === 'distributions' || leaderboardTab === 'pe'}
-          />
+          {/* Section 4b: Global Leaderboard (suppressed for scenario completions — */}
+          {/* scenario result + top-10 already shown in section 1.5 above) */}
+          {!isScenarioChallengeMode && (
+            <GameOverLeaderboard
+              allEntries={leaderboard}
+              loading={leaderboardLoading}
+              error={leaderboardError}
+              onRetry={handleRetryLeaderboard}
+              savedEntryId={savedEntryId}
+              activeTab={leaderboardTab}
+              onTabChange={setLeaderboardTab}
+              showWealth={leaderboardTab === 'distributions' || leaderboardTab === 'pe'}
+            />
+          )}
 
-          {/* Section 5: Challenge Share (holdco only) */}
-          {!isFundManagerMode && (
+          {/* Section 5: Challenge Share (holdco only, not in scenarios — scenarios share via the scenario URL) */}
+          {!isFundManagerMode && !isScenarioChallengeMode && (
             <ChallengeShareSection
               challengeData={challengeData ?? null}
               currentChallengeParams={currentChallengeParams}
@@ -1025,9 +1081,12 @@ export function GameOverScreen({
             lpCommentary={useGameStore.getState().lpCommentary ?? undefined}
             totalCapitalDeployed={useGameStore.getState().totalCapitalDeployed}
             lpDistributions={lpDistributions ?? undefined}
+            isScenarioChallengeMode={isScenarioChallengeMode ?? false}
             onDebriefGenerated={(debrief) => {
               setLiveDebrief(debrief);
               // Persist debrief to game_history.strategy.aiDebrief
+              // Scenario challenges never reach this callback (AIAnalysisSection early-returns)
+              // but threading the scenario tag here anyway keeps payload shapes consistent.
               saveGameHistory({
                 holdcoName: isFundManagerMode ? (fundName || 'PE Fund') : holdcoName,
                 seed, score: isFundManagerMode ? (peScore?.total ?? 0) : score.total,
@@ -1036,6 +1095,8 @@ export function GameOverScreen({
                 enterpriseValue: Math.round(enterpriseValue),
                 founderEquityValue: Math.round(founderEquityValue),
                 strategy: { aiDebrief: debrief },
+                ...(scenarioChallengeId ? { scenarioChallengeId } : {}),
+                ...(isAdminPreview ? { isAdminPreview: true } : {}),
               });
             }}
           />

@@ -3,17 +3,19 @@ import { AdminLogin } from './AdminLogin';
 import { FeedbackTab } from './FeedbackTab';
 import { CommunityTab } from './CommunityTab';
 import { OverviewTab } from './OverviewTab';
+import { ScenarioChallengesTab } from './ScenarioChallengesTab';
 import { SectionHeader } from './adminShared';
 import { MetricCard } from '../ui/MetricCard';
 import type { AnalyticsData, Totals, DayData } from './adminTypes';
 
 // ── Tab Configuration ────────────────────────────────────────
 
-type TabId = 'overview' | 'community' | 'bschool' | 'feedback';
+type TabId = 'overview' | 'community' | 'bschool' | 'scenarios' | 'feedback';
 const TABS: { id: TabId; label: string }[] = [
   { id: 'overview', label: 'Overview' },
   { id: 'community', label: 'Community' },
   { id: 'bschool', label: 'B-School' },
+  { id: 'scenarios', label: 'Scenarios' },
   { id: 'feedback', label: 'Feedback' },
 ];
 
@@ -291,6 +293,7 @@ export function AdminDashboard() {
       )}
       {activeTab === 'community' && <CommunityTab token={token!} />}
       {activeTab === 'bschool' && <BSchoolTab token={token!} />}
+      {activeTab === 'scenarios' && <ScenarioChallengesTab token={token!} />}
       {activeTab === 'feedback' && <FeedbackTab token={token!} />}
     </div>
   );

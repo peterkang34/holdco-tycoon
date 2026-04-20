@@ -105,7 +105,7 @@ Spawn via Agent tool (background). Always include:
 - **Test Shortcuts**: `#/fo-test` (Family Office), `#/go-test` (Game Over — variants: `?v=holdco|pe|bankrupt|pe-bankrupt`), `#/bs-test` (Business School graduation)
 - **All monetary values in thousands** (1000 = $1M)
 - **Game loop**: 10 or 20 annual rounds — Collect → [Restructure] → Event → Allocate → End Year
-- **Modes**: Easy ($20M, 80% ownership) / Normal ($5M + $3M debt, 100% ownership) × Quick (10yr) / Standard (20yr) + PE Fund Manager ($100M, 10yr) + Business School (2yr guided tutorial)
+- **Modes**: Easy ($20M, 80% ownership) / Normal ($5M + $3M debt, 100% ownership) × Quick (10yr) / Standard (20yr) + PE Fund Manager ($100M, 10yr) + Business School (2yr guided tutorial) + Scenario Challenges (admin-authored themed time-limited events, 3-30yr, standalone leaderboards; default flagged admin-only via `VITE_SCENARIO_CHALLENGES_ENABLED`)
 - **Business School**: 2 annual rounds, 3 starting businesses, 15-step guided checklist, curated deals/events, platform forging, graduation diploma. Emerald theme. No leaderboard/achievements (except B-School Graduate at 10+ completion).
 - **PE Fund Mode**: $100M committed, 2% mgmt fee, 8% hurdle, 20% carry. LP satisfaction 0-100 (5-tier: Delighted/Satisfied/Cautious/At Risk/Critical). Forced liquidation Y10. 6-dimension PE scoring. PE-specific AI debrief with MOIC/IRR/carry/LP analysis.
 - **Auth**: Supabase (Google OAuth implicit flow + Magic Link). Anonymous sessions auto-created. `linkIdentity` preserves UUID on upgrade. Postgres trigger auto-creates `player_profiles` on `auth.users` INSERT. Auto-save persists every game to `game_history` (fire-and-forget with `keepalive`).
@@ -163,6 +163,17 @@ research/                   # GIT-TRACKED — external research
 - `api/_lib/ai.ts` — Anthropic client (Haiku model, configurable timeout)
 - `api/_lib/playerStats.ts` — Pre-computed stats (updatePlayerStats, updateGlobalStats)
 - `api/_lib/adminAuth.ts` — KV-based admin session tokens (NOT env vars)
+- `src/data/scenarioChallenges.ts` — Scenario Challenge config + validation + feature-gating registry
+- `src/data/modeGating.ts` — Cross-mode `isActionBlocked` (single authority for B-School/PE/Scenario)
+- `src/data/fundStructure.ts` — Parameterized PE fund economics (scenarios can override)
+- `src/utils/featureFlags.ts` — `VITE_SCENARIO_CHALLENGES_ENABLED` gate ('true' | 'false' | 'admin-only')
+- `src/utils/scenarioUrl.ts` — Unified `?se=` / `?tab=scenarios` parser
+- `src/components/admin/ScenarioChallengesTab.tsx` — Admin authoring UI (AI generation + JSON editor)
+- `src/components/gameover/ScenarioChallengeResultSection.tsx` — Game-over scenario rank + top 10
+- `api/scenario-challenges/{submit,leaderboard,list,active,config}.ts` — Public scenario endpoints (isolated from global leaderboard)
+- `api/admin/scenario-challenges.ts` + `api/admin/scenario-challenges/{generate,clear-preview}.ts` — Admin CRUD
+- `api/cron/scenario-archive-snapshot.ts` — Weekly Postgres snapshot (Sunday 04:00 UTC)
+- `api/_lib/leaderboardCore.ts` — Shared submit core used by both global + scenario leaderboards
 
 ### Test Files
 - `src/engine/__tests__/display-proofreader.test.ts` — UI copy vs engine constants (~330 tests)

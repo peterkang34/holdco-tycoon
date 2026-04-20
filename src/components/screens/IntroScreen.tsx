@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
-import { SectorId, GameDifficulty, GameDuration } from '../../engine/types';
+import { SectorId, GameDifficulty, GameDuration, ScenarioChallengeConfig } from '../../engine/types';
 import { SECTOR_LIST_STANDARD, SECTORS, UNLOCKABLE_SECTORS, getAvailableSectors } from '../../data/sectors';
 import { getUnlockedSectorIds, getEarnedAchievementIds } from '../../hooks/useUnlocks';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
+import { parseScenarioUrl, cleanScenarioUrl } from '../../utils/scenarioUrl';
+import { isScenarioChallengesPlayerFacingEnabled, isScenarioChallengesPublicEntryEnabled } from '../../utils/featureFlags';
 import { ChangelogModal } from '../ui/ChangelogModal';
 import { UserManualModal } from '../ui/UserManualModal';
 import { FeedbackModal } from '../ui/FeedbackModal';
@@ -56,14 +58,73 @@ interface IntroScreenProps {
   onStart: (holdcoName: string, startingSector: SectorId, difficulty: GameDifficulty, duration: GameDuration, seed?: number) => void;
   onStartFund: (fundName: string) => void;
   onStartBusinessSchool?: (holdcoName: string) => void;
+  onStartScenarioChallenge?: (holdcoName: string, config: ScenarioChallengeConfig) => void;
   challengeData?: ChallengeParams | null;
+  /** True when the player has an active game in progress that would be replaced by a new start. */
+  hasGameInProgress?: boolean;
 }
 
-export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, challengeData }: IntroScreenProps) {
+// ── Scenario Banner ────────────────────────────────────────────────────
+
+interface ScenarioBannerSummary {
+  id: string;
+  name: string;
+  tagline: string;
+  description: string;
+  theme: { emoji: string; color: string };
+  startDate: string;
+  endDate: string;
+  difficulty: string;
+  duration: string;
+  maxRounds: number;
+  rankingMetric: string;
+  isPE: boolean;
+  entryCount: number;
+  topScore: number | null;
+}
+
+/** Compute a human-readable countdown to `endDate` (e.g. "5d left", "3h left"). */
+function formatCountdown(endDate: string): string {
+  const endMs = Date.parse(endDate);
+  if (!Number.isFinite(endMs)) return '';
+  const diffMs = endMs - Date.now();
+  if (diffMs <= 0) return 'Ended';
+  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
+  if (days >= 2) return `${days}d left`;
+  const hours = Math.floor(diffMs / (60 * 60 * 1000));
+  if (hours >= 2) return `${hours}h left`;
+  const mins = Math.floor(diffMs / (60 * 1000));
+  return `${mins}m left`;
+}
+
+export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, onStartScenarioChallenge, challengeData, hasGameInProgress }: IntroScreenProps) {
   const isChallenge = !!challengeData;
   const isLoggedIn = useIsLoggedIn();
   const openStatsModal = useAuthStore((s) => s.openStatsModal);
-  const [step, setStep] = useState<'mode' | 'setup' | 'fund_setup' | 'bschool_setup'>(isChallenge ? 'setup' : 'mode');
+  const [step, setStep] = useState<'mode' | 'setup' | 'fund_setup' | 'bschool_setup' | 'se_setup'>(isChallenge ? 'setup' : 'mode');
+  // Active scenarios for the home banner. Loaded on mount; empty array shows nothing.
+  const [activeScenarios, setActiveScenarios] = useState<ScenarioBannerSummary[]>([]);
+  // The scenario the player is entering (after clicking a banner or arriving via ?se=id).
+  const [scenarioSetup, setScenarioSetup] = useState<ScenarioChallengeConfig | null>(null);
+  const [scenarioLoadError, setScenarioLoadError] = useState<string | null>(null);
+  // Save-in-progress confirmation — stores the action to run if the player confirms.
+  const [pendingStartAction, setPendingStartAction] = useState<(() => void) | null>(null);
+  const [scenarioName, setScenarioName] = useState('');
+  // Dara H1: when the URL carries `?se={id}`, defer rendering the banner until Effect B
+  // resolves (success → se_setup, failure → error state). Otherwise Effect A's earlier
+  // resolution would flash the banner for a paint on deep-link arrivals.
+  const [scenarioLoading, setScenarioLoading] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    const p = parseScenarioUrl(window.location.search);
+    return !!(p && p.intent === 'play' && p.scenarioId);
+  });
+  // Dara M3: tick every 60s so banner + setup `formatCountdown` refreshes. Matters
+  // most in the final hours of a scenario when the countdown is 15m / 5m etc.
+  const [, setNowTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setNowTick(t => t + 1), 60_000);
+    return () => clearInterval(id);
+  }, []);
   const [holdcoName, setHoldcoName] = useState('');
   const [fundName, setFundName] = useState('');
   const [bschoolName, setBschoolName] = useState('My First Holdco');
@@ -73,6 +134,11 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, chall
   const [selectedDuration, setSelectedDuration] = useState<GameDuration>(challengeData?.duration ?? 'quick');
   const [showNameError, setShowNameError] = useState(false);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
+  // Deep-link plumbing: `?tab=scenarios[&scenario={id}]` arrives → open the modal on the
+  // scenarios tab (optionally focused). Undefined for the normal "Global Leaderboard"
+  // button path, which lets the modal default to 'overall'. Reset on modal close so the
+  // next button click opens on default again. Dara M3.
+  const [leaderboardDeepLink, setLeaderboardDeepLink] = useState<{ tab: 'scenarios'; scenarioId: string | null } | null>(null);
   const [showChangelog, setShowChangelog] = useState(false);
   const [showUserManual, setShowUserManual] = useState(false);
   const [showFeedback, setShowFeedback] = useState(false);
@@ -115,6 +181,96 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, chall
     }
   }, [challengeData]);
 
+  // Fetch active scenarios for the home banner. Runs once on mount.
+  // Non-blocking — failures silently produce an empty banner.
+  useEffect(() => {
+    if (isChallenge) return; // Challenge recipients never see the scenario banner.
+    if (!isScenarioChallengesPlayerFacingEnabled()) return; // Feature-flag gate (plan §12).
+    let cancelled = false;
+    fetch('/api/scenario-challenges/active')
+      .then(res => res.ok ? res.json() : { scenarios: [] })
+      .then(data => {
+        if (cancelled) return;
+        setActiveScenarios(Array.isArray(data?.scenarios) ? data.scenarios.slice(0, 3) : []);
+      })
+      .catch(() => { /* silent — banner just stays empty */ });
+    return () => { cancelled = true; };
+  }, [isChallenge]);
+
+  // Handle `?tab=scenarios[&scenario={id}]` arrival — open LeaderboardModal on the
+  // scenarios tab (optionally focused on a specific scenario). URL is cleaned after
+  // the intent is consumed. Runs before the play/preview effect below since the
+  // leaderboard intent has no overlap with `?se=` (parseScenarioUrl returns one or
+  // the other, not both).
+  useEffect(() => {
+    if (isChallenge) return;
+    if (!isScenarioChallengesPlayerFacingEnabled()) return; // Feature-flag gate.
+    const parsed = parseScenarioUrl(window.location.search);
+    if (!parsed || parsed.intent !== 'leaderboard') return;
+    setLeaderboardDeepLink({ tab: 'scenarios', scenarioId: parsed.scenarioId });
+    setShowLeaderboard(true);
+    cleanScenarioUrl();
+  }, [isChallenge]);
+
+  // Handle `?se={id}` arrival — fetch the full config and open the se_setup screen.
+  // Expired/missing configs fall through gracefully: URL is cleaned, error surfaced.
+  // Public `?se=` entries gate on the feature flag; admin previews (`?se=X&preview=1`)
+  // always work regardless so authors can test without flipping rollout state.
+  useEffect(() => {
+    if (isChallenge) return;
+    const parsed = parseScenarioUrl(window.location.search);
+    if (!parsed || parsed.intent !== 'play' || !parsed.scenarioId) return;
+    if (!isScenarioChallengesPublicEntryEnabled()) {
+      // Feature flag off — clean URL silently so the player lands on the normal home.
+      cleanScenarioUrl();
+      setScenarioLoading(false);
+      return;
+    }
+
+    let cancelled = false;
+    fetch(`/api/scenario-challenges/config?id=${encodeURIComponent(parsed.scenarioId)}`)
+      .then(res => {
+        if (res.status === 404 || res.status === 410) {
+          throw new Error('ended');
+        }
+        if (!res.ok) throw new Error(`fetch failed: ${res.status}`);
+        return res.json();
+      })
+      .then(data => {
+        if (cancelled) return;
+        if (!data?.config) throw new Error('missing config');
+        setScenarioSetup(data.config as ScenarioChallengeConfig);
+        setScenarioName(data.config.name ?? '');
+        setStep('se_setup');
+      })
+      .catch(err => {
+        if (cancelled) return;
+        const ended = err instanceof Error && err.message === 'ended';
+        setScenarioLoadError(ended
+          ? 'This scenario has ended or is no longer available.'
+          : 'Failed to load scenario — please try again.');
+        cleanScenarioUrl();
+      })
+      .finally(() => {
+        // Dara H1: clear the loading flag in both branches so the banner can
+        // render once we've either transitioned to se_setup or fallen back to mode.
+        if (!cancelled) setScenarioLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [isChallenge]);
+
+  /**
+   * Wrap any start action with the save-in-progress confirmation when a game
+   * is already active. Dara H2: bidirectional coverage — wires to normal, fund,
+   * B-School, scenario, AND challenge-creator submits (NOT challenge-recipient,
+   * who arrived via an intentional share link and already passed the warning
+   * moment). If there's no game in progress, the action runs immediately.
+   */
+  const guardedStart = (action: () => void) => {
+    if (hasGameInProgress) setPendingStartAction(() => action);
+    else action();
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (holdcoName.trim().length < 2) {
@@ -126,7 +282,14 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, chall
           ? Math.abs(challengeData.seed) % SECTOR_LIST_STANDARD.length
           : Math.floor(Math.random() * SECTOR_LIST_STANDARD.length)].id
       : selectedSector;
-    onStart(holdcoName.trim(), sector, selectedDifficulty, selectedDuration, challengeData?.seed);
+    const seed = challengeData?.seed;
+    const name = holdcoName.trim();
+    // Challenge recipients (isChallenge=true) bypass the warning — they clicked a link.
+    if (isChallenge) {
+      onStart(name, sector, selectedDifficulty, selectedDuration, seed);
+      return;
+    }
+    guardedStart(() => onStart(name, sector, selectedDifficulty, selectedDuration, seed));
   };
 
   const handleFundSubmit = (e: React.FormEvent) => {
@@ -135,7 +298,7 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, chall
       setShowNameError(true);
       return;
     }
-    onStartFund(fundName.trim());
+    guardedStart(() => onStartFund(fundName.trim()));
   };
 
   const handleChallengeStart = (e: React.FormEvent) => {
@@ -213,6 +376,44 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, chall
             Build a portfolio. Allocate capital. Compound value.
           </p>
         </div>
+
+        {/* ═══ Scenario Banner (above mode card, hidden for challenge recipients) ═══ */}
+        {/* Dara H1: `scenarioLoading` guards against banner flash on `?se=` deep-links. */}
+        {!isChallenge && step === 'mode' && activeScenarios.length > 0 && !scenarioLoading && (
+          <ScenarioBanner
+            scenarios={activeScenarios}
+            onEnter={(summary) => {
+              // Fetch the full config and transition to se_setup. Errors swallow silently;
+              // the banner click is a lightweight "tell me more" gesture, not a commit.
+              fetch(`/api/scenario-challenges/config?id=${encodeURIComponent(summary.id)}`)
+                .then(r => r.ok ? r.json() : null)
+                .then(data => {
+                  if (data?.config) {
+                    setScenarioSetup(data.config as ScenarioChallengeConfig);
+                    setScenarioName(data.config.name ?? '');
+                    setStep('se_setup');
+                  }
+                })
+                .catch(() => { /* silent */ });
+            }}
+          />
+        )}
+
+        {scenarioLoadError && (
+          <div className="mb-4 p-3 rounded bg-warning/10 border border-warning/20 text-sm text-warning flex items-center justify-between gap-3">
+            <span>{scenarioLoadError}</span>
+            {/* Dara M4: retry affordance for transient failures. "Ended" errors are
+                non-retryable — the scenario is genuinely gone. */}
+            {!scenarioLoadError.includes('ended or is no longer available') && (
+              <button
+                onClick={() => window.location.reload()}
+                className="text-xs px-2 py-1 rounded bg-warning/20 text-warning hover:bg-warning/30 shrink-0"
+              >
+                Retry
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ═══ CHALLENGE RECIPIENT FLOW ═══ */}
         {isChallenge ? (
@@ -445,7 +646,7 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, chall
                 type="button"
                 onClick={() => {
                   const name = bschoolName.trim() || 'My First Holdco';
-                  onStartBusinessSchool?.(name);
+                  guardedStart(() => onStartBusinessSchool?.(name));
                 }}
                 disabled={!bschoolName.trim()}
                 className="btn-primary w-full text-lg bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-500 hover:to-emerald-400 mb-5"
@@ -617,6 +818,28 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, chall
                 Launch Your Fund →
               </button>
             </form>
+          </>
+        ) : step === 'se_setup' && scenarioSetup ? (
+          <>
+            {/* ═══ SCENARIO CHALLENGE SETUP ═══ */}
+            <ScenarioSetupView
+              config={scenarioSetup}
+              name={scenarioName}
+              onNameChange={setScenarioName}
+              onBack={() => {
+                setStep('mode');
+                setScenarioSetup(null);
+                setScenarioLoadError(null);
+                cleanScenarioUrl();
+              }}
+              onEnter={() => {
+                if (!scenarioSetup || !scenarioName.trim() || !onStartScenarioChallenge) return;
+                guardedStart(() => {
+                  onStartScenarioChallenge(scenarioName.trim(), scenarioSetup);
+                  cleanScenarioUrl();
+                });
+              }}
+            />
           </>
         ) : (
           <>
@@ -918,7 +1141,14 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, chall
       </div>
 
       {showLeaderboard && (
-        <LeaderboardModal onClose={() => setShowLeaderboard(false)} />
+        <LeaderboardModal
+          onClose={() => {
+            setShowLeaderboard(false);
+            setLeaderboardDeepLink(null);
+          }}
+          initialTab={leaderboardDeepLink?.tab}
+          initialScenarioId={leaderboardDeepLink?.scenarioId ?? null}
+        />
       )}
       {showChangelog && (
         <ChangelogModal onClose={() => setShowChangelog(false)} />
@@ -932,6 +1162,211 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, chall
         context={{ screen: 'intro' }}
       />
       <VideoModal isOpen={showVideo} onClose={() => setShowVideo(false)} />
+
+      {/* Save-in-progress confirmation. Fires when player starts a new game
+          while another is in progress. Bidirectional across all modes (plan §5.5). */}
+      {pendingStartAction && (
+        <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+          <div className="bg-bg-primary border border-white/10 rounded-lg max-w-md w-full p-5">
+            <h3 className="text-sm font-semibold mb-2">Replace game in progress?</h3>
+            <p className="text-xs text-text-muted mb-4">
+              Starting this will replace your current game in progress. Your unfinished game will be lost.
+            </p>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setPendingStartAction(null)}
+                className="px-3 py-1.5 rounded text-xs bg-bg-secondary text-text-secondary hover:text-text-primary border border-white/10"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const action = pendingStartAction;
+                  setPendingStartAction(null);
+                  action?.();
+                }}
+                className="px-3 py-1.5 rounded text-xs font-medium bg-accent text-white hover:bg-accent/90"
+              >
+                Continue
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+}
+
+// ── Scenario Banner ────────────────────────────────────────────────────
+
+function ScenarioBanner({
+  scenarios,
+  onEnter,
+}: {
+  scenarios: ScenarioBannerSummary[];
+  onEnter: (summary: ScenarioBannerSummary) => void;
+}) {
+  if (scenarios.length === 0) return null;
+  const [featured, ...rest] = scenarios; // First = full banner, up to 2 more = compact rows.
+
+  return (
+    <div className="mb-6 space-y-2">
+      {/* Full banner — first featured scenario */}
+      <button
+        onClick={() => onEnter(featured)}
+        className="w-full text-left rounded-lg border-2 border-amber-500/40 bg-gradient-to-r from-amber-500/10 to-amber-500/5 hover:border-amber-500/60 transition-all p-4"
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-bold text-amber-400 px-1.5 py-0.5 rounded bg-amber-500/20">LIVE</span>
+              <span className="text-xs text-amber-400/80 font-mono">{formatCountdown(featured.endDate)}</span>
+            </div>
+            <h3 className="text-base font-bold text-text-primary">
+              <span className="mr-2">{featured.theme?.emoji}</span>{featured.name}
+            </h3>
+            <p className="text-xs text-text-secondary mt-1">{featured.tagline}</p>
+            <div className="flex items-center gap-3 mt-2 text-[10px] text-text-muted">
+              <span>{featured.entryCount} {featured.entryCount === 1 ? 'entry' : 'entries'}</span>
+              <span>·</span>
+              <span>{featured.difficulty} · {featured.duration} · {featured.maxRounds}yr</span>
+              {featured.isPE && <><span>·</span><span className="text-amber-400">PE</span></>}
+            </div>
+          </div>
+          <div className="text-amber-400 text-sm shrink-0">→</div>
+        </div>
+      </button>
+
+      {/* Compact rows — scenarios 2 & 3 */}
+      {rest.map(s => (
+        <button
+          key={s.id}
+          onClick={() => onEnter(s)}
+          className="w-full text-left rounded border border-amber-500/20 bg-amber-500/5 hover:border-amber-500/40 transition-all px-3 py-2 flex items-center justify-between gap-2"
+        >
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            <span className="shrink-0">{s.theme?.emoji}</span>
+            <span className="text-sm font-medium text-text-primary truncate">{s.name}</span>
+            <span className="text-[10px] text-amber-400/70 font-mono shrink-0">{formatCountdown(s.endDate)}</span>
+          </div>
+          <span className="text-amber-400 text-xs shrink-0">→</span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ── Scenario Setup View ────────────────────────────────────────────────
+
+function ScenarioSetupView({
+  config,
+  name,
+  onNameChange,
+  onBack,
+  onEnter,
+}: {
+  config: ScenarioChallengeConfig;
+  name: string;
+  onNameChange: (name: string) => void;
+  onBack: () => void;
+  onEnter: () => void;
+}) {
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); onEnter(); }} className="card p-6 border-amber-500/30 bg-gradient-to-b from-amber-500/5 to-transparent">
+      <div className="flex items-center justify-between mb-4">
+        <button
+          type="button"
+          onClick={onBack}
+          className="text-sm text-text-muted hover:text-text-secondary transition-colors"
+        >
+          ← Back
+        </button>
+        <span className="text-xs font-bold text-amber-400 px-1.5 py-0.5 rounded bg-amber-500/20">LIVE · {formatCountdown(config.endDate)}</span>
+      </div>
+
+      <div className="text-center mb-4">
+        <div className="text-5xl mb-2">{config.theme?.emoji}</div>
+        <h2 className="text-xl font-bold text-text-primary mb-1">{config.name}</h2>
+        <p className="text-sm text-text-secondary">{config.tagline}</p>
+      </div>
+
+      <div className="rounded bg-white/5 border border-white/10 p-3 mb-4 text-xs text-text-secondary whitespace-pre-wrap">
+        {config.description}
+      </div>
+
+      {/* Locked config summary — admin-set parameters the player can't change. */}
+      <div className="grid grid-cols-2 gap-2 mb-4 text-[11px]">
+        <div className="bg-white/5 rounded p-2">
+          <div className="text-text-muted">Difficulty</div>
+          <div className="font-medium text-text-primary capitalize">{config.difficulty}</div>
+        </div>
+        <div className="bg-white/5 rounded p-2">
+          <div className="text-text-muted">Rounds</div>
+          <div className="font-medium text-text-primary">{config.maxRounds} yr</div>
+        </div>
+        {config.fundStructure ? (
+          <>
+            <div className="bg-white/5 rounded p-2">
+              <div className="text-text-muted">Fund Size</div>
+              <div className="font-medium text-text-primary">${(config.fundStructure.committedCapital / 1000).toFixed(0)}M</div>
+            </div>
+            <div className="bg-white/5 rounded p-2">
+              <div className="text-text-muted">Mode</div>
+              <div className="font-medium text-amber-400">PE Fund</div>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="bg-white/5 rounded p-2">
+              <div className="text-text-muted">Starting Cash</div>
+              <div className="font-medium text-text-primary">${(config.startingCash / 1000).toFixed(1)}M</div>
+            </div>
+            <div className="bg-white/5 rounded p-2">
+              <div className="text-text-muted">Starting Debt</div>
+              <div className="font-medium text-text-primary">${(config.startingDebt / 1000).toFixed(1)}M</div>
+            </div>
+          </>
+        )}
+      </div>
+
+      {config.startingBusinesses.length > 0 && (
+        <div className="mb-4">
+          <div className="text-[11px] text-text-muted mb-1.5">Starting Portfolio</div>
+          <div className="space-y-1">
+            {config.startingBusinesses.map((b, i) => (
+              <div key={i} className="text-[11px] bg-white/5 rounded px-2 py-1 flex items-center justify-between gap-2">
+                <span className="text-text-primary">
+                  {b.name}
+                  {b.status === 'distressed' && <span className="ml-1.5 text-[9px] text-warning">DISTRESSED</span>}
+                </span>
+                <span className="text-text-muted font-mono">Q{b.quality} · ${(b.ebitda / 1000).toFixed(1)}M EBITDA</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <label className="block text-left mb-2 text-sm text-text-muted">
+        Name your {config.fundStructure ? 'fund' : 'holding company'} <span className="text-danger">*</span>
+      </label>
+      <input
+        type="text"
+        value={name}
+        onChange={(e) => onNameChange(e.target.value)}
+        placeholder={config.fundStructure ? 'e.g. Beacon Capital Fund' : 'e.g. Apex Holdings'}
+        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-amber-500 transition-colors mb-4"
+        maxLength={30}
+        autoFocus
+        required
+      />
+
+      <button
+        type="submit"
+        disabled={!name.trim()}
+        className="btn-primary w-full text-lg bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 disabled:from-amber-500/50 disabled:to-amber-600/50"
+      >
+        Enter {config.name} →
+      </button>
+    </form>
   );
 }

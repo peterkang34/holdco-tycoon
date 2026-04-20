@@ -20,8 +20,9 @@ import { calculateEnterpriseValue } from './scoring';
 import { calculateDistressLevel, getDistressRestrictions } from './distress';
 import { getMASourcingAnnualCost } from '../data/sharedServices';
 import { getTurnaroundTierAnnualCost, getProgramById } from '../data/turnaroundPrograms';
-import { EARNOUT_EXPIRATION_YEARS, PE_FUND_CONFIG } from '../data/gameConfig';
+import { EARNOUT_EXPIRATION_YEARS } from '../data/gameConfig';
 import { SECTORS } from '../data/sectors';
+import { getAnnualMgmtFee, getCarryRate, getCommittedCapital, getHurdleReturn } from '../data/fundStructure';
 
 // ── Shared computation context ──
 
@@ -50,7 +51,7 @@ export function buildDrilldownContext(state: GameState): DrilldownContext {
   const maSourcingCost = state.maSourcing?.active
     ? getMASourcingAnnualCost(state.maSourcing.tier)
     : 0;
-  const managementFee = state.isFundManagerMode ? PE_FUND_CONFIG.annualManagementFee : 0;
+  const managementFee = state.isFundManagerMode ? getAnnualMgmtFee(state) : 0;
   const totalDeductibleCosts = sharedServicesCost + maSourcingCost + managementFee;
 
   const totalEbitdaTop = activeBusinesses.reduce((sum, b) => sum + b.ebitda, 0);
@@ -423,7 +424,7 @@ export function computePEMoicBreakdown(state: GameState, ctx: DrilldownContext):
   const { activeBusinesses } = ctx;
   const nav = calculateEnterpriseValue(state);
   const lpDist = state.lpDistributions ?? 0;
-  const fs = state.fundSize ?? PE_FUND_CONFIG.fundSize;
+  const fs = getCommittedCapital(state);
   const totalValue = nav + lpDist;
   const grossMoic = fs > 0 ? totalValue / fs : 0;
 
@@ -550,7 +551,7 @@ export interface DpiBreakdown {
 
 export function computeDpiBreakdown(state: GameState): DpiBreakdown {
   const lpDist = state.lpDistributions ?? 0;
-  const fs = state.fundSize ?? PE_FUND_CONFIG.fundSize;
+  const fs = getCommittedCapital(state);
   const dpi = fs > 0 ? lpDist / fs : 0;
 
   return {
@@ -579,11 +580,12 @@ export interface CarryBreakdown {
 export function computeCarryBreakdown(state: GameState): CarryBreakdown {
   const nav = calculateEnterpriseValue(state);
   const lpDist = state.lpDistributions ?? 0;
-  const fs = state.fundSize ?? PE_FUND_CONFIG.fundSize;
+  const fs = getCommittedCapital(state);
   const totalValue = nav + lpDist;
-  const hurdleTarget = PE_FUND_CONFIG.hurdleReturn;
+  const hurdleTarget = getHurdleReturn(state);
   const aboveHurdle = totalValue - hurdleTarget;
-  const estCarry = aboveHurdle > 0 ? aboveHurdle * PE_FUND_CONFIG.carryRate : 0;
+  const carryRate = getCarryRate(state);
+  const estCarry = aboveHurdle > 0 ? aboveHurdle * carryRate : 0;
 
   return {
     nav,
@@ -593,7 +595,7 @@ export function computeCarryBreakdown(state: GameState): CarryBreakdown {
     hurdleTarget,
     aboveHurdle,
     estCarry,
-    carryRate: PE_FUND_CONFIG.carryRate,
+    carryRate,
     managementFeesCollected: state.managementFeesCollected ?? 0,
   };
 }
@@ -610,7 +612,7 @@ export interface DeployedBreakdown {
 }
 
 export function computeDeployedBreakdown(state: GameState, ctx: DrilldownContext): DeployedBreakdown {
-  const fs = state.fundSize ?? PE_FUND_CONFIG.fundSize;
+  const fs = getCommittedCapital(state);
   const deployed = state.totalCapitalDeployed ?? 0;
   const deployPct = fs > 0 ? (deployed / fs) * 100 : 0;
 

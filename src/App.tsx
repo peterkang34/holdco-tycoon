@@ -56,6 +56,7 @@ function App() {
   const [isFoTest, setIsFoTest] = useState(!authCallbackPending && window.location.hash === '#/fo-test');
   const [isGoTest, setIsGoTest] = useState(!authCallbackPending && window.location.hash.startsWith('#/go-test'));
   const [isBsTest, setIsBsTest] = useState(!authCallbackPending && window.location.hash === '#/bs-test');
+  const [isSePreview, setIsSePreview] = useState(!authCallbackPending && window.location.hash.startsWith('#/se-preview'));
 
   // Open legal modals if URL hash matches
   useEffect(() => {
@@ -70,6 +71,7 @@ function App() {
       setIsFoTest(window.location.hash === '#/fo-test');
       setIsGoTest(window.location.hash.startsWith('#/go-test'));
       setIsBsTest(window.location.hash === '#/bs-test');
+      setIsSePreview(window.location.hash.startsWith('#/se-preview'));
       if (window.location.hash === '#/privacy') useAuthStore.getState().openPrivacyModal();
       if (window.location.hash === '#/terms') useAuthStore.getState().openTermsModal();
     };
@@ -138,6 +140,7 @@ function App() {
     completeFamilyOffice,
     startGame,
     startBusinessSchool,
+    startScenarioChallenge,
     resetGame,
   } = useGameStore();
 
@@ -217,6 +220,35 @@ function App() {
         });
       }
       setScreen('graduation');
+      return;
+    }
+    // #/se-preview?h={handoffId} — admin preview of a scenario. Config is handed
+    // off via sessionStorage keyed by a per-click UUID (Dara H2 from 3B.2 review)
+    // so rapid Preview clicks don't collide — each opener→opened tab pair is
+    // scoped to its own key. `isAdminPreview` makes submit.ts drop all writes.
+    if (isSePreview) {
+      try {
+        const hash = window.location.hash;
+        const queryIdx = hash.indexOf('?');
+        const params = queryIdx >= 0 ? new URLSearchParams(hash.slice(queryIdx + 1)) : null;
+        const handoffId = params?.get('h');
+        if (handoffId) {
+          const storageKey = `scenario_preview_config:${handoffId}`;
+          const raw = sessionStorage.getItem(storageKey);
+          if (raw) {
+            const config = JSON.parse(raw);
+            sessionStorage.removeItem(storageKey);
+            startScenarioChallenge(config.name ?? 'Preview', config, true);
+            setScreen('game');
+            return;
+          }
+        }
+      } catch (err) {
+        console.error('scenario preview handoff failed:', err);
+      }
+      // Fallback — no handoff or missing config. Drop to intro.
+      window.location.hash = '';
+      setScreen('intro');
       return;
     }
     const currentState = useGameStore.getState();
@@ -455,7 +487,12 @@ function App() {
           onStart={handleStart}
           onStartFund={handleStartFund}
           onStartBusinessSchool={handleStartBusinessSchool}
+          onStartScenarioChallenge={(name, config) => {
+            startScenarioChallenge(name, config, false);
+            setScreen('game');
+          }}
           challengeData={challengeData}
+          hasGameInProgress={!!(holdcoName && round > 0 && !gameOver)}
         />
       )}
       {screen === 'game' && <ErrorBoundary><GameScreen onGameOver={handleGameOver} onResetGame={handlePlayAgain} showTutorial={isNewGame} isChallenge={!!challengeData} /></ErrorBoundary>}

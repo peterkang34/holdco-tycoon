@@ -77,7 +77,16 @@ import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue
 import { getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
 
-import type { GameDifficulty, GameDuration, GameActionType, DealHeat, LPComment } from '../engine/types';
+import type { GameDifficulty, GameDuration, GameActionType, DealHeat, LPComment, ScenarioChallengeConfig } from '../engine/types';
+import { isActionBlocked } from '../data/modeGating';
+import {
+  getAnnualMgmtFee,
+  getCommittedCapital,
+  getDefaultFundStructure,
+  getForcedLiquidationDiscount,
+  getForcedLiquidationYear,
+} from '../data/fundStructure';
+import { createBusinessFromConfig, createDealFromCuratedConfig, createForcedGameEvent } from '../data/scenarioChallenges';
 import { selectLPQuote } from '../data/lpCommentary';
 import type { LPTriggerId, LPSpeaker } from '../data/lpCommentary';
 import { generateRandomSeed, createRngStreams } from '../engine/rng';
@@ -138,8 +147,8 @@ export function checkLPACRequired(
   targetPlatformId?: string,
 ): { required: boolean; platformName: string; cumulativeValue: number } {
   if (!state.isFundManagerMode) return { required: false, platformName: '', cumulativeValue: 0 };
-  const fundSize = state.fundSize || PE_FUND_CONFIG.fundSize;
-  const threshold = fundSize * PE_FUND_CONFIG.maxConcentration; // $25M
+  const fundSize = getCommittedCapital(state);
+  const threshold = fundSize * PE_FUND_CONFIG.maxConcentration; // $25M (maxConcentration is shared across all PE games)
 
   // For tuck-ins: check if target platform already exceeds threshold
   if (targetPlatformId) {
@@ -353,6 +362,7 @@ interface GameStore extends GameState {
   // Actions
   startGame: (holdcoName: string, startingSector: SectorId | undefined, difficulty?: GameDifficulty, duration?: GameDuration, seed?: number, isFundManagerMode?: boolean, fundName?: string) => void;
   startBusinessSchool: (holdcoName: string) => void;
+  startScenarioChallenge: (holdcoName: string, config: ScenarioChallengeConfig, isAdminPreview?: boolean) => void;
   resetGame: () => void;
 
   // Phase transitions
@@ -642,7 +652,13 @@ export const useGameStore = create<GameStore>()(
             // PE Fund Mode fields
             isFundManagerMode: true,
             fundName: fundName || holdcoName,
-            fundSize: PE_FUND_CONFIG.fundSize,
+            // Step 1.5: fundStructure carries the parameterized economics
+            // (committed capital, fees, hurdle, carry, forced-exit terms). Default is
+            // traditional_pe — matches the legacy PE_FUND_CONFIG constants so behavior
+            // is preserved. Scenarios with custom FundStructure override via startScenarioChallenge.
+            // state.fundSize derives from fundStructure.committedCapital so they never drift.
+            fundStructure: getDefaultFundStructure(),
+            fundSize: getDefaultFundStructure().committedCapital,
             managementFeesCollected: 0,
             lpSatisfactionScore: PE_FUND_CONFIG.lpSatisfactionStart,
             lpCommentary: [],
@@ -786,6 +802,123 @@ export const useGameStore = create<GameStore>()(
         trackGameStart(BS_DIFFICULTY, BS_DURATION, undefined, BS_MAX_ROUNDS, false, 'business_school');
       },
 
+      startScenarioChallenge: (holdcoName: string, config: ScenarioChallengeConfig, isAdminPreview: boolean = false) => {
+        resetBusinessIdCounter();
+        resetUsedNames();
+
+        // Use config.seed — deterministic for all players, fixed at scenario design time.
+        const gameSeed = config.seed;
+        const round1Streams = createRngStreams(gameSeed, 1);
+
+        // Build starting businesses from config overrides. Empty array = capital-only start.
+        const businesses = config.startingBusinesses.map((biz, i) =>
+          createBusinessFromConfig(biz, `scenario_biz_${i + 1}`)
+        );
+        const totalInvested = businesses.reduce((s, b) => s + b.acquisitionPrice, 0);
+
+        const isPEScenario = !!config.fundStructure;
+
+        // Initial deal pipeline:
+        //   - If round-1 curated deals present, use them verbatim
+        //   - Otherwise, generate via normal pipeline (sector filter applied at round-advance)
+        const startingCash = isPEScenario
+          ? (config.fundStructure!.committedCapital)
+          : config.startingCash;
+        let initialDealPipeline;
+        if (config.curatedDeals?.[1] && config.curatedDeals[1].length > 0) {
+          initialDealPipeline = config.curatedDeals[1].map((d, i) =>
+            createDealFromCuratedConfig(d, `scenario_deal_r1_${i + 1}`, 1)
+          );
+        } else {
+          // Pass unlockedSectorIds: [] + isChallenge: true for seed determinism
+          initialDealPipeline = generateDealPipeline(
+            [], 1, undefined, undefined, undefined, 0, 0, false, undefined,
+            config.maxRounds, false, round1Streams.deals, 0, startingCash, null,
+            false, false, config.difficulty, [], [], true,
+          );
+        }
+
+        // Enforce FamilyOffice disable at state level (plan rule: scenarios never unlock FO).
+        const disabledFeatures = { ...(config.disabledFeatures ?? {}), familyOffice: true };
+
+        const newState: GameState = {
+          ...initialState,
+          holdcoName,
+          seed: gameSeed,
+          difficulty: config.difficulty,
+          duration: config.duration,
+          maxRounds: config.maxRounds,
+          round: 1,
+          phase: 'collect',
+          businesses,
+          cash: startingCash,
+          totalDebt: isPEScenario ? 0 : config.startingDebt,
+          totalInvestedCapital: totalInvested,
+          founderShares: isPEScenario ? 0 : config.founderShares,
+          sharesOutstanding: isPEScenario ? 1000 : config.sharesOutstanding,
+          initialRaiseAmount: startingCash + totalInvested,
+          initialOwnershipPct: isPEScenario
+            ? 0
+            : (config.sharesOutstanding > 0 ? config.founderShares / config.sharesOutstanding : 1.0),
+          interestRate: config.startingInterestRate ?? initialState.interestRate ?? 0.07,
+          holdcoDebtStartRound: 0,
+          holdcoLoanBalance: 0,
+          holdcoLoanRate: 0,
+          holdcoLoanRoundsRemaining: 0,
+          sharedServices: initializeSharedServices(),
+          dealPipeline: initialDealPipeline,
+          maSourcing: {
+            tier: (config.startingMaSourcingTier ?? 0) as MASourcingTier,
+            active: (config.startingMaSourcingTier ?? 0) > 0,
+            unlockedRound: (config.startingMaSourcingTier ?? 0) > 0 ? 1 : 0,
+            lastUpgradeRound: 0,
+          },
+          maxAcquisitionsPerRound: config.maxAcquisitionsPerRound ?? 3,
+          turnaroundTier: 0 as any,
+          activeTurnarounds: [],
+          founderDistributionsReceived: 0,
+          // Fixed seed for all players (same as challenge mode plumbing)
+          isChallenge: true,
+          dealInflationState: { crisisResetRoundsRemaining: 0 },
+          ipoState: null,
+          familyOfficeState: null,
+          // Seed determinism: lock unlocks so two players with different achievements get identical deals
+          unlockedSectorIds: [],
+          unlockedMechanics: { enhancedSubTypeSpec: false, crossSectorSaasServices: false },
+          // Scenario Challenge mode fields
+          isScenarioChallengeMode: true,
+          scenarioChallengeId: config.id,
+          scenarioChallengeConfig: { ...config, disabledFeatures },
+          isAdminPreview,
+          // PE coexistence — when scenario is PE-structured, also enable Fund Manager mode.
+          ...(isPEScenario
+            ? {
+                isFundManagerMode: true,
+                fundName: holdcoName,
+                fundSize: config.fundStructure!.committedCapital,
+                fundStructure: config.fundStructure,
+                managementFeesCollected: 0,
+                // Match startGame's PE branch — sourced from constant to avoid drift if Reiko retunes.
+                lpSatisfactionScore: PE_FUND_CONFIG.lpSatisfactionStart,
+                lpCommentary: [],
+                fundCashFlows: [],
+                totalCapitalDeployed: 0,
+                lpDistributions: 0,
+                dpiMilestones: { half: false, full: false },
+              }
+            : {}),
+        };
+
+        set({
+          ...newState,
+          metrics: calculateMetrics(newState),
+          focusBonus: calculateSectorFocusBonus(newState.businesses),
+          yearChronicle: null,
+        });
+
+        trackGameStart(config.difficulty, config.duration, undefined, config.maxRounds, true, 'scenario_challenge');
+      },
+
       resetGame: () => {
         // Send abandon telemetry if mid-game
         const state = get();
@@ -837,8 +970,9 @@ export const useGameStore = create<GameStore>()(
         // Collect FCF when transitioning from collect to event phase (annual)
         // Portfolio tax (with interest/SS+MA deductions for tax shield) is computed inside
         // PE Fund Manager: management fee deducted from cash, tax-deductible
-        // Fee is contractual (2% of committed capital) — not capped by pre-FCF cash
-        const managementFee = state.isFundManagerMode ? PE_FUND_CONFIG.annualManagementFee : 0;
+        // Fee is contractual (% of committed capital per the fund structure) — not capped by pre-FCF cash.
+        // Reads from state.fundStructure so scenarios with custom fee/capital override correctly.
+        const managementFee = state.isFundManagerMode ? getAnnualMgmtFee(state) : 0;
 
         // Use holdcoLoanRate + penalty for tax deduction (matches actual interest paid)
         const totalDeductibleCosts = sharedServicesCost + maSourcingCost + managementFee;
@@ -1066,8 +1200,17 @@ export const useGameStore = create<GameStore>()(
           oilShockRoundsRemaining: decrementedOilShock,
           dealInflationState: decrementedDealInflation,
         };
-        // Business School: curated events (bull market Y1, quiet year Y2) instead of random
-        const event = state.isBusinessSchoolMode ? getBSEvent(state.round) : generateEvent(stateForEventGen, roundStreams.events);
+        // Event priority (3-way): Business School → Scenario Challenge forced → normal RNG.
+        // B-School serves curated events (bull market Y1, quiet year Y2). Scenario forced events
+        // override RNG at the configured round; uncurated rounds fall through to normal generation.
+        let event;
+        if (state.isBusinessSchoolMode) {
+          event = getBSEvent(state.round);
+        } else if (state.isScenarioChallengeMode && state.scenarioChallengeConfig?.forcedEvents?.[state.round]) {
+          event = createForcedGameEvent(state.scenarioChallengeConfig.forcedEvents[state.round], state.round);
+        } else {
+          event = generateEvent(stateForEventGen, roundStreams.events);
+        }
 
         // Generate guaranteed proSports event if player owns a franchise
         // Uses cosmetic stream fork to avoid disturbing the event RNG
@@ -1357,6 +1500,31 @@ export const useGameStore = create<GameStore>()(
           return;
         }
 
+        // Scenario Challenge: serve curated deals for this round if the admin configured any.
+        // Uncurated rounds fall through to normal RNG generation (with sector filter + deal floor
+        // applied below). This gives scenarios pinpoint control over specific rounds while
+        // letting the engine drive variety on uncurated ones.
+        if (state.isScenarioChallengeMode && state.scenarioChallengeConfig?.curatedDeals?.[state.round]) {
+          const curated = state.scenarioChallengeConfig.curatedDeals[state.round];
+          const scenarioDeals = curated.map((d, i) =>
+            createDealFromCuratedConfig(d, `scenario_deal_r${state.round}_${i + 1}`, state.round)
+          );
+          set({
+            ...state,
+            phase: 'allocate' as GamePhase,
+            dealPipeline: scenarioDeals,
+            acquisitionsThisRound: 0,
+            lastAcquisitionResult: null,
+            lastIntegrationOutcome: null,
+            debtPaymentThisRound: 0,
+            cashBeforeDebtPayments: state.cash,
+            currentEvent: null,
+            metrics: calculateMetrics(state as GameState),
+            focusBonus,
+          });
+          return;
+        }
+
         // Generate new deals with M&A focus, portfolio synergies, and affordability
         // Collect owned pro sports sub-types for uniqueness filtering
         const ownedProSportsSubTypes = state.businesses
@@ -1387,8 +1555,84 @@ export const useGameStore = create<GameStore>()(
           state.isChallenge,
         );
 
+        // Scenario Challenge sector/sub-type filter + deal floor guarantee.
+        // Determinism: always fork the 'dealFloor' RNG stream regardless of whether the
+        // floor fires — this keeps the main deals stream position stable across future
+        // code changes. Discard the fork output when unused.
+        let postFilterPipeline = newPipeline;
+        const dealFloorFork = roundStreams.deals.fork(`dealFloor_r${state.round}`);
+        if (state.isScenarioChallengeMode && state.scenarioChallengeConfig) {
+          const cfg = state.scenarioChallengeConfig;
+          // allowedSectors narrowed to SectorId at construction — validation already
+          // guarantees each entry is valid (see validateScenarioConfig).
+          const allowedSectors: Set<SectorId> | null = cfg.allowedSectors && cfg.allowedSectors.length > 0
+            ? new Set<SectorId>(cfg.allowedSectors)
+            : null;
+          const allowedSubTypes: Set<string> | null = cfg.allowedSubTypes && cfg.allowedSubTypes.length > 0
+            ? new Set<string>(cfg.allowedSubTypes)
+            : null;
+
+          if (allowedSectors || allowedSubTypes) {
+            postFilterPipeline = newPipeline.filter(d => {
+              if (allowedSectors && !allowedSectors.has(d.business.sectorId)) return false;
+              if (allowedSubTypes && !allowedSubTypes.has(d.business.subType)) return false;
+              return true;
+            });
+          }
+
+          // Deal floor: if the filter zeroed out the pipeline, synthesize ≥1 deal
+          // from the allowed sectors using the pre-forked stream. generateDealPipeline
+          // doesn't accept a sub-type constraint, so when allowedSubTypes narrows the
+          // allowed sectors further we retry a few times and ultimately synthesize a
+          // curated-style deal from the allowed sectors+sub-types as a last resort.
+          if (postFilterPipeline.length === 0 && allowedSectors) {
+            const sectorIds = [...allowedSectors];
+            const MAX_FLOOR_RETRIES = 5;
+            for (let attempt = 0; attempt < MAX_FLOOR_RETRIES && postFilterPipeline.length === 0; attempt++) {
+              const pickIdx = Math.floor(dealFloorFork.next() * sectorIds.length);
+              const floorSectorId = sectorIds[pickIdx];
+              const floorDeals = generateDealPipeline(
+                [], state.round, undefined, undefined, undefined, 0, 0, false,
+                undefined, state.maxRounds, false, dealFloorFork, dealInflationAdder,
+                state.cash, null, false, false, state.difficulty, [], [floorSectorId], true,
+              );
+              postFilterPipeline = floorDeals.filter(d => {
+                if (allowedSectors && !allowedSectors.has(d.business.sectorId)) return false;
+                if (allowedSubTypes && !allowedSubTypes.has(d.business.subType)) return false;
+                return true;
+              }).slice(0, 1);
+            }
+
+            // Last-resort synthesis: if 5 retries still produced zero deals (narrow
+            // sub-type slice + unlucky RNG), build a deal directly from the config.
+            // Sector-midpoint EBITDA + first allowed sub-type for that sector.
+            if (postFilterPipeline.length === 0) {
+              const pickIdx = Math.floor(dealFloorFork.next() * sectorIds.length);
+              const fallbackSectorId = sectorIds[pickIdx];
+              const sector = SECTORS[fallbackSectorId];
+              const subTypeForSector = sector.subTypes.find(st => !allowedSubTypes || allowedSubTypes.has(st))
+                ?? sector.subTypes[0];
+              const ebitdaMid = Math.round((sector.baseEbitda[0] + sector.baseEbitda[1]) / 2);
+              const multipleMid = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
+              const synthesized = createDealFromCuratedConfig(
+                {
+                  name: `${sector.name} Deal`,
+                  sectorId: fallbackSectorId,
+                  subType: subTypeForSector,
+                  ebitda: ebitdaMid,
+                  multiple: Math.round(multipleMid * 10) / 10,
+                  quality: 3,
+                },
+                `scenario_floor_synth_r${state.round}`,
+                state.round,
+              );
+              postFilterPipeline = [synthesized];
+            }
+          }
+        }
+
         // Inject distressed deals during Financial Crisis (bypass MAX_DEALS cap)
-        let finalPipeline = newPipeline;
+        let finalPipeline = postFilterPipeline;
         if (state.currentEvent?.type === 'global_financial_crisis') {
           const distressedDeals = generateDistressedDeals(state.round, state.maxRounds, roundStreams.deals, state.cash);
           finalPipeline = [...finalPipeline, ...distressedDeals];
@@ -1564,7 +1808,12 @@ export const useGameStore = create<GameStore>()(
         }
 
         const newRound = state.round + 1;
-        const gameOver = newRound > state.maxRounds || gameOverFromBankruptcy;
+        // PE Fund Mode: forced liquidation may trigger before maxRounds if the fund structure
+        // specifies an earlier `forcedLiquidationYear` (scenario tightening). For standard
+        // PE Fund Manager mode (traditional_pe default, Y10) this resolves to maxRounds=10
+        // — behavior-preserving. Non-PE games fall back to maxRounds via the helper.
+        const peLiquidationTriggered = state.isFundManagerMode && newRound > getForcedLiquidationYear(state);
+        const gameOver = newRound > state.maxRounds || peLiquidationTriggered || gameOverFromBankruptcy;
 
         // Persist round history snapshot
         const roundHistoryEntry: RoundHistoryEntry = {
@@ -1588,7 +1837,7 @@ export const useGameStore = create<GameStore>()(
         let updatedLPCommentary = [...(state.lpCommentary || [])];
         if (state.isFundManagerMode) {
           const round = state.round;
-          const fundSize = state.fundSize || PE_FUND_CONFIG.fundSize;
+          const fundSize = getCommittedCapital(state);
           const dpi = (state.lpDistributions || 0) / fundSize;
           const activeCount = updatedBusinesses.filter(b => b.status === 'active').length;
           const totalEbitda = updatedBusinesses.filter(b => b.status === 'active').reduce((s, b) => s + b.ebitda, 0);
@@ -1680,8 +1929,8 @@ export const useGameStore = create<GameStore>()(
             if (prevActiveCount === 0) adjustment -= 10;
           }
 
-          // Management fee shortfall
-          if (state.cash < PE_FUND_CONFIG.annualManagementFee) adjustment -= 8;
+          // Management fee shortfall (reads from state.fundStructure for scenario overrides)
+          if (state.cash < getAnnualMgmtFee(state)) adjustment -= 8;
 
           // Earn-out skipped (if any earnout payments were skipped this round due to cash)
           const skippedEarnouts = updatedBusinesses.some(b =>
@@ -1798,7 +2047,7 @@ export const useGameStore = create<GameStore>()(
             const lastEvent = state.eventHistory[state.eventHistory.length - 1];
             for (const biz of updatedBusinesses.filter(b => b.status === 'active')) {
               const valuation = calculateExitValuation(biz, state.round, lastEvent?.type, undefined, state.integratedPlatforms);
-              let grossEV = biz.ebitda * valuation.totalMultiple * PE_FUND_CONFIG.forcedLiquidationDiscount;
+              let grossEV = biz.ebitda * valuation.totalMultiple * getForcedLiquidationDiscount(state);
 
               // Distress discount for forced sellers
               const bizMetrics = endMetrics; // Use portfolio-level distress
@@ -2074,7 +2323,7 @@ export const useGameStore = create<GameStore>()(
       // Acquire a tuck-in and fold it into an existing platform
       acquireTuckIn: (deal: Deal, structure: DealStructure, targetPlatformId: string) => {
         const state = get();
-        if (state.isBusinessSchoolMode) return; // Blocked in B-School
+        if (isActionBlocked(state, 'acquire_tuck_in').blocked) return;
 
         // Guard: pro sports teams cannot be tuck-ins or tucked into
         if (deal.business.sectorId === 'proSports') return;
@@ -2405,7 +2654,7 @@ export const useGameStore = create<GameStore>()(
       // Merge two owned businesses into one larger platform
       mergeBusinesses: (businessId1: string, businessId2: string, newName: string) => {
         const state = get();
-        if (state.isBusinessSchoolMode) return; // Blocked in B-School
+        if (isActionBlocked(state, 'merge_businesses').blocked) return;
 
         const biz1 = state.businesses.find(b => b.id === businessId1 && b.status === 'active');
         const biz2 = state.businesses.find(b => b.id === businessId2 && b.status === 'active');
@@ -2667,7 +2916,7 @@ export const useGameStore = create<GameStore>()(
       // Designate an existing business as a platform
       designatePlatform: (businessId: string) => {
         const state = get();
-        if (state.isBusinessSchoolMode) return; // Blocked in B-School
+        if (isActionBlocked(state, 'designate_platform').blocked) return;
         const business = state.businesses.find(b => b.id === businessId && b.status === 'active');
         if (!business) {
           useToastStore.getState().addToast({ message: 'Action failed: business no longer available', type: 'warning' });
@@ -3029,7 +3278,7 @@ export const useGameStore = create<GameStore>()(
       issueEquity: (amount: number) => {
         const state = get();
         if (state.isFamilyOfficeMode) return; // No equity raises in FO mode
-        if (state.isFundManagerMode) return; // Fund size fixed; GP can't demand more capital
+        if (isActionBlocked(state, 'issue_equity').blocked) return;
         if (amount <= 0) return;
 
         // Guard: no normal equity raises during restructuring (use emergencyEquityRaise instead)
@@ -3111,9 +3360,8 @@ export const useGameStore = create<GameStore>()(
 
       buybackShares: (amount: number) => {
         const state = get();
-        if (state.isBusinessSchoolMode) return; // Blocked in B-School
+        if (isActionBlocked(state, 'buyback').blocked) return;
         if (state.isFamilyOfficeMode) return; // No buybacks in FO mode
-        if (state.isFundManagerMode) return; // No public shares in fund mode
         if (state.cash < amount) return;
 
         // Block buybacks when no active businesses — prevents sell-all-then-buyback FEV exploit
@@ -3190,7 +3438,7 @@ export const useGameStore = create<GameStore>()(
       distributeToOwners: (amount: number) => {
         const state = get();
         if (state.isFamilyOfficeMode) return; // No distributions in FO mode
-        if (state.isFundManagerMode) return; // Replaced by LP distributions (DPI)
+        if (isActionBlocked(state, 'distribute').blocked) return;
         if (state.cash < amount) return;
 
         // Enforce distress restrictions — covenant breach blocks distributions
@@ -3237,7 +3485,7 @@ export const useGameStore = create<GameStore>()(
 
         const addToast = useToastStore.getState().addToast;
         const newLpDistributions = (state.lpDistributions || 0) + amount;
-        const newDpi = newLpDistributions / (state.fundSize || PE_FUND_CONFIG.fundSize);
+        const newDpi = newLpDistributions / getCommittedCapital(state);
         const dpiMilestones = { ...(state.dpiMilestones || { half: false, full: false }) };
 
         // Check DPI milestones — DPI = distributions / fund size (capital return metric)
@@ -4545,7 +4793,7 @@ export const useGameStore = create<GameStore>()(
 
       executeIPO: () => {
         const state = get();
-        if (state.isBusinessSchoolMode) return; // Blocked in B-School
+        if (isActionBlocked(state, 'ipo').blocked) return;
         if (state.isFamilyOfficeMode) return; // No IPO in FO mode
         const { eligible, reasons } = checkIPOEligibility(state);
         if (!eligible) {
@@ -5831,7 +6079,7 @@ export const useGameStore = create<GameStore>()(
 
       unlockTurnaroundTier: () => {
         const state = get();
-        if (state.isBusinessSchoolMode) return; // Blocked in B-School
+        if (isActionBlocked(state, 'unlock_turnaround_tier').blocked) return;
         if (state.isFamilyOfficeMode) return; // No turnaround unlocks in FO mode
         if (state.phase !== 'allocate') return;
 
@@ -5859,7 +6107,7 @@ export const useGameStore = create<GameStore>()(
 
       startTurnaroundProgram: (businessId: string, programId: string) => {
         const state = get();
-        if (state.isBusinessSchoolMode) return; // Blocked in B-School
+        if (isActionBlocked(state, 'start_turnaround').blocked) return;
         if (state.isFamilyOfficeMode) return; // No turnarounds in FO mode
         if (state.phase !== 'allocate') return;
 
@@ -6109,7 +6357,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v42', // v42: Portfolio Synergies (route density, sub-type spec, cross-sector recipe)
+      name: 'holdco-tycoon-save-v43', // v43: Scenario Challenge mode + PE fundStructure parameterization (Step 1/1.5)
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -6184,6 +6432,7 @@ export const useGameStore = create<GameStore>()(
         isFundManagerMode: state.isFundManagerMode,
         fundName: state.fundName,
         fundSize: state.fundSize,
+        fundStructure: state.fundStructure,
         managementFeesCollected: state.managementFeesCollected,
         lpSatisfactionScore: state.lpSatisfactionScore,
         lpCommentary: state.lpCommentary,
@@ -6191,6 +6440,11 @@ export const useGameStore = create<GameStore>()(
         totalCapitalDeployed: state.totalCapitalDeployed,
         lpDistributions: state.lpDistributions,
         dpiMilestones: state.dpiMilestones,
+        // Scenario Challenge Mode
+        isScenarioChallengeMode: state.isScenarioChallengeMode,
+        scenarioChallengeId: state.scenarioChallengeId,
+        scenarioChallengeConfig: state.scenarioChallengeConfig,
+        isAdminPreview: state.isAdminPreview,
       }),
       // Debounced storage to coalesce rapid mutations (game is turn-based, 500ms delay is safe)
       storage: {
@@ -6282,6 +6536,32 @@ export const useGameStore = create<GameStore>()(
             // Backfill Business School Mode
             if (s.isBusinessSchoolMode === undefined) s.isBusinessSchoolMode = false;
             if (s.businessSchoolState === undefined) s.businessSchoolState = null;
+            // Backfill Scenario Challenge Mode (Step 1)
+            if (s.isScenarioChallengeMode === undefined) s.isScenarioChallengeMode = false;
+            if (s.isAdminPreview === undefined) s.isAdminPreview = false;
+            // Dara M5 (Phase 3C): defensive guard against corrupted saves where
+            // `isScenarioChallengeMode === true` but `scenarioChallengeConfig` is
+            // missing — the GameScreen event bar + engine scenario code paths both
+            // dereference the config and would crash. Reset to non-scenario mode
+            // (same pattern as the PE fundStructure backfill below).
+            if (s.isScenarioChallengeMode === true && !s.scenarioChallengeConfig) {
+              s.isScenarioChallengeMode = false;
+              s.scenarioChallengeId = undefined;
+              s.isAdminPreview = false;
+            }
+            // Backfill PE fundStructure for PE saves that somehow arrive at rehydrate
+            // without one. This is load-bearing (not belt-and-suspenders) for three paths:
+            //   (1) Partial v42→v43 migration failures where the v43 key was written but
+            //       the try/catch swallowed the fundStructure assignment
+            //   (2) Brand-new v43 saves created before startFundManagerMode was updated to
+            //       populate fundStructure (shouldn't happen post-Step-1.5, but guards regression)
+            //   (3) Future first-load on a fresh install that finds a legacy key the
+            //       migration chain didn't handle
+            // The migration + this backfill together guarantee runtime code never hits an
+            // undefined fundStructure when isFundManagerMode === true.
+            if (s.isFundManagerMode === true && !s.fundStructure) {
+              s.fundStructure = getDefaultFundStructure();
+            }
             // Backfill Portfolio Synergies unlock state — retroactively evaluate from earned achievements
             {
               const um = s.unlockedMechanics as { enhancedSubTypeSpec?: boolean; crossSectorSaasServices?: boolean } | undefined;

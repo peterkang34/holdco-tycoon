@@ -120,8 +120,8 @@ import {
   COMPLEXITY_MAX_MARGIN_COMPRESSION,
   COMPLEXITY_COST_EXPONENT,
   COMPLEXITY_COST_EXPONENT_QUICK,
-  PE_FUND_CONFIG,
 } from '../data/gameConfig';
+import { getAnnualMgmtFee } from '../data/fundStructure';
 import { getPlatformMultipleExpansion, getPlatformRecessionModifier } from './platforms';
 import { getTurnaroundExitPremium } from './turnarounds';
 import { getTurnaroundTierAnnualCost, getProgramById } from '../data/turnaroundPrograms';
@@ -2313,8 +2313,9 @@ export function calculateMetrics(state: GameState): Metrics {
   const maSourcingCost = state.maSourcing?.active
     ? getMASourcingAnnualCost(state.maSourcing.tier)
     : 0;
-  // PE Fund management fee (tax-deductible — matches waterfall in useGame.ts)
-  const managementFee = state.isFundManagerMode ? PE_FUND_CONFIG.annualManagementFee : 0;
+  // PE Fund management fee (tax-deductible — matches waterfall in useGame.ts).
+  // Reads from state.fundStructure so scenarios with custom fund economics produce correct fees.
+  const managementFee = state.isFundManagerMode ? getAnnualMgmtFee(state) : 0;
   const totalDeductibleCosts = sharedServicesCost + maSourcingCost + managementFee;
 
   // Holdco loan

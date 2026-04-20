@@ -57,7 +57,7 @@ export function createChain(result: { data?: unknown; error?: unknown; count?: n
   const chain: Record<string, unknown> = {};
 
   // Chainable methods return chain
-  for (const method of ['select', 'eq', 'neq', 'order', 'range', 'limit', 'in', 'gt', 'lt', 'gte', 'lte']) {
+  for (const method of ['select', 'eq', 'neq', 'is', 'order', 'range', 'limit', 'in', 'gt', 'lt', 'gte', 'lte']) {
     chain[method] = vi.fn(() => chain);
   }
 
@@ -68,6 +68,12 @@ export function createChain(result: { data?: unknown; error?: unknown; count?: n
   // Mutation methods return result
   chain.insert = vi.fn(async () => result);
   chain.upsert = vi.fn(async () => result);
+  chain.update = vi.fn(() => {
+    const updateChain: Record<string, unknown> = {};
+    updateChain.eq = vi.fn(async () => result);
+    updateChain.then = (resolve: (v: unknown) => void) => resolve(result);
+    return updateChain;
+  });
   chain.delete = vi.fn(() => {
     const deleteChain: Record<string, unknown> = {};
     deleteChain.eq = vi.fn(async () => result);

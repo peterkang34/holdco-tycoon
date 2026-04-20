@@ -1,12 +1,16 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { kv } from '@vercel/kv';
 import { randomUUID } from 'crypto';
-import { getClientIp, isBodyTooLarge } from '../_lib/rateLimit.js';
+import { isBodyTooLarge } from '../_lib/rateLimit.js';
 import { LEADERBOARD_KEY, DIFFICULTY_MULTIPLIER } from '../_lib/leaderboard.js';
-import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
-import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { updatePlayerStats, updateGlobalStats } from '../_lib/playerStats.js';
 import { validatePlaybook } from '../_lib/playbookValidation.js';
+import {
+  checkSubmitRateLimit,
+  resolvePlayerIdentity,
+  upsertPlayerProfile,
+  writeLeaderboardEntry,
+  upsertGameHistoryRow,
+} from '../_lib/leaderboardCore.js';
 
 const MAX_ENTRIES = 500;
 const RATE_LIMIT_SECONDS = 60;
@@ -42,6 +46,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const body = req.body;
 
+    // --- Scenario isolation guard ---
+    // Scenario completions must go to api/scenario-challenges/submit — never the
+    // global leaderboard (plan Section 4). The client routes correctly via
+    // GameOverScreen.tsx, but defense-in-depth: reject any payload tagged with
+    // scenarioChallengeId. If a scenario ever reaches this endpoint, that's a
+    // client bug worth surfacing loudly.
+    if (typeof body?.scenarioChallengeId === 'string' && body.scenarioChallengeId.length > 0) {
+      return res.status(400).json({ error: 'Scenario submissions must use /api/scenario-challenges/submit' });
+    }
+
     // --- Validation ---
     const {
       holdcoName,
@@ -51,7 +65,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       grade,
       businessCount,
       totalRounds,
-      totalInvestedCapital,
       totalRevenue,
       avgEbitdaMargin,
       difficulty,
@@ -158,16 +171,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
-    // --- Rate Limiting (uses x-real-ip, not spoofable x-forwarded-for) ---
-    const ip = getClientIp(req);
-    const rateLimitKey = `ratelimit:leaderboard:${ip}`;
-
-    const existing = await kv.get(rateLimitKey);
-    if (existing) {
+    // --- Rate Limiting (IP-based, 60s window) ---
+    if (await checkSubmitRateLimit(req, { namespace: 'leaderboard', windowSeconds: RATE_LIMIT_SECONDS })) {
       return res.status(429).json({ error: 'Rate limited. One submission per 60 seconds.' });
     }
-
-    await kv.set(rateLimitKey, '1', { ex: RATE_LIMIT_SECONDS });
 
     // Validate strategy (optional enrichment data)
     let validStrategy = undefined;
@@ -229,77 +236,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const playbookShareId = validPlaybook ? randomUUID().replace(/-/g, '').slice(0, 12) : undefined;
 
     // --- Player Identity (optional — silent if unauthenticated) ---
-    const playerId = await getPlayerIdFromToken(req);
+    const { playerId, verifiedPlayerId } = await resolvePlayerIdentity(req);
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     const claimToken = typeof body?.claimToken === 'string' && UUID_REGEX.test(body.claimToken)
       ? body.claimToken : undefined;
 
-    // Check if player is anonymous — anonymous users don't get verified badge
-    let isAnonymous = true;
-    if (playerId && supabaseAdmin) {
-      try {
-        const { data: { user } } = await supabaseAdmin.auth.admin.getUserById(playerId);
-        isAnonymous = user?.is_anonymous ?? true;
-      } catch { /* treat as anonymous */ }
-    }
-    // Only real (non-anonymous) accounts get playerId on leaderboard entries
-    const verifiedPlayerId = playerId && !isAnonymous ? playerId : undefined;
-
-    // --- Early profile upsert + public_id lookup (needed for KV entry) ---
-    let publicProfileId: string | undefined;
-    let achievementCount: number | undefined;
+    // --- Profile upsert + public_id lookup (needed for KV entry) ---
     const entryDate = new Date().toISOString();
-
-    if (playerId && supabaseAdmin) {
-      // Ensure player_profile exists and sync initials from user-typed input
-      const publicId = randomUUID().replace(/-/g, '').slice(0, 12);
-      try {
-        // Create profile if new (ignoreDuplicates so we don't overwrite public_id)
-        await supabaseAdmin.from('player_profiles').upsert({
-          id: playerId,
-          initials,
-          public_id: publicId,
-          created_at: entryDate,
-          updated_at: entryDate,
-          last_played_at: entryDate,
-        }, { onConflict: 'id', ignoreDuplicates: true });
-
-        // ALWAYS sync initials + last_played_at (the upsert above skips on conflict,
-        // so this separate update ensures user-typed initials override the 'AA' default)
-        await supabaseAdmin.from('player_profiles')
-          .update({ initials, last_played_at: entryDate, updated_at: entryDate })
-          .eq('id', playerId);
-      } catch (err) {
-        console.error('player_profiles upsert failed:', err);
-      }
-
-      // Look up the public_id (may be newly created or existing)
-      // If null (profile created by auto-link/claim before public_id existed), backfill it
-      if (verifiedPlayerId) {
-        try {
-          const { data: profile } = await supabaseAdmin
-            .from('player_profiles')
-            .select('public_id')
-            .eq('id', verifiedPlayerId)
-            .single();
-          if (profile?.public_id) {
-            publicProfileId = profile.public_id;
-          } else {
-            // Backfill: profile exists but public_id is null
-            const newPublicId = randomUUID().replace(/-/g, '').slice(0, 12);
-            await supabaseAdmin.from('player_profiles')
-              .update({ public_id: newPublicId, updated_at: entryDate })
-              .eq('id', verifiedPlayerId);
-            publicProfileId = newPublicId;
-          }
-        } catch { /* best effort */ }
-      }
-
-      // Achievement count from strategy data
-      if (validStrategy && Array.isArray((validStrategy as any).earnedAchievementIds)) {
-        achievementCount = (validStrategy as any).earnedAchievementIds.length;
-      }
-    }
+    const earnedAchievementIds = Array.isArray((validStrategy as any)?.earnedAchievementIds)
+      ? (validStrategy as any).earnedAchievementIds as string[]
+      : undefined;
+    const achievementCount = earnedAchievementIds?.length;
+    const { publicProfileId } = playerId
+      ? await upsertPlayerProfile({ playerId, verifiedPlayerId, initials, entryDate })
+      : { publicProfileId: undefined };
 
     // --- Store Entry ---
     const id = randomUUID();
@@ -347,93 +297,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ...(achievementCount != null ? { achievementCount } : {}),
     };
 
-    // Add to sorted set — PE entries use grossMoic × fundSize as proxy score, holdco uses adjusted FEV
+    // --- Write to KV sorted set + compute rank ---
+    // PE entries use grossMoic × fundSize as proxy score, holdco uses adjusted FEV
     const sortScore = isPE && typeof grossMoic === 'number' ? Math.round(grossMoic * 100000) : adjustedFEV;
-    await kv.zadd(LEADERBOARD_KEY, { score: sortScore, member: JSON.stringify(entry) });
-
-    // Prune to max entries: remove lowest-scoring entries beyond the limit
-    const totalCount = await kv.zcard(LEADERBOARD_KEY);
-    if (totalCount > MAX_ENTRIES) {
-      await kv.zremrangebyrank(LEADERBOARD_KEY, 0, totalCount - MAX_ENTRIES - 1);
-    }
-
-    // Calculate rank (number of entries with higher EV + 1)
-    const ascRank = await kv.zrank(LEADERBOARD_KEY, JSON.stringify(entry));
-    const currentCount = await kv.zcard(LEADERBOARD_KEY);
-    const rank = ascRank !== null ? currentCount - ascRank : 1;
+    const entryJson = JSON.stringify(entry);
+    const { rank } = await writeLeaderboardEntry({
+      kvKey: LEADERBOARD_KEY,
+      entryJson,
+      sortScore,
+      maxEntries: MAX_ENTRIES,
+    });
 
     // --- Dual-write to Postgres (game_history + stats) ---
-    if (playerId && supabaseAdmin) {
-      // Check if auto-save already created a row for this game (match by player + score + grade + difficulty + no leaderboard yet)
-      let existingRowId: string | null = null;
-      try {
-        const { data: existing } = await supabaseAdmin
-          .from('game_history')
-          .select('id')
-          .eq('player_id', playerId)
-          .eq('score', score)
-          .eq('grade', grade)
-          .eq('difficulty', validDifficulty)
-          .is('leaderboard_entry_id', null)
-          .order('completed_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        existingRowId = existing?.id ?? null;
-      } catch { /* proceed to insert */ }
-
-      try {
-        if (existingRowId) {
-          // Auto-save row exists — enrich it with leaderboard data
-          await supabaseAdmin.from('game_history')
-            .update({
-              leaderboard_entry_id: id,
-              initials,
-              holdco_name: holdcoName.trim(),
-              ...(validPlaybook ? { playbook: validPlaybook } : {}),
-              ...(playbookShareId ? { playbook_share_id: playbookShareId } : {}),
-            })
-            .eq('id', existingRowId);
-        } else {
-          // No auto-save row — insert fresh (original behavior)
-          await supabaseAdmin.from('game_history').insert({
-            player_id: playerId,
-            holdco_name: holdcoName.trim(),
-            initials,
-            difficulty: validDifficulty,
-            duration: validDuration,
-            enterprise_value: Math.round(enterpriseValue),
-            founder_equity_value: validFEV,
-            founder_personal_wealth: validPersonalWealth,
-            adjusted_fev: adjustedFEV,
-            score,
-            grade,
-            submitted_multiplier: multiplier,
-            business_count: businessCount,
-            total_revenue: typeof totalRevenue === 'number' ? Math.round(totalRevenue) : null,
-            avg_ebitda_margin: typeof avgEbitdaMargin === 'number' ? Math.round(avgEbitdaMargin * 1000) / 1000 : null,
-            has_restructured: hasRestructured === true,
-            family_office_completed: familyOfficeCompleted === true,
-            legacy_grade: typeof legacyGrade === 'string' && ['Enduring','Influential','Established','Fragile'].includes(legacyGrade) ? legacyGrade : null,
-            fo_multiplier: validFoMultiplier,
-            strategy: validStrategy || null,
-            ...(validStrategy?.scoreBreakdown ? {
-              score_value_creation: validStrategy.scoreBreakdown.valueCreation,
-              score_fcf_share_growth: validStrategy.scoreBreakdown.fcfShareGrowth,
-              score_portfolio_roic: validStrategy.scoreBreakdown.portfolioRoic,
-              score_capital_deployment: validStrategy.scoreBreakdown.capitalDeployment,
-              score_balance_sheet: validStrategy.scoreBreakdown.balanceSheetHealth,
-              score_strategic_discipline: validStrategy.scoreBreakdown.strategicDiscipline,
-            } : {}),
-            leaderboard_entry_id: id,
-            completed_at: entryDate,
-            // Operator's Playbook
-            ...(validPlaybook ? { playbook: validPlaybook } : {}),
-            ...(playbookShareId ? { playbook_share_id: playbookShareId } : {}),
-          });
-        }
-      } catch (err) {
-        console.error('game_history insert/update failed:', err);
-      }
+    if (playerId) {
+      await upsertGameHistoryRow({
+        playerId,
+        match: {
+          score,
+          grade,
+          difficulty: validDifficulty,
+        },
+        enrichFields: {
+          leaderboard_entry_id: id,
+          initials,
+          holdco_name: holdcoName.trim(),
+          ...(validPlaybook ? { playbook: validPlaybook } : {}),
+          ...(playbookShareId ? { playbook_share_id: playbookShareId } : {}),
+        },
+        insertRow: {
+          player_id: playerId,
+          holdco_name: holdcoName.trim(),
+          initials,
+          difficulty: validDifficulty,
+          duration: validDuration,
+          enterprise_value: Math.round(enterpriseValue),
+          founder_equity_value: validFEV,
+          founder_personal_wealth: validPersonalWealth,
+          adjusted_fev: adjustedFEV,
+          score,
+          grade,
+          submitted_multiplier: multiplier,
+          business_count: businessCount,
+          total_revenue: typeof totalRevenue === 'number' ? Math.round(totalRevenue) : null,
+          avg_ebitda_margin: typeof avgEbitdaMargin === 'number' ? Math.round(avgEbitdaMargin * 1000) / 1000 : null,
+          has_restructured: hasRestructured === true,
+          family_office_completed: familyOfficeCompleted === true,
+          legacy_grade: typeof legacyGrade === 'string' && ['Enduring','Influential','Established','Fragile'].includes(legacyGrade) ? legacyGrade : null,
+          fo_multiplier: validFoMultiplier,
+          strategy: validStrategy || null,
+          ...(validStrategy?.scoreBreakdown ? {
+            score_value_creation: validStrategy.scoreBreakdown.valueCreation,
+            score_fcf_share_growth: validStrategy.scoreBreakdown.fcfShareGrowth,
+            score_portfolio_roic: validStrategy.scoreBreakdown.portfolioRoic,
+            score_capital_deployment: validStrategy.scoreBreakdown.capitalDeployment,
+            score_balance_sheet: validStrategy.scoreBreakdown.balanceSheetHealth,
+            score_strategic_discipline: validStrategy.scoreBreakdown.strategicDiscipline,
+          } : {}),
+          leaderboard_entry_id: id,
+          completed_at: entryDate,
+          ...(validPlaybook ? { playbook: validPlaybook } : {}),
+          ...(playbookShareId ? { playbook_share_id: playbookShareId } : {}),
+        },
+      });
 
       // Update pre-computed stats (non-blocking)
       updatePlayerStats(playerId).catch(console.error);

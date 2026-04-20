@@ -99,6 +99,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const difficulty = typeof body.difficulty === 'string' && (VALID_DIFFICULTIES as readonly string[]).includes(body.difficulty) ? body.difficulty : 'easy';
     const duration = typeof body.duration === 'string' && (VALID_DURATIONS as readonly string[]).includes(body.duration) ? body.duration : 'standard';
 
+    // Scenario Challenge tagging + accept 3-30 rounds when tagged.
+    const scenarioChallengeId = typeof body.scenarioChallengeId === 'string' && body.scenarioChallengeId.length <= 60
+      ? body.scenarioChallengeId : null;
+    const rawTotalRounds = body.totalRounds;
+    const totalRounds = typeof rawTotalRounds === 'number' && Number.isInteger(rawTotalRounds)
+      && rawTotalRounds >= 3 && rawTotalRounds <= 30
+      ? rawTotalRounds
+      : 20; // legacy fallback for malformed clients — behavior unchanged for non-scenario submissions
+
     // --- Origin check ---
     const origin = req.headers.origin || req.headers.referer || '';
     if (origin && !origin.includes('holdcoguide.com') && !origin.includes('localhost') && !origin.includes('vercel.app')) {
@@ -139,8 +148,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       businessCount: typeof body.businessCount === 'number' ? Math.min(30, Math.max(0, Math.round(body.businessCount))) : 0,
       difficulty,
       duration,
-      totalRounds: body.totalRounds === 10 || body.totalRounds === 20 ? body.totalRounds : 20,
+      totalRounds,
       hasRestructured: body.hasRestructured === true ? true : undefined,
+      // Scenario Challenge tagging
+      ...(scenarioChallengeId ? { scenarioChallengeId } : {}),
+      ...(body.isAdminPreview === true ? { isAdminPreview: true } : {}),
       date: new Date().toISOString(),
       // PE Fund
       ...(isPE ? {

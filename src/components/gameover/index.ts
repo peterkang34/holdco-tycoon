@@ -5,6 +5,7 @@ export { FEVHeroSection } from './FEVHeroSection';
 export { CarryHeroSection } from './CarryHeroSection';
 export { CarryWaterfallSection } from './CarryWaterfallSection';
 export { LeaderboardSaveInput } from './LeaderboardSaveInput';
+export { ScenarioChallengeResultSection } from './ScenarioChallengeResultSection';
 export { ChallengeShareSection } from './ChallengeShareSection';
 export { PortfolioSummary } from './PortfolioSummary';
 export { ProfileAchievementSection } from './ProfileAchievementSection';

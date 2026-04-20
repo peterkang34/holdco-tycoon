@@ -424,8 +424,8 @@ describe('runAllMigrations', () => {
 
     // v9 should be consumed
     expect(localStorageMock.getItem('holdco-tycoon-save-v9')).toBeNull();
-    // Final v42 should exist (chain goes through all migrations including v41→v42)
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v42')!);
+    // Final v43 should exist (chain goes through all migrations including v42→v43)
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v43')!);
     expect(result.state.difficulty).toBe('easy');
     expect(result.state.maxRounds).toBe(20);
     expect(result.state.founderDistributionsReceived).toBeDefined();
@@ -491,6 +491,51 @@ describe('runAllMigrations', () => {
     expect(result.state.businesses[0].qualityImprovedTiers).toBe(0);
     // v41→v42 fields (Portfolio Synergies)
     expect(result.state.unlockedMechanics).toEqual({ enhancedSubTypeSpec: false, crossSectorSaasServices: false });
+    // v42→v43 fields (Scenario Challenge + PE fundStructure parameterization)
+    expect(result.state.isScenarioChallengeMode).toBe(false);
+    expect(result.state.isAdminPreview).toBe(false);
+    // fundStructure is only backfilled for PE Fund Manager saves — this fixture is holdco, so stays unset
+    expect(result.state.fundStructure).toBeUndefined();
+  });
+
+  it('v42→v43 backfills fundStructure for PE Fund Manager saves only', () => {
+    const v42PEData = {
+      state: {
+        isFundManagerMode: true,
+        fundSize: 100_000,
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v42', JSON.stringify(v42PEData));
+
+    runAllMigrations();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v43')!);
+    expect(result.state.fundStructure).toEqual({
+      committedCapital: 100_000,
+      mgmtFeePercent: 0.02,
+      hurdleRate: 0.08,
+      carryRate: 0.20,
+      forcedLiquidationYear: 10,
+      forcedLiquidationDiscount: 0.90,
+    });
+    expect(result.state.isScenarioChallengeMode).toBe(false);
+  });
+
+  it('v42→v43 leaves fundStructure unset for non-PE saves', () => {
+    const v42HoldcoData = {
+      state: {
+        isFundManagerMode: false,
+        difficulty: 'easy',
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v42', JSON.stringify(v42HoldcoData));
+
+    runAllMigrations();
+
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v43')!);
+    expect(result.state.fundStructure).toBeUndefined();
+    expect(result.state.isScenarioChallengeMode).toBe(false);
+    expect(result.state.isAdminPreview).toBe(false);
   });
 
   it('should be safe to call multiple times (idempotent)', () => {

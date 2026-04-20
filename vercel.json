@@ -1,5 +1,8 @@
 {
-  "crons": [{ "path": "/api/cron/cleanup-anonymous", "schedule": "0 3 1 * *" }],
+  "crons": [
+    { "path": "/api/cron/cleanup-anonymous", "schedule": "0 3 1 * *" },
+    { "path": "/api/cron/scenario-archive-snapshot", "schedule": "0 4 * * 0" }
+  ],
   "ignoreCommand": "git diff --quiet HEAD^ HEAD -- src/ api/ index.html package.json package-lock.json vite.config.ts tsconfig.json tsconfig.app.json tsconfig.node.json vercel.json",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",

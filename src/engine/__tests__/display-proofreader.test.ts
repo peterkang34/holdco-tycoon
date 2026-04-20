@@ -2582,4 +2582,57 @@ describe('Display Proofreader', () => {
       expect(COMPLEXITY_MAX_MARGIN_COMPRESSION).toBe(0.04);
     });
   });
+
+  // ══════════════════════════════════════════════════════════════════
+  // SCENARIO CHALLENGES
+  // Per plan §11: scenario badge + label copy must be centralized in
+  // mechanicsCopy.ts so home banner / event bar / modal tab / result
+  // section / Scenarios tab all render consistent strings.
+  // ══════════════════════════════════════════════════════════════════
+
+  describe('Scenario Challenges', () => {
+    it('PREVIEW badge text consistent across GameScreen + ScenarioChallengeResultSection', () => {
+      const gameScreen = readComponent('components/screens/GameScreen.tsx');
+      const resultSection = readComponent('components/gameover/ScenarioChallengeResultSection.tsx');
+      // Both must show the literal "PREVIEW" label when rendering the admin badge.
+      expect(gameScreen).toContain('PREVIEW');
+      expect(resultSection).toContain('PREVIEW');
+    });
+
+    it('ARCHIVED badge text consistent across LeaderboardModal + ScenarioChallengeResultSection', () => {
+      const modal = readComponent('components/ui/LeaderboardModal.tsx');
+      const resultSection = readComponent('components/gameover/ScenarioChallengeResultSection.tsx');
+      expect(modal).toContain('ARCHIVED');
+      expect(resultSection).toContain('ARCHIVED');
+    });
+
+    it('Scenarios tab label + mobile label match mechanicsCopy values', () => {
+      // Tab labels are hardcoded in the TABS array — this ensures the ALL_TABS values
+      // still match the centralized copy. If someone renames the tab, update both.
+      const modal = readComponent('components/ui/LeaderboardModal.tsx');
+      expect(modal).toContain(`'Scenarios'`); // SCENARIO_TAB_COPY.label
+      expect(modal).toContain(`'SC'`);        // SCENARIO_TAB_COPY.mobileLabel
+    });
+
+    it('ranking metric labels agree between client helper and centralized copy', () => {
+      // scenarioLeaderboard.ts pulls labels from SCENARIO_RANKING_METRIC_LABELS; if
+      // this test fails, the import was replaced with hardcoded strings.
+      const service = readComponent('services/scenarioLeaderboard.ts');
+      expect(service).toContain('SCENARIO_RANKING_METRIC_LABELS');
+      // Unit tests in services/scenarioLeaderboard.test.ts pin the display shape
+      // (e.g., "MOIC" → "2.50x") — this scan just guards against drift from the copy source.
+    });
+
+    it('submit/preview/closed banner text present in ScenarioChallengeResultSection', () => {
+      const resultSection = readComponent('components/gameover/ScenarioChallengeResultSection.tsx');
+      expect(resultSection).toContain('Saved to scenario leaderboard!');
+      expect(resultSection).toContain('Preview run — not submitted');
+      expect(resultSection).toContain('Submissions closed');
+    });
+
+    it('scenario tab subtitle matches centralized copy', () => {
+      const modal = readComponent('components/ui/LeaderboardModal.tsx');
+      expect(modal).toContain('Themed, time-limited challenges with standalone leaderboards');
+    });
+  });
 });

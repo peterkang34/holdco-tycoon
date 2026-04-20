@@ -22,6 +22,9 @@ vi.mock('@vercel/kv', () => ({
     zadd: vi.fn(),
     zrange: vi.fn(),
     zrem: vi.fn(),
+    zcard: vi.fn(),
+    zrank: vi.fn(),
+    zremrangebyrank: vi.fn(),
     ping: vi.fn(),
   },
 }));
@@ -89,6 +92,9 @@ beforeEach(() => {
   vi.mocked(kv.zadd).mockResolvedValue(0 as never);
   vi.mocked(kv.zrange).mockResolvedValue([] as never);
   vi.mocked(kv.zrem).mockResolvedValue(0 as never);
+  vi.mocked((kv as any).zcard).mockResolvedValue(0);
+  vi.mocked((kv as any).zrank).mockResolvedValue(0);
+  vi.mocked((kv as any).zremrangebyrank).mockResolvedValue(0);
   vi.mocked((kv as any).ping).mockResolvedValue('PONG');
 
   // Supabase auth — default: no user

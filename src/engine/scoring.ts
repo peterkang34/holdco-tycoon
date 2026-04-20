@@ -13,6 +13,7 @@ import { calculateMetrics, calculateSectorFocusBonus, calculateExitValuation } f
 import { POST_GAME_INSIGHTS } from '../data/tips';
 import { getAllDedupedBusinesses } from './helpers';
 import { RESTRUCTURING_FEV_PENALTY, PE_FUND_CONFIG, PE_IRR_CARRY_TIERS, PE_GRADE_THRESHOLDS, PE_GRADE_TITLES } from '../data/gameConfig';
+import { getAnnualMgmtFee, getCarryRate, getCommittedCapital, getHurdleReturn } from '../data/fundStructure';
 import { calculatePublicCompanyBonus } from './ipo';
 
 const LEADERBOARD_KEY = 'holdco-tycoon-leaderboard';
@@ -135,12 +136,22 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
   const allBusinesses = getAllDedupedBusinesses(state.businesses, state.exitedBusinesses);
   const maxRounds = state.maxRounds || 20;
 
+  // Scenario Challenge grade scaling: scenarios can have any `maxRounds` (3-30), so the
+  // binary Standard/Quick thresholds below would miscalibrate. For scenarios, scale the
+  // 20-year target proportionally by `maxRounds / 20`. A 10-round scenario gets the
+  // half-length target; a 15-round gets 75%. Non-scenario games keep the binary 10/20
+  // behavior — behavior-preserving for PE Fund Manager and holdco modes.
+  const isScenario = state.isScenarioChallengeMode === true;
+  const durationScale = isScenario ? maxRounds / 20 : 1;
+
   // 1. Value Creation (20 points max) — FEV / initial raise
   let valueCreation = 0;
   if (state.initialRaiseAmount > 0) {
     const fev = calculateFounderEquityValue(state);
     const fevMultiple = fev / state.initialRaiseAmount;
-    const target = maxRounds >= 20 ? 10 : 5; // 10x for 20yr, 5x for 10yr
+    const target = isScenario
+      ? 10 * durationScale          // proportional target for scenarios
+      : (maxRounds >= 20 ? 10 : 5); // legacy binary branch for global modes
     if (fevMultiple >= target) {
       valueCreation = 20;
     } else if (fevMultiple >= target / 2) {
@@ -155,7 +166,9 @@ export function calculateFinalScore(state: GameState): ScoreBreakdown {
 
   // 2. FCF/Share Growth (20 points max)
   let fcfShareGrowth = 0;
-  const fcfGrowthTarget = maxRounds >= 20 ? 4.0 : 2.0; // 400% for 20yr, 200% for 10yr
+  const fcfGrowthTarget = isScenario
+    ? 4.0 * durationScale           // proportional target for scenarios (20 rounds = 400%)
+    : (maxRounds >= 20 ? 4.0 : 2.0); // legacy binary branch for global modes
   if (state.metricsHistory.length > 1) {
     const startFcfPerShare = state.metricsHistory[0]?.metrics.fcfPerShare ?? 0;
     const endFcfPerShare = metrics.fcfPerShare;
@@ -389,7 +402,7 @@ export function generatePostGameInsights(state: GameState): PostGameInsight[] {
 
   // PE Fund Mode: separate insight path
   if (state.isFundManagerMode) {
-    const fundSize = state.fundSize || 100000;
+    const fundSize = getCommittedCapital(state);
     const dpi = fundSize > 0 ? (state.lpDistributions || 0) / fundSize : 0;
     const totalDeployed = state.totalCapitalDeployed || 0;
     const deployPct = fundSize > 0 ? totalDeployed / fundSize : 0;
@@ -399,10 +412,12 @@ export function generatePostGameInsights(state: GameState): PostGameInsight[] {
       const dealValue = b.acquisitionPrice + (b.bankDebtBalance || 0);
       return totalDeployed > 0 && dealValue / totalDeployed > 0.40;
     });
-    // Hurdle: $100M * 1.08^10 ≈ $216M → need ~$116M above cost basis
+    // Hurdle target computed from fund structure — scenarios with custom hurdleRate
+    // or maxRounds produce the right threshold (e.g., high_performer = 10% hurdle
+    // over state.maxRounds years).
     const nav = calculateEnterpriseValue(state);
     const totalValue = nav + (state.lpDistributions || 0);
-    const hurdleTarget = fundSize * Math.pow(1.08, 10);
+    const hurdleTarget = getHurdleReturn(state);
     const missedHurdleNarrowly = totalValue < hurdleTarget && totalValue >= hurdleTarget - 10000;
 
     if (dpi === 0 && allBusinesses.length > 0) insights.push(POST_GAME_INSIGHTS.pe_never_distributed);
@@ -773,16 +788,21 @@ export function calculateIRR(cashFlows: { round: number; amount: number }[]): nu
  * Assumes all businesses have been liquidated — portfolio = 0, debt = 0.
  */
 export function calculateCarryWaterfall(state: GameState): CarryWaterfall {
-  const fundSize = state.fundSize || PE_FUND_CONFIG.fundSize;
+  const fundSize = getCommittedCapital(state);
+  const fundYears = state.maxRounds || 10;
   const lpDistributed = state.lpDistributions || 0;
 
   // At game end, all businesses liquidated, portfolio = 0, debt = 0
   const grossTotalReturns = lpDistributed + state.cash;
 
+  // Hurdle return is computed from fund economics (committed capital × (1 + hurdleRate)^years)
+  // so scenarios with custom hurdleRate/committedCapital produce correct hurdle targets.
+  const hurdleAmount = getHurdleReturn(state);
+
   // Base carry calculation (before IRR multiplier)
-  const carryRate = PE_FUND_CONFIG.carryRate;
-  const baseCarry = grossTotalReturns > PE_FUND_CONFIG.hurdleReturn
-    ? (grossTotalReturns - PE_FUND_CONFIG.hurdleReturn) * carryRate
+  const carryRate = getCarryRate(state);
+  const baseCarry = grossTotalReturns > hurdleAmount
+    ? (grossTotalReturns - hurdleAmount) * carryRate
     : 0;
 
   // Two-pass approach: compute base net IRR using base carry
@@ -790,7 +810,7 @@ export function calculateCarryWaterfall(state: GameState): CarryWaterfall {
   const baseIrrFlows: { round: number; amount: number }[] = [
     { round: 0, amount: -fundSize },
     ...(state.fundCashFlows || []),
-    { round: 10, amount: baseNetTerminal },
+    { round: fundYears, amount: baseNetTerminal },
   ];
   const baseNetIrr = calculateIRR(baseIrrFlows);
 
@@ -811,20 +831,21 @@ export function calculateCarryWaterfall(state: GameState): CarryWaterfall {
   const irrCashFlows: { round: number; amount: number }[] = [
     { round: 0, amount: -fundSize },
     ...(state.fundCashFlows || []),
-    { round: 10, amount: netTerminalValue },
+    { round: fundYears, amount: netTerminalValue },
   ];
   const netIrr = calculateIRR(irrCashFlows);
 
-  // Management fees: annual fee × 10 rounds
-  const managementFees = PE_FUND_CONFIG.annualManagementFee * 10;
+  // Management fees: annual fee × fund years (defaults to maxRounds = 10 for Fund Manager mode).
+  // Scenarios with custom maxRounds / mgmtFeePercent produce the right total.
+  const managementFees = getAnnualMgmtFee(state) * fundYears;
   const totalGpEconomics = carry + managementFees;
 
   return {
     grossTotalReturns,
     returnOfCapital: fundSize,
-    hurdleAmount: PE_FUND_CONFIG.hurdleReturn,
-    hurdleCleared: grossTotalReturns > PE_FUND_CONFIG.hurdleReturn,
-    aboveHurdle: Math.max(0, grossTotalReturns - PE_FUND_CONFIG.hurdleReturn),
+    hurdleAmount,
+    hurdleCleared: grossTotalReturns > hurdleAmount,
+    aboveHurdle: Math.max(0, grossTotalReturns - hurdleAmount),
     carry,
     baseCarry,
     irrMultiplier,
@@ -914,7 +935,7 @@ export function calculatePEFundScore(state: GameState): PEScoreBreakdown {
   // ── 4. Deployment Discipline (15 pts) — Pacing (10) + Harvest (5) ──
   let deploymentDiscipline = 0;
   const totalCapitalDeployed = state.totalCapitalDeployed || 0;
-  const fundSize = state.fundSize || PE_FUND_CONFIG.fundSize;
+  const fundSize = getCommittedCapital(state);
 
   if (totalCapitalDeployed > 0) {
     // Pacing sub-component (10 pts): % deployed by Year 5

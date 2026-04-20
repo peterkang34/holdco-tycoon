@@ -1,5 +1,6 @@
+import type React from 'react';
 import { Fragment, useEffect, useMemo, useState } from 'react';
-import { LeaderboardEntry, GameDifficulty, GameDuration, formatMoney } from '../../engine/types';
+import { LeaderboardEntry, GameDifficulty, GameDuration, formatMoney, RankingMetric } from '../../engine/types';
 import { loadLeaderboard } from '../../engine/scoring';
 import { getGradeColor, getRankColor } from '../../utils/gradeColors';
 import { Modal } from './Modal';
@@ -7,8 +8,16 @@ import { RESTRUCTURING_FEV_PENALTY } from '../../data/gameConfig';
 import { useAuthStore } from '../../hooks/useAuth';
 import { ACHIEVEMENT_PREVIEW } from '../../data/achievementPreview';
 import { ProfileModal } from './ProfileModal';
+import {
+  fetchScenarioList,
+  fetchScenarioLeaderboard,
+  formatRankingMetric,
+  type ScenarioListSummary,
+  type ScenarioLeaderboardEntry,
+} from '../../services/scenarioLeaderboard';
+import { isScenarioChallengesPlayerFacingEnabled } from '../../utils/featureFlags';
 
-type LeaderboardTab = 'overall' | 'hard20' | 'hard10' | 'easy20' | 'easy10' | 'distributions' | 'pe';
+type LeaderboardTab = 'overall' | 'hard20' | 'hard10' | 'easy20' | 'easy10' | 'distributions' | 'pe' | 'scenarios';
 
 interface TabDef {
   id: LeaderboardTab;
@@ -16,7 +25,7 @@ interface TabDef {
   mobileLabel: string;
 }
 
-const TABS: TabDef[] = [
+const ALL_TABS: TabDef[] = [
   { id: 'overall', label: 'Overall', mobileLabel: 'All' },
   { id: 'hard20', label: 'Hard / 20yr', mobileLabel: 'H/20' },
   { id: 'hard10', label: 'Hard / 10yr', mobileLabel: 'H/10' },
@@ -24,7 +33,14 @@ const TABS: TabDef[] = [
   { id: 'easy10', label: 'Easy / 10yr', mobileLabel: 'E/10' },
   { id: 'distributions', label: 'Distributions', mobileLabel: 'Dist' },
   { id: 'pe', label: 'PE Fund', mobileLabel: 'PE' },
+  { id: 'scenarios', label: 'Scenarios', mobileLabel: 'SC' },
 ];
+
+// Scenarios tab is feature-flagged (plan §12). Hidden in the tab bar when flag off,
+// but we keep it in `ALL_TABS` for type exhaustiveness; `TABS` is the render set.
+const TABS: TabDef[] = isScenarioChallengesPlayerFacingEnabled()
+  ? ALL_TABS
+  : ALL_TABS.filter(t => t.id !== 'scenarios');
 
 const TAB_DISPLAY_CAP = 50;
 
@@ -35,6 +51,10 @@ interface LeaderboardModalProps {
   hypotheticalWealth?: number;
   currentDifficulty?: GameDifficulty;
   currentDuration?: GameDuration;
+  /** Deep-link: open on a specific tab. */
+  initialTab?: LeaderboardTab;
+  /** Deep-link: when initialTab==='scenarios', focus this scenario's leaderboard. */
+  initialScenarioId?: string | null;
 }
 
 function formatDate(dateStr: string) {
@@ -97,6 +117,10 @@ function filterAndSort(entries: LeaderboardEntry[], tab: LeaderboardTab): Leader
       filtered = [...peEntries];
       filtered.sort((a, b) => (b.carryEarned ?? 0) - (a.carryEarned ?? 0));
       break;
+    case 'scenarios':
+      // Scenarios have their own endpoint + panel; never surface global entries here.
+      filtered = [];
+      break;
   }
 
   return filtered.slice(0, TAB_DISPLAY_CAP);
@@ -146,6 +170,8 @@ function getGhostValue(
       return hypotheticalWealth && hypotheticalWealth > 0 ? hypotheticalWealth : -1;
     case 'pe':
       return -1; // No ghost row for PE tab (PE games always end before viewing leaderboard mid-game)
+    case 'scenarios':
+      return -1; // No ghost row — scenarios tab uses a separate panel.
   }
 }
 
@@ -156,13 +182,45 @@ export function LeaderboardModal({
   hypotheticalWealth,
   currentDifficulty,
   currentDuration,
+  initialTab,
+  initialScenarioId,
 }: LeaderboardModalProps) {
   const [allEntries, setAllEntries] = useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
-  const [activeTab, setActiveTab] = useState<LeaderboardTab>('overall');
+  // Defense-in-depth: if flag flips off while a deep-link URL is cached, fall back to 'overall'.
+  const resolvedInitialTab: LeaderboardTab = initialTab === 'scenarios' && !isScenarioChallengesPlayerFacingEnabled()
+    ? 'overall'
+    : (initialTab ?? 'overall');
+  const [activeTab, setActiveTab] = useState<LeaderboardTab>(resolvedInitialTab);
   const [profileId, setProfileId] = useState<string | null>(null);
   const [showProfile, setShowProfile] = useState(false);
+
+  // Scenarios-tab state lifted here (Dara H2) so tab flips don't refetch
+  // `/api/scenario-challenges/list` — the list changes only on admin activity,
+  // which is rare within a single modal session. Selected scenario also persists
+  // so back-button lands on the previously-seen browse view instead of losing
+  // scroll position.
+  const [scenariosList, setScenariosList] = useState<{ active: ScenarioListSummary[]; archived: ScenarioListSummary[] } | null>(null);
+  const [scenariosListLoading, setScenariosListLoading] = useState(false);
+  const [scenariosListError, setScenariosListError] = useState(false);
+  const [scenariosListLoaded, setScenariosListLoaded] = useState(false);
+  const [selectedScenarioId, setSelectedScenarioId] = useState<string | null>(initialScenarioId ?? null);
+
+  const loadScenariosList = () => {
+    setScenariosListLoading(true);
+    setScenariosListError(false);
+    fetchScenarioList()
+      .then(res => {
+        setScenariosList(res);
+        setScenariosListLoading(false);
+        setScenariosListLoaded(true);
+      })
+      .catch(() => {
+        setScenariosListError(true);
+        setScenariosListLoading(false);
+      });
+  };
 
   const fetchLeaderboard = () => {
     setLoading(true);
@@ -179,8 +237,31 @@ export function LeaderboardModal({
   };
 
   useEffect(() => {
-    fetchLeaderboard();
+    // Skip global fetch when opening directly on the scenarios tab — saves a round-trip.
+    // Browsing the scenarios tab and later flipping to a global tab triggers the effect only if
+    // it hadn't loaded yet, so we lazy-fetch instead.
+    if (activeTab === 'scenarios') {
+      // Opened directly on scenarios tab — kick off list load. List lives in LeaderboardModal
+      // state so switching tabs back and forth doesn't refetch (Dara H2).
+      loadScenariosList();
+    } else {
+      fetchLeaderboard();
+    }
+    // Intentional: we only need to guard the INITIAL fetch; subsequent tab swaps reuse cache.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Lazy-load global entries if the user arrives on scenarios then clicks a global tab.
+  useEffect(() => {
+    if (activeTab !== 'scenarios' && allEntries.length === 0 && !loading && !error) {
+      fetchLeaderboard();
+    }
+    // Lazy-load scenarios list the first time scenarios tab becomes active.
+    if (activeTab === 'scenarios' && !scenariosListLoaded && !scenariosListLoading) {
+      loadScenariosList();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
 
   const filtered = useMemo(() => filterAndSort(allEntries, activeTab), [allEntries, activeTab]);
 
@@ -221,6 +302,8 @@ export function LeaderboardModal({
     ? 'Ranked by founder distributions received'
     : activeTab === 'pe'
     ? 'PE Fund Manager runs ranked by carried interest earned'
+    : activeTab === 'scenarios'
+    ? 'Themed, time-limited challenges with standalone leaderboards'
     : 'Ranked by adjusted FEV within mode';
 
   return (
@@ -230,7 +313,11 @@ export function LeaderboardModal({
       header={
         <>
           <h3 className="text-xl font-bold flex items-center gap-2">
-            <span>🌍</span> Global Leaderboard
+            {activeTab === 'scenarios' ? (
+              <><span>🎯</span> Scenario Challenges</>
+            ) : (
+              <><span>🌍</span> Global Leaderboard</>
+            )}
           </h3>
           <p className="text-text-muted text-sm">{tabSubtitle}</p>
         </>
@@ -255,7 +342,19 @@ export function LeaderboardModal({
         ))}
       </div>
 
-      {loading && (
+      {activeTab === 'scenarios' ? (
+        <ScenariosPanel
+          list={scenariosList}
+          listLoading={scenariosListLoading}
+          listError={scenariosListError}
+          onRetryList={loadScenariosList}
+          selectedScenarioId={selectedScenarioId}
+          onSelectScenario={setSelectedScenarioId}
+          onProfileClick={handleProfileClick}
+        />
+      ) : null}
+
+      {activeTab !== 'scenarios' && loading && (
         <div className="space-y-2 min-h-[300px] sm:min-h-[400px]">
           {[...Array(8)].map((_, i) => (
             <div key={i} className="h-14 bg-white/5 rounded-lg animate-pulse" />
@@ -263,7 +362,7 @@ export function LeaderboardModal({
         </div>
       )}
 
-      {error && (
+      {activeTab !== 'scenarios' && error && (
         <div className="card text-center text-text-muted py-8 min-h-[300px] sm:min-h-[400px] flex flex-col items-center justify-center">
           <p>Failed to load leaderboard.</p>
           <button onClick={fetchLeaderboard} className="btn-secondary text-sm mt-3">
@@ -272,14 +371,14 @@ export function LeaderboardModal({
         </div>
       )}
 
-      {!loading && !error && filtered.length === 0 && ghostRank === -1 ? (
+      {activeTab !== 'scenarios' && !loading && !error && filtered.length === 0 && ghostRank === -1 ? (
         <div className="card text-center text-text-muted py-8 min-h-[300px] sm:min-h-[400px] flex flex-col items-center justify-center">
           <p>No scores yet{activeTab !== 'overall' ? ' in this category' : ''}.</p>
           <p className="text-sm mt-2">Complete a game to set your first record.</p>
         </div>
       ) : null}
 
-      {!loading && !error && (filtered.length > 0 || ghostRank !== -1) && (
+      {activeTab !== 'scenarios' && !loading && !error && (filtered.length > 0 || ghostRank !== -1) && (
         <div className="space-y-2 min-h-[300px] sm:min-h-[400px]">
           {filtered.map((entry, index) => (
             <Fragment key={entry.id}>
@@ -408,6 +507,305 @@ function GhostRow({ rank, value, label }: { rank: number; value: number; label: 
         <div className="min-w-[3.5rem]" />
         <div className="w-8" />
         <div className="w-20 hidden sm:block" />
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════════════════════════════════════════════
+// Scenarios tab — two sub-views: browse (active+archived) / detail
+// ════════════════════════════════════════════════════════════════
+
+interface ScenariosPanelProps {
+  list: { active: ScenarioListSummary[]; archived: ScenarioListSummary[] } | null;
+  listLoading: boolean;
+  listError: boolean;
+  onRetryList: () => void;
+  selectedScenarioId: string | null;
+  onSelectScenario: (id: string | null) => void;
+  onProfileClick: (pubId: string) => void;
+}
+
+function ScenariosPanel({
+  list,
+  listLoading,
+  listError,
+  onRetryList,
+  selectedScenarioId,
+  onSelectScenario,
+  onProfileClick,
+}: ScenariosPanelProps) {
+  if (selectedScenarioId) {
+    return (
+      <ScenarioDetail
+        scenarioId={selectedScenarioId}
+        onBack={() => onSelectScenario(null)}
+        onProfileClick={onProfileClick}
+      />
+    );
+  }
+
+  if (listLoading) {
+    return (
+      <div className="space-y-2 min-h-[300px] sm:min-h-[400px]">
+        {[...Array(6)].map((_, i) => (
+          <div key={i} className="h-20 bg-white/5 rounded-lg animate-pulse" />
+        ))}
+      </div>
+    );
+  }
+
+  if (listError || !list) {
+    return (
+      <div className="card text-center text-text-muted py-8 min-h-[300px] sm:min-h-[400px] flex flex-col items-center justify-center">
+        <p>Failed to load scenarios.</p>
+        <button onClick={onRetryList} className="btn-secondary text-sm mt-3">Retry</button>
+      </div>
+    );
+  }
+
+  if (list.active.length === 0 && list.archived.length === 0) {
+    return (
+      <div className="card text-center text-text-muted py-8 min-h-[300px] sm:min-h-[400px] flex flex-col items-center justify-center">
+        <p>No scenarios yet.</p>
+        <p className="text-sm mt-2">Check back soon — new themed challenges coming.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-[300px] sm:min-h-[400px]">
+      {list.active.length > 0 && (
+        <section className="mb-5">
+          <h4 className="text-sm font-bold text-accent mb-2 uppercase tracking-wide">Active</h4>
+          <div className="space-y-2">
+            {list.active.map(s => (
+              <ScenarioCard key={s.id} summary={s} onClick={() => onSelectScenario(s.id)} />
+            ))}
+          </div>
+        </section>
+      )}
+      {list.archived.length > 0 && (
+        <section>
+          <h4 className="text-sm font-bold text-text-muted mb-2 uppercase tracking-wide">Archived</h4>
+          <div className="space-y-2">
+            {list.archived.map(s => (
+              <ScenarioCard key={s.id} summary={s} onClick={() => onSelectScenario(s.id)} archived />
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function ScenarioCard({
+  summary,
+  onClick,
+  archived = false,
+}: {
+  summary: ScenarioListSummary;
+  onClick: () => void;
+  archived?: boolean;
+}) {
+  const topMetric = formatRankingMetric(summary.rankingMetric as RankingMetric, {
+    sortScore: summary.topScore ?? undefined,
+  });
+  const accent = summary.theme?.color || (archived ? '#64748b' : '#f59e0b');
+
+  return (
+    <button
+      onClick={onClick}
+      className="w-full text-left px-3 py-3 rounded-lg bg-white/5 hover:bg-white/[0.08] active:bg-white/[0.12] transition-colors flex items-start gap-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-bg-primary"
+      style={{ borderLeft: `3px solid ${accent}`, '--tw-ring-color': accent } as React.CSSProperties}
+    >
+      <span className="text-2xl shrink-0" aria-hidden>{summary.theme?.emoji ?? '🎯'}</span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-bold text-sm" style={{ color: accent }}>{summary.name}</p>
+          {archived && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-500/30 text-slate-200">
+              ARCHIVED
+            </span>
+          )}
+          {summary.isPE && !archived && (
+            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300">
+              PE
+            </span>
+          )}
+        </div>
+        <p className="text-xs text-text-muted mt-0.5 line-clamp-2">{summary.tagline}</p>
+        <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mt-1 text-[11px] text-text-muted tabular-nums">
+          <span>{summary.entryCount} {summary.entryCount === 1 ? 'entry' : 'entries'}</span>
+          {summary.topScore != null && (
+            <span>Top {topMetric.label}: <span className="text-text-secondary">{topMetric.display}</span></span>
+          )}
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function ScenarioDetail({
+  scenarioId,
+  onBack,
+  onProfileClick,
+}: {
+  scenarioId: string;
+  onBack: () => void;
+  onProfileClick: (pubId: string) => void;
+}) {
+  const [data, setData] = useState<{
+    scenario: { id: string; name: string; rankingMetric: RankingMetric; entryCount: number };
+    entries: ScenarioLeaderboardEntry[];
+  } | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState(false);
+
+  const currentPlayerId = useAuthStore(s => s.player?.id);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setErr(false);
+    fetchScenarioLeaderboard(scenarioId, 50)
+      .then(res => {
+        if (cancelled) return;
+        setData({
+          scenario: { ...res.scenario, rankingMetric: res.scenario.rankingMetric as RankingMetric },
+          entries: res.entries,
+        });
+        setLoading(false);
+      })
+      .catch(() => { if (!cancelled) { setErr(true); setLoading(false); } });
+    return () => { cancelled = true; };
+  }, [scenarioId]);
+
+  const retry = () => {
+    // Force a re-run of the useEffect by toggling `err` (the effect ignores err in deps;
+    // simplest: just re-read by touching state). We inline the same fetch logic here.
+    setLoading(true);
+    setErr(false);
+    fetchScenarioLeaderboard(scenarioId, 50)
+      .then(res => {
+        setData({
+          scenario: { ...res.scenario, rankingMetric: res.scenario.rankingMetric as RankingMetric },
+          entries: res.entries,
+        });
+        setLoading(false);
+      })
+      .catch(() => { setErr(true); setLoading(false); });
+  };
+
+  return (
+    <div className="min-h-[300px] sm:min-h-[400px]">
+      <button
+        onClick={onBack}
+        className="text-sm text-text-muted hover:text-text-primary mb-3 flex items-center gap-1"
+      >
+        ← All scenarios
+      </button>
+
+      {loading && (
+        <div className="space-y-2">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="h-12 bg-white/5 rounded-lg animate-pulse" />
+          ))}
+        </div>
+      )}
+
+      {err && !loading && (
+        <div className="card text-center text-text-muted py-8">
+          <p>Failed to load scenario leaderboard.</p>
+          <button onClick={retry} className="btn-secondary text-sm mt-3">Retry</button>
+        </div>
+      )}
+
+      {data && !loading && !err && (
+        <>
+          <div className="mb-3">
+            <p className="font-bold text-lg">{data.scenario.name}</p>
+            <p className="text-xs text-text-muted">
+              {data.scenario.entryCount} {data.scenario.entryCount === 1 ? 'entry' : 'entries'} ·
+              ranked by {formatRankingMetric(data.scenario.rankingMetric, {}).label}
+            </p>
+          </div>
+
+          {data.entries.length === 0 ? (
+            <p className="text-sm text-text-muted text-center py-8">No entries yet.</p>
+          ) : (
+            <div className="space-y-1.5">
+              {data.entries.map(entry => (
+                <ScenarioDetailRow
+                  key={entry.id}
+                  entry={entry}
+                  rankingMetric={data.scenario.rankingMetric}
+                  isYou={!!currentPlayerId && entry.playerId === currentPlayerId}
+                  onProfileClick={onProfileClick}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function ScenarioDetailRow({
+  entry,
+  rankingMetric,
+  isYou,
+  onProfileClick,
+}: {
+  entry: ScenarioLeaderboardEntry;
+  rankingMetric: RankingMetric;
+  isYou: boolean;
+  onProfileClick: (pubId: string) => void;
+}) {
+  const metric = formatRankingMetric(rankingMetric, {
+    founderEquityValue: entry.founderEquityValue,
+    grossMoic: entry.grossMoic,
+    netIrr: entry.netIrr,
+    carryEarned: entry.carryEarned,
+    sortScore: entry.sortScore,
+  });
+  const canClick = !!entry.publicProfileId;
+
+  return (
+    <div
+      className={`flex items-center justify-between px-3 py-2.5 rounded-lg ${
+        isYou ? 'bg-accent/15 border border-accent/30' : 'bg-white/5'
+      } ${canClick ? 'cursor-pointer hover:bg-white/[0.08] transition-colors' : ''}`}
+      onClick={canClick ? () => onProfileClick(entry.publicProfileId!) : undefined}
+      role={canClick ? 'button' : undefined}
+      tabIndex={canClick ? 0 : undefined}
+      onKeyDown={canClick ? e => { if (e.key === 'Enter') onProfileClick(entry.publicProfileId!); } : undefined}
+    >
+      <div className="flex items-center gap-3 min-w-0 flex-1">
+        <span className={`text-sm font-bold tabular-nums w-8 text-center shrink-0 ${getRankColor(entry.rank)}`}>
+          #{entry.rank}
+        </span>
+        <div className="min-w-0">
+          <p className="text-sm font-bold truncate">
+            {entry.initials}
+            {entry.playerId && <span className="text-blue-300 ml-1 text-xs" title="Verified">✓</span>}
+            {isYou && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded bg-accent/20 text-accent font-medium">You</span>}
+          </p>
+          <p className="text-[11px] text-text-muted truncate">{entry.holdcoName}</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-4 shrink-0 text-right">
+        <div className="min-w-[4.5rem]">
+          <p className="text-[10px] text-text-muted uppercase">{metric.label}</p>
+          <p className="font-mono tabular-nums text-sm font-bold text-accent">{metric.display}</p>
+        </div>
+        <div className="min-w-[3rem]">
+          <p className="text-[10px] text-text-muted uppercase">Score</p>
+          <p className={`font-mono tabular-nums text-sm ${getGradeColor(entry.grade)}`}>
+            {entry.score} ({entry.grade})
+          </p>
+        </div>
       </div>
     </div>
   );

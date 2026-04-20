@@ -9,9 +9,9 @@ import type { GameState, Business, Metrics } from '../engine/types';
 import { formatMoney } from '../engine/types';
 import { calculateMetrics, calculatePortfolioTax } from '../engine/simulation';
 import { calculateFounderEquityValue, calculateEnterpriseValue } from '../engine/scoring';
-import { PE_FUND_CONFIG } from '../data/gameConfig';
 import { SECTORS } from '../data/sectors';
 import { getMASourcingAnnualCost } from '../data/sharedServices';
+import { getCarryRate, getCommittedCapital, getHurdleReturn } from '../data/fundStructure';
 import { getNarrativePhase } from '../data/gameConfig';
 import type { NarrativePhaseId } from '../data/gameConfig';
 
@@ -365,17 +365,20 @@ export function buildChronicleContext(state: GameState): ChronicleContext {
     context.narrativeToneGuidance = 'Contemplative and institutional. This is a family office — emphasize stewardship, generational permanence, and legacy building. Avoid startup energy or scrappy holdco vibes.';
   }
 
-  // PE Fund Manager mode — override tone and add fund-specific fields
+  // PE Fund Manager mode — override tone and add fund-specific fields.
+  // Reads fund economics from state.fundStructure so scenarios with custom hurdle/carry/capital
+  // produce correct AI narrative numbers (search_fund $10M/25% carry won't be told hurdle = $216M).
   if (state.isFundManagerMode) {
     const nav = calculateEnterpriseValue(state);
-    const fs = state.fundSize || PE_FUND_CONFIG.fundSize;
+    const fs = getCommittedCapital(state);
     const lpDist = state.lpDistributions || 0;
     const totalValue = nav + lpDist;
     const grossMoic = fs > 0 ? totalValue / fs : 0;
     const dpi = fs > 0 ? lpDist / fs : 0;
     const deployPct = fs > 0 ? ((state.totalCapitalDeployed || 0) / fs) * 100 : 0;
-    const estCarry = totalValue > PE_FUND_CONFIG.hurdleReturn
-      ? (totalValue - PE_FUND_CONFIG.hurdleReturn) * PE_FUND_CONFIG.carryRate : 0;
+    const hurdleAmount = getHurdleReturn(state);
+    const estCarry = totalValue > hurdleAmount
+      ? (totalValue - hurdleAmount) * getCarryRate(state) : 0;
     const lpSat = state.lpSatisfactionScore ?? 75;
     const lpTone = lpSat >= 60 ? 'confident' : lpSat >= 40 ? 'cautious' : 'frustrated';
 
@@ -385,7 +388,7 @@ export function buildChronicleContext(state: GameState): ChronicleContext {
     context.dpi = `${dpi.toFixed(2)}x`;
     context.deploymentPct = `${deployPct.toFixed(0)}%`;
     context.dryPowder = formatMoney(state.cash);
-    context.hurdleProgress = `${formatMoney(Math.round(totalValue))} of ${formatMoney(Math.round(PE_FUND_CONFIG.hurdleReturn))}`;
+    context.hurdleProgress = `${formatMoney(Math.round(totalValue))} of ${formatMoney(hurdleAmount)}`;
     context.estimatedCarry = estCarry > 0 ? `~${formatMoney(Math.round(estCarry))}` : '$0 (below hurdle)';
     context.lpSatisfactionTone = lpTone;
     // Override narrative phase for PE

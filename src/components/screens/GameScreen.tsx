@@ -274,6 +274,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
     isFamilyOfficeMode,
     isFundManagerMode,
     isBusinessSchoolMode,
+    isScenarioChallengeMode,
+    scenarioChallengeConfig,
+    isAdminPreview,
     fundName,
     familyOfficeState,
     distributeToLPs,
@@ -1143,7 +1146,7 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
       )}
 
       {/* Challenge Mode Banner */}
-      {isChallenge && (
+      {isChallenge && !isScenarioChallengeMode && (
         <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-3 py-1.5 flex items-center justify-center gap-3">
           <span className="text-xs text-yellow-400 font-medium">Challenge Mode<span className="hidden sm:inline"> — same deals, same events</span></span>
           <button
@@ -1152,6 +1155,30 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
           >
             {copiedLink ? 'Copied!' : 'Copy Link'}
           </button>
+        </div>
+      )}
+
+      {/* Scenario Challenge Event Bar — persistent across all phases (plan §6).
+          Amber theme, theme-colored left border, PREVIEW pill when admin preview. */}
+      {isScenarioChallengeMode && scenarioChallengeConfig && (
+        <div
+          className="border-b border-amber-500/30 bg-gradient-to-r from-amber-500/15 to-amber-500/5 px-3 py-1.5 flex items-center justify-between gap-3"
+          style={{ borderLeftWidth: '3px', borderLeftColor: scenarioChallengeConfig.theme?.color ?? '#F59E0B' }}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="shrink-0">{scenarioChallengeConfig.theme?.emoji}</span>
+            <span className="text-xs font-medium text-amber-400 truncate">
+              <span className="hidden sm:inline">{scenarioChallengeConfig.name}</span>
+              <span className="sm:hidden">Scenario</span>
+            </span>
+            {isAdminPreview && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-200 shrink-0">PREVIEW</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-amber-400/80 font-mono shrink-0">
+            <span className="hidden sm:inline">Year {round}/{scenarioChallengeConfig.maxRounds}</span>
+            <span className="sm:hidden">{round}/{scenarioChallengeConfig.maxRounds}</span>
+          </div>
         </div>
       )}
 

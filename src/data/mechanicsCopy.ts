@@ -199,6 +199,60 @@ export const PORTFOLIO_SYNERGY_LABELS = {
   },
 } as const;
 
+/**
+ * Scenario Challenge copy — admin-designed themed events with standalone leaderboards.
+ * Centralized so the home banner, in-game event bar, scenario setup view, result
+ * section, and Scenarios-tab header all render the same strings. Any mismatch between
+ * components is caught by the Scenario Challenges block in `display-proofreader.test.ts`.
+ */
+export const SCENARIO_BADGE_COPY = {
+  /** Admin-preview run — entry dropped server-side, UI shows the preview banner. */
+  preview: 'PREVIEW',
+  /** Scenario endDate < now — still viewable, new entries rejected past the 24h grace. */
+  archived: 'ARCHIVED',
+  /** PE fund-structure scenario (for differentiation in card lists). */
+  peBadge: 'PE',
+} as const;
+
+export const SCENARIO_TAB_COPY = {
+  /** 8th tab in LeaderboardModal. Kept short for mobile truncation. */
+  label: 'Scenarios',
+  mobileLabel: 'SC',
+  /** Subtitle shown when the tab is active. */
+  subtitle: 'Themed, time-limited challenges with standalone leaderboards',
+  /** Modal header override when scenarios tab is active. */
+  header: 'Scenario Challenges',
+  headerEmoji: '🎯',
+} as const;
+
+export const SCENARIO_RESULT_COPY = {
+  /** Game-over section title when in scenario mode. */
+  sectionPrefix: 'Your',
+  /** Shown after scenario submit success. */
+  savedBanner: 'Saved to scenario leaderboard!',
+  /** Admin preview banner when the completion is dropped server-side. */
+  previewBanner: 'Preview run — not submitted',
+  /** Closed banner when past endDate + 24h. */
+  closedBanner: 'Submissions closed',
+  /** Empty state for the top-10 list. */
+  emptyList: 'No entries yet — you could be first.',
+} as const;
+
+/**
+ * Human-readable labels per ranking metric. Client + server must agree — the
+ * client computes these for display, the server computes the corresponding
+ * sort score via `computeSortScore` in api/scenario-challenges/submit.ts.
+ * Adding a new metric requires updates in BOTH places; this constant + the
+ * exhaustiveness test in scenarioLeaderboard.test.ts guards drift.
+ */
+export const SCENARIO_RANKING_METRIC_LABELS = {
+  fev: 'Adj FEV',
+  moic: 'MOIC',
+  cashOnCash: 'Cash-on-Cash',
+  irr: 'Net IRR',
+  gpCarry: 'GP Carry',
+} as const;
+
 export const BANNED_COPY_PATTERNS: ReadonlyArray<{
   pattern: RegExp;
   reason: string;

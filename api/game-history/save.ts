@@ -60,9 +60,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const difficulty = typeof body.difficulty === 'string' && (VALID_DIFFICULTIES as readonly string[]).includes(body.difficulty) ? body.difficulty as 'easy' | 'normal' : 'easy';
     const duration = typeof body.duration === 'string' && (VALID_DURATIONS as readonly string[]).includes(body.duration) ? body.duration : 'standard';
     const seed = typeof body.seed === 'number' ? body.seed : null;
+    const scenarioChallengeId = typeof body.scenarioChallengeId === 'string' && body.scenarioChallengeId.length <= 60
+      ? body.scenarioChallengeId : null;
+    const isAdminPreview = body.isAdminPreview === true;
+
+    // Scenario Challenge completions can have any positive integer totalRounds (3-30).
+    // For scenarios, trust body.totalRounds if present; otherwise fall through to the
+    // legacy 10/20 path used by Fund Manager + holdco modes.
+    const totalRoundsRaw = typeof body.totalRounds === 'number' ? Math.round(body.totalRounds) : null;
+    const maxRounds = scenarioChallengeId && totalRoundsRaw != null && totalRoundsRaw >= 3 && totalRoundsRaw <= 30
+      ? totalRoundsRaw
+      : (totalRoundsRaw === 10 || totalRoundsRaw === 20 ? totalRoundsRaw : (duration === 'quick' ? 10 : 20));
 
     // --- Compute completion_id for dedup (server-side, not client-provided) ---
-    const completionId = `${playerId}-${seed ?? 0}-${difficulty}-${duration}-${score}-${grade}`;
+    // Includes maxRounds + scenarioChallengeId so two scenarios sharing seed/difficulty/duration/
+    // score/grade don't collide (fixes ultraplan C1). Non-scenario games get 'none' for the
+    // scenario segment — stable across all legacy + current Fund Manager / holdco saves.
+    const scenarioSegment = scenarioChallengeId ?? 'none';
+    const completionId = `${playerId}-${seed ?? 0}-${difficulty}-${duration}-${maxRounds}-${score}-${grade}-${scenarioSegment}`;
 
     // --- Compute adjusted FEV ---
     const FEV_CAP = 10_000_000_000; // $10T in thousands
@@ -81,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const avgEbitdaMargin = typeof body.avgEbitdaMargin === 'number' ? Math.round(body.avgEbitdaMargin * 1000) / 1000 : null;
     const familyOfficeCompleted = body.familyOfficeCompleted === true;
     const legacyGrade = typeof body.legacyGrade === 'string' && ['Enduring', 'Influential', 'Established', 'Fragile'].includes(body.legacyGrade) ? body.legacyGrade : null;
-    const maxRounds = body.totalRounds === 10 || body.totalRounds === 20 ? body.totalRounds : (duration === 'quick' ? 10 : 20);
+    // maxRounds already computed above with scenario-aware validation
 
     // --- Strategy object (sanitize) ---
     let validStrategy: Record<string, unknown> | null = null;
@@ -160,6 +175,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       strategy: validStrategy,
       completion_id: completionId,
       completed_at: new Date().toISOString(),
+      // Scenario Challenge tagging — NULL for non-scenario completions.
+      ...(scenarioChallengeId ? { scenario_challenge_id: scenarioChallengeId } : {}),
+      ...(isAdminPreview ? { is_admin_preview: true } : {}),
       ...(scoreBreakdown ? {
         score_value_creation: scoreBreakdown.valueCreation,
         score_fcf_share_growth: scoreBreakdown.fcfShareGrowth,
