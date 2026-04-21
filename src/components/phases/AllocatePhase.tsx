@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useCallback } from 'react';
+import { useState, useRef, useMemo, useCallback, useEffect } from 'react';
 import {
   Business,
   Deal,
@@ -251,6 +251,14 @@ export function AllocatePhase({
   const canTurnaround     = isFeatureAvailable(modeContext, 'turnaround').available;
   const canPayDownDebt    = isFeatureAvailable(modeContext, 'payDownDebt').available;
   const canPlatformForge  = isFeatureAvailable(modeContext, 'platformForge').available;
+
+  // Scenario `allowedSectors` with a single entry auto-selects as the M&A focus.
+  // Without this, the Target Sector dropdown shows only that one option but
+  // `maFocus.sectorId` stays null until the player clicks — which they don't,
+  // since it looks pre-selected. Result: sub-type targeting (tier ≥ 2) stays
+  // hidden because its render gate checks `maFocus.sectorId`. Run once when
+  // the constraint is set + focus is unset; intentionally NOT dependency-gated
+  // on `maFocus` updates so we don't overwrite deliberate player changes.
   const isMobile = useIsMobile();
   const [videoBannerDismissed, setVideoBannerDismissed] = useState(() => localStorage.getItem('holdco-video-banner-dismissed') === 'true');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -297,6 +305,14 @@ export function AllocatePhase({
   const [showRollUpGuide, setShowRollUpGuide] = useState(false);
   const [sellConfirmBusiness, setSellConfirmBusiness] = useState<Business | null>(null);
   const [sellCelebration, setSellCelebration] = useState<{ name: string; moic: number } | null>(null);
+
+  useEffect(() => {
+    const allowed = scenarioChallengeConfig?.allowedSectors;
+    if (allowed && allowed.length === 1 && maFocus.sectorId === null) {
+      onSetMAFocus(allowed[0], maFocus.sizePreference, maFocus.subType ?? null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenarioChallengeConfig?.allowedSectors, maFocus.sectorId]);
 
   const [dismissedWarnings, setDismissedWarnings] = useState<Set<string>>(new Set());
   const [forgeConfirm, setForgeConfirm] = useState<{ recipeId: string; businessIds: string[] } | null>(null);
