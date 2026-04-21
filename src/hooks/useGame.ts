@@ -836,6 +836,21 @@ export const useGameStore = create<GameStore>()(
             config.maxRounds, false, round1Streams.deals, 0, startingCash, null,
             false, false, config.difficulty, [], [], true,
           );
+          // Round-1 allowedSectors/allowedSubTypes filter. Same pattern as the round
+          // advance path (advanceToAllocate) so the scenario's restrictions apply
+          // from turn 1. Without this, the initial pipeline includes deals from all
+          // 13 standard sectors and only later rounds enforce the restriction.
+          const allowedSectors = config.allowedSectors && config.allowedSectors.length > 0
+            ? new Set<SectorId>(config.allowedSectors) : null;
+          const allowedSubTypes = config.allowedSubTypes && config.allowedSubTypes.length > 0
+            ? new Set<string>(config.allowedSubTypes) : null;
+          if (allowedSectors || allowedSubTypes) {
+            initialDealPipeline = initialDealPipeline.filter(d => {
+              if (allowedSectors && !allowedSectors.has(d.business.sectorId)) return false;
+              if (allowedSubTypes && !allowedSubTypes.has(d.business.subType)) return false;
+              return true;
+            });
+          }
         }
 
         // Enforce FamilyOffice disable at state level (plan rule: scenarios never unlock FO).
@@ -1673,6 +1688,27 @@ export const useGameStore = create<GameStore>()(
             finalPipeline = [...finalPipeline, exclusiveDeal];
           }
           clearedBoomSectorId = undefined;
+        }
+
+        // Re-apply scenario allowedSectors/allowedSubTypes filter to catch event-injected
+        // deals (financial crisis distressed, oil shock aftershock, recession discounts,
+        // consolidation boom exclusive tuck-in). These bypass the pre-filter above because
+        // they're generated from `state.currentEvent` after the filter runs. Scenarios
+        // that restrict to specific sectors must not leak sector-unrelated deals even when
+        // a cross-sector event fires.
+        if (state.isScenarioChallengeMode && state.scenarioChallengeConfig) {
+          const cfg = state.scenarioChallengeConfig;
+          const allowedSectors = cfg.allowedSectors && cfg.allowedSectors.length > 0
+            ? new Set<SectorId>(cfg.allowedSectors) : null;
+          const allowedSubTypes = cfg.allowedSubTypes && cfg.allowedSubTypes.length > 0
+            ? new Set<string>(cfg.allowedSubTypes) : null;
+          if (allowedSectors || allowedSubTypes) {
+            finalPipeline = finalPipeline.filter(d => {
+              if (allowedSectors && !allowedSectors.has(d.business.sectorId)) return false;
+              if (allowedSubTypes && !allowedSubTypes.has(d.business.subType)) return false;
+              return true;
+            });
+          }
         }
 
         // Clean up passedDealIds — remove IDs for deals no longer in the pipeline
