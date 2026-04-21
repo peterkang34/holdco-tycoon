@@ -87,6 +87,31 @@ import {
   getForcedLiquidationYear,
 } from '../data/fundStructure';
 import { createBusinessFromConfig, createDealFromCuratedConfig, createForcedGameEvent } from '../data/scenarioChallenges';
+
+/**
+ * Strip deals whose sector/sub-type isn't allowed by the current scenario's
+ * allowedSectors/allowedSubTypes. No-op outside scenario mode or when the
+ * scenario doesn't set restrictions. Used by sourceDeals / proactiveOutreach /
+ * smbBrokerDealFlow + round-advance deal injection so scenario-restricted
+ * pipelines stay consistent regardless of generation source.
+ */
+function filterDealsByScenario<T extends { business: { sectorId: string; subType: string } }>(
+  state: Pick<GameState, 'isScenarioChallengeMode' | 'scenarioChallengeConfig'>,
+  deals: T[],
+): T[] {
+  if (!state.isScenarioChallengeMode || !state.scenarioChallengeConfig) return deals;
+  const cfg = state.scenarioChallengeConfig;
+  const allowedSectors = cfg.allowedSectors && cfg.allowedSectors.length > 0
+    ? new Set<string>(cfg.allowedSectors) : null;
+  const allowedSubTypes = cfg.allowedSubTypes && cfg.allowedSubTypes.length > 0
+    ? new Set<string>(cfg.allowedSubTypes) : null;
+  if (!allowedSectors && !allowedSubTypes) return deals;
+  return deals.filter(d => {
+    if (allowedSectors && !allowedSectors.has(d.business.sectorId)) return false;
+    if (allowedSubTypes && !allowedSubTypes.has(d.business.subType)) return false;
+    return true;
+  });
+}
 import { selectLPQuote } from '../data/lpCommentary';
 import type { LPTriggerId, LPSpeaker } from '../data/lpCommentary';
 import { generateRandomSeed, createRngStreams } from '../engine/rng';
@@ -4813,6 +4838,10 @@ export const useGameStore = create<GameStore>()(
           );
         }
 
+        // Scenario allowedSectors/allowedSubTypes: Source Deals must respect the scenario's
+        // sector constraints or players can buy cross-sector deals in single-sector scenarios.
+        newDeals = filterDealsByScenario(state, newDeals);
+
         const srcState = { ...state, cash: state.cash - cost };
         set({
           ...srcState,
@@ -5170,6 +5199,9 @@ export const useGameStore = create<GameStore>()(
           );
         }
 
+        // Scenario allowedSectors/allowedSubTypes (see sourceDeals for rationale).
+        newDeals = filterDealsByScenario(state, newDeals);
+
         const outState = { ...state, cash: state.cash - PROACTIVE_OUTREACH_COST };
         set({
           ...outState,
@@ -5191,12 +5223,32 @@ export const useGameStore = create<GameStore>()(
         const priorBrokerCount = state.actionsThisRound.filter(a => a.type === 'smb_broker').length;
         const brokerStreams = createRngStreams(state.seed, state.round);
         const brokerInflation = calculateDealInflation(state.round, state.duration, state.dealInflationState);
-        const newDeal = generateSMBBrokerDeal(
-          state.round,
-          state.maxRounds,
-          brokerStreams.deals.fork(`smb-broker-${priorBrokerCount}`),
-          brokerInflation,
-        );
+
+        // Scenario allowedSectors: SMB broker randomly picks from 5 cheap sectors.
+        // In a restricted scenario, most attempts produce a non-allowed deal. Retry
+        // up to MAX_TRIES so the player isn't charged $150k for a dropped deal.
+        // If no overlap between SMB broker's cheap pool and allowedSectors after
+        // MAX_TRIES, bail with a warning (don't silently eat the cost).
+        const MAX_TRIES = 10;
+        let newDeal: Deal | null = null;
+        for (let attempt = 0; attempt < MAX_TRIES; attempt++) {
+          const candidate = generateSMBBrokerDeal(
+            state.round,
+            state.maxRounds,
+            brokerStreams.deals.fork(`smb-broker-${priorBrokerCount}-${attempt}`),
+            brokerInflation,
+          );
+          const [filtered] = filterDealsByScenario(state, [candidate]);
+          if (filtered) { newDeal = filtered; break; }
+        }
+        if (!newDeal) {
+          useToastStore.getState().addToast({
+            message: 'SMB Broker',
+            detail: 'No matching deals in this scenario',
+            type: 'warning',
+          });
+          return;
+        }
 
         const smbState = { ...state, cash: state.cash - SMB_BROKER_COST };
         set({
