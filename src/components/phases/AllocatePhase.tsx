@@ -1620,22 +1620,33 @@ export function AllocatePhase({
               </div>
             )}
 
-            {/* Locked Cross-Sector Recipe — achievement-gated */}
-            {!hasCrossSectorRecipeUnlock && activeBusinesses.length >= 3 && (
-              <div className="card bg-gray-500/5 border-gray-500/20 mb-6 opacity-60">
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">🔒</span>
-                  <h3 className="font-bold text-text-muted text-sm">Vertical SaaS + Services</h3>
-                  <span className="text-xs bg-purple-500/15 text-purple-400 px-2 py-0.5 rounded">Cross-Sector Recipe</span>
+            {/* Locked Cross-Sector Recipe — achievement-gated. Hidden in scenarios whose
+                allowedSectors can't possibly fulfill the recipe (needs 1 SaaS + 2+ from a
+                services sector). Showing it there is pure noise since the player can never
+                unlock it within the scenario's sector constraints. */}
+            {(() => {
+              if (hasCrossSectorRecipeUnlock || activeBusinesses.length < 3) return null;
+              const allowed = scenarioChallengeConfig?.allowedSectors;
+              if (allowed && allowed.length > 0) {
+                const recipePossible = allowed.length >= 2 && allowed.includes('saas');
+                if (!recipePossible) return null;
+              }
+              return (
+                <div className="card bg-gray-500/5 border-gray-500/20 mb-6 opacity-60">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🔒</span>
+                    <h3 className="font-bold text-text-muted text-sm">Vertical SaaS + Services</h3>
+                    <span className="text-xs bg-purple-500/15 text-purple-400 px-2 py-0.5 rounded">Cross-Sector Recipe</span>
+                  </div>
+                  <p className="text-xs text-text-muted mb-2">
+                    Embed SaaS into a services vertical for +5% margin, +3% growth, +2.0x exit multiple.
+                  </p>
+                  <p className="text-xs text-text-muted italic">
+                    Unlock: Forge a platform across 3+ sectors with a B grade, or earn 14 total achievements.
+                  </p>
                 </div>
-                <p className="text-xs text-text-muted mb-2">
-                  Embed SaaS into a services vertical for +5% margin, +3% growth, +2.0x exit multiple.
-                </p>
-                <p className="text-xs text-text-muted italic">
-                  Unlock: Forge a platform across 3+ sectors with a B grade, or earn 14 total achievements.
-                </p>
-              </div>
-            )}
+              );
+            })()}
 
             {activeBusinesses.length > 0 && (
               <div className="mb-3">
