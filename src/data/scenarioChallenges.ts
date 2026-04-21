@@ -237,7 +237,7 @@ export function validateScenarioConfig(config: ScenarioChallengeConfig): Scenari
       if (!SECTORS[sid]) errors.push(`allowedSectors contains invalid sector '${sid}'`);
     }
     if (config.allowedSectors.length === 1 && !hasCuratedDealsForAllRounds(config)) {
-      warnings.push('Single-sector restriction without curated deals may produce ~1/3 zero-deal rounds — engine will force a floor, but variety will be low');
+      warnings.push('Single-sector restriction: engine filters + floor loop guarantee ≥1 deal per round, but deal variety will be low (single sector pool). Consider adding curated deals for crown-jewel / distressed flavor at specific rounds.');
     }
   }
   if (config.allowedSubTypes && config.allowedSectors) {

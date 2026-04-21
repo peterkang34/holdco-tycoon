@@ -321,7 +321,7 @@ describe('validateScenarioConfig — sector restrictions', () => {
     const { warnings } = validateScenarioConfig(makeValidHoldcoConfig({
       allowedSectors: ['saas'],
     }));
-    expect(warnings.some(w => w.includes('zero-deal'))).toBe(true);
+    expect(warnings.some(w => w.includes('Single-sector restriction'))).toBe(true);
   });
 
   it('no warning when single-sector has curated deals for all rounds', () => {
@@ -333,7 +333,7 @@ describe('validateScenarioConfig — sector restrictions', () => {
       allowedSectors: ['saas'],
       curatedDeals,
     }));
-    expect(warnings.some(w => w.includes('zero-deal'))).toBe(false);
+    expect(warnings.some(w => w.includes('Single-sector restriction'))).toBe(false);
   });
 
   it('rejects allowedSubTypes not valid for any allowed sector', () => {
