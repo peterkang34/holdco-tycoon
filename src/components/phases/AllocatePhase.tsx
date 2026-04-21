@@ -33,6 +33,7 @@ import { SECTORS } from '../../data/sectors';
 // getUnlockedSectorIds removed — prestige sectors now snapshotted in game state (unlockedSectorIds)
 // useAuthStore removed — prestige sectors now read from game state, not auth
 import { useGameStore } from '../../hooks/useGame';
+import { isFeatureAvailable } from '../../data/modeGating';
 import { BS_YEAR_1_ITEMS, BS_YEAR_2_ITEMS, BS_CHECKLIST_INFO } from '../../data/businessSchool';
 import { MIN_OPCOS_FOR_SHARED_SERVICES, MAX_ACTIVE_SHARED_SERVICES, MA_SOURCING_CONFIG, getMASourcingUpgradeCost, getMASourcingAnnualCost } from '../../data/sharedServices';
 import { MarketGuideModal } from '../ui/MarketGuideModal';
@@ -224,8 +225,32 @@ export function AllocatePhase({
   onDistributeToLPs,
 }: AllocatePhaseProps) {
   const isBusinessSchoolMode = useGameStore((s) => s.isBusinessSchoolMode);
+  const isScenarioChallengeMode = useGameStore((s) => s.isScenarioChallengeMode);
+  const scenarioChallengeConfig = useGameStore((s) => s.scenarioChallengeConfig);
   const businessSchoolState = useGameStore((s) => s.businessSchoolState);
   const hasCrossSectorRecipeUnlock = useGameStore((s) => s.unlockedMechanics?.crossSectorSaasServices ?? false);
+
+  // Mode context for isFeatureAvailable. Each feature check is O(1); memo avoids
+  // re-allocating the object per feature check during a single render.
+  const modeContext = useMemo(() => ({
+    isBusinessSchoolMode,
+    isFundManagerMode,
+    isScenarioChallengeMode,
+    scenarioChallengeConfig,
+    isFamilyOfficeMode,
+  }), [isBusinessSchoolMode, isFundManagerMode, isScenarioChallengeMode, scenarioChallengeConfig, isFamilyOfficeMode]);
+
+  // Per-feature availability. Render-phase checks; handlers also call isFeatureAvailable
+  // at call time to catch any state-diff races.
+  const canEquityRaise    = isFeatureAvailable(modeContext, 'equityRaise').available;
+  const canBuyback        = isFeatureAvailable(modeContext, 'buybackShares').available;
+  const canDistribute     = isFeatureAvailable(modeContext, 'distributions').available;
+  const canIpo            = isFeatureAvailable(modeContext, 'ipo').available;
+  const canSharedServices = isFeatureAvailable(modeContext, 'sharedServices').available;
+  const canMaSourcing     = isFeatureAvailable(modeContext, 'maSourcing').available;
+  const canTurnaround     = isFeatureAvailable(modeContext, 'turnaround').available;
+  const canPayDownDebt    = isFeatureAvailable(modeContext, 'payDownDebt').available;
+  const canPlatformForge  = isFeatureAvailable(modeContext, 'platformForge').available;
   const isMobile = useIsMobile();
   const [videoBannerDismissed, setVideoBannerDismissed] = useState(() => localStorage.getItem('holdco-video-banner-dismissed') === 'true');
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -1503,7 +1528,7 @@ export function AllocatePhase({
                           <span className="text-sm font-mono">
                             Cost: <span className={canAfford ? 'text-text-primary' : 'text-danger'}>{formatMoney(cost)}</span>
                           </span>
-                          <button
+                          {canPlatformForge && <button
                             onClick={() => setForgeConfirm({
                               recipeId: recipe.id,
                               businessIds: eligible.map(b => b.id),
@@ -1512,7 +1537,7 @@ export function AllocatePhase({
                             className={`btn-primary text-sm px-4 py-3 min-h-[44px] w-full sm:w-auto ${!canAfford ? 'opacity-50 cursor-not-allowed' : ''}`}
                           >
                             Forge Platform
-                          </button>
+                          </button>}
                         </div>
                       </div>
                     );
@@ -1623,9 +1648,17 @@ export function AllocatePhase({
                 <BusinessCard
                   key={business.id}
                   business={business}
-                  onSell={() => setSellConfirmBusiness(business)}
-                  onImprove={() => setSelectedBusinessForImprovement(business)}
-                  onDesignatePlatform={!business.isPlatform && onDesignatePlatform ? () => onDesignatePlatform(business.id) : undefined}
+                  // Gate sell/improve/designate/turnaround at callback level — BusinessCard
+                  // hides the corresponding button when callback is undefined.
+                  onSell={isFeatureAvailable(modeContext, 'sellBusiness').available ? (() => setSellConfirmBusiness(business)) : undefined}
+                  onImprove={isFeatureAvailable(modeContext, 'improveBusiness').available ? (() => setSelectedBusinessForImprovement(business)) : undefined}
+                  onDesignatePlatform={
+                    !business.isPlatform
+                      && onDesignatePlatform
+                      && isFeatureAvailable(modeContext, 'designatePlatform').available
+                      ? () => onDesignatePlatform(business.id)
+                      : undefined
+                  }
 
                   onShowRollUpGuide={() => setShowRollUpGuide(true)}
                   isPlatform={business.isPlatform}
@@ -1637,7 +1670,7 @@ export function AllocatePhase({
                   integratedPlatforms={integratedPlatforms}
                   activeTurnaround={activeTurnarounds.find(t => t.businessId === business.id && t.status === 'active') ?? null}
                   turnaroundEligible={turnaroundTier > 0 && getEligiblePrograms(business, turnaroundTier, activeTurnarounds).length > 0}
-                  onStartTurnaround={turnaroundTier > 0 ? () => setTurnaroundBusiness(business) : undefined}
+                  onStartTurnaround={canTurnaround && turnaroundTier > 0 ? () => setTurnaroundBusiness(business) : undefined}
                   collapsible={isMobile}
                   isExpanded={!isMobile || expandedBusinessIds.has(business.id)}
                   onToggle={() => toggleBusiness(business.id)}
@@ -1706,12 +1739,23 @@ export function AllocatePhase({
                     )}
                     className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent"
                   >
-                    <option value="">Any Sector</option>
-                    {getAvailableSectors(isFamilyOfficeMode, useGameStore.getState().unlockedSectorIds ?? []).map(sector => (
-                      <option key={sector.id} value={sector.id}>
-                        {sector.emoji} {sector.name}
-                      </option>
-                    ))}
+                    {/* Scenario `allowedSectors` filter: if a scenario restricts to specific sectors,
+                        drop the "Any Sector" option and hide all non-allowed sectors from the picker.
+                        Engine already enforces this at deal-generation time; UI parity is this filter. */}
+                    {(!scenarioChallengeConfig?.allowedSectors || scenarioChallengeConfig.allowedSectors.length === 0) && (
+                      <option value="">Any Sector</option>
+                    )}
+                    {getAvailableSectors(isFamilyOfficeMode, useGameStore.getState().unlockedSectorIds ?? [])
+                      .filter(sector => {
+                        const allowed = scenarioChallengeConfig?.allowedSectors;
+                        if (!allowed || allowed.length === 0) return true;
+                        return allowed.includes(sector.id);
+                      })
+                      .map(sector => (
+                        <option key={sector.id} value={sector.id}>
+                          {sector.emoji} {sector.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
                 <div>
@@ -1974,8 +2018,8 @@ export function AllocatePhase({
 
         {activeTab === 'shared_services' && (
           <div>
-            {/* M&A Infrastructure (separate from operational shared services) */}
-            <div className="card mb-6 border-purple-500/30 bg-purple-500/5">
+            {/* M&A Infrastructure (separate from operational shared services) — hidden when scenario disables maSourcing */}
+            {canMaSourcing && <div className="card mb-6 border-purple-500/30 bg-purple-500/5">
               <div className="flex items-start justify-between mb-4">
                 <div>
                   <h3 className="font-bold text-lg flex items-center gap-2">
@@ -2095,10 +2139,10 @@ export function AllocatePhase({
               {maSourcing.tier >= 3 && (
                 <p className="text-xs text-purple-400 text-center">Fully upgraded — Proprietary Network active</p>
               )}
-            </div>
+            </div>}
 
-            {/* Turnaround Operations */}
-            {activeBusinesses.length >= 2 && (
+            {/* Turnaround Operations — gated by scenario `turnaround` disable */}
+            {canTurnaround && activeBusinesses.length >= 2 && (
               <div className="card mb-6 border-amber-500/30 bg-amber-500/5">
                 <div className="flex items-start justify-between mb-4">
                   <div>
@@ -2216,8 +2260,8 @@ export function AllocatePhase({
               </div>
             )}
 
-            {/* Operational Shared Services */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Operational Shared Services — gated by scenario `sharedServices` disable */}
+            {canSharedServices && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {sharedServices.map(service => (
               <div
                 key={service.type}
@@ -2261,7 +2305,7 @@ export function AllocatePhase({
                 )}
               </div>
             ))}
-            </div>
+            </div>}
           </div>
         )}
 
@@ -2386,8 +2430,8 @@ export function AllocatePhase({
               );
             })()}
 
-            {/* IPO Pathway — 20-year mode only (hidden in FO + Fund Manager mode) */}
-            {!isFamilyOfficeMode && !isFundManagerMode && (() => {
+            {/* IPO Pathway — 20-year mode only. `canIpo` folds in FO + PE + scenario `ipo: true` gates. */}
+            {canIpo && (() => {
               if (duration !== 'standard') return null;
               if (ipoState?.isPublic) {
                 // Post-IPO: Public Company Dashboard
@@ -2530,8 +2574,8 @@ export function AllocatePhase({
             })()}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Pay Down Holdco Debt (hidden in fund mode — no holdco loans) */}
-            {!isFundManagerMode && <div className="card">
+            {/* Pay Down Holdco Debt — hidden when no holdco loans (PE) OR scenario disables payDownDebt */}
+            {!isFundManagerMode && canPayDownDebt && <div className="card">
               <h4 className="font-bold mb-3">Pay Down Holdco Debt</h4>
               <p className="text-sm text-text-muted mb-4">
                 Holdco debt: {formatMoney(holdcoLoanBalance)} @ {formatPercent(interestRate)}
@@ -2572,8 +2616,8 @@ export function AllocatePhase({
               <p className="text-xs text-text-muted mt-2">Interest charged annually on remaining balance</p>
             </div>}
 
-            {/* Pay Down Bank Debt (per-business) */}
-            {(() => {
+            {/* Pay Down Bank Debt (per-business) — hidden when scenario disables payDownDebt */}
+            {canPayDownDebt && (() => {
               const bizWithBankDebt = allBusinesses.filter(b => b.status === 'active' && b.bankDebtBalance > 0);
               if (bizWithBankDebt.length === 0) return null;
               return (
@@ -2842,10 +2886,12 @@ export function AllocatePhase({
               );
             })()}
 
-            {/* Equity / Buyback / Distribute — hidden in FO + Fund Manager mode */}
-            {!isFamilyOfficeMode && !isFundManagerMode && <>
+            {/* Equity / Buyback — each gated individually via isFeatureAvailable so scenarios
+                that disable only equityRaise (not buyback) still show the buyback card. Wrapper
+                stays as a cheap short-circuit when both are unavailable (FO + PE modes). */}
+            {(canEquityRaise || canBuyback) && <>
             {/* Issue Equity */}
-            <div className={`card ${raiseBlocked ? 'opacity-50' : ''}`}>
+            {canEquityRaise && <div className={`card ${raiseBlocked ? 'opacity-50' : ''}`}>
               <h4 className="font-bold mb-3">Issue Equity</h4>
               <p className="text-sm text-text-muted mb-2">
                 {isPublic
@@ -3010,10 +3056,10 @@ export function AllocatePhase({
                   </div>
                 );
               })()}
-            </div>
+            </div>}
 
             {/* Buyback Shares */}
-            <div className={`card ${buybackCooldownBlocked || activeBusinesses.length === 0 ? 'opacity-50' : ''}`}>
+            {canBuyback && <div className={`card ${buybackCooldownBlocked || activeBusinesses.length === 0 ? 'opacity-50' : ''}`}>
               <h4 className="font-bold mb-3">Buyback Shares</h4>
               <p className="text-sm text-text-muted mb-2">
                 Repurchase outside investor shares at {formatMoney(buybackPricePerShare)}/share{isPublic ? ' (market price)' : ''}.
@@ -3143,10 +3189,10 @@ export function AllocatePhase({
                   </div>
                 );
               })()}
-            </div>
+            </div>}
 
-            {/* Distribute */}
-            {(() => {
+            {/* Distribute — separate scenario-disabled gate from Buyback/Equity */}
+            {canDistribute && (() => {
               const ownershipPct = Math.floor((founderShares / sharesOutstanding) * 100);
               const hasOutsideOwners = founderShares < sharesOutstanding;
               const isStandard = duration === 'standard';

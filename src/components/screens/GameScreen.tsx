@@ -25,6 +25,7 @@ import { ToastContainer } from '../ui/ToastContainer';
 import { calculateFounderEquityValue, calculateFounderPersonalWealth, calculateEnterpriseValue } from '../../engine/scoring';
 import { calculateComplexityCost, getMarketCycleIndicator, calculateMetrics } from '../../engine/simulation';
 import { DIFFICULTY_CONFIG, PE_FUND_CONFIG } from '../../data/gameConfig';
+import { isFeatureAvailable } from '../../data/modeGating';
 import { MARKET_CYCLE_LABELS } from '../../data/mechanicsCopy';
 import { Tooltip } from '../ui/Tooltip';
 import { updateSessionRound, trackEventChoice } from '../../services/telemetry';
@@ -548,6 +549,15 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   }, [payDownBankDebt, businesses]);
 
   const handleIssueEquity = useCallback((amount: number) => {
+    const preState = useGameStore.getState();
+    // Mode-level gate first (PE / B-School / scenario / FO). Produces the correct
+    // "Disabled in this scenario" / "Not available in Fund Manager mode" toast
+    // instead of the old "would breach 51% floor" guess.
+    const gate = isFeatureAvailable(preState, 'equityRaise');
+    if (!gate.available) {
+      addToast({ message: 'Equity raise blocked', detail: gate.message, type: 'warning' });
+      return;
+    }
     const snap = takeSnapshot();
     const prevShares = sharesOutstanding;
     const prevSentiment = useGameStore.getState().ipoState?.marketSentiment;
@@ -581,6 +591,12 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   }, [issueEquity, founderShares, sharesOutstanding, addToast]);
 
   const handleBuyback = useCallback((amount: number) => {
+    const preState = useGameStore.getState();
+    const gate = isFeatureAvailable(preState, 'buybackShares');
+    if (!gate.available) {
+      addToast({ message: 'Buyback blocked', detail: gate.message, type: 'warning' });
+      return;
+    }
     const snap = takeSnapshot();
     const prevShares = sharesOutstanding;
     buybackShares(amount);
@@ -608,6 +624,12 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
   }, [buybackShares, founderShares, sharesOutstanding, addToast]);
 
   const handleDistribute = useCallback((amount: number) => {
+    const preState = useGameStore.getState();
+    const gate = isFeatureAvailable(preState, 'distributions');
+    if (!gate.available) {
+      addToast({ message: 'Distribution blocked', detail: gate.message, type: 'warning' });
+      return;
+    }
     const snap = takeSnapshot();
     const prevCash = cash;
     distributeToOwners(amount);
