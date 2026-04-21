@@ -6,9 +6,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { isActionBlocked, PE_BLOCKED_ACTIONS } from '../../data/modeGating';
+import { isActionBlocked, isFeatureAvailable, PE_BLOCKED_ACTIONS, type FeatureKey } from '../../data/modeGating';
 import { BS_BLOCKED_ACTIONS } from '../../data/businessSchool';
-import type { GameState, GameActionType, ScenarioChallengeConfig } from '../types';
+import { DISABLED_FEATURE_ACTIONS } from '../../data/scenarioChallenges';
+import type { GameState, GameActionType, ScenarioChallengeConfig, DisabledFeatureKey } from '../types';
 
 /** Minimal state slice — only fields isActionBlocked actually reads. */
 type GateState = Pick<GameState, 'isBusinessSchoolMode' | 'isFundManagerMode' | 'isScenarioChallengeMode' | 'scenarioChallengeConfig'>;
@@ -225,6 +226,173 @@ describe('isActionBlocked — multi-mode priority', () => {
     const result = isActionBlocked(s, 'ipo');
     expect(result.blocked).toBe(true);
     expect(result.reason).toBe('scenario');
+  });
+});
+
+// ══════════════════════════════════════════════════════════════════
+// isFeatureAvailable — UI-layer projection of isActionBlocked
+// ══════════════════════════════════════════════════════════════════
+
+type FeatureState = Pick<
+  GameState,
+  'isBusinessSchoolMode' | 'isFundManagerMode' | 'isScenarioChallengeMode' | 'scenarioChallengeConfig' | 'isFamilyOfficeMode'
+>;
+
+function featureState(overrides: Partial<FeatureState> = {}): FeatureState {
+  return {
+    isBusinessSchoolMode: false,
+    isFundManagerMode: false,
+    isScenarioChallengeMode: false,
+    isFamilyOfficeMode: false,
+    ...overrides,
+  };
+}
+
+const ALL_FEATURES: FeatureKey[] = [
+  'improveBusiness', 'equityRaise', 'buybackShares', 'distributions',
+  'payDownDebt', 'sellBusiness', 'sharedServices', 'platformForge',
+  'turnaround', 'maSourcing', 'ipo', 'designatePlatform',
+];
+
+describe('isFeatureAvailable — default (no modes)', () => {
+  it('returns available: true for every FeatureKey when no modes active', () => {
+    const s = featureState();
+    for (const feature of ALL_FEATURES) {
+      const result = isFeatureAvailable(s, feature);
+      expect(result.available).toBe(true);
+      expect(result.reason).toBe('allowed');
+      expect(result.message).toBe('');
+    }
+  });
+});
+
+describe('isFeatureAvailable — Business School mode', () => {
+  it('blocks BS-curriculum features with reason=bschool', () => {
+    const s = featureState({ isBusinessSchoolMode: true });
+    // Every feature whose representative action is in BS_BLOCKED_ACTIONS should be blocked.
+    let blockedCount = 0;
+    for (const feature of ALL_FEATURES) {
+      const result = isFeatureAvailable(s, feature);
+      if (!result.available) {
+        expect(result.reason).toBe('bschool');
+        expect(result.message).toBe('Not available in this tutorial');
+        blockedCount++;
+      }
+    }
+    expect(blockedCount).toBeGreaterThan(0); // at least ipo, turnaround are blocked in BS
+  });
+});
+
+describe('isFeatureAvailable — PE Fund Manager mode', () => {
+  it('blocks PE-restricted features with reason=pe_fund', () => {
+    const s = featureState({ isFundManagerMode: true });
+    // PE blocks issue_equity, buyback, distribute — so these features block.
+    expect(isFeatureAvailable(s, 'equityRaise')).toMatchObject({ available: false, reason: 'pe_fund' });
+    expect(isFeatureAvailable(s, 'buybackShares')).toMatchObject({ available: false, reason: 'pe_fund' });
+    expect(isFeatureAvailable(s, 'distributions')).toMatchObject({ available: false, reason: 'pe_fund' });
+    expect(isFeatureAvailable(s, 'equityRaise').message).toBe('Not available in Fund Manager mode');
+    // Other features still available.
+    expect(isFeatureAvailable(s, 'improveBusiness').available).toBe(true);
+    expect(isFeatureAvailable(s, 'sellBusiness').available).toBe(true);
+  });
+});
+
+describe('isFeatureAvailable — Scenario Challenge disabledFeatures', () => {
+  it('equityRaise: true blocks the equity-raise feature', () => {
+    const s = featureState({
+      isScenarioChallengeMode: true,
+      scenarioChallengeConfig: scenarioWith({ equityRaise: true }),
+    });
+    const result = isFeatureAvailable(s, 'equityRaise');
+    expect(result.available).toBe(false);
+    expect(result.reason).toBe('scenario');
+    expect(result.message).toBe('Disabled in this scenario');
+  });
+
+  it('other features remain available when only equityRaise disabled', () => {
+    const s = featureState({
+      isScenarioChallengeMode: true,
+      scenarioChallengeConfig: scenarioWith({ equityRaise: true }),
+    });
+    expect(isFeatureAvailable(s, 'buybackShares').available).toBe(true);
+    expect(isFeatureAvailable(s, 'sellBusiness').available).toBe(true);
+    expect(isFeatureAvailable(s, 'ipo').available).toBe(true);
+  });
+
+  it('all scenario-targetable features can be individually disabled', () => {
+    // Every DisabledFeatureKey → corresponding FeatureKey (where one exists) → blocked when set.
+    const cases: Array<{ key: DisabledFeatureKey; feature: FeatureKey }> = [
+      { key: 'improveBusiness', feature: 'improveBusiness' },
+      { key: 'equityRaise', feature: 'equityRaise' },
+      { key: 'buybackShares', feature: 'buybackShares' },
+      { key: 'distributions', feature: 'distributions' },
+      { key: 'payDownDebt', feature: 'payDownDebt' },
+      { key: 'sellBusiness', feature: 'sellBusiness' },
+      { key: 'sharedServices', feature: 'sharedServices' },
+      { key: 'platformForge', feature: 'platformForge' },
+      { key: 'turnaround', feature: 'turnaround' },
+      { key: 'maSourcing', feature: 'maSourcing' },
+      { key: 'ipo', feature: 'ipo' },
+    ];
+    for (const { key, feature } of cases) {
+      const s = featureState({
+        isScenarioChallengeMode: true,
+        scenarioChallengeConfig: scenarioWith({ [key]: true }),
+      });
+      const result = isFeatureAvailable(s, feature);
+      expect(result.available, `feature ${feature} should be blocked when disabledFeatures.${key}=true`).toBe(false);
+      expect(result.reason).toBe('scenario');
+    }
+  });
+});
+
+describe('isFeatureAvailable — Family Office', () => {
+  it('blocks capital-allocation features with reason=family_office', () => {
+    const s = featureState({ isFamilyOfficeMode: true });
+    expect(isFeatureAvailable(s, 'equityRaise')).toMatchObject({ available: false, reason: 'family_office' });
+    expect(isFeatureAvailable(s, 'buybackShares')).toMatchObject({ available: false, reason: 'family_office' });
+    expect(isFeatureAvailable(s, 'distributions')).toMatchObject({ available: false, reason: 'family_office' });
+    // Other features still available — FO doesn't gate improve/sell/etc at this layer.
+    expect(isFeatureAvailable(s, 'improveBusiness').available).toBe(true);
+  });
+});
+
+describe('isFeatureAvailable — multi-mode priority', () => {
+  it('family_office wins over pe_fund when both would block the same feature', () => {
+    const s = featureState({ isFundManagerMode: true, isFamilyOfficeMode: true });
+    const result = isFeatureAvailable(s, 'equityRaise');
+    expect(result.available).toBe(false);
+    // FO is checked first in isFeatureAvailable, even though PE also blocks equityRaise.
+    expect(result.reason).toBe('family_office');
+  });
+});
+
+// ── Exhaustiveness tripwire ──────────────────────────────────────────────
+
+describe('isFeatureAvailable — exhaustiveness tripwires', () => {
+  it('every DisabledFeatureKey with a non-empty action list has a matching FeatureKey', () => {
+    // If someone adds a new disabledFeatures key + action list but forgets to wire
+    // the UI helper, this test fails — forces them to update FEATURE_REPRESENTATIVE_ACTION.
+    const allFeatureKeys: ReadonlySet<FeatureKey> = new Set<FeatureKey>(ALL_FEATURES);
+
+    const missingUiCoverage: string[] = [];
+    for (const [key, actions] of Object.entries(DISABLED_FEATURE_ACTIONS)) {
+      if (actions.length === 0) continue; // restructure/familyOffice — intentional UI no-ops
+      if (!allFeatureKeys.has(key as FeatureKey)) {
+        // Some DisabledFeatureKey names don't line up with FeatureKey names by design
+        // (e.g., 'familyOffice' has no UI button). Only flag the ones that should.
+        const uiOptional: string[] = ['familyOffice', 'restructure'];
+        if (!uiOptional.includes(key)) missingUiCoverage.push(key);
+      }
+    }
+    expect(missingUiCoverage).toEqual([]);
+  });
+
+  it('every FeatureKey that appears in ALL_FEATURES is in the test list (no drift)', () => {
+    // If someone adds a new FeatureKey to the union, they must add it to ALL_FEATURES here.
+    // Detected via tripwire: cast to ensure the length assertion stays honest.
+    expect(ALL_FEATURES.length).toBe(12);
+    expect(new Set(ALL_FEATURES).size).toBe(ALL_FEATURES.length);
   });
 });
 

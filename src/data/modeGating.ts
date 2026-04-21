@@ -84,3 +84,121 @@ export function isActionBlocked(
   }
   return { blocked: false, reason: 'allowed' };
 }
+
+// ══════════════════════════════════════════════════════════════════
+// UI-layer feature availability — projection of `isActionBlocked` for
+// components. Components should use `isFeatureAvailable` to decide
+// whether to render/disable a card; store actions continue to use
+// `isActionBlocked` for the engine gate. The two agree by construction
+// via FEATURE_REPRESENTATIVE_ACTION below.
+//
+// Why a separate layer: components need a label/reason for rendering
+// ("Disabled in this scenario") that the engine gate shouldn't carry.
+// Components also need Family Office as a blocker — FO is an inline
+// state guard in useGame.ts, not a GameActionType gate, so this layer
+// folds it in. Keeping these concerns in ONE helper means adding a new
+// disabledFeatures key only needs one DISABLED_FEATURE_ACTIONS edit +
+// one FEATURE_REPRESENTATIVE_ACTION edit — exhaustiveness tests catch drift.
+// ══════════════════════════════════════════════════════════════════
+
+/** UI-level feature keys. Mirrors DisabledFeatureKey minus `restructure` (no UI surface —
+ * restructure is system-triggered via distress pipeline) and `familyOffice` (no button,
+ * transition-only). Adds `designatePlatform` which has no disabledFeatures key but IS
+ * PE/BS-gated via GameActionType and needs UI coverage. */
+export type FeatureKey =
+  | 'improveBusiness'
+  | 'equityRaise'
+  | 'buybackShares'
+  | 'distributions'
+  | 'payDownDebt'
+  | 'sellBusiness'
+  | 'sharedServices'
+  | 'platformForge'
+  | 'turnaround'
+  | 'maSourcing'
+  | 'ipo'
+  | 'designatePlatform';
+
+export type FeatureBlockReason = ActionBlockReason | 'family_office';
+
+export interface FeatureAvailability {
+  available: boolean;
+  reason: FeatureBlockReason;
+  /** UI-ready copy for the blocked case. Empty string when available. */
+  message: string;
+}
+
+/**
+ * Representative `GameActionType` for each UI feature. The feature is available
+ * iff its representative action is not blocked. Keeps two layers in lockstep.
+ *
+ * `satisfies Record<FeatureKey, GameActionType>` gives a compile-error tripwire
+ * if `FeatureKey` grows without a matching entry here.
+ */
+const FEATURE_REPRESENTATIVE_ACTION = {
+  improveBusiness:   'improve',
+  equityRaise:       'issue_equity',
+  buybackShares:     'buyback',
+  distributions:     'distribute',
+  payDownDebt:       'pay_debt',
+  sellBusiness:      'sell',
+  sharedServices:    'unlock_shared_service',
+  platformForge:     'forge_integrated_platform',
+  turnaround:        'start_turnaround',
+  maSourcing:        'source_deals',
+  ipo:               'ipo',
+  designatePlatform: 'designate_platform',
+} as const satisfies Record<FeatureKey, GameActionType>;
+
+/** UI-only message copy per block reason. Shown inline on disabled buttons + in blocked toasts. */
+const BLOCK_REASON_MESSAGES: Record<FeatureBlockReason, string> = {
+  bschool:       'Not available in this tutorial',
+  pe_fund:       'Not available in Fund Manager mode',
+  scenario:      'Disabled in this scenario',
+  family_office: 'Not available in Family Office mode',
+  allowed:       '',
+};
+
+/**
+ * Is this UI feature available to the player right now?
+ *
+ * Components call this in render to hide/disable cards; event handlers call it
+ * to surface the correct blocked-reason toast when a shortcut-action fires
+ * against a hidden feature. Priority order: family_office → bschool → pe_fund →
+ * scenario, matching the existing precedence in `isActionBlocked`.
+ */
+export function isFeatureAvailable(
+  state: Pick<
+    GameState,
+    | 'isBusinessSchoolMode'
+    | 'isFundManagerMode'
+    | 'isScenarioChallengeMode'
+    | 'scenarioChallengeConfig'
+    | 'isFamilyOfficeMode'
+  >,
+  feature: FeatureKey,
+): FeatureAvailability {
+  // Family Office: a handful of features (equity, buyback, distributions) are
+  // hard-gated at the state level inside store actions. Not routed through
+  // isActionBlocked per the design note at line 55–61. Fold it in here so the
+  // UI gets a consistent answer.
+  if (state.isFamilyOfficeMode && FO_BLOCKED_FEATURES.has(feature)) {
+    return { available: false, reason: 'family_office', message: BLOCK_REASON_MESSAGES.family_office };
+  }
+
+  const action = FEATURE_REPRESENTATIVE_ACTION[feature];
+  const blocked = isActionBlocked(state, action);
+  if (blocked.blocked) {
+    return { available: false, reason: blocked.reason, message: BLOCK_REASON_MESSAGES[blocked.reason] };
+  }
+  return { available: true, reason: 'allowed', message: '' };
+}
+
+/** Features that Family Office mode disables at the UI level. Mirrors the
+ * inline `if (state.isFamilyOfficeMode) return;` guards in useGame.ts. */
+const FO_BLOCKED_FEATURES: ReadonlySet<FeatureKey> = new Set<FeatureKey>([
+  'equityRaise',
+  'buybackShares',
+  'distributions',
+]);
+
