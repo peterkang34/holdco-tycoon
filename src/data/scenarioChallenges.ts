@@ -372,6 +372,71 @@ function hasCuratedDealsForAllRounds(config: ScenarioChallengeConfig): boolean {
 // ── Business factory ──────────────────────────────────────────────────────
 
 /**
+ * Build deterministic due-diligence signals for a curated (scenario-authored)
+ * deal. Mirrors the quality→category mapping in `generateDueDiligence` but uses
+ * fixed representative text strings (no RNG) so all players see identical DD
+ * on the same curated deal — important for leaderboard fairness since
+ * `competitivePosition: 'leader'` adds a valuation premium at exit.
+ */
+function buildCuratedDueDiligence(
+  quality: QualityRating,
+  sectorConcentration: 'low' | 'medium' | 'high',
+) {
+  let revenueConcentration: 'low' | 'medium' | 'high';
+  if (sectorConcentration === 'high') {
+    revenueConcentration = quality >= 4 ? 'medium' : 'high';
+  } else if (sectorConcentration === 'medium') {
+    revenueConcentration = quality >= 4 ? 'low' : quality >= 2 ? 'medium' : 'high';
+  } else {
+    revenueConcentration = quality >= 3 ? 'low' : 'medium';
+  }
+  const concentrationText = {
+    low: 'No client exceeds 10% of revenue',
+    medium: 'Top client is 20-25% of revenue',
+    high: 'Top client is 40%+ of revenue',
+  }[revenueConcentration];
+
+  const operatorQuality: 'strong' | 'moderate' | 'weak' =
+    quality >= 4 ? 'strong' : quality >= 2 ? 'moderate' : 'weak';
+  const operatorText = {
+    strong: 'Strong management team in place',
+    moderate: 'Decent team, some gaps',
+    weak: 'Founder looking to exit fully',
+  }[operatorQuality];
+
+  const trend: 'growing' | 'flat' | 'declining' =
+    quality >= 4 ? 'growing' : quality <= 1 ? 'declining' : 'flat';
+  const trendText = {
+    growing: 'EBITDA growing 10% YoY',
+    flat: 'EBITDA flat for 2 years',
+    declining: 'EBITDA declining 5-10% annually',
+  }[trend];
+
+  const customerRetention = quality >= 4 ? 94 : quality >= 3 ? 87 : quality >= 2 ? 80 : 71;
+
+  const competitivePosition: 'leader' | 'competitive' | 'commoditized' =
+    quality >= 4 ? 'leader' : quality >= 2 ? 'competitive' : 'commoditized';
+  const positionText = {
+    leader: 'Category leader in niche',
+    competitive: 'Solid competitive position',
+    commoditized: 'Commoditized market',
+  }[competitivePosition];
+
+  return {
+    revenueConcentration,
+    revenueConcentrationText: concentrationText,
+    operatorQuality,
+    operatorQualityText: operatorText,
+    trend,
+    trendText,
+    customerRetention,
+    customerRetentionText: `${customerRetention}% annual retention`,
+    competitivePosition,
+    competitivePositionText: positionText,
+  };
+}
+
+/**
  * Build a full Business from a scenario's StartingBusinessConfig, filling
  * sector-default fields the config didn't override.
  *
@@ -416,18 +481,7 @@ export function createBusinessFromConfig(
     revenueGrowthRate: orgGrowthMid,
     marginDriftRate: marginDriftMid,
     qualityRating: override.quality as QualityRating,
-    dueDiligence: {
-      revenueConcentration: sector.clientConcentration,
-      revenueConcentrationText: '',
-      operatorQuality: override.quality >= 4 ? 'strong' : override.quality >= 2 ? 'moderate' : 'weak',
-      operatorQualityText: '',
-      trend: 'flat',
-      trendText: '',
-      customerRetention: 85,
-      customerRetentionText: '',
-      competitivePosition: override.quality >= 4 ? 'leader' : override.quality >= 2 ? 'competitive' : 'commoditized',
-      competitivePositionText: '',
-    },
+    dueDiligence: buildCuratedDueDiligence(override.quality as QualityRating, sector.clientConcentration),
     integrationRoundsRemaining: 0,
     integrationGrowthDrag: 0,
     improvements: [],
