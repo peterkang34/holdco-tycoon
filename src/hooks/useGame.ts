@@ -77,7 +77,7 @@ import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue
 import { getDistressRestrictions } from '../engine/distress';
 import { SECTORS } from '../data/sectors';
 
-import type { GameDifficulty, GameDuration, GameActionType, DealHeat, LPComment, ScenarioChallengeConfig } from '../engine/types';
+import type { GameDifficulty, GameDuration, GameActionType, DealHeat, LPComment, ScenarioChallengeConfig, ScenarioTrigger } from '../engine/types';
 import { isActionBlocked } from '../data/modeGating';
 import {
   getAnnualMgmtFee,
@@ -90,6 +90,7 @@ import { createBusinessFromConfig, createDealFromCuratedConfig, createForcedGame
 import {
   resolveAllowedSectors,
   resolveAllowedSubTypes,
+  evaluateTriggers,
 } from '../engine/scenarioRules';
 
 /**
@@ -961,12 +962,39 @@ export const useGameStore = create<GameStore>()(
             : {}),
         };
 
+        // Phase 4 — evaluate triggers immediately so any with minRound:1 +
+        // condition true on starting state fire on turn 1 (e.g., starting-portfolio
+        // composition triggers). Toast surfaces them after set() so the player
+        // sees the unlock context alongside their first deal pipeline.
+        const startMetrics = calculateMetrics(newState);
+        let initialTriggerIds: string[] = [];
+        let initialFireRounds: Record<string, number> = {};
+        const startupFiredTriggers: ScenarioTrigger[] = [];
+        if (config.triggers?.length) {
+          const fired = evaluateTriggers(newState, startMetrics, newState);
+          if (fired.length > 0) {
+            startupFiredTriggers.push(...fired);
+            initialTriggerIds = fired.map(t => t.id);
+            for (const t of fired) initialFireRounds[t.id] = 1;
+          }
+        }
+
         set({
           ...newState,
-          metrics: calculateMetrics(newState),
+          triggeredTriggerIds: initialTriggerIds,
+          triggerFireRounds: initialFireRounds,
+          metrics: startMetrics,
           focusBonus: calculateSectorFocusBonus(newState.businesses),
           yearChronicle: null,
         });
+
+        for (const trigger of startupFiredTriggers) {
+          useToastStore.getState().addToast({
+            message: trigger.narrative.title,
+            detail: trigger.narrative.detail,
+            type: 'success',
+          });
+        }
 
         trackGameStart(config.difficulty, config.duration, undefined, config.maxRounds, true, 'scenario_challenge');
       },
@@ -1489,8 +1517,29 @@ export const useGameStore = create<GameStore>()(
       },
 
       advanceToAllocate: () => {
-        const state = get();
-        if (state.phase !== 'event') return; // Guard: must be in event phase
+        const stateRaw = get();
+        if (stateRaw.phase !== 'event') return; // Guard: must be in event phase
+
+        // Phase 4 — Feature B: evaluate triggers BEFORE generating the new pipeline
+        // so any newly-unlocked sectors/features show up in this round's deals.
+        // Pure evaluation; we then patch state with the new ledger before falling
+        // through to the rest of the function.
+        let state = stateRaw;
+        const newlyFiredTriggers: ScenarioTrigger[] = [];
+        if (state.isScenarioChallengeMode && state.scenarioChallengeConfig?.triggers?.length) {
+          const fired = evaluateTriggers(
+            state,
+            state.metrics,
+            state,
+          );
+          if (fired.length > 0) {
+            newlyFiredTriggers.push(...fired);
+            const newIds = [...(state.triggeredTriggerIds ?? []), ...fired.map(t => t.id)];
+            const newFireRounds = { ...(state.triggerFireRounds ?? {}) };
+            for (const t of fired) newFireRounds[t.id] = state.round;
+            state = { ...state, triggeredTriggerIds: newIds, triggerFireRounds: newFireRounds };
+          }
+        }
 
         // Phase 4 — Feature A: detect round-based sector transitions. State.round
         // is already the new round (endRound advanced it). Compare the resolver
@@ -1498,8 +1547,12 @@ export const useGameStore = create<GameStore>()(
         // at the end of advanceToAllocate so the new pipeline is visible alongside
         // the message. We capture both lists upfront, before any other state
         // mutations could shift the resolver answer.
+        //
+        // Note: prevSectorsForToast deliberately uses the PRE-trigger ledger so a
+        // trigger firing in the same advanceToAllocate doesn't suppress the
+        // round-transition toast — they fire independently when relevant.
         const prevSectorsForToast = state.isScenarioChallengeMode && state.round > 1
-          ? resolveAllowedSectors({ ...state, round: state.round - 1 })
+          ? resolveAllowedSectors({ ...stateRaw, round: state.round - 1 })
           : null;
         const nextSectorsForToast = state.isScenarioChallengeMode
           ? resolveAllowedSectors(state)
@@ -1790,6 +1843,17 @@ export const useGameStore = create<GameStore>()(
             message: `Year ${state.round} · Industry Rotation`,
             detail: `New deals limited to: ${sectorNames}${moreCount}`,
             type: 'info',
+          });
+        }
+
+        // Phase 4 — Feature B: surface each newly-fired trigger as a success toast.
+        // Player sees the narrative title + detail; the action's effects are already
+        // baked into this round's pipeline via the trigger ledger update above.
+        for (const trigger of newlyFiredTriggers) {
+          useToastStore.getState().addToast({
+            message: trigger.narrative.title,
+            detail: trigger.narrative.detail,
+            type: 'success',
           });
         }
       },

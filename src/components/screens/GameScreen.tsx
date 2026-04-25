@@ -26,6 +26,7 @@ import { calculateFounderEquityValue, calculateFounderPersonalWealth, calculateE
 import { calculateComplexityCost, getMarketCycleIndicator, calculateMetrics } from '../../engine/simulation';
 import { DIFFICULTY_CONFIG, PE_FUND_CONFIG } from '../../data/gameConfig';
 import { isFeatureAvailable } from '../../data/modeGating';
+import { resolveAllowedSectors } from '../../engine/scenarioRules';
 import { MARKET_CYCLE_LABELS } from '../../data/mechanicsCopy';
 import { Tooltip } from '../ui/Tooltip';
 import { updateSessionRound, trackEventChoice } from '../../services/telemetry';
@@ -1196,6 +1197,9 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
             {isAdminPreview && (
               <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-200 shrink-0">PREVIEW</span>
             )}
+            {/* Phase 4 — current effective sector restriction. Reads through resolver
+                so allowedSectorsByRound + trigger overlays are reflected. */}
+            <ScenarioSectorChip />
           </div>
           <div className="flex items-center gap-2 text-[11px] text-amber-400/80 font-mono shrink-0">
             <span className="hidden sm:inline">Year {round}/{scenarioChallengeConfig.maxRounds}</span>
@@ -1511,5 +1515,41 @@ export function GameScreen({ onGameOver, onResetGame, showTutorial = false, isCh
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * Inline chip in the scenario event bar showing the current effective sector
+ * restriction. Reads through resolveAllowedSectors so allowedSectorsByRound
+ * (Feature A) + fired-trigger overlays (Feature B) are reflected in real time.
+ * Hidden when the scenario has no sector restrictions.
+ */
+function ScenarioSectorChip() {
+  const isScenarioChallengeMode = useGameStore(s => s.isScenarioChallengeMode);
+  const scenarioChallengeConfig = useGameStore(s => s.scenarioChallengeConfig);
+  const round = useGameStore(s => s.round);
+  const triggeredTriggerIds = useGameStore(s => s.triggeredTriggerIds);
+  const sectors = useMemo(() => {
+    if (!isScenarioChallengeMode || !scenarioChallengeConfig) return null;
+    // Lazy-import the resolver via a closure-stable shape to avoid a top-level
+    // import cycle with useGame. Resolver is pure — fine to call in render.
+    return resolveAllowedSectors({
+      isScenarioChallengeMode,
+      scenarioChallengeConfig,
+      round,
+      triggeredTriggerIds,
+    });
+  }, [isScenarioChallengeMode, scenarioChallengeConfig, round, triggeredTriggerIds]);
+  if (!sectors || sectors.length === 0) return null;
+  const label = sectors.length === 1
+    ? SECTORS[sectors[0]]?.name ?? sectors[0]
+    : `${sectors.length} sectors`;
+  return (
+    <span
+      className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-white/10 text-amber-200/90 shrink-0"
+      title={sectors.map(sid => SECTORS[sid]?.name ?? sid).join(', ')}
+    >
+      {label}
+    </span>
   );
 }
