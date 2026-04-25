@@ -249,7 +249,7 @@ async function readIdList(key: string): Promise<string[]> {
  * scenario would appear "archived" in the lists but "active" in the stored
  * config, relying on two separate fences to hide it from players. Dara H1.
  */
-async function writeConfig(config: ScenarioChallengeConfig): Promise<void> {
+export async function writeConfig(config: ScenarioChallengeConfig): Promise<void> {
   const endMs = Date.parse(config.endDate);
   if (Number.isFinite(endMs) && Date.now() > endMs) {
     config.isActive = false;
@@ -269,7 +269,7 @@ async function writeConfig(config: ScenarioChallengeConfig): Promise<void> {
  * The lists are authoritative — admins may pre-stage a scenario (isActive=false)
  * and only activate it later, which flips it from archive → active.
  */
-async function rebuildListMemberships(config: ScenarioChallengeConfig): Promise<void> {
+export async function rebuildListMemberships(config: ScenarioChallengeConfig): Promise<void> {
   const endMs = Date.parse(config.endDate);
   const expired = Number.isFinite(endMs) && Date.now() > endMs;
   const belongsActive = config.isActive && !expired;

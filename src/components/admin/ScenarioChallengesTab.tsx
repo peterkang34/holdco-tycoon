@@ -214,6 +214,10 @@ export function ScenarioChallengesTab({ token }: { token: string }) {
   const [aiError, setAiError] = useState('');
   const [aiUsage, setAiUsage] = useState<{ used: number; limit: number } | null>(null);
 
+  // Phase 5 — Road to Carry preset seeding state
+  const [seedLoading, setSeedLoading] = useState(false);
+  const [seedResult, setSeedResult] = useState<{ written: string[]; skipped: { id: string; reason: string }[] } | null>(null);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -257,6 +261,31 @@ export function ScenarioChallengesTab({ token }: { token: string }) {
     setEditing(blankConfigTemplate());
     setEditingMode('create');
     setEditingValidation(null);
+  };
+
+  const handleSeedPresets = async () => {
+    setSeedLoading(true);
+    setSeedResult(null);
+    setError('');
+    try {
+      const res = await fetch('/api/admin/scenario-challenges/seed-presets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ preset: 'road-to-carry' }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(typeof body.error === 'string' ? body.error : `Seed failed (${res.status})`);
+      }
+      const result = await res.json() as { written: string[]; skipped: { id: string; reason: string }[]; total: number };
+      setSeedResult({ written: result.written, skipped: result.skipped });
+      // Refresh scenario list so newly-seeded scenarios appear immediately.
+      void refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Seed failed');
+    } finally {
+      setSeedLoading(false);
+    }
   };
 
   const handleEdit = async (id: string) => {
@@ -374,8 +403,31 @@ export function ScenarioChallengesTab({ token }: { token: string }) {
           >
             Or create manually
           </button>
+          <button
+            onClick={handleSeedPresets}
+            disabled={seedLoading}
+            className="px-3 py-1.5 rounded text-xs font-medium bg-amber-600 text-white hover:bg-amber-500 disabled:opacity-40 ml-auto"
+            title="Bulk-write the 5 Road to Carry case-study scenarios into KV. Idempotent — safe to re-run."
+          >
+            {seedLoading ? 'Seeding…' : 'Seed Road to Carry presets (5)'}
+          </button>
           {aiError && <span className="text-xs text-danger">{aiError}</span>}
         </div>
+        {seedResult && (
+          <div className="text-[11px] text-text-muted mt-2">
+            <strong className="text-accent">{seedResult.written.length}</strong> written
+            {seedResult.skipped.length > 0 && (
+              <> · <strong className="text-warning">{seedResult.skipped.length}</strong> skipped</>
+            )}
+            {seedResult.skipped.length > 0 && (
+              <ul className="mt-1 list-disc list-inside text-danger">
+                {seedResult.skipped.map(s => (
+                  <li key={s.id}><code>{s.id}</code>: {s.reason}</li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </section>
 
       {/* ── Existing Scenarios ── */}
