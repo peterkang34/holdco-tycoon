@@ -227,18 +227,23 @@ export function AllocatePhase({
   const isBusinessSchoolMode = useGameStore((s) => s.isBusinessSchoolMode);
   const isScenarioChallengeMode = useGameStore((s) => s.isScenarioChallengeMode);
   const scenarioChallengeConfig = useGameStore((s) => s.scenarioChallengeConfig);
+  const triggeredTriggerIds = useGameStore((s) => s.triggeredTriggerIds);
   const businessSchoolState = useGameStore((s) => s.businessSchoolState);
   const hasCrossSectorRecipeUnlock = useGameStore((s) => s.unlockedMechanics?.crossSectorSaasServices ?? false);
 
   // Mode context for isFeatureAvailable. Each feature check is O(1); memo avoids
   // re-allocating the object per feature check during a single render.
+  // Phase 4: includes `round` + `triggeredTriggerIds` so resolveDisabledFeatures
+  // can read trigger-fired enableFeature actions when checking gating.
   const modeContext = useMemo(() => ({
     isBusinessSchoolMode,
     isFundManagerMode,
     isScenarioChallengeMode,
     scenarioChallengeConfig,
     isFamilyOfficeMode,
-  }), [isBusinessSchoolMode, isFundManagerMode, isScenarioChallengeMode, scenarioChallengeConfig, isFamilyOfficeMode]);
+    round,
+    triggeredTriggerIds,
+  }), [isBusinessSchoolMode, isFundManagerMode, isScenarioChallengeMode, scenarioChallengeConfig, isFamilyOfficeMode, round, triggeredTriggerIds]);
 
   // Per-feature availability. Render-phase checks; handlers also call isFeatureAvailable
   // at call time to catch any state-diff races.

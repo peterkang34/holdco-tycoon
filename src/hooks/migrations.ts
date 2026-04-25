@@ -1173,6 +1173,39 @@ function migrateV42ToV43(): void {
   }
 }
 
+// --- v43 → v44: Scenario trigger state (Phase 4 — Feature B) ---
+// Adds two new GameState fields used by the trigger evaluator:
+//   - triggeredTriggerIds: string[]              — sticky set of fired trigger ids
+//   - triggerFireRounds:   Record<string, number> — round each trigger first fired
+// Both default to empty/{} for any save. In-flight scenarios that already exist
+// pre-deploy don't re-evaluate retroactively (they wouldn't have any triggers in
+// the saved scenarioChallengeConfig anyway). Pure additive — no behavior change
+// for non-scenario saves.
+
+function migrateV43ToV44(): void {
+  const v43Key = 'holdco-tycoon-save-v43';
+  const v44Key = 'holdco-tycoon-save-v44';
+  if (localStorage.getItem(v44Key)) return;
+  try {
+    const raw = localStorage.getItem(v43Key);
+    if (!raw) return;
+    const v43Data = JSON.parse(raw);
+    if (!v43Data?.state) return;
+
+    if (v43Data.state.triggeredTriggerIds === undefined) {
+      v43Data.state.triggeredTriggerIds = [];
+    }
+    if (v43Data.state.triggerFireRounds === undefined) {
+      v43Data.state.triggerFireRounds = {};
+    }
+
+    localStorage.setItem(v44Key, JSON.stringify(v43Data));
+    localStorage.removeItem(v43Key);
+  } catch (e) {
+    console.error('v43→v44 migration failed:', e);
+  }
+}
+
 /**
  * Run all migrations in chronological order.
  * Safe to call multiple times — each migration is idempotent.
@@ -1212,4 +1245,5 @@ export function runAllMigrations(): void {
   migrateV40ToV41();
   migrateV41ToV42();
   migrateV42ToV43();
+  migrateV43ToV44();
 }

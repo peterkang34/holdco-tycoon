@@ -87,6 +87,10 @@ import {
   getForcedLiquidationYear,
 } from '../data/fundStructure';
 import { createBusinessFromConfig, createDealFromCuratedConfig, createForcedGameEvent } from '../data/scenarioChallenges';
+import {
+  resolveAllowedSectors,
+  resolveAllowedSubTypes,
+} from '../engine/scenarioRules';
 
 /**
  * Strip deals whose sector/sub-type isn't allowed by the current scenario's
@@ -96,15 +100,20 @@ import { createBusinessFromConfig, createDealFromCuratedConfig, createForcedGame
  * pipelines stay consistent regardless of generation source.
  */
 function filterDealsByScenario<T extends { business: { sectorId: string; subType: string } }>(
-  state: Pick<GameState, 'isScenarioChallengeMode' | 'scenarioChallengeConfig'>,
+  state: Pick<GameState, 'isScenarioChallengeMode' | 'scenarioChallengeConfig' | 'round' | 'triggeredTriggerIds'>,
   deals: T[],
 ): T[] {
   if (!state.isScenarioChallengeMode || !state.scenarioChallengeConfig) return deals;
-  const cfg = state.scenarioChallengeConfig;
-  const allowedSectors = cfg.allowedSectors && cfg.allowedSectors.length > 0
-    ? new Set<string>(cfg.allowedSectors) : null;
-  const allowedSubTypes = cfg.allowedSubTypes && cfg.allowedSubTypes.length > 0
-    ? new Set<string>(cfg.allowedSubTypes) : null;
+  // Read through the resolver — composes static allowedSectors + allowedSectorsByRound
+  // (Phase 4 Feature A) + fired-trigger overlays (Phase 4 Feature B). Same call site
+  // used by sourceDeals / proactiveOutreach / smbBrokerDealFlow / round-advance
+  // pipeline construction.
+  const allowedSectorsList = resolveAllowedSectors(state);
+  const allowedSubTypesList = resolveAllowedSubTypes(state);
+  const allowedSectors = allowedSectorsList && allowedSectorsList.length > 0
+    ? new Set<string>(allowedSectorsList) : null;
+  const allowedSubTypes = allowedSubTypesList && allowedSubTypesList.length > 0
+    ? new Set<string>(allowedSubTypesList) : null;
   if (!allowedSectors && !allowedSubTypes) return deals;
   return deals.filter(d => {
     if (allowedSectors && !allowedSectors.has(d.business.sectorId)) return false;
@@ -930,6 +939,9 @@ export const useGameStore = create<GameStore>()(
           scenarioChallengeId: config.id,
           scenarioChallengeConfig: { ...config, disabledFeatures },
           isAdminPreview,
+          // Phase 4 — trigger ledger starts empty; evaluator runs in advanceToAllocate.
+          triggeredTriggerIds: [],
+          triggerFireRounds: {},
           // PE coexistence — when scenario is PE-structured, also enable Fund Manager mode.
           ...(isPEScenario
             ? {
@@ -1480,6 +1492,19 @@ export const useGameStore = create<GameStore>()(
         const state = get();
         if (state.phase !== 'event') return; // Guard: must be in event phase
 
+        // Phase 4 — Feature A: detect round-based sector transitions. State.round
+        // is already the new round (endRound advanced it). Compare the resolver
+        // result for this round vs the prior round; if it changed, fire a toast
+        // at the end of advanceToAllocate so the new pipeline is visible alongside
+        // the message. We capture both lists upfront, before any other state
+        // mutations could shift the resolver answer.
+        const prevSectorsForToast = state.isScenarioChallengeMode && state.round > 1
+          ? resolveAllowedSectors({ ...state, round: state.round - 1 })
+          : null;
+        const nextSectorsForToast = state.isScenarioChallengeMode
+          ? resolveAllowedSectors(state)
+          : null;
+
         // If there's a pending proSports event, show it before advancing to allocate
         if (state.pendingProSportsEvent) {
           const proEvent = state.pendingProSportsEvent;
@@ -1599,18 +1624,19 @@ export const useGameStore = create<GameStore>()(
         // Determinism: always fork the 'dealFloor' RNG stream regardless of whether the
         // floor fires — this keeps the main deals stream position stable across future
         // code changes. Discard the fork output when unused.
+        //
+        // Phase 4: read effective restrictions through resolveAllowedSectors / Sub.
+        // This composes static allowedSectors + allowedSectorsByRound (Feature A) +
+        // fired-trigger overlays (Feature B) in one place.
         let postFilterPipeline = newPipeline;
         const dealFloorFork = roundStreams.deals.fork(`dealFloor_r${state.round}`);
         if (state.isScenarioChallengeMode && state.scenarioChallengeConfig) {
-          const cfg = state.scenarioChallengeConfig;
-          // allowedSectors narrowed to SectorId at construction — validation already
-          // guarantees each entry is valid (see validateScenarioConfig).
-          const allowedSectors: Set<SectorId> | null = cfg.allowedSectors && cfg.allowedSectors.length > 0
-            ? new Set<SectorId>(cfg.allowedSectors)
-            : null;
-          const allowedSubTypes: Set<string> | null = cfg.allowedSubTypes && cfg.allowedSubTypes.length > 0
-            ? new Set<string>(cfg.allowedSubTypes)
-            : null;
+          const allowedSectorsArr = resolveAllowedSectors(state);
+          const allowedSubTypesArr = resolveAllowedSubTypes(state);
+          const allowedSectors: Set<SectorId> | null = allowedSectorsArr && allowedSectorsArr.length > 0
+            ? new Set<SectorId>(allowedSectorsArr) : null;
+          const allowedSubTypes: Set<string> | null = allowedSubTypesArr && allowedSubTypesArr.length > 0
+            ? new Set<string>(allowedSubTypesArr) : null;
 
           if (allowedSectors || allowedSubTypes) {
             postFilterPipeline = newPipeline.filter(d => {
@@ -1722,18 +1748,9 @@ export const useGameStore = create<GameStore>()(
         // that restrict to specific sectors must not leak sector-unrelated deals even when
         // a cross-sector event fires.
         if (state.isScenarioChallengeMode && state.scenarioChallengeConfig) {
-          const cfg = state.scenarioChallengeConfig;
-          const allowedSectors = cfg.allowedSectors && cfg.allowedSectors.length > 0
-            ? new Set<SectorId>(cfg.allowedSectors) : null;
-          const allowedSubTypes = cfg.allowedSubTypes && cfg.allowedSubTypes.length > 0
-            ? new Set<string>(cfg.allowedSubTypes) : null;
-          if (allowedSectors || allowedSubTypes) {
-            finalPipeline = finalPipeline.filter(d => {
-              if (allowedSectors && !allowedSectors.has(d.business.sectorId)) return false;
-              if (allowedSubTypes && !allowedSubTypes.has(d.business.subType)) return false;
-              return true;
-            });
-          }
+          // Phase 4 — read through the resolver so round-based + trigger overlays apply
+          // to event-injected deals too.
+          finalPipeline = filterDealsByScenario(state, finalPipeline);
         }
 
         // Clean up passedDealIds — remove IDs for deals no longer in the pipeline
@@ -1755,6 +1772,26 @@ export const useGameStore = create<GameStore>()(
           ...allocateState,
           metrics: calculateMetrics(allocateState),
         });
+
+        // Surface round-based sector transitions as a toast. Only fires when the
+        // resolved set actually changed from the prior round — pure round-1 inheritance
+        // (no key set at this round) silently rolls forward.
+        if (
+          state.isScenarioChallengeMode
+          && nextSectorsForToast !== null
+          && JSON.stringify(prevSectorsForToast ?? []) !== JSON.stringify(nextSectorsForToast)
+        ) {
+          const sectorNames = nextSectorsForToast
+            .map(sid => SECTORS[sid]?.name ?? sid)
+            .slice(0, 4)
+            .join(', ');
+          const moreCount = nextSectorsForToast.length > 4 ? ` (+${nextSectorsForToast.length - 4} more)` : '';
+          useToastStore.getState().addToast({
+            message: `Year ${state.round} · Industry Rotation`,
+            detail: `New deals limited to: ${sectorNames}${moreCount}`,
+            type: 'info',
+          });
+        }
       },
 
       endRound: () => {
@@ -6445,7 +6482,7 @@ export const useGameStore = create<GameStore>()(
       },
     }),
     {
-      name: 'holdco-tycoon-save-v43', // v43: Scenario Challenge mode + PE fundStructure parameterization (Step 1/1.5)
+      name: 'holdco-tycoon-save-v44', // v44: Scenario triggers (triggeredTriggerIds + triggerFireRounds) — Phase 4 Feature B
       partialize: (state) => ({
         holdcoName: state.holdcoName,
         round: state.round,
@@ -6533,6 +6570,9 @@ export const useGameStore = create<GameStore>()(
         scenarioChallengeId: state.scenarioChallengeId,
         scenarioChallengeConfig: state.scenarioChallengeConfig,
         isAdminPreview: state.isAdminPreview,
+        // Phase 4 — scenario trigger state (sticky fired-trigger ledger).
+        triggeredTriggerIds: state.triggeredTriggerIds,
+        triggerFireRounds: state.triggerFireRounds,
       }),
       // Debounced storage to coalesce rapid mutations (game is turn-based, 500ms delay is safe)
       storage: {

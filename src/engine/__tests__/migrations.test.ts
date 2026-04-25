@@ -424,8 +424,8 @@ describe('runAllMigrations', () => {
 
     // v9 should be consumed
     expect(localStorageMock.getItem('holdco-tycoon-save-v9')).toBeNull();
-    // Final v43 should exist (chain goes through all migrations including v42→v43)
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v43')!);
+    // Final v44 should exist (chain runs through v42→v43→v44 — Phase 4 trigger state)
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v44')!);
     expect(result.state.difficulty).toBe('easy');
     expect(result.state.maxRounds).toBe(20);
     expect(result.state.founderDistributionsReceived).toBeDefined();
@@ -509,7 +509,7 @@ describe('runAllMigrations', () => {
 
     runAllMigrations();
 
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v43')!);
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v44')!);
     expect(result.state.fundStructure).toEqual({
       committedCapital: 100_000,
       mgmtFeePercent: 0.02,
@@ -532,10 +532,40 @@ describe('runAllMigrations', () => {
 
     runAllMigrations();
 
-    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v43')!);
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v44')!);
     expect(result.state.fundStructure).toBeUndefined();
     expect(result.state.isScenarioChallengeMode).toBe(false);
     expect(result.state.isAdminPreview).toBe(false);
+  });
+
+  it('v43→v44 backfills empty trigger state (Phase 4)', () => {
+    const v43Data = {
+      state: {
+        difficulty: 'easy',
+        isFundManagerMode: false,
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v43', JSON.stringify(v43Data));
+    runAllMigrations();
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v44')!);
+    expect(result.state.triggeredTriggerIds).toEqual([]);
+    expect(result.state.triggerFireRounds).toEqual({});
+    // v43 key should be consumed.
+    expect(localStorageMock.getItem('holdco-tycoon-save-v43')).toBeNull();
+  });
+
+  it('v43→v44 preserves existing trigger state if somehow already set', () => {
+    const v43Data = {
+      state: {
+        triggeredTriggerIds: ['t1'],
+        triggerFireRounds: { t1: 5 },
+      },
+    };
+    localStorageMock.setItem('holdco-tycoon-save-v43', JSON.stringify(v43Data));
+    runAllMigrations();
+    const result = JSON.parse(localStorageMock.getItem('holdco-tycoon-save-v44')!);
+    expect(result.state.triggeredTriggerIds).toEqual(['t1']);
+    expect(result.state.triggerFireRounds).toEqual({ t1: 5 });
   });
 
   it('should be safe to call multiple times (idempotent)', () => {

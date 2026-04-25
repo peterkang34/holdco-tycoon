@@ -18,6 +18,7 @@
 import type { GameState, GameActionType } from '../engine/types';
 import { BS_BLOCKED_ACTIONS } from './businessSchool';
 import { DISABLED_FEATURE_ACTIONS } from './scenarioChallenges';
+import { resolveDisabledFeatures } from '../engine/scenarioRules';
 
 /**
  * Actions blocked by PE Fund Manager mode.
@@ -60,10 +61,9 @@ export interface ActionBlockResult {
  * will fail — on purpose, so you re-think the design.
  */
 export function isActionBlocked(
-  state: Pick<
-    GameState,
-    'isBusinessSchoolMode' | 'isFundManagerMode' | 'isScenarioChallengeMode' | 'scenarioChallengeConfig'
-  >,
+  state:
+    & Pick<GameState, 'isBusinessSchoolMode' | 'isFundManagerMode' | 'isScenarioChallengeMode' | 'scenarioChallengeConfig'>
+    & Partial<Pick<GameState, 'round' | 'triggeredTriggerIds'>>,
   action: GameActionType,
 ): ActionBlockResult {
   if (state.isBusinessSchoolMode && BS_BLOCKED_ACTIONS.has(action)) {
@@ -73,7 +73,10 @@ export function isActionBlocked(
     return { blocked: true, reason: 'pe_fund' };
   }
   if (state.isScenarioChallengeMode && state.scenarioChallengeConfig?.disabledFeatures) {
-    const disabled = state.scenarioChallengeConfig.disabledFeatures;
+    // Read through resolveDisabledFeatures (Phase 4 — scenarioRules.ts) so
+    // trigger-fired `enableFeature` actions correctly clear scenario-disabled
+    // flags. Falls back to the static config when no triggers have fired.
+    const disabled = resolveDisabledFeatures(state) ?? state.scenarioChallengeConfig.disabledFeatures;
     for (const [key, isDisabled] of Object.entries(disabled)) {
       if (!isDisabled) continue;
       const blockedActions = DISABLED_FEATURE_ACTIONS[key as keyof typeof DISABLED_FEATURE_ACTIONS];
@@ -168,14 +171,15 @@ const BLOCK_REASON_MESSAGES: Record<FeatureBlockReason, string> = {
  * scenario, matching the existing precedence in `isActionBlocked`.
  */
 export function isFeatureAvailable(
-  state: Pick<
-    GameState,
-    | 'isBusinessSchoolMode'
-    | 'isFundManagerMode'
-    | 'isScenarioChallengeMode'
-    | 'scenarioChallengeConfig'
-    | 'isFamilyOfficeMode'
-  >,
+  state:
+    & Pick<GameState,
+      | 'isBusinessSchoolMode'
+      | 'isFundManagerMode'
+      | 'isScenarioChallengeMode'
+      | 'scenarioChallengeConfig'
+      | 'isFamilyOfficeMode'
+    >
+    & Partial<Pick<GameState, 'round' | 'triggeredTriggerIds'>>,
   feature: FeatureKey,
 ): FeatureAvailability {
   // Family Office: a handful of features (equity, buyback, distributions) are
