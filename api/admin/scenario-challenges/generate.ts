@@ -188,6 +188,82 @@ Optional fields you may include:
   maxAcquisitionsPerRound: number,     // >= 1
   fundStructure: { committedCapital, mgmtFeePercent, hurdleRate, carryRate, forcedLiquidationDiscount, forcedLiquidationYear? },
 
+Phase 4 — Dynamic restrictions (use ONLY when the scenario description explicitly calls for one of these patterns):
+
+allowedSectorsByRound: { [round]: SectorId[] }
+  Sparse keys with REPLACE + INHERIT semantics. Sparse means unset rounds inherit
+  from the most recent prior key. REPLACE means a new round's list FULLY replaces
+  the prior — to keep prior sectors available, list them explicitly. Use this for
+  "industry rotation" scenarios (e.g., 2008 crash → financialServices only;
+  2012 recovery → tech/saas; 2020 pandemic → healthcare).
+
+triggers: Array<{
+  id: string,                          // unique within scenario, kebab-case
+  when: TriggerCondition,              // single condition or { all: [...] } / { any: [...] } — max nesting depth 2
+  actions: TriggerAction[],            // ≥1 action; fired in order when condition first true
+  narrative: { title: string (≤60 chars), detail: string (≤200 chars) },
+  minRound?: number,                   // optional: skip evaluation before this round
+}>
+  Sticky (fire once, stay active). Add-only — no remove/lock actions.
+  Use this for "unlock X when Y" patterns (EBITDA threshold, business count, cash, etc.).
+
+TriggerCondition shape (leaf):
+  { metric: <numeric metric>, op: '>' | '>=' | '<' | '<=' | '==', value: number }
+  | { metric: 'hasBusinessWithQuality', op: '>=', value: 1|2|3|4|5 }
+  | { metric: 'hasBusinessInSector', sectorId: SectorId }
+
+Valid numeric metrics:
+  round, cash, portfolioEbitda, activeBusinessCount, totalDistributions,
+  netDebtToEbitda, totalRevenue, avgEbitdaMargin, exitedBusinessCount, totalExitProceeds.
+
+Cash/EBITDA thresholds are in $K (e.g., $10M = 10000).
+
+TriggerAction types:
+  { type: 'addAllowedSectors', sectors: SectorId[] }      — union with current allowed
+  { type: 'addAllowedSubTypes', subTypes: string[] }      — union with current allowed sub-types
+  { type: 'enableFeature', feature: DisabledFeatureKey }  — clears a disabledFeatures gate
+  { type: 'setAllowedSectors', sectors: SectorId[] }      — HARD REPLACE for dramatic pivots
+
+Dynamic restriction rules (CRITICAL — these are the ones that fail validation):
+- DO NOT generate a trigger that can never fire (e.g., round > maxRounds).
+- DO NOT generate triggers fire-immediately at round 1 with no real gating — put those in allowedSectors directly.
+- DO NOT use enableFeature for a feature NOT in disabledFeatures (validator rejects no-op unlocks).
+- Every trigger MUST have a narrative — players see it as a toast + game-over milestone.
+- DO NOT nest all/any deeper than 2 levels.
+- If the description mentions "industry rotation" or "era shift", prefer allowedSectorsByRound.
+- If the description mentions "unlock X when Y", prefer triggers.
+
+Examples:
+
+Industry rotation (Feature A):
+  allowedSectorsByRound: {
+    1: ["financialServices"],
+    5: ["saas", "fintech"],
+    9: ["healthcare"]
+  }
+
+Metric-triggered unlock (Feature B):
+  triggers: [{
+    id: "industrial-unlock",
+    when: { metric: "portfolioEbitda", op: ">=", value: 10000 },
+    actions: [{ type: "addAllowedSectors", sectors: ["industrial"] }],
+    narrative: { title: "Industrial Sector Unlocked",
+                 detail: "Your portfolio scale attracts industrial sellers." }
+  }]
+
+Composite unlock (Feature B):
+  disabledFeatures: { ipo: true },
+  triggers: [{
+    id: "ipo-unlock",
+    when: { all: [
+      { metric: "activeBusinessCount", op: ">=", value: 5 },
+      { metric: "portfolioEbitda", op: ">=", value: 25000 }
+    ]},
+    actions: [{ type: "enableFeature", feature: "ipo" }],
+    narrative: { title: "IPO Pathway Unlocked",
+                 detail: "Portfolio scale qualifies for public markets." }
+  }]
+
 Rules:
 - Output ONLY the JSON object. No prose, no markdown code fences, no commentary.
 - Every sectorId must be from the valid list above.

@@ -46,6 +46,9 @@ interface ScenarioChallengeResultSectionProps {
   strategy?: Partial<LeaderboardStrategy>;
   isLoggedIn: boolean;
   onSignUp: () => void;
+  /** Phase 4 — round each trigger first fired. Empty / missing for scenarios
+   * without triggers or when no triggers fired. */
+  triggerFireRounds?: Record<string, number>;
 }
 
 const TOP_N = 10;
@@ -68,6 +71,7 @@ export function ScenarioChallengeResultSection({
   strategy,
   isLoggedIn,
   onSignUp,
+  triggerFireRounds,
 }: ScenarioChallengeResultSectionProps) {
   const [initials, setInitials] = useState('');
   const [saving, setSaving] = useState(false);
@@ -225,6 +229,9 @@ export function ScenarioChallengeResultSection({
           isArchived={isArchived}
         />
       )}
+
+      {/* ── Phase 4: Scenario Milestones (triggers fired) ── */}
+      <ScenarioMilestones config={config} triggerFireRounds={triggerFireRounds} />
 
       {/* ── Top 10 ── */}
       <div className="mt-4 pt-4 border-t border-white/10">
@@ -436,6 +443,58 @@ function ClosedBanner() {
       <p className="text-xs text-text-muted mt-1">
         This scenario ended more than 24 hours ago.
       </p>
+    </div>
+  );
+}
+
+/**
+ * Phase 4 — Scenario Milestones timeline. Renders the triggers the player
+ * fired during the run, in chronological order, with the round each fired.
+ * Hidden when the scenario has no triggers OR none fired (e.g., the player
+ * never crossed any threshold).
+ */
+function ScenarioMilestones({
+  config,
+  triggerFireRounds,
+}: {
+  config: ScenarioChallengeConfig;
+  triggerFireRounds?: Record<string, number>;
+}) {
+  if (!config.triggers || config.triggers.length === 0) return null;
+  if (!triggerFireRounds || Object.keys(triggerFireRounds).length === 0) return null;
+
+  // Pull narrative for each fired trigger by id; sort by round, then by config order.
+  const fired = config.triggers
+    .filter(t => triggerFireRounds[t.id] !== undefined)
+    .map(t => ({ trigger: t, round: triggerFireRounds[t.id] }))
+    .sort((a, b) => a.round - b.round);
+
+  if (fired.length === 0) return null;
+
+  return (
+    <div className="mt-4 pt-4 border-t border-white/10">
+      <p className="text-sm font-bold text-text-secondary mb-3">
+        Scenario Milestones
+        <span className="text-xs text-text-muted font-normal ml-2">
+          · {fired.length} of {config.triggers.length} triggered
+        </span>
+      </p>
+      <div className="space-y-2">
+        {fired.map(({ trigger, round }) => (
+          <div
+            key={trigger.id}
+            className="flex items-start gap-3 px-3 py-2 rounded-lg bg-white/5"
+          >
+            <span className="text-xs font-mono tabular-nums text-amber-400 shrink-0 mt-0.5">
+              Y{round}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-text-primary">{trigger.narrative.title}</p>
+              <p className="text-xs text-text-muted">{trigger.narrative.detail}</p>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

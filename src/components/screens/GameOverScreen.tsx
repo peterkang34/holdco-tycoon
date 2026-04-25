@@ -972,6 +972,7 @@ export function GameOverScreen({
           }}
           isLoggedIn={isLoggedIn}
           onSignUp={() => openAccountModal()}
+          triggerFireRounds={useGameStore.getState().triggerFireRounds}
         />
       )}
       {!isBankruptcy && !isScenarioChallengeMode && (
