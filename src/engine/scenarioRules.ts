@@ -35,7 +35,18 @@ import type {
 type NumericMetric =
   | 'round' | 'cash' | 'portfolioEbitda' | 'activeBusinessCount'
   | 'totalDistributions' | 'netDebtToEbitda' | 'totalRevenue'
-  | 'avgEbitdaMargin' | 'exitedBusinessCount' | 'totalExitProceeds';
+  | 'avgEbitdaMargin' | 'exitedBusinessCount' | 'totalExitProceeds'
+  // Phase 5
+  | 'integratedPlatformCount' | 'largestPlatformEbitda' | 'peakNetWorth'
+  | 'successfulExits' | 'successfulExitValue' | 'lowestAverageLeverage' | 'totalTuckIns';
+
+/** Pick of GameState fields the trigger evaluator needs at full read scope.
+ * Phase 5 adds integratedPlatforms, metricsHistory, roundHistory for the new
+ * milestone metrics — kept optional via Partial<> so callers passing minimal
+ * test fixtures (no platforms / no history) don't have to enumerate them. */
+type EvaluatorState =
+  & Pick<GameState, 'cash' | 'businesses' | 'exitedBusinesses' | 'totalDistributions' | 'round'>
+  & Partial<Pick<GameState, 'integratedPlatforms' | 'metricsHistory' | 'roundHistory'>>;
 
 type ScenarioState =
   & Pick<GameState, 'isScenarioChallengeMode' | 'scenarioChallengeConfig'>
@@ -130,7 +141,7 @@ export function resolveDisabledFeatures(state: ScenarioState): DisabledFeatures 
 export function evaluateTriggers(
   state: ScenarioState,
   metrics: Pick<Metrics, 'totalEbitda' | 'totalRevenue' | 'avgEbitdaMargin' | 'netDebtToEbitda'> & { exitedBusinessCount?: number; totalExitProceeds?: number },
-  fullState: Pick<GameState, 'cash' | 'businesses' | 'exitedBusinesses' | 'totalDistributions' | 'round'>,
+  fullState: EvaluatorState,
 ): ScenarioTrigger[] {
   if (!state.isScenarioChallengeMode || !state.scenarioChallengeConfig) return [];
   const cfg = state.scenarioChallengeConfig;
@@ -152,7 +163,7 @@ export function evaluateTriggers(
 function evaluateCondition(
   cond: TriggerCondition,
   metrics: Pick<Metrics, 'totalEbitda' | 'totalRevenue' | 'avgEbitdaMargin' | 'netDebtToEbitda'> & { exitedBusinessCount?: number; totalExitProceeds?: number },
-  fullState: Pick<GameState, 'cash' | 'businesses' | 'exitedBusinesses' | 'totalDistributions' | 'round'>,
+  fullState: EvaluatorState,
 ): boolean {
   if ('all' in cond) return cond.all.every(c => evaluateCondition(c, metrics, fullState));
   if ('any' in cond) return cond.any.some(c => evaluateCondition(c, metrics, fullState));
@@ -171,14 +182,59 @@ function evaluateCondition(
     return compare(max, cond.op, cond.value);
   }
 
+  // platformsAboveEbitda — parameterized: count integrated platforms whose EBITDA ≥ threshold,
+  // then compare that count to value. Falls back to active businesses marked isPlatform when
+  // integratedPlatforms is sparsely populated (defensive).
+  if (cond.metric === 'platformsAboveEbitda') {
+    const platformEbitdas = computePlatformEbitdas(fullState);
+    const count = platformEbitdas.filter(e => e >= cond.threshold).length;
+    return compare(count, cond.op, cond.value);
+  }
+
   const lhs = readMetric(cond.metric as NumericMetric, metrics, fullState);
   return compare(lhs, cond.op, cond.value);
+}
+
+/**
+ * Compute per-platform EBITDA totals. An "integrated platform" rolls up its
+ * constituent businesses' EBITDA. Standalone platform-marked businesses count
+ * as solo platforms with their own EBITDA.
+ */
+function computePlatformEbitdas(state: EvaluatorState): number[] {
+  const ebitdas: number[] = [];
+  // Integrated platforms (the explicit forge_integrated_platform output) — sum
+  // each platform's constituent businesses by id.
+  if (state.integratedPlatforms && state.integratedPlatforms.length > 0) {
+    const businessById = new Map(state.businesses.map(b => [b.id, b]));
+    const seen = new Set<string>();
+    for (const ip of state.integratedPlatforms) {
+      const sum = ip.constituentBusinessIds.reduce((s: number, id: string) => {
+        const b = businessById.get(id);
+        if (!b || b.status !== 'active') return s;
+        seen.add(id);
+        return s + b.ebitda;
+      }, 0);
+      if (sum > 0) ebitdas.push(sum);
+    }
+    // Standalone platforms (designate_platform — not part of an integrated forge):
+    // include only those NOT already captured by an integrated platform above.
+    for (const b of state.businesses) {
+      if (b.status !== 'active' || !b.isPlatform || seen.has(b.id)) continue;
+      ebitdas.push(b.ebitda);
+    }
+  } else {
+    // No integrated platforms — use designated standalone platforms.
+    for (const b of state.businesses) {
+      if (b.status === 'active' && b.isPlatform) ebitdas.push(b.ebitda);
+    }
+  }
+  return ebitdas;
 }
 
 function readMetric(
   metric: NumericMetric,
   metrics: Pick<Metrics, 'totalEbitda' | 'totalRevenue' | 'avgEbitdaMargin' | 'netDebtToEbitda'> & { exitedBusinessCount?: number; totalExitProceeds?: number },
-  fullState: Pick<GameState, 'cash' | 'businesses' | 'exitedBusinesses' | 'totalDistributions' | 'round'>,
+  fullState: EvaluatorState,
 ): number {
   switch (metric) {
     case 'round':                  return fullState.round;
@@ -191,8 +247,60 @@ function readMetric(
     case 'avgEbitdaMargin':        return metrics.avgEbitdaMargin ?? 0;
     case 'exitedBusinessCount':    return fullState.exitedBusinesses?.length ?? 0;
     case 'totalExitProceeds':      return fullState.exitedBusinesses?.reduce((s, b) => s + (b.exitPrice ?? 0), 0) ?? 0;
+    // ── Phase 5 milestone metrics ──
+    case 'integratedPlatformCount': return fullState.integratedPlatforms?.length ?? 0;
+    case 'largestPlatformEbitda':   return Math.max(0, ...computePlatformEbitdas(fullState));
+    case 'peakNetWorth':            return readPeakNetWorth(fullState);
+    case 'successfulExits':         return (fullState.exitedBusinesses ?? []).filter(b => (b.exitPrice ?? 0) > 0).length;
+    case 'successfulExitValue':     return (fullState.exitedBusinesses ?? []).reduce((s, b) => s + Math.max(0, b.exitPrice ?? 0), 0);
+    case 'lowestAverageLeverage':   return readLowestAverageLeverage(fullState);
+    case 'totalTuckIns':            return readTotalTuckIns(fullState);
     default:                        return 0;
   }
+}
+
+/** Peak net worth across the run — max of (cash - totalDebt + portfolio EV) per recorded round. */
+function readPeakNetWorth(state: EvaluatorState): number {
+  const history = state.metricsHistory ?? [];
+  if (history.length === 0) {
+    // Fallback: synthesize from current state (start of run, before any history).
+    return Math.max(0, state.cash);
+  }
+  let peak = 0;
+  for (const h of history) {
+    const m = h.metrics;
+    const portfolioValue = (m.totalEbitda ?? 0) * 5; // approximate — real EV is sector-adjusted
+    const netWorth = state.cash + portfolioValue - (m.netDebtToEbitda ?? 0) * (m.totalEbitda ?? 0);
+    if (netWorth > peak) peak = netWorth;
+  }
+  return Math.round(peak);
+}
+
+/**
+ * Lowest average leverage (net debt / EBITDA) recorded across the run. Lower
+ * = better. Returns 0 when there's no history (no leverage = best possible).
+ */
+function readLowestAverageLeverage(state: EvaluatorState): number {
+  const history = state.metricsHistory ?? [];
+  if (history.length === 0) return 0;
+  let lowest = Infinity;
+  for (const h of history) {
+    const lev = h.metrics.netDebtToEbitda ?? 0;
+    if (lev < lowest) lowest = lev;
+  }
+  return Number.isFinite(lowest) ? lowest : 0;
+}
+
+/** Count of acquire_tuck_in actions across the entire round history. */
+function readTotalTuckIns(state: EvaluatorState): number {
+  const history = state.roundHistory ?? [];
+  let count = 0;
+  for (const round of history) {
+    for (const action of round.actions ?? []) {
+      if (action.type === 'acquire_tuck_in') count++;
+    }
+  }
+  return count;
 }
 
 function compare(lhs: number, op: '>' | '>=' | '<' | '<=' | '==', rhs: number): boolean {
@@ -242,4 +350,57 @@ function collectFiredTriggerActions(state: ScenarioState): TriggerAction[] {
 
 function uniq<T>(arr: T[]): T[] {
   return [...new Set(arr)];
+}
+
+// ── Phase 5: Milestone-based FEV multiplier resolution ────────────────────
+
+/** Maximum stacked FEV multiplier — caps any combination of fired multiplier
+ * triggers so a config with many small bonuses can't compound into absurdity. */
+export const MAX_FEV_MULTIPLIER = 5;
+
+/**
+ * Resolve the effective FEV multiplier from fired `applyFevMultiplier` triggers.
+ * Multipliers stack multiplicatively: 1.5 × 1.2 × 1.3 = 2.34. Cap at MAX_FEV_MULTIPLIER.
+ *
+ * Returns 1.0 when nothing has fired or scenario mode is off — caller can multiply
+ * unconditionally without branching. Server-authoritative path uses the same logic;
+ * see api/scenario-challenges/submit.ts.
+ */
+export function resolveFevMultiplier(state: ScenarioState): number {
+  if (!state.isScenarioChallengeMode || !state.scenarioChallengeConfig) return 1;
+  const cfg = state.scenarioChallengeConfig;
+  if (!cfg.triggers || cfg.triggers.length === 0) return 1;
+  const fired = new Set(state.triggeredTriggerIds ?? []);
+  if (fired.size === 0) return 1;
+  let mult = 1;
+  for (const trigger of cfg.triggers) {
+    if (!fired.has(trigger.id)) continue;
+    for (const action of trigger.actions) {
+      if (action.type === 'applyFevMultiplier' && Number.isFinite(action.value) && action.value > 0) {
+        mult *= action.value;
+      }
+    }
+  }
+  return Math.min(mult, MAX_FEV_MULTIPLIER);
+}
+
+/**
+ * List the fired multiplier triggers + their values, in fire order. Used by the
+ * game-over screen to render the breakdown ("Y3: Roll-up Champion · 1.5×").
+ */
+export function listFiredFevMultipliers(state: ScenarioState): Array<{ trigger: ScenarioTrigger; value: number }> {
+  if (!state.isScenarioChallengeMode || !state.scenarioChallengeConfig) return [];
+  const cfg = state.scenarioChallengeConfig;
+  if (!cfg.triggers || cfg.triggers.length === 0) return [];
+  const fired = new Set(state.triggeredTriggerIds ?? []);
+  const result: Array<{ trigger: ScenarioTrigger; value: number }> = [];
+  for (const trigger of cfg.triggers) {
+    if (!fired.has(trigger.id)) continue;
+    for (const action of trigger.actions) {
+      if (action.type === 'applyFevMultiplier' && Number.isFinite(action.value) && action.value > 0) {
+        result.push({ trigger, value: action.value });
+      }
+    }
+  }
+  return result;
 }

@@ -11,7 +11,10 @@ import {
   resolveAllowedSectors,
   resolveAllowedSubTypes,
   resolveDisabledFeatures,
+  resolveFevMultiplier,
+  listFiredFevMultipliers,
   evaluateTriggers,
+  MAX_FEV_MULTIPLIER,
 } from '../scenarioRules';
 import type { GameState, ScenarioChallengeConfig, Metrics, Business, ScenarioTrigger } from '../types';
 
@@ -351,5 +354,118 @@ describe('evaluateTriggers — sticky, condition logic, composites', () => {
     const r2 = evaluateTriggers(makeState(3, cfg, []), FAKE_METRICS, fullState);
     expect(r1.map(t => t.id)).toEqual(r2.map(t => t.id));
     expect(r1.map(t => t.id)).toEqual(['a', 'b']);
+  });
+});
+
+// ── Phase 5: FEV multiplier resolver ──────────────────────────────────────
+
+describe('resolveFevMultiplier — milestone-based FEV bonuses', () => {
+  it('returns 1.0 when scenario mode off', () => {
+    expect(resolveFevMultiplier({ isScenarioChallengeMode: false })).toBe(1);
+  });
+
+  it('returns 1.0 when no triggers fired', () => {
+    const cfg = makeConfig({
+      triggers: [{
+        id: 'm1',
+        when: { metric: 'cash', op: '>=', value: 10000 },
+        actions: [{ type: 'applyFevMultiplier', value: 1.5 }],
+        narrative: { title: 'A', detail: 'A' },
+      }],
+    });
+    expect(resolveFevMultiplier(makeState(3, cfg, []))).toBe(1);
+  });
+
+  it('applies a single fired multiplier', () => {
+    const cfg = makeConfig({
+      triggers: [{
+        id: 'm1',
+        when: { metric: 'cash', op: '>=', value: 1 },
+        actions: [{ type: 'applyFevMultiplier', value: 1.5 }],
+        narrative: { title: 'A', detail: 'A' },
+      }],
+    });
+    expect(resolveFevMultiplier(makeState(3, cfg, ['m1']))).toBe(1.5);
+  });
+
+  it('stacks multiple fired multipliers multiplicatively', () => {
+    const cfg = makeConfig({
+      triggers: [
+        { id: 'm1', when: { metric: 'cash', op: '>=', value: 1 }, actions: [{ type: 'applyFevMultiplier', value: 1.5 }], narrative: { title: 'A', detail: 'A' } },
+        { id: 'm2', when: { metric: 'cash', op: '>=', value: 1 }, actions: [{ type: 'applyFevMultiplier', value: 1.2 }], narrative: { title: 'B', detail: 'B' } },
+      ],
+    });
+    expect(resolveFevMultiplier(makeState(3, cfg, ['m1', 'm2']))).toBeCloseTo(1.8); // 1.5 × 1.2
+  });
+
+  it('caps stacked multipliers at MAX_FEV_MULTIPLIER (5×)', () => {
+    const cfg = makeConfig({
+      triggers: [
+        { id: 'm1', when: { metric: 'cash', op: '>=', value: 1 }, actions: [{ type: 'applyFevMultiplier', value: 5 }], narrative: { title: 'A', detail: 'A' } },
+        { id: 'm2', when: { metric: 'cash', op: '>=', value: 1 }, actions: [{ type: 'applyFevMultiplier', value: 5 }], narrative: { title: 'B', detail: 'B' } },
+      ],
+    });
+    // 5 × 5 = 25 → capped at 5
+    expect(resolveFevMultiplier(makeState(3, cfg, ['m1', 'm2']))).toBe(MAX_FEV_MULTIPLIER);
+  });
+
+  it('ignores untriggered multiplier triggers', () => {
+    const cfg = makeConfig({
+      triggers: [
+        { id: 'fired', when: { metric: 'cash', op: '>=', value: 1 }, actions: [{ type: 'applyFevMultiplier', value: 1.5 }], narrative: { title: 'A', detail: 'A' } },
+        { id: 'unfired', when: { metric: 'cash', op: '>=', value: 1 }, actions: [{ type: 'applyFevMultiplier', value: 2.0 }], narrative: { title: 'B', detail: 'B' } },
+      ],
+    });
+    expect(resolveFevMultiplier(makeState(3, cfg, ['fired']))).toBe(1.5);
+  });
+
+  it('listFiredFevMultipliers returns triggers in config order with their values', () => {
+    const cfg = makeConfig({
+      triggers: [
+        { id: 'm1', when: { metric: 'cash', op: '>=', value: 1 }, actions: [{ type: 'applyFevMultiplier', value: 1.5 }], narrative: { title: 'Alpha', detail: 'A' } },
+        { id: 'm2', when: { metric: 'cash', op: '>=', value: 1 }, actions: [{ type: 'applyFevMultiplier', value: 1.2 }], narrative: { title: 'Beta', detail: 'B' } },
+      ],
+    });
+    const fired = listFiredFevMultipliers(makeState(3, cfg, ['m1', 'm2']));
+    expect(fired.map(f => f.trigger.id)).toEqual(['m1', 'm2']);
+    expect(fired.map(f => f.value)).toEqual([1.5, 1.2]);
+  });
+});
+
+// ── Phase 5: parameterized platformsAboveEbitda condition ─────────────────
+
+describe('platformsAboveEbitda — parameterized condition', () => {
+  function makePlatform(id: string, businessIds: string[]) {
+    return {
+      id, recipeId: 'r', name: 'P', sectorIds: ['agency'] as const,
+      constituentBusinessIds: businessIds, forgedInRound: 1, bonuses: {} as never,
+    };
+  }
+
+  it('counts integrated platforms whose summed EBITDA ≥ threshold', () => {
+    const cfg = makeConfig({
+      triggers: [makeTrigger({
+        id: 't1',
+        when: { metric: 'platformsAboveEbitda', op: '>=', value: 2, threshold: 3000 },
+      })],
+    });
+    // 3 active businesses, 2 platforms: P1=[b1,b2] sums to 4000, P2=[b3] sums to 2000
+    const businesses = [
+      makeBiz({ id: 'b1', ebitda: 2500 }),
+      makeBiz({ id: 'b2', ebitda: 1500 }),
+      makeBiz({ id: 'b3', ebitda: 2000 }),
+    ];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const integratedPlatforms = [makePlatform('P1', ['b1', 'b2']), makePlatform('P2', ['b3'])] as any;
+    // Only 1 platform meets the 3000 threshold (P1=4000, P2=2000) — condition needs >=2.
+    expect(evaluateTriggers(makeState(3, cfg, []), FAKE_METRICS, { ...makeFullState({ businesses }), integratedPlatforms })).toHaveLength(0);
+    // Bump P2 to 3500 by changing threshold to 1500 instead. Both qualify now.
+    const cfgLower = makeConfig({
+      triggers: [makeTrigger({
+        id: 't2',
+        when: { metric: 'platformsAboveEbitda', op: '>=', value: 2, threshold: 1500 },
+      })],
+    });
+    expect(evaluateTriggers(makeState(3, cfgLower, []), FAKE_METRICS, { ...makeFullState({ businesses }), integratedPlatforms })).toHaveLength(1);
   });
 });

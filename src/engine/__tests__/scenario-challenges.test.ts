@@ -526,6 +526,97 @@ describe('validateScenarioConfig — triggers', () => {
     expect(warnings.some(w => w.includes('no-op when fired'))).toBe(true);
   });
 
+  // ── Phase 5: applyFevMultiplier validation ─────────────────────────────
+
+  it('accepts a milestone trigger with applyFevMultiplier action', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [{
+        id: 'roll-up-champion',
+        when: { metric: 'integratedPlatformCount', op: '>=', value: 3 },
+        actions: [{ type: 'applyFevMultiplier', value: 1.5 }],
+        narrative: { title: 'Roll-up Champion', detail: '3+ platforms — solid roll-up execution.' },
+      }],
+    }));
+    expect(errors).toEqual([]);
+  });
+
+  it('rejects applyFevMultiplier outside [0.5, 5]', () => {
+    const { errors: tooLow } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [{
+        id: 't',
+        when: { metric: 'cash', op: '>=', value: 1000 },
+        actions: [{ type: 'applyFevMultiplier', value: 0.1 }],
+        narrative: { title: 'A', detail: 'A' },
+      }],
+    }));
+    expect(tooLow.some(e => e.includes('value must be in [0.5, 5]'))).toBe(true);
+
+    const { errors: tooHigh } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [{
+        id: 't',
+        when: { metric: 'cash', op: '>=', value: 1000 },
+        actions: [{ type: 'applyFevMultiplier', value: 100 }],
+        narrative: { title: 'A', detail: 'A' },
+      }],
+    }));
+    expect(tooHigh.some(e => e.includes('value must be in [0.5, 5]'))).toBe(true);
+  });
+
+  it('warns when applyFevMultiplier value is exactly 1.0 (no-op)', () => {
+    const { warnings } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [{
+        id: 't',
+        when: { metric: 'cash', op: '>=', value: 1000 },
+        actions: [{ type: 'applyFevMultiplier', value: 1 }],
+        narrative: { title: 'A', detail: 'A' },
+      }],
+    }));
+    expect(warnings.some(w => w.includes('no-op multiplier'))).toBe(true);
+  });
+
+  it('accepts new Phase 5 metrics (integratedPlatformCount, peakNetWorth, etc.)', () => {
+    const phase5Metrics = [
+      'integratedPlatformCount', 'largestPlatformEbitda', 'peakNetWorth',
+      'successfulExits', 'successfulExitValue', 'lowestAverageLeverage', 'totalTuckIns',
+    ] as const;
+    for (const metric of phase5Metrics) {
+      const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+        triggers: [{
+          id: `t-${metric}`,
+          when: { metric, op: '>=', value: 1 },
+          actions: [{ type: 'applyFevMultiplier', value: 1.2 }],
+          narrative: { title: 'A', detail: 'A' },
+        }],
+      }));
+      expect(errors, `metric ${metric} should validate cleanly`).toEqual([]);
+    }
+  });
+
+  it('rejects platformsAboveEbitda without threshold parameter', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [{
+        id: 't',
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        when: { metric: 'platformsAboveEbitda', op: '>=', value: 3 } as any,
+        actions: [{ type: 'applyFevMultiplier', value: 1.5 }],
+        narrative: { title: 'A', detail: 'A' },
+      }],
+    }));
+    expect(errors.some(e => e.includes('threshold is required'))).toBe(true);
+  });
+
+  it('accepts platformsAboveEbitda with valid threshold + count', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [{
+        id: 't',
+        when: { metric: 'platformsAboveEbitda', op: '>=', value: 3, threshold: 5000 },
+        actions: [{ type: 'applyFevMultiplier', value: 1.5 }],
+        narrative: { title: 'Mega Roll-up', detail: '3+ platforms ≥ $5M EBITDA' },
+      }],
+    }));
+    expect(errors).toEqual([]);
+  });
+
   it('warns when scenario has > 10 triggers (opacity)', () => {
     const triggers = Array.from({ length: 11 }, (_, i) => ({
       id: `t${i}`,

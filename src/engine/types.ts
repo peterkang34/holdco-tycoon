@@ -738,7 +738,13 @@ export interface ScenarioChallengeConfig {
 // ── Scenario triggers (Feature B — metric-based conditional unlocks) ─────
 
 /** Game-state metrics a trigger condition can read. Pure projections of GameState
- * + Metrics — no RNG, fully deterministic for leaderboard fairness. */
+ * + Metrics + metricsHistory — no RNG, fully deterministic for leaderboard fairness.
+ *
+ * Phase 5 additions (for milestone-based FEV multipliers):
+ *   - integratedPlatformCount, largestPlatformEbitda, peakNetWorth
+ *   - successfulExits, successfulExitValue, lowestAverageLeverage, totalTuckIns
+ *   - platformsAboveEbitda (parameterized condition; uses dedicated condition shape)
+ */
 export type TriggerMetric =
   | 'round'
   | 'cash'
@@ -751,25 +757,45 @@ export type TriggerMetric =
   | 'exitedBusinessCount'
   | 'totalExitProceeds'
   | 'hasBusinessWithQuality'
-  | 'hasBusinessInSector';
+  | 'hasBusinessInSector'
+  // Phase 5 metrics
+  | 'integratedPlatformCount'
+  | 'largestPlatformEbitda'
+  | 'peakNetWorth'
+  | 'successfulExits'
+  | 'successfulExitValue'
+  | 'lowestAverageLeverage'
+  | 'totalTuckIns'
+  | 'platformsAboveEbitda';
 
 /** Single comparison or boolean composition. Composition depth capped at 2 (validator
- * enforces) — keeps configs human-readable + AI-generatable without unparseable trees. */
+ * enforces) — keeps configs human-readable + AI-generatable without unparseable trees.
+ *
+ * Phase 5 adds the parameterized `platformsAboveEbitda` shape (counts platforms whose
+ * EBITDA ≥ threshold, then compares that count to value). All other Phase 5 numeric
+ * metrics use the existing op+value shape. */
 export type TriggerCondition =
-  | { metric: 'round' | 'cash' | 'portfolioEbitda' | 'activeBusinessCount' | 'totalDistributions' | 'netDebtToEbitda' | 'totalRevenue' | 'avgEbitdaMargin' | 'exitedBusinessCount' | 'totalExitProceeds'; op: '>' | '>=' | '<' | '<=' | '=='; value: number }
+  | { metric: 'round' | 'cash' | 'portfolioEbitda' | 'activeBusinessCount' | 'totalDistributions' | 'netDebtToEbitda' | 'totalRevenue' | 'avgEbitdaMargin' | 'exitedBusinessCount' | 'totalExitProceeds' | 'integratedPlatformCount' | 'largestPlatformEbitda' | 'peakNetWorth' | 'successfulExits' | 'successfulExitValue' | 'lowestAverageLeverage' | 'totalTuckIns'; op: '>' | '>=' | '<' | '<=' | '=='; value: number }
   | { metric: 'hasBusinessWithQuality'; op: '>='; value: 1 | 2 | 3 | 4 | 5 }
   | { metric: 'hasBusinessInSector'; sectorId: SectorId }
+  | { metric: 'platformsAboveEbitda'; op: '>' | '>=' | '<' | '<=' | '=='; value: number; threshold: number }
   | { all: TriggerCondition[] }
   | { any: TriggerCondition[] };
 
 /** Action a trigger fires when its condition becomes true. Add-only by design (v1) —
  * no remove/lock actions to prevent punitive scenario designs that revoke player
- * access mid-game. Plan §11 / open question #2. */
+ * access mid-game. Plan §11 / open question #2.
+ *
+ * Phase 5 adds `applyFevMultiplier` — milestone-based scoring bonus. Multiple
+ * fired multiplier triggers stack multiplicatively (capped at 5× total) and apply
+ * to founderEquityValue at leaderboard submission time. Server-authoritative —
+ * see api/scenario-challenges/submit.ts. */
 export type TriggerAction =
   | { type: 'addAllowedSectors'; sectors: SectorId[] }
   | { type: 'addAllowedSubTypes'; subTypes: string[] }
   | { type: 'enableFeature'; feature: DisabledFeatureKey }
-  | { type: 'setAllowedSectors'; sectors: SectorId[] };
+  | { type: 'setAllowedSectors'; sectors: SectorId[] }
+  | { type: 'applyFevMultiplier'; value: number };
 
 /** A scenario trigger: when X becomes true, fire actions Y and tell the player Z.
  * Sticky — once fired, the action's effects stay active for the rest of the run.

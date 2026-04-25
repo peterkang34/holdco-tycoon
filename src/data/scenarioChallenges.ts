@@ -352,6 +352,17 @@ export function validateScenarioConfig(config: ScenarioChallengeConfig): Scenari
             } else if (!config.disabledFeatures?.[a.feature]) {
               errors.push(`triggers[${t.id}].actions.enableFeature: '${a.feature}' is not in disabledFeatures — nothing to unlock`);
             }
+          } else if (a.type === 'applyFevMultiplier') {
+            // Phase 5: milestone-based FEV multiplier. Validator enforces a sane
+            // single-trigger range of [0.5, 5.0]. Total stacked multiplier is
+            // capped at 5× server-side regardless of individual trigger values.
+            if (typeof a.value !== 'number' || !Number.isFinite(a.value)) {
+              errors.push(`triggers[${t.id}].actions.applyFevMultiplier: value must be a finite number`);
+            } else if (a.value < 0.5 || a.value > 5) {
+              errors.push(`triggers[${t.id}].actions.applyFevMultiplier: value must be in [0.5, 5] (got ${a.value})`);
+            } else if (a.value === 1) {
+              warnings.push(`triggers[${t.id}].actions.applyFevMultiplier: value 1.0 is a no-op multiplier`);
+            }
           } else {
             errors.push(`triggers[${t.id}].actions: unknown action type`);
           }
@@ -524,6 +535,10 @@ function validateCondition(
     'round', 'cash', 'portfolioEbitda', 'activeBusinessCount', 'totalDistributions',
     'netDebtToEbitda', 'totalRevenue', 'avgEbitdaMargin', 'exitedBusinessCount',
     'totalExitProceeds', 'hasBusinessWithQuality', 'hasBusinessInSector',
+    // Phase 5
+    'integratedPlatformCount', 'largestPlatformEbitda', 'peakNetWorth',
+    'successfulExits', 'successfulExitValue', 'lowestAverageLeverage', 'totalTuckIns',
+    'platformsAboveEbitda',
   ]);
   if (typeof c.metric !== 'string' || !validMetrics.has(c.metric)) {
     errors.push(`triggers[${triggerId}].when.metric '${c.metric}' is not a valid metric`);
@@ -546,6 +561,16 @@ function validateCondition(
   if (c.metric === 'hasBusinessWithQuality') {
     if (typeof c.value !== 'number' || ![1, 2, 3, 4, 5].includes(c.value)) {
       errors.push(`triggers[${triggerId}].when.value for hasBusinessWithQuality must be 1-5`);
+    }
+  }
+  // Phase 5: platformsAboveEbitda needs an extra `threshold` parameter (the EBITDA
+  // floor each platform must clear). Without it the metric is meaningless.
+  if (c.metric === 'platformsAboveEbitda') {
+    if (typeof c.threshold !== 'number' || !Number.isFinite(c.threshold) || c.threshold < 0) {
+      errors.push(`triggers[${triggerId}].when.threshold is required for platformsAboveEbitda (EBITDA floor in $K)`);
+    }
+    if (typeof c.value !== 'number' || c.value < 0 || !Number.isInteger(c.value)) {
+      errors.push(`triggers[${triggerId}].when.value for platformsAboveEbitda must be a non-negative integer (count of platforms)`);
     }
   }
   // Unreachable trigger heuristic: round > maxRounds will never fire.
