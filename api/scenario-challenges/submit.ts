@@ -161,13 +161,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? await upsertPlayerProfile({ playerId, verifiedPlayerId, initials, entryDate })
       : { publicProfileId: undefined };
 
+    // ── Phase 5: milestone FEV multiplier (server-authoritative) ─────
+    // Client sends raw founderEquityValue + triggeredTriggerIds. Server reads
+    // the scenario config (already loaded above as `c`), looks up each fired
+    // trigger ID's applyFevMultiplier action, multiplies them together, caps
+    // at MAX_FEV_MULTIPLIER (5×), and applies to the FEV used for both the
+    // leaderboard entry AND the sort score. Client-side display is informational.
+    //
+    // Security: bogus trigger IDs in the client payload are silently ignored
+    // (lookup misses → no multiplier). Player can only claim multipliers that
+    // (a) exist in the scenario config and (b) have an applyFevMultiplier action.
+    // Whether they actually EARNED them is trusted at the same level as the
+    // raw FEV / grossMoic / etc. fields above — there's no anti-cheat snapshot
+    // verification in v1.
+
+    const submittedTriggerIds = Array.isArray(body.triggeredTriggerIds)
+      ? body.triggeredTriggerIds.filter((t: unknown): t is string => typeof t === 'string')
+      : [];
+    const fevMultiplier = computeFevMultiplier(c, submittedTriggerIds);
+    const adjustedFEV = Math.round(validFEV * fevMultiplier);
+
     // ── Compute sort score from rankingMetric ────────────────────────
 
     const rankingMetric = String(c.rankingMetric ?? 'fev');
     const sortScore = computeSortScore(
       rankingMetric,
       {
-        founderEquityValue: validFEV,
+        founderEquityValue: adjustedFEV,
         grossMoic: typeof grossMoic === 'number' ? grossMoic : null,
         netIrr: typeof netIrr === 'number' ? netIrr : null,
         carryEarned: typeof carryEarned === 'number' ? carryEarned : null,
@@ -184,7 +204,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       holdcoName: holdcoName.trim(),
       initials,
       enterpriseValue: Math.round(enterpriseValue),
-      founderEquityValue: validFEV,
+      // Phase 5: store the ADJUSTED FEV (raw × milestone multiplier, capped 5×)
+      // so leaderboard reads + UI display agree. `rawFounderEquityValue` keeps
+      // the pre-multiplier value for analytics + game-history dual-write.
+      founderEquityValue: adjustedFEV,
+      rawFounderEquityValue: validFEV,
+      fevMultiplier,
+      triggeredTriggerIds: submittedTriggerIds.length > 0 ? submittedTriggerIds : undefined,
       founderPersonalWealth: validPersonalWealth,
       difficulty: validDifficulty,
       duration: validDuration,
@@ -294,6 +320,44 @@ function computeSortScore(
       );
       return inputs.founderEquityValue;
   }
+}
+
+/**
+ * Phase 5 — server-authoritative FEV multiplier. Walks the scenario config's
+ * triggers, finds those whose IDs are in the submitted `triggeredTriggerIds`
+ * list, sums their applyFevMultiplier action values multiplicatively, caps at
+ * MAX_FEV_MULTIPLIER. Bogus IDs are silently ignored (lookup miss = 1×).
+ *
+ * Mirrors `resolveFevMultiplier` in src/engine/scenarioRules.ts. Two impls
+ * because api/ can't import src/ values without ESM extension cascades — kept
+ * in lockstep manually + the structural test in scenario-rules.test.ts (client)
+ * + this endpoint's test suite (server).
+ */
+const MAX_FEV_MULTIPLIER = 5;
+function computeFevMultiplier(
+  config: Record<string, unknown>,
+  submittedTriggerIds: string[],
+): number {
+  const triggers = config.triggers;
+  if (!Array.isArray(triggers) || triggers.length === 0) return 1;
+  if (submittedTriggerIds.length === 0) return 1;
+  const fired = new Set(submittedTriggerIds);
+  let mult = 1;
+  for (const t of triggers) {
+    if (!t || typeof t !== 'object') continue;
+    const trigger = t as { id?: unknown; actions?: unknown };
+    if (typeof trigger.id !== 'string' || !fired.has(trigger.id)) continue;
+    if (!Array.isArray(trigger.actions)) continue;
+    for (const a of trigger.actions) {
+      if (!a || typeof a !== 'object') continue;
+      const action = a as { type?: unknown; value?: unknown };
+      if (action.type === 'applyFevMultiplier' && typeof action.value === 'number'
+          && Number.isFinite(action.value) && action.value > 0) {
+        mult *= action.value;
+      }
+    }
+  }
+  return Math.min(mult, MAX_FEV_MULTIPLIER);
 }
 
 /**

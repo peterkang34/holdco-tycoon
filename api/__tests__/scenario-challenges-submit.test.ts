@@ -404,4 +404,156 @@ describe('POST /api/scenario-challenges/submit', () => {
       expect(body.rank).toBe(8); // 10 - 2
     });
   });
+
+  // ── Phase 5: server-authoritative milestone FEV multiplier ─────────────
+
+  describe('Phase 5 — applyFevMultiplier (server-authoritative)', () => {
+    it('applies a single fired multiplier to founderEquityValue', async () => {
+      const config = MOCK_CONFIG({
+        triggers: [{
+          id: 'roll-up-champ',
+          when: { metric: 'integratedPlatformCount', op: '>=', value: 3 },
+          actions: [{ type: 'applyFevMultiplier', value: 1.5 }],
+          narrative: { title: 'A', detail: 'A' },
+        }],
+      });
+      vi.mocked(kv.get).mockResolvedValueOnce(config as never);
+      vi.mocked((kv as unknown as { zadd: ReturnType<typeof vi.fn> }).zadd).mockResolvedValue(1);
+      vi.mocked((kv as unknown as { zcard: ReturnType<typeof vi.fn> }).zcard).mockResolvedValue(5);
+      vi.mocked((kv as unknown as { zrank: ReturnType<typeof vi.fn> }).zrank).mockResolvedValue(2);
+
+      const { req, res, getResponse } = createMockReqRes({
+        method: 'POST',
+        body: validBody({
+          founderEquityValue: 10_000_000,
+          triggeredTriggerIds: ['roll-up-champ'],
+        }),
+      });
+      await handler(req, res);
+
+      const { statusCode } = getResponse();
+      expect(statusCode).toBe(200);
+      // Server should have multiplied the FEV by 1.5 before computing sort score / storing.
+      // We can't directly inspect the entry from the response, but zadd was called with the
+      // adjusted score. For 'fev' ranking metric, sortScore == adjustedFEV.
+      const zaddCalls = vi.mocked((kv as unknown as { zadd: ReturnType<typeof vi.fn> }).zadd).mock.calls;
+      // Last zadd call's score arg should reflect 10M raw × 1.5 = 15M adjusted (truncated to integer $K).
+      const lastCall = zaddCalls[zaddCalls.length - 1];
+      const scoreArg = (lastCall[1] as { score: number }).score;
+      expect(scoreArg).toBe(15_000_000);
+    });
+
+    it('stacks multiple fired multipliers multiplicatively', async () => {
+      const config = MOCK_CONFIG({
+        triggers: [
+          { id: 'm1', when: { metric: 'cash', op: '>=', value: 1 }, actions: [{ type: 'applyFevMultiplier', value: 1.5 }], narrative: { title: 'A', detail: 'A' } },
+          { id: 'm2', when: { metric: 'cash', op: '>=', value: 1 }, actions: [{ type: 'applyFevMultiplier', value: 1.2 }], narrative: { title: 'B', detail: 'B' } },
+        ],
+      });
+      vi.mocked(kv.get).mockResolvedValueOnce(config as never);
+      vi.mocked((kv as unknown as { zadd: ReturnType<typeof vi.fn> }).zadd).mockResolvedValue(1);
+      vi.mocked((kv as unknown as { zcard: ReturnType<typeof vi.fn> }).zcard).mockResolvedValue(5);
+      vi.mocked((kv as unknown as { zrank: ReturnType<typeof vi.fn> }).zrank).mockResolvedValue(0);
+
+      const { req, res } = createMockReqRes({
+        method: 'POST',
+        body: validBody({
+          founderEquityValue: 10_000_000,
+          triggeredTriggerIds: ['m1', 'm2'],
+        }),
+      });
+      await handler(req, res);
+
+      const zaddCalls = vi.mocked((kv as unknown as { zadd: ReturnType<typeof vi.fn> }).zadd).mock.calls;
+      const lastCall = zaddCalls[zaddCalls.length - 1];
+      const scoreArg = (lastCall[1] as { score: number }).score;
+      // 10M × 1.5 × 1.2 = 18M
+      expect(scoreArg).toBe(18_000_000);
+    });
+
+    it('caps stacked multipliers at MAX_FEV_MULTIPLIER (5×)', async () => {
+      const config = MOCK_CONFIG({
+        triggers: [
+          { id: 'm1', when: { metric: 'cash', op: '>=', value: 1 }, actions: [{ type: 'applyFevMultiplier', value: 5 }], narrative: { title: 'A', detail: 'A' } },
+          { id: 'm2', when: { metric: 'cash', op: '>=', value: 1 }, actions: [{ type: 'applyFevMultiplier', value: 5 }], narrative: { title: 'B', detail: 'B' } },
+        ],
+      });
+      vi.mocked(kv.get).mockResolvedValueOnce(config as never);
+      vi.mocked((kv as unknown as { zadd: ReturnType<typeof vi.fn> }).zadd).mockResolvedValue(1);
+      vi.mocked((kv as unknown as { zcard: ReturnType<typeof vi.fn> }).zcard).mockResolvedValue(5);
+      vi.mocked((kv as unknown as { zrank: ReturnType<typeof vi.fn> }).zrank).mockResolvedValue(0);
+
+      const { req, res } = createMockReqRes({
+        method: 'POST',
+        body: validBody({
+          founderEquityValue: 10_000_000,
+          triggeredTriggerIds: ['m1', 'm2'],
+        }),
+      });
+      await handler(req, res);
+
+      const zaddCalls = vi.mocked((kv as unknown as { zadd: ReturnType<typeof vi.fn> }).zadd).mock.calls;
+      const lastCall = zaddCalls[zaddCalls.length - 1];
+      const scoreArg = (lastCall[1] as { score: number }).score;
+      // 5 × 5 = 25 → capped at 5 → 10M × 5 = 50M
+      expect(scoreArg).toBe(50_000_000);
+    });
+
+    it('ignores bogus trigger IDs not in the scenario config', async () => {
+      const config = MOCK_CONFIG({
+        triggers: [{
+          id: 'real-trigger',
+          when: { metric: 'cash', op: '>=', value: 1 },
+          actions: [{ type: 'applyFevMultiplier', value: 1.5 }],
+          narrative: { title: 'A', detail: 'A' },
+        }],
+      });
+      vi.mocked(kv.get).mockResolvedValueOnce(config as never);
+      vi.mocked((kv as unknown as { zadd: ReturnType<typeof vi.fn> }).zadd).mockResolvedValue(1);
+      vi.mocked((kv as unknown as { zcard: ReturnType<typeof vi.fn> }).zcard).mockResolvedValue(5);
+      vi.mocked((kv as unknown as { zrank: ReturnType<typeof vi.fn> }).zrank).mockResolvedValue(0);
+
+      const { req, res } = createMockReqRes({
+        method: 'POST',
+        body: validBody({
+          founderEquityValue: 10_000_000,
+          // 'fake-trigger' doesn't exist in config; should be ignored.
+          triggeredTriggerIds: ['fake-trigger'],
+        }),
+      });
+      await handler(req, res);
+
+      const zaddCalls = vi.mocked((kv as unknown as { zadd: ReturnType<typeof vi.fn> }).zadd).mock.calls;
+      const lastCall = zaddCalls[zaddCalls.length - 1];
+      const scoreArg = (lastCall[1] as { score: number }).score;
+      // No multiplier applied — score == raw FEV.
+      expect(scoreArg).toBe(10_000_000);
+    });
+
+    it('no-ops when triggeredTriggerIds is omitted', async () => {
+      const config = MOCK_CONFIG({
+        triggers: [{
+          id: 'm1',
+          when: { metric: 'cash', op: '>=', value: 1 },
+          actions: [{ type: 'applyFevMultiplier', value: 2 }],
+          narrative: { title: 'A', detail: 'A' },
+        }],
+      });
+      vi.mocked(kv.get).mockResolvedValueOnce(config as never);
+      vi.mocked((kv as unknown as { zadd: ReturnType<typeof vi.fn> }).zadd).mockResolvedValue(1);
+      vi.mocked((kv as unknown as { zcard: ReturnType<typeof vi.fn> }).zcard).mockResolvedValue(5);
+      vi.mocked((kv as unknown as { zrank: ReturnType<typeof vi.fn> }).zrank).mockResolvedValue(0);
+
+      const { req, res } = createMockReqRes({
+        method: 'POST',
+        body: validBody({ founderEquityValue: 10_000_000 }),
+      });
+      await handler(req, res);
+
+      const zaddCalls = vi.mocked((kv as unknown as { zadd: ReturnType<typeof vi.fn> }).zadd).mock.calls;
+      const lastCall = zaddCalls[zaddCalls.length - 1];
+      const scoreArg = (lastCall[1] as { score: number }).score;
+      expect(scoreArg).toBe(10_000_000); // no multiplier
+    });
+  });
 });
