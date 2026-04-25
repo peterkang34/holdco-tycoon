@@ -26,6 +26,7 @@ import type {
   ForcedEvent,
   QualityRating,
   EventType,
+  SectorId,
 } from '../engine/types';
 import { SECTORS } from './sectors.js';
 
@@ -249,6 +250,136 @@ export function validateScenarioConfig(config: ScenarioChallengeConfig): Scenari
     }
   }
 
+  // ── Round-based sector restrictions (Feature A) ──
+  // Replace + Inherit semantics: sparse keys, each round's list FULLY replaces the
+  // prior. Validator catches invalid rounds, invalid sector ids, and trap configs.
+  if (config.allowedSectorsByRound) {
+    const maxRounds = typeof config.maxRounds === 'number' ? config.maxRounds : 30;
+    const sortedRounds = Object.keys(config.allowedSectorsByRound)
+      .map(k => Number(k))
+      .filter(n => Number.isFinite(n));
+    for (const roundKey of Object.keys(config.allowedSectorsByRound)) {
+      const round = Number(roundKey);
+      if (!Number.isInteger(round) || round < 1 || round > maxRounds) {
+        errors.push(`allowedSectorsByRound key '${roundKey}' must be an integer in [1, maxRounds]`);
+        continue;
+      }
+      const sectors = config.allowedSectorsByRound[round];
+      if (!Array.isArray(sectors)) {
+        errors.push(`allowedSectorsByRound[${round}] must be an array of SectorId`);
+        continue;
+      }
+      if (sectors.length === 0) {
+        errors.push(`allowedSectorsByRound[${round}] is empty — would halt deal generation entirely. Use [] only intentionally with a curated deal at that round.`);
+        continue;
+      }
+      for (const sid of sectors) {
+        if (!SECTORS[sid]) errors.push(`allowedSectorsByRound[${round}] contains invalid sector '${sid}'`);
+      }
+    }
+    // Warn on gaps — author may not realize unlisted rounds inherit.
+    if (sortedRounds.length >= 2) {
+      sortedRounds.sort((a, b) => a - b);
+      for (let i = 1; i < sortedRounds.length; i++) {
+        const gap = sortedRounds[i] - sortedRounds[i - 1];
+        if (gap > 1) {
+          warnings.push(`allowedSectorsByRound has gap between round ${sortedRounds[i - 1]} and ${sortedRounds[i]}: rounds ${sortedRounds[i - 1] + 1}-${sortedRounds[i] - 1} inherit from round ${sortedRounds[i - 1]}. Confirm intended.`);
+        }
+      }
+    }
+    // Trap: allowedSectorsByRound[1] equal to static allowedSectors → redundant.
+    if (
+      config.allowedSectorsByRound[1] && config.allowedSectors &&
+      JSON.stringify([...config.allowedSectorsByRound[1]].sort()) === JSON.stringify([...config.allowedSectors].sort())
+    ) {
+      warnings.push('allowedSectorsByRound[1] duplicates static allowedSectors. Drop one — prefer the static field for round-1 baseline.');
+    }
+  }
+  // Same shape for allowedSubTypesByRound — validate keys + entries.
+  if (config.allowedSubTypesByRound) {
+    const maxRounds = typeof config.maxRounds === 'number' ? config.maxRounds : 30;
+    for (const roundKey of Object.keys(config.allowedSubTypesByRound)) {
+      const round = Number(roundKey);
+      if (!Number.isInteger(round) || round < 1 || round > maxRounds) {
+        errors.push(`allowedSubTypesByRound key '${roundKey}' must be an integer in [1, maxRounds]`);
+        continue;
+      }
+      const subs = config.allowedSubTypesByRound[round];
+      if (!Array.isArray(subs)) {
+        errors.push(`allowedSubTypesByRound[${round}] must be an array of strings`);
+      }
+    }
+  }
+
+  // ── Triggers (Feature B) ──
+  if (config.triggers && config.triggers.length > 0) {
+    const maxRounds = typeof config.maxRounds === 'number' ? config.maxRounds : 30;
+    const seenIds = new Set<string>();
+    const validFeatureKeys = Object.keys(DISABLED_FEATURE_ACTIONS) as (keyof typeof DISABLED_FEATURE_ACTIONS)[];
+    config.triggers.forEach((t, idx) => {
+      if (!t.id || typeof t.id !== 'string') {
+        errors.push(`triggers[${idx}].id is required (non-empty string)`);
+        return;
+      }
+      if (seenIds.has(t.id)) errors.push(`triggers[${idx}].id '${t.id}' is duplicated within scenario`);
+      seenIds.add(t.id);
+      if (!t.actions || !Array.isArray(t.actions) || t.actions.length === 0) {
+        errors.push(`triggers[${t.id}].actions must be a non-empty array`);
+      } else {
+        for (const a of t.actions) {
+          if (a.type === 'addAllowedSectors' || a.type === 'setAllowedSectors') {
+            if (!Array.isArray(a.sectors) || a.sectors.length === 0) {
+              errors.push(`triggers[${t.id}].actions: ${a.type} requires non-empty sectors array`);
+            } else {
+              for (const sid of a.sectors) {
+                if (!SECTORS[sid]) errors.push(`triggers[${t.id}].actions.${a.type}: invalid sector '${sid}'`);
+              }
+            }
+            // No-op detection: addAllowedSectors entirely subset of static allowedSectors.
+            if (a.type === 'addAllowedSectors' && config.allowedSectors) {
+              const staticSet = new Set(config.allowedSectors);
+              if (a.sectors.every(s => staticSet.has(s))) {
+                warnings.push(`triggers[${t.id}].addAllowedSectors lists sectors already in static allowedSectors — no-op when fired`);
+              }
+            }
+          } else if (a.type === 'addAllowedSubTypes') {
+            if (!Array.isArray(a.subTypes) || a.subTypes.length === 0) {
+              errors.push(`triggers[${t.id}].actions.addAllowedSubTypes requires non-empty subTypes array`);
+            }
+          } else if (a.type === 'enableFeature') {
+            if (!validFeatureKeys.includes(a.feature)) {
+              errors.push(`triggers[${t.id}].actions.enableFeature: invalid feature '${a.feature}'`);
+            } else if (!config.disabledFeatures?.[a.feature]) {
+              errors.push(`triggers[${t.id}].actions.enableFeature: '${a.feature}' is not in disabledFeatures — nothing to unlock`);
+            }
+          } else {
+            errors.push(`triggers[${t.id}].actions: unknown action type`);
+          }
+        }
+      }
+      if (t.minRound !== undefined) {
+        if (!Number.isInteger(t.minRound) || t.minRound < 1 || t.minRound > maxRounds) {
+          errors.push(`triggers[${t.id}].minRound must be integer in [1, maxRounds]`);
+        }
+      }
+      if (!t.narrative || typeof t.narrative.title !== 'string' || typeof t.narrative.detail !== 'string') {
+        warnings.push(`triggers[${t.id}].narrative missing — players won't see why the unlock fired`);
+      } else {
+        if (t.narrative.title.length > 60) errors.push(`triggers[${t.id}].narrative.title must be ≤60 chars`);
+        if (t.narrative.detail.length > 200) errors.push(`triggers[${t.id}].narrative.detail must be ≤200 chars`);
+      }
+      if (!t.when) {
+        errors.push(`triggers[${t.id}].when is required`);
+      } else {
+        const conditionErrors = validateCondition(t.when, t.id, maxRounds, 0);
+        errors.push(...conditionErrors);
+      }
+    });
+    if (config.triggers.length > 10) {
+      warnings.push(`Scenario has ${config.triggers.length} triggers — consider consolidating; many triggers make the scenario opaque to players`);
+    }
+  }
+
   if (config.startingMaSourcingTier !== undefined) {
     if (!Number.isInteger(config.startingMaSourcingTier) ||
         config.startingMaSourcingTier < 0 || config.startingMaSourcingTier > 3) {
@@ -358,6 +489,70 @@ export function validateScenarioConfig(config: ScenarioChallengeConfig): Scenari
   }
 
   return { errors, warnings };
+}
+
+/** Recursively validate a TriggerCondition tree. Enforces max depth 2 (one level of
+ * `all`/`any` nesting) — keeps configs human-readable + AI-generatable. */
+function validateCondition(
+  cond: unknown,
+  triggerId: string,
+  maxRounds: number,
+  depth: number,
+): string[] {
+  const errors: string[] = [];
+  if (depth > 2) {
+    errors.push(`triggers[${triggerId}].when nests deeper than 2 levels — flatten the condition tree`);
+    return errors;
+  }
+  if (!cond || typeof cond !== 'object') {
+    errors.push(`triggers[${triggerId}].when must be a condition object`);
+    return errors;
+  }
+  const c = cond as Record<string, unknown>;
+  if (Array.isArray(c.all)) {
+    if (c.all.length === 0) errors.push(`triggers[${triggerId}].when.all must have ≥1 child`);
+    for (const child of c.all) errors.push(...validateCondition(child, triggerId, maxRounds, depth + 1));
+    return errors;
+  }
+  if (Array.isArray(c.any)) {
+    if (c.any.length === 0) errors.push(`triggers[${triggerId}].when.any must have ≥1 child`);
+    for (const child of c.any) errors.push(...validateCondition(child, triggerId, maxRounds, depth + 1));
+    return errors;
+  }
+  // Leaf condition.
+  const validMetrics = new Set([
+    'round', 'cash', 'portfolioEbitda', 'activeBusinessCount', 'totalDistributions',
+    'netDebtToEbitda', 'totalRevenue', 'avgEbitdaMargin', 'exitedBusinessCount',
+    'totalExitProceeds', 'hasBusinessWithQuality', 'hasBusinessInSector',
+  ]);
+  if (typeof c.metric !== 'string' || !validMetrics.has(c.metric)) {
+    errors.push(`triggers[${triggerId}].when.metric '${c.metric}' is not a valid metric`);
+    return errors;
+  }
+  if (c.metric === 'hasBusinessInSector') {
+    if (typeof c.sectorId !== 'string' || !SECTORS[c.sectorId as SectorId]) {
+      errors.push(`triggers[${triggerId}].when.sectorId is not a valid SectorId`);
+    }
+    return errors;
+  }
+  // Numeric metrics need op + value.
+  const validOps = new Set(['>', '>=', '<', '<=', '==']);
+  if (typeof c.op !== 'string' || !validOps.has(c.op)) {
+    errors.push(`triggers[${triggerId}].when.op must be one of >, >=, <, <=, ==`);
+  }
+  if (typeof c.value !== 'number' || !Number.isFinite(c.value)) {
+    errors.push(`triggers[${triggerId}].when.value must be a finite number`);
+  }
+  if (c.metric === 'hasBusinessWithQuality') {
+    if (typeof c.value !== 'number' || ![1, 2, 3, 4, 5].includes(c.value)) {
+      errors.push(`triggers[${triggerId}].when.value for hasBusinessWithQuality must be 1-5`);
+    }
+  }
+  // Unreachable trigger heuristic: round > maxRounds will never fire.
+  if (c.metric === 'round' && (c.op === '>' || c.op === '>=') && typeof c.value === 'number' && c.value > maxRounds) {
+    errors.push(`triggers[${triggerId}].when: round ${c.op} ${c.value} can never fire (maxRounds=${maxRounds})`);
+  }
+  return errors;
 }
 
 /** True if every round from 1..maxRounds has at least one curated deal. */

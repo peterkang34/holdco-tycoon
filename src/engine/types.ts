@@ -709,6 +709,20 @@ export interface ScenarioChallengeConfig {
   maxAcquisitionsPerRound?: number;
   startingInterestRate?: number;       // 0..0.25 — starting value only; events mutate normally
 
+  // Dynamic restrictions (Phase 4 — Replace + Inherit semantics):
+  //   - Sparse keys: unlisted rounds inherit the most recent prior key's list.
+  //   - Replace, not union: at each transition the new list FULLY replaces the prior;
+  //     to keep prior sectors available, list them explicitly in the new round's array.
+  //   - Static `allowedSectors` is the fallback for rounds before any byRound key fires.
+  // Triggers can layer additional unlocks ON TOP via addAllowedSectors, OR hard-replace
+  // via setAllowedSectors. See ScenarioTrigger.
+  allowedSectorsByRound?: Record<number, SectorId[]>;
+  allowedSubTypesByRound?: Record<number, string[]>;
+
+  // Metric-triggered conditional unlocks. Sticky (once fired, stay active). Add-only.
+  // See ScenarioTrigger / TriggerCondition / TriggerAction below for shape + semantics.
+  triggers?: ScenarioTrigger[];
+
   // Scoring
   rankingMetric: RankingMetric;       // required; 'fev' for holdco, PE options for fundStructure scenarios
 
@@ -719,6 +733,58 @@ export interface ScenarioChallengeConfig {
   scenarioNarrative?: string;
   businessBackstories?: Record<string, string>;
   roundNarratives?: Record<number, string>;
+}
+
+// ── Scenario triggers (Feature B — metric-based conditional unlocks) ─────
+
+/** Game-state metrics a trigger condition can read. Pure projections of GameState
+ * + Metrics — no RNG, fully deterministic for leaderboard fairness. */
+export type TriggerMetric =
+  | 'round'
+  | 'cash'
+  | 'portfolioEbitda'
+  | 'activeBusinessCount'
+  | 'totalDistributions'
+  | 'netDebtToEbitda'
+  | 'totalRevenue'
+  | 'avgEbitdaMargin'
+  | 'exitedBusinessCount'
+  | 'totalExitProceeds'
+  | 'hasBusinessWithQuality'
+  | 'hasBusinessInSector';
+
+/** Single comparison or boolean composition. Composition depth capped at 2 (validator
+ * enforces) — keeps configs human-readable + AI-generatable without unparseable trees. */
+export type TriggerCondition =
+  | { metric: 'round' | 'cash' | 'portfolioEbitda' | 'activeBusinessCount' | 'totalDistributions' | 'netDebtToEbitda' | 'totalRevenue' | 'avgEbitdaMargin' | 'exitedBusinessCount' | 'totalExitProceeds'; op: '>' | '>=' | '<' | '<=' | '=='; value: number }
+  | { metric: 'hasBusinessWithQuality'; op: '>='; value: 1 | 2 | 3 | 4 | 5 }
+  | { metric: 'hasBusinessInSector'; sectorId: SectorId }
+  | { all: TriggerCondition[] }
+  | { any: TriggerCondition[] };
+
+/** Action a trigger fires when its condition becomes true. Add-only by design (v1) —
+ * no remove/lock actions to prevent punitive scenario designs that revoke player
+ * access mid-game. Plan §11 / open question #2. */
+export type TriggerAction =
+  | { type: 'addAllowedSectors'; sectors: SectorId[] }
+  | { type: 'addAllowedSubTypes'; subTypes: string[] }
+  | { type: 'enableFeature'; feature: DisabledFeatureKey }
+  | { type: 'setAllowedSectors'; sectors: SectorId[] };
+
+/** A scenario trigger: when X becomes true, fire actions Y and tell the player Z.
+ * Sticky — once fired, the action's effects stay active for the rest of the run.
+ * Tracked in `state.triggeredTriggerIds` so re-evaluation skips already-fired ones. */
+export interface ScenarioTrigger {
+  /** Stable, unique within scenario. Used as set key in triggeredTriggerIds. */
+  id: string;
+  /** Single condition or composite (max nesting depth 2). */
+  when: TriggerCondition;
+  /** ≥1 actions, fired in order when `when` first evaluates true. */
+  actions: TriggerAction[];
+  /** Player-facing copy: title shown as toast on fire + game-over milestone label. */
+  narrative: { title: string; detail: string };
+  /** Skip evaluation entirely before this round — perf optimization for late-game triggers. */
+  minRound?: number;
 }
 
 /** Result of `validateScenarioConfig` — admin UI surfaces both errors and warnings. */
@@ -879,6 +945,12 @@ export interface GameState {
   scenarioChallengeId?: string;
   scenarioChallengeConfig?: ScenarioChallengeConfig | null;
   isAdminPreview?: boolean;             // admin test-play — submissions skipped
+  // Trigger state (Phase 4 — Feature B). Sticky: triggers in this list have fired
+  // and their effects (sector unlocks, feature enables) stay active for the run.
+  // `triggerFireRounds` records the round each trigger first fired — used by the
+  // GameOverScreen "Scenario Milestones" timeline.
+  triggeredTriggerIds?: string[];
+  triggerFireRounds?: Record<string, number>;
 }
 
 export type GameActionType =

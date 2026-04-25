@@ -345,6 +345,199 @@ describe('validateScenarioConfig — sector restrictions', () => {
   });
 });
 
+// ── Validation — round-based sector restrictions (Feature A) ──────────────
+
+describe('validateScenarioConfig — allowedSectorsByRound', () => {
+  it('accepts a valid sparse round-based map', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      allowedSectorsByRound: { 1: ['agency'], 5: ['saas'], 9: ['healthcare'] },
+    }));
+    expect(errors).toEqual([]);
+  });
+
+  it('rejects out-of-range round keys', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      maxRounds: 10,
+      allowedSectorsByRound: { 0: ['agency'], 11: ['saas'] },
+    }));
+    expect(errors.some(e => e.includes("'0'"))).toBe(true);
+    expect(errors.some(e => e.includes("'11'"))).toBe(true);
+  });
+
+  it('rejects invalid sector ids in by-round map', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      allowedSectorsByRound: { 1: ['nonsense' as any] },
+    }));
+    expect(errors.some(e => e.includes("invalid sector 'nonsense'"))).toBe(true);
+  });
+
+  it('rejects empty array at a round (would halt deal generation)', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      allowedSectorsByRound: { 3: [] },
+    }));
+    expect(errors.some(e => e.includes('empty'))).toBe(true);
+  });
+
+  it('warns on gaps between explicit rounds (inheritance is intentional but worth flagging)', () => {
+    const { warnings } = validateScenarioConfig(makeValidHoldcoConfig({
+      allowedSectorsByRound: { 1: ['agency'], 5: ['saas'] },
+    }));
+    expect(warnings.some(w => w.includes('gap between round 1 and 5'))).toBe(true);
+  });
+
+  it('warns when allowedSectorsByRound[1] duplicates static allowedSectors', () => {
+    const { warnings } = validateScenarioConfig(makeValidHoldcoConfig({
+      allowedSectors: ['agency'],
+      allowedSectorsByRound: { 1: ['agency'] },
+    }));
+    expect(warnings.some(w => w.includes('duplicates static allowedSectors'))).toBe(true);
+  });
+});
+
+// ── Validation — triggers (Feature B) ─────────────────────────────────────
+
+describe('validateScenarioConfig — triggers', () => {
+  it('accepts a simple metric-threshold trigger with addAllowedSectors action', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [{
+        id: 'industrial-unlock',
+        when: { metric: 'portfolioEbitda', op: '>=', value: 10000 },
+        actions: [{ type: 'addAllowedSectors', sectors: ['industrial'] }],
+        narrative: { title: 'Industrial Unlocked', detail: 'Scale attracts industrial sellers.' },
+      }],
+    }));
+    expect(errors).toEqual([]);
+  });
+
+  it('accepts a composite all/any trigger', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [{
+        id: 'ipo-unlock',
+        when: { all: [
+          { metric: 'activeBusinessCount', op: '>=', value: 5 },
+          { metric: 'portfolioEbitda', op: '>=', value: 25000 },
+        ]},
+        actions: [{ type: 'enableFeature', feature: 'ipo' }],
+        narrative: { title: 'IPO Unlocked', detail: 'Scale qualifies for public markets.' },
+      }],
+      disabledFeatures: { ipo: true },
+    }));
+    expect(errors).toEqual([]);
+  });
+
+  it('rejects duplicate trigger ids', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [
+        { id: 'dupe', when: { metric: 'cash', op: '>=', value: 10000 }, actions: [{ type: 'addAllowedSectors', sectors: ['saas'] }], narrative: { title: 'A', detail: 'A' } },
+        { id: 'dupe', when: { metric: 'cash', op: '>=', value: 20000 }, actions: [{ type: 'addAllowedSectors', sectors: ['industrial'] }], narrative: { title: 'B', detail: 'B' } },
+      ],
+    }));
+    expect(errors.some(e => e.includes('duplicated'))).toBe(true);
+  });
+
+  it('rejects empty actions array', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [{ id: 't1', when: { metric: 'cash', op: '>=', value: 10000 }, actions: [], narrative: { title: 'A', detail: 'A' } }],
+    }));
+    expect(errors.some(e => e.includes('non-empty array'))).toBe(true);
+  });
+
+  it('rejects invalid sector in addAllowedSectors action', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [{
+        id: 't1',
+        when: { metric: 'cash', op: '>=', value: 10000 },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        actions: [{ type: 'addAllowedSectors', sectors: ['nonsense' as any] }],
+        narrative: { title: 'A', detail: 'A' },
+      }],
+    }));
+    expect(errors.some(e => e.includes('invalid sector'))).toBe(true);
+  });
+
+  it("rejects enableFeature pointing at a feature that's not in disabledFeatures", () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      // ipo is NOT disabled, so enabling it is a no-op error.
+      triggers: [{
+        id: 't1',
+        when: { metric: 'cash', op: '>=', value: 10000 },
+        actions: [{ type: 'enableFeature', feature: 'ipo' }],
+        narrative: { title: 'A', detail: 'A' },
+      }],
+    }));
+    expect(errors.some(e => e.includes('not in disabledFeatures'))).toBe(true);
+  });
+
+  it('rejects nesting deeper than 2 levels', () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [{
+        id: 't1',
+        when: { all: [
+          { any: [
+            { all: [
+              { metric: 'cash', op: '>=', value: 1000 },
+            ]},
+          ]},
+        ]},
+        actions: [{ type: 'addAllowedSectors', sectors: ['saas'] }],
+        narrative: { title: 'A', detail: 'A' },
+      }],
+    }));
+    expect(errors.some(e => e.includes('nests deeper than 2 levels'))).toBe(true);
+  });
+
+  it("rejects unreachable trigger (round > maxRounds)", () => {
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      maxRounds: 10,
+      triggers: [{
+        id: 't1',
+        when: { metric: 'round', op: '>=', value: 99 },
+        actions: [{ type: 'addAllowedSectors', sectors: ['saas'] }],
+        narrative: { title: 'A', detail: 'A' },
+      }],
+    }));
+    expect(errors.some(e => e.includes('can never fire'))).toBe(true);
+  });
+
+  it('rejects narrative title > 60 chars / detail > 200 chars', () => {
+    const longTitle = 'A'.repeat(70);
+    const { errors } = validateScenarioConfig(makeValidHoldcoConfig({
+      triggers: [{
+        id: 't1',
+        when: { metric: 'cash', op: '>=', value: 10000 },
+        actions: [{ type: 'addAllowedSectors', sectors: ['saas'] }],
+        narrative: { title: longTitle, detail: 'short' },
+      }],
+    }));
+    expect(errors.some(e => e.includes('≤60 chars'))).toBe(true);
+  });
+
+  it('warns when addAllowedSectors lists sectors already in static allowedSectors (no-op)', () => {
+    const { warnings } = validateScenarioConfig(makeValidHoldcoConfig({
+      allowedSectors: ['agency'],
+      triggers: [{
+        id: 't1',
+        when: { metric: 'cash', op: '>=', value: 10000 },
+        actions: [{ type: 'addAllowedSectors', sectors: ['agency'] }],
+        narrative: { title: 'A', detail: 'A' },
+      }],
+    }));
+    expect(warnings.some(w => w.includes('no-op when fired'))).toBe(true);
+  });
+
+  it('warns when scenario has > 10 triggers (opacity)', () => {
+    const triggers = Array.from({ length: 11 }, (_, i) => ({
+      id: `t${i}`,
+      when: { metric: 'cash' as const, op: '>=' as const, value: (i + 1) * 1000 },
+      actions: [{ type: 'addAllowedSectors' as const, sectors: ['saas' as const] }],
+      narrative: { title: `A${i}`, detail: 'A' },
+    }));
+    const { warnings } = validateScenarioConfig(makeValidHoldcoConfig({ triggers }));
+    expect(warnings.some(w => w.includes('11 triggers'))).toBe(true);
+  });
+});
+
 // ── Validation — ranking metric & PE rules ────────────────────────────────
 
 describe('validateScenarioConfig — ranking metric & PE', () => {
