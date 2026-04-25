@@ -214,7 +214,15 @@ TriggerCondition shape (leaf):
 
 Valid numeric metrics:
   round, cash, portfolioEbitda, activeBusinessCount, totalDistributions,
-  netDebtToEbitda, totalRevenue, avgEbitdaMargin, exitedBusinessCount, totalExitProceeds.
+  netDebtToEbitda, totalRevenue, avgEbitdaMargin, exitedBusinessCount, totalExitProceeds,
+  // Phase 5 — milestone metrics
+  integratedPlatformCount, largestPlatformEbitda, peakNetWorth, successfulExits,
+  successfulExitValue, lowestAverageLeverage, totalTuckIns.
+
+Parameterized condition (Phase 5):
+  { metric: 'platformsAboveEbitda', op, value: <count of platforms>, threshold: <ebitda floor in $K> }
+  e.g., "≥3 integrated platforms each with EBITDA ≥ $5M":
+    { metric: 'platformsAboveEbitda', op: '>=', value: 3, threshold: 5000 }
 
 Cash/EBITDA thresholds are in $K (e.g., $10M = 10000).
 
@@ -223,6 +231,9 @@ TriggerAction types:
   { type: 'addAllowedSubTypes', subTypes: string[] }      — union with current allowed sub-types
   { type: 'enableFeature', feature: DisabledFeatureKey }  — clears a disabledFeatures gate
   { type: 'setAllowedSectors', sectors: SectorId[] }      — HARD REPLACE for dramatic pivots
+  { type: 'applyFevMultiplier', value: number }           — Phase 5: milestone-based FEV bonus
+                                                            value range [0.5, 5.0]; multiple
+                                                            stack multiplicatively (capped 5×)
 
 Dynamic restriction rules (CRITICAL — these are the ones that fail validation):
 - DO NOT generate a trigger that can never fire (e.g., round > maxRounds).
@@ -263,6 +274,52 @@ Composite unlock (Feature B):
     narrative: { title: "IPO Pathway Unlocked",
                  detail: "Portfolio scale qualifies for public markets." }
   }]
+
+Phase 5 — Milestone-based FEV multipliers:
+
+When the description says "if X then Y× FEV bonus" or "milestones for scoring multipliers"
+or similar, generate triggers with applyFevMultiplier actions. These are SHOWN to the
+player upfront on the scenario setup screen as "Scenario Goals" — make narrative.title
+and detail crisp + descriptive of the goal so players can chase them.
+
+Roll-up champion (3 platforms above $5M EBITDA → 1.5× FEV):
+  triggers: [{
+    id: "roll-up-champion",
+    when: { metric: "platformsAboveEbitda", op: ">=", value: 3, threshold: 5000 },
+    actions: [{ type: "applyFevMultiplier", value: 1.5 }],
+    narrative: { title: "Roll-up Champion",
+                 detail: "Built 3+ integrated platforms each above $5M EBITDA." }
+  }]
+
+Disciplined operator (kept leverage low + at least one $10M+ exit → 1.3× FEV):
+  triggers: [{
+    id: "disciplined-operator",
+    when: { all: [
+      { metric: "lowestAverageLeverage", op: "<=", value: 2 },
+      { metric: "successfulExitValue", op: ">=", value: 10000 }
+    ]},
+    actions: [{ type: "applyFevMultiplier", value: 1.3 }],
+    narrative: { title: "Disciplined Operator",
+                 detail: "Kept leverage ≤2× and realized $10M+ in exits." }
+  }]
+
+Tuck-in machine (15+ tuck-in acquisitions → 1.4× FEV):
+  triggers: [{
+    id: "tuck-in-machine",
+    when: { metric: "totalTuckIns", op: ">=", value: 15 },
+    actions: [{ type: "applyFevMultiplier", value: 1.4 }],
+    narrative: { title: "Tuck-in Machine",
+                 detail: "Executed 15+ tuck-in acquisitions across the run." }
+  }]
+
+Phase 5 rules (CRITICAL):
+- applyFevMultiplier value MUST be in [0.5, 5.0]. Validator rejects outside this range.
+- 1.0 is a no-op (validator warns). Use 1.1+ for actual bonuses.
+- Multiple multiplier triggers stack multiplicatively + cap at 5× total — design with that in mind.
+- Phase 5 metrics are perfect for end-of-game-style milestones; mid-game unlocks (Feature B
+  base behavior) are still better with addAllowedSectors / enableFeature.
+- "lowestAverageLeverage" is INVERSE — lower is better. Use op '<=' for "kept leverage at or below X".
+- "platformsAboveEbitda" REQUIRES the threshold parameter (EBITDA floor in $K). Don't omit it.
 
 Rules:
 - Output ONLY the JSON object. No prose, no markdown code fences, no commentary.

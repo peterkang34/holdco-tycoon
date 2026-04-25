@@ -2634,5 +2634,33 @@ describe('Display Proofreader', () => {
       const modal = readComponent('components/ui/LeaderboardModal.tsx');
       expect(modal).toContain('Themed, time-limited challenges with standalone leaderboards');
     });
+
+    // ── Phase 5: Milestone FEV multiplier surfaces ──
+
+    it('Scenario Goals panel renders on scenario setup screen', () => {
+      const intro = readComponent('components/screens/IntroScreen.tsx');
+      // Anchor: the panel header copy that distinguishes it from other scenario UI.
+      expect(intro).toContain('Scenario Goals');
+      expect(intro).toContain('ScenarioGoalsPanel');
+    });
+
+    it('Game-over Scenario Milestones surfaces FEV multiplier badges + total bonus', () => {
+      const result = readComponent('components/gameover/ScenarioChallengeResultSection.tsx');
+      // Per-trigger FEV badge — confirms the multiplier displays on each fired trigger.
+      expect(result).toContain('FEV');
+      // Cumulative footer phrase.
+      expect(result).toContain('Total milestone bonus applied to FEV');
+      // Cap label.
+      expect(result).toContain('capped at');
+    });
+
+    it('Server submit endpoint computes the FEV multiplier (anti-cheat)', () => {
+      const submit = readComponent('../api/scenario-challenges/submit.ts');
+      // Function presence — drift catcher if someone deletes the helper.
+      expect(submit).toContain('computeFevMultiplier');
+      expect(submit).toContain('MAX_FEV_MULTIPLIER');
+      // Cap value matches client-side resolver.
+      expect(submit).toMatch(/MAX_FEV_MULTIPLIER\s*=\s*5/);
+    });
   });
 });
