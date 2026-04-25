@@ -98,8 +98,18 @@ export function ScenarioChallengeResultSection({
   // Mirror server's `endDate + 24h grace` — UI shows "submissions closed" once over.
   const submissionsClosed = Number.isFinite(endMs) && nowTick > endMs + GRACE_MS;
 
+  // Phase 5 — apply milestone FEV multiplier to the displayed value when the
+  // ranking metric is FEV. Server re-computes the same multiplier from the
+  // submitted triggeredTriggerIds (commit 3) so leaderboard + display agree.
+  // Other ranking metrics (moic, irr, gpCarry, cashOnCash) are PE-only and
+  // not affected — applyFevMultiplier specifically targets FEV.
+  const fevMultiplier = config.rankingMetric === 'fev'
+    ? computeFevMultiplier(config, triggerFireRounds)
+    : 1;
+  const adjustedFEV = Math.round(founderEquityValue * fevMultiplier);
+
   const playerMetric = formatRankingMetric(config.rankingMetric, {
-    founderEquityValue,
+    founderEquityValue: adjustedFEV,
     grossMoic,
     netIrr,
     carryEarned,
@@ -141,6 +151,9 @@ export function ScenarioChallengeResultSection({
         holdcoName,
         initials: initials.toUpperCase(),
         enterpriseValue: Math.round(enterpriseValue),
+        // Phase 5: send RAW founderEquityValue + triggeredTriggerIds. Server
+        // applies the milestone FEV multiplier (server-authoritative) before
+        // storing in the leaderboard so player can't spoof the multiplier.
         founderEquityValue: Math.round(founderEquityValue),
         founderPersonalWealth: Math.round(founderPersonalWealth),
         score,
@@ -154,6 +167,7 @@ export function ScenarioChallengeResultSection({
         netIrr,
         carryEarned,
         strategy,
+        triggeredTriggerIds: triggerFireRounds ? Object.keys(triggerFireRounds) : undefined,
       });
       setHasSaved(true);
       setSavedRank(typeof res.rank === 'number' ? res.rank : null);
@@ -436,6 +450,31 @@ function PreviewBanner() {
   );
 }
 
+/**
+ * Phase 5 — compute the cumulative FEV multiplier from fired-trigger IDs and the
+ * scenario config. Mirrors `resolveFevMultiplier` in scenarioRules.ts but takes
+ * the simpler (config, triggerFireRounds) shape since this component already
+ * has those props. Capped at 5× — same as MAX_FEV_MULTIPLIER.
+ */
+function computeFevMultiplier(
+  config: ScenarioChallengeConfig,
+  triggerFireRounds: Record<string, number> | undefined,
+): number {
+  if (!config.triggers || !triggerFireRounds) return 1;
+  const MAX = 5;
+  const fired = new Set(Object.keys(triggerFireRounds));
+  let mult = 1;
+  for (const t of config.triggers) {
+    if (!fired.has(t.id)) continue;
+    for (const a of t.actions) {
+      if (a.type === 'applyFevMultiplier' && Number.isFinite(a.value) && a.value > 0) {
+        mult *= a.value;
+      }
+    }
+  }
+  return Math.min(mult, MAX);
+}
+
 function ClosedBanner() {
   return (
     <div className="text-center py-3 rounded-lg bg-slate-500/10 border border-slate-500/30">
@@ -448,10 +487,13 @@ function ClosedBanner() {
 }
 
 /**
- * Phase 4 — Scenario Milestones timeline. Renders the triggers the player
+ * Phase 4 + 5 — Scenario Milestones timeline. Renders the triggers the player
  * fired during the run, in chronological order, with the round each fired.
- * Hidden when the scenario has no triggers OR none fired (e.g., the player
- * never crossed any threshold).
+ * Hidden when the scenario has no triggers OR none fired.
+ *
+ * Phase 5 enrichment: per-trigger FEV multiplier badge + cumulative-multiplier
+ * footer showing the total bonus applied to the player's final FEV. Cap at 5×
+ * mirrors MAX_FEV_MULTIPLIER in scenarioRules.ts.
  */
 function ScenarioMilestones({
   config,
@@ -471,6 +513,20 @@ function ScenarioMilestones({
 
   if (fired.length === 0) return null;
 
+  // Compute per-trigger multiplier value + cumulative total (capped at 5×).
+  const MAX_MULT = 5;
+  const multiplierByTriggerId: Record<string, number> = {};
+  let cumulative = 1;
+  for (const t of config.triggers) {
+    const mult = t.actions
+      .filter(a => a.type === 'applyFevMultiplier')
+      .reduce((p, a) => p * (a as { type: 'applyFevMultiplier'; value: number }).value, 1);
+    if (mult !== 1) multiplierByTriggerId[t.id] = mult;
+    if (triggerFireRounds[t.id] !== undefined && mult !== 1) cumulative *= mult;
+  }
+  const totalMultiplier = Math.min(cumulative, MAX_MULT);
+  const showTotal = totalMultiplier !== 1;
+
   return (
     <div className="mt-4 pt-4 border-t border-white/10">
       <p className="text-sm font-bold text-text-secondary mb-3">
@@ -480,21 +536,40 @@ function ScenarioMilestones({
         </span>
       </p>
       <div className="space-y-2">
-        {fired.map(({ trigger, round }) => (
-          <div
-            key={trigger.id}
-            className="flex items-start gap-3 px-3 py-2 rounded-lg bg-white/5"
-          >
-            <span className="text-xs font-mono tabular-nums text-amber-400 shrink-0 mt-0.5">
-              Y{round}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium text-text-primary">{trigger.narrative.title}</p>
-              <p className="text-xs text-text-muted">{trigger.narrative.detail}</p>
+        {fired.map(({ trigger, round }) => {
+          const mult = multiplierByTriggerId[trigger.id];
+          return (
+            <div
+              key={trigger.id}
+              className="flex items-start gap-3 px-3 py-2 rounded-lg bg-white/5"
+            >
+              <span className="text-xs font-mono tabular-nums text-amber-400 shrink-0 mt-0.5">
+                Y{round}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-medium text-text-primary">{trigger.narrative.title}</p>
+                  {mult !== undefined && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-200 font-mono">
+                      {mult.toFixed(2)}× FEV
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-text-muted">{trigger.narrative.detail}</p>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
+      {showTotal && (
+        <div className="mt-3 pt-3 border-t border-amber-500/20 flex items-baseline justify-between text-sm">
+          <span className="text-text-secondary">Total milestone bonus applied to FEV</span>
+          <span className="font-mono font-bold text-amber-300 tabular-nums">
+            {totalMultiplier.toFixed(2)}×
+            {cumulative > MAX_MULT && <span className="text-[10px] text-text-muted ml-1">(capped at {MAX_MULT}×)</span>}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

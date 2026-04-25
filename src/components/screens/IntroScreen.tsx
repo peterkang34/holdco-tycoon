@@ -1346,6 +1346,11 @@ function ScenarioSetupView({
         </div>
       )}
 
+      {/* Phase 5 — Scenario Goals: enumerate fired-FEV-multiplier triggers so
+          the player knows what to chase. Hidden when scenario has no multiplier
+          triggers. */}
+      <ScenarioGoalsPanel config={config} />
+
       <label className="block text-left mb-2 text-sm text-text-muted">
         Name your {config.fundStructure ? 'fund' : 'holding company'} <span className="text-danger">*</span>
       </label>
@@ -1368,5 +1373,47 @@ function ScenarioSetupView({
         Enter {config.name} →
       </button>
     </form>
+  );
+}
+
+/**
+ * Phase 5 — Scenario Goals panel. Lists every trigger with an applyFevMultiplier
+ * action so the player sees the milestones they can chase for FEV bonuses BEFORE
+ * starting the scenario. Hidden when the scenario has no such triggers.
+ */
+function ScenarioGoalsPanel({ config }: { config: ScenarioChallengeConfig }) {
+  const goals = (config.triggers ?? []).filter(t =>
+    t.actions.some(a => a.type === 'applyFevMultiplier')
+  );
+  if (goals.length === 0) return null;
+  return (
+    <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 mb-4">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-amber-400">🎯</span>
+        <span className="text-xs font-bold uppercase tracking-wide text-amber-400">Scenario Goals</span>
+      </div>
+      <ul className="space-y-1.5">
+        {goals.map(t => {
+          const mult = t.actions
+            .filter(a => a.type === 'applyFevMultiplier')
+            .map(a => (a as { type: 'applyFevMultiplier'; value: number }).value)
+            .reduce((p, v) => p * v, 1);
+          return (
+            <li key={t.id} className="text-xs text-text-secondary flex items-start gap-2">
+              <span className="font-mono font-bold text-amber-300 shrink-0 min-w-[3.5rem]">
+                {mult.toFixed(2)}× FEV
+              </span>
+              <span className="min-w-0">
+                <span className="font-medium text-text-primary">{t.narrative.title}</span>
+                <span className="text-text-muted"> — {t.narrative.detail}</span>
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="text-[10px] text-text-muted mt-2 italic">
+        Bonuses stack multiplicatively, capped at 5× total. Earned milestones apply to your final FEV at game end.
+      </p>
+    </div>
   );
 }

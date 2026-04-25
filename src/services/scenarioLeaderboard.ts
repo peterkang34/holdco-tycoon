@@ -35,6 +35,10 @@ export interface ScenarioSubmitPayload {
   netIrr?: number;
   carryEarned?: number;
   strategy?: Partial<LeaderboardStrategy>;
+  /** Phase 5 — fired-trigger IDs. Server uses these to look up applyFevMultiplier
+   * actions in the scenario config and apply the cumulative multiplier (capped 5×)
+   * to founderEquityValue before storing in the leaderboard. */
+  triggeredTriggerIds?: string[];
 }
 
 export interface ScenarioSubmitResponse {
