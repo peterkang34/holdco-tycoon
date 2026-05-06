@@ -2,6 +2,10 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { checkAIRateLimit, isBodyTooLarge } from './rateLimit.js';
 
 export const AI_MODEL = 'claude-haiku-4-5-20251001';
+// Sonnet 4.6 — used for tasks that need stricter schema/exact-string adherence
+// (admin scenario generation). Higher per-call cost is fine because volume is
+// rate-limited; do NOT swap this in for high-volume player-facing flows.
+export const AI_MODEL_STRUCTURED = 'claude-sonnet-4-6';
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
 /**
@@ -42,6 +46,7 @@ export async function callAnthropic(
   maxTokens: number,
   systemMessage?: string,
   timeoutMs: number = 8000,
+  model: string = AI_MODEL,
 ): Promise<{ content: string | null; error?: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -52,7 +57,7 @@ export async function callAnthropic(
     ];
 
     const body: Record<string, unknown> = {
-      model: AI_MODEL,
+      model,
       max_tokens: maxTokens,
       messages,
     };

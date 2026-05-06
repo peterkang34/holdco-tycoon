@@ -160,7 +160,7 @@ research/                   # GIT-TRACKED — external research
 - `api/game-history/save.ts` — Auto-save endpoint (completion_id dedup, keepalive-safe)
 - `api/leaderboard/submit.ts` — Leaderboard + game_history dual-write (dedup with auto-save)
 - `api/admin/` — Admin dashboard endpoints (analytics, community, bschool-stats, backfills)
-- `api/_lib/ai.ts` — Anthropic client (Haiku model, configurable timeout)
+- `api/_lib/ai.ts` — Anthropic client. Two models: `AI_MODEL` (Haiku 4.5) is the default for high-volume player flows (game debriefs, narrative generation); `AI_MODEL_STRUCTURED` (Sonnet 4.6) is for admin/structured-output flows that need strict schema adherence (scenario generation). Pass model as 5th arg to `callAnthropic`. Do NOT swap Sonnet into player flows — cost compounds at scale.
 - `api/_lib/playerStats.ts` — Pre-computed stats (updatePlayerStats, updateGlobalStats)
 - `api/_lib/adminAuth.ts` — KV-based admin session tokens (NOT env vars)
 - `src/data/scenarioChallenges.ts` — Scenario Challenge config + validation + feature-gating registry

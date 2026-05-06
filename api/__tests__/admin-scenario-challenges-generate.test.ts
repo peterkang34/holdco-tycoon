@@ -22,8 +22,9 @@ vi.mock('../_lib/ai.js', async (importOriginal) => {
 });
 
 import { verifyAdminToken } from '../_lib/adminAuth.js';
-import { callAnthropic } from '../_lib/ai.js';
+import { callAnthropic, AI_MODEL_STRUCTURED } from '../_lib/ai.js';
 import handler from '../admin/scenario-challenges/generate.js';
+import { SECTORS } from '../../src/data/sectors.js';
 
 function setAdminAuth(authorized: boolean) {
   vi.mocked(verifyAdminToken).mockImplementation(async (_req, res) => {
@@ -282,6 +283,98 @@ describe('admin/scenario-challenges/generate', () => {
     expect(getResponse().statusCode).toBe(200); // still 200 — admin can fix in wizard
     expect(getResponse().body.errors.length).toBeGreaterThan(0);
     expect(getResponse().body.errors[0]).toMatch(/maxRounds/);
+  });
+
+  it('system prompt enumerates every sector and every subType verbatim', async () => {
+    const { req, res } = createMockReqRes({
+      method: 'POST',
+      headers: { authorization: 'Bearer test' },
+      body: { description: 'Generate a generic scenario' },
+    });
+    await handler(req, res);
+
+    expect(callAnthropic).toHaveBeenCalledTimes(1);
+    const systemMessage = vi.mocked(callAnthropic).mock.calls[0][2] ?? '';
+
+    for (const [sectorId, sector] of Object.entries(SECTORS)) {
+      expect(systemMessage, `prompt missing sector ${sectorId}`).toContain(sectorId);
+      for (const subType of sector.subTypes) {
+        expect(systemMessage, `prompt missing subType "${subType}" for ${sectorId}`).toContain(subType);
+      }
+    }
+  });
+
+  it('uses the structured-output model (Sonnet 4.6) for scenario generation', async () => {
+    const { req, res } = createMockReqRes({
+      method: 'POST',
+      headers: { authorization: 'Bearer test' },
+      body: { description: 'Generate a generic scenario' },
+    });
+    await handler(req, res);
+
+    expect(callAnthropic).toHaveBeenCalledTimes(1);
+    const modelArg = vi.mocked(callAnthropic).mock.calls[0][4];
+    expect(modelArg).toBe(AI_MODEL_STRUCTURED);
+  });
+
+  it('auto-corrects shorthand subType via case-insensitive prefix match', async () => {
+    const out = JSON.parse(buildAiOutput());
+    out.startingBusinesses = [
+      { name: 'A', sectorId: 'homeServices', subType: 'HVAC', ebitda: 1000, multiple: 4, quality: 3 },
+      { name: 'B', sectorId: 'homeServices', subType: 'plumbing', ebitda: 1000, multiple: 4, quality: 3 },
+    ];
+    vi.mocked(callAnthropic).mockResolvedValueOnce({ content: JSON.stringify(out) });
+
+    const { req, res, getResponse } = createMockReqRes({
+      method: 'POST',
+      headers: { authorization: 'Bearer test' },
+      body: { description: 'Generate something' },
+    });
+    await handler(req, res);
+
+    const businesses = getResponse().body.config.startingBusinesses;
+    expect(businesses[0].subType).toBe('HVAC Services');
+    expect(businesses[1].subType).toBe('Plumbing Services');
+    expect(getResponse().body.errors).toEqual([]);
+  });
+
+  it('drops unrecoverable subType so the business stays valid', async () => {
+    const out = JSON.parse(buildAiOutput());
+    out.startingBusinesses = [
+      { name: 'A', sectorId: 'homeServices', subType: 'totally-fake-subtype', ebitda: 1000, multiple: 4, quality: 3 },
+    ];
+    vi.mocked(callAnthropic).mockResolvedValueOnce({ content: JSON.stringify(out) });
+
+    const { req, res, getResponse } = createMockReqRes({
+      method: 'POST',
+      headers: { authorization: 'Bearer test' },
+      body: { description: 'Generate something' },
+    });
+    await handler(req, res);
+
+    const business = getResponse().body.config.startingBusinesses[0];
+    expect(business.subType).toBeUndefined();
+    expect(business.name).toBe('A');
+    expect(getResponse().body.errors).toEqual([]);
+  });
+
+  it('also sanitizes curatedDeals[].subType', async () => {
+    const out = JSON.parse(buildAiOutput());
+    out.curatedDeals = {
+      3: [
+        { name: 'Deal', sectorId: 'homeServices', subType: 'HVAC', ebitda: 800, multiple: 4, quality: 3 },
+      ],
+    };
+    vi.mocked(callAnthropic).mockResolvedValueOnce({ content: JSON.stringify(out) });
+
+    const { req, res, getResponse } = createMockReqRes({
+      method: 'POST',
+      headers: { authorization: 'Bearer test' },
+      body: { description: 'Generate something' },
+    });
+    await handler(req, res);
+
+    expect(getResponse().body.config.curatedDeals[3][0].subType).toBe('HVAC Services');
   });
 
   it('backfills missing configVersion to current schema', async () => {

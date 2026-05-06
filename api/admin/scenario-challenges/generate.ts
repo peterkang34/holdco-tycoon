@@ -20,7 +20,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import { verifyAdminToken } from '../../_lib/adminAuth.js';
-import { callAnthropic, ANTHROPIC_API_KEY } from '../../_lib/ai.js';
+import { callAnthropic, ANTHROPIC_API_KEY, AI_MODEL_STRUCTURED } from '../../_lib/ai.js';
 import { isBodyTooLarge } from '../../_lib/rateLimit.js';
 import {
   validateScenarioConfig,
@@ -85,7 +85,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const systemMessage = buildSystemPrompt();
   const userPrompt = buildUserPrompt(description);
 
-  const { content, error } = await callAnthropic(userPrompt, MAX_TOKENS, systemMessage, GENERATION_TIMEOUT_MS);
+  // Use Sonnet 4.6 — admin volume is rate-limited (20/day) and strict-schema
+  // adherence (exact subType strings, valid sectorIds) matters more than latency.
+  const { content, error } = await callAnthropic(
+    userPrompt,
+    MAX_TOKENS,
+    systemMessage,
+    GENERATION_TIMEOUT_MS,
+    AI_MODEL_STRUCTURED,
+  );
   if (!content) {
     return res.status(502).json({ error: error ?? 'AI generation failed', usage: { used: usedCount, limit: DAILY_LIMIT } });
   }
@@ -135,6 +143,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 function buildSystemPrompt(): string {
   const sectorList = Object.keys(SECTORS).join(', ');
   const forceableEvents = FORCEABLE_EVENT_TYPES.join(', ');
+  // Enumerate exact subType strings per sector. Validator does case-sensitive
+  // exact-string matching against SECTORS[sectorId].subTypes — without this
+  // listing, the model invents shorthand ("plumbing" instead of "Plumbing
+  // Services") and validation rejects every business it generates.
+  const subTypesBySector = Object.entries(SECTORS)
+    .map(([id, s]) => `  ${id}: [${s.subTypes.map(st => `"${st}"`).join(', ')}]`)
+    .join('\n');
 
   return `You generate Scenario Challenge configs for Holdco Tycoon, a holding-company strategy game.
 
@@ -176,6 +191,12 @@ Output a single JSON object matching this TypeScript shape:
 
 Valid sector ids: ${sectorList}
 Valid forceable event types (for forcedEvents): ${forceableEvents}
+
+Valid subType strings per sector — USE EXACT STRINGS, case-sensitive, including
+spaces and punctuation. Any deviation ("plumbing" vs "Plumbing Services",
+"hvac" vs "HVAC Services") fails validation. The same enumeration applies to
+top-level allowedSubTypes and to subType inside curatedDeals.
+${subTypesBySector}
 
 Optional fields you may include:
   allowedSectors: SectorId[],          // restrict deal generation
@@ -432,5 +453,49 @@ function backfillDefaults(raw: Record<string, unknown>): ScenarioChallengeConfig
   if (typeof c.sharesOutstanding !== 'number') c.sharesOutstanding = 1_000;
   if (typeof c.rankingMetric !== 'string') c.rankingMetric = c.fundStructure ? 'moic' : 'fev';
 
+  // Sanitize subType strings the AI invents. Even with the prompt enumeration,
+  // the model occasionally produces shorthand like 'HVAC' or 'plumbing' instead
+  // of the canonical 'HVAC Services' / 'Plumbing Services'. We try to recover
+  // by case-insensitive prefix match against the sector's valid subTypes; on
+  // miss or ambiguity we drop the field (subType is optional) so the business
+  // is still usable. Applies to startingBusinesses[].subType and to every
+  // curatedDeals[round][].subType.
+  sanitizeBusinessSubTypes(c.startingBusinesses as unknown[]);
+  if (c.curatedDeals && typeof c.curatedDeals === 'object') {
+    for (const deals of Object.values(c.curatedDeals as Record<string, unknown>)) {
+      if (Array.isArray(deals)) sanitizeBusinessSubTypes(deals);
+    }
+  }
+
   return c as unknown as ScenarioChallengeConfig;
+}
+
+/** In-place: for each entry with a sectorId + invalid subType, fuzzy-match to a
+ * canonical subType from SECTORS[sectorId].subTypes. Drop the field on miss. */
+function sanitizeBusinessSubTypes(entries: unknown[]): void {
+  for (const entry of entries) {
+    if (!entry || typeof entry !== 'object') continue;
+    const e = entry as Record<string, unknown>;
+    const sectorId = e.sectorId;
+    const subType = e.subType;
+    if (typeof sectorId !== 'string' || typeof subType !== 'string') continue;
+    const sector = SECTORS[sectorId as keyof typeof SECTORS];
+    if (!sector) continue;
+    const valid = sector.subTypes as readonly string[];
+    if (valid.includes(subType)) continue;
+    const recovered = recoverSubType(subType, valid);
+    if (recovered) e.subType = recovered;
+    else delete e.subType;
+  }
+}
+
+/** Case-insensitive recovery: exact-match (case-insensitive) first, then unique
+ * prefix. Returns null if no match or ambiguous (>1 prefix candidate). */
+function recoverSubType(input: string, valid: readonly string[]): string | null {
+  const norm = input.trim().toLowerCase();
+  if (!norm) return null;
+  const exact = valid.find(v => v.toLowerCase() === norm);
+  if (exact) return exact;
+  const prefixMatches = valid.filter(v => v.toLowerCase().startsWith(norm));
+  return prefixMatches.length === 1 ? prefixMatches[0] : null;
 }
