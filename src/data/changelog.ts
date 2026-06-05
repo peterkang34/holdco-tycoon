@@ -13,6 +13,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'June 4, 2026',
+    title: 'Achievement Fixes',
+    sections: [
+      {
+        heading: 'Deal Architect',
+        items: [
+          'Fixed Deal Architect so it now correctly unlocks when you close acquisitions using 4 or more unique deal structures (all-cash, seller note, bank debt, earn-out, seller note + bank debt, rollover equity, or share-funded). It previously tracked the wrong field and could never fire.',
+          'The same fix restores the deal-structure breakdown and rollover-equity count in your end-of-game Operator Playbook.',
+        ],
+      },
+      {
+        heading: 'No Leverage',
+        items: [
+          'No Leverage now correctly requires you to actually avoid debt financing across the run. It was previously awarded to any solvent C-grade-or-better game regardless of how much leverage you used. Achievements already earned are preserved.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'April 11, 2026',
     title: 'Portfolio Synergies',
     sections: [
