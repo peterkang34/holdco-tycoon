@@ -3,7 +3,7 @@ import { AdminLogin } from './AdminLogin';
 import { FeedbackTab } from './FeedbackTab';
 import { CommunityTab } from './CommunityTab';
 import { OverviewTab } from './OverviewTab';
-import { ScenarioChallengesTab } from './ScenarioChallengesTab';
+import { ScenarioBuilderTab } from './ScenarioBuilderTab';
 import { SectionHeader } from './adminShared';
 import { MetricCard } from '../ui/MetricCard';
 import type { AnalyticsData, Totals, DayData } from './adminTypes';
@@ -293,7 +293,7 @@ export function AdminDashboard() {
       )}
       {activeTab === 'community' && <CommunityTab token={token!} />}
       {activeTab === 'bschool' && <BSchoolTab token={token!} />}
-      {activeTab === 'scenarios' && <ScenarioChallengesTab token={token!} />}
+      {activeTab === 'scenarios' && <ScenarioBuilderTab token={token!} />}
       {activeTab === 'feedback' && <FeedbackTab token={token!} />}
     </div>
   );

@@ -9,7 +9,7 @@
  *                         hidden from regular players, and public `?se=`/`?tab=scenarios`
  *                         deep links are ignored.
  *
- * Admin surfaces (ScenarioChallengesTab, `/api/admin/scenario-challenges/*`) NEVER
+ * Admin surfaces (ScenarioBuilderTab, `/api/admin/scenario-challenges/*`) NEVER
  * gate on this flag — admins always need to author, regardless of rollout phase.
  * Admin preview path (`?se={id}&preview=1`) also stays functional in all modes so
  * authors can test without flipping a flag.

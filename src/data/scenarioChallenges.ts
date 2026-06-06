@@ -7,7 +7,7 @@
  * Consumed by:
  *   - `useGame.startScenarioChallenge` (plan Section 3)
  *   - `api/admin/scenario-challenges` (validation before save/activate)
- *   - `api/admin/scenario-challenges/generate` (AI output validation)
+ *   - `data/scenarioBuilder/compileDraft` (GUI builder → config compile target)
  *
  * See `plans/backlog/scenario-challenges.md` v3.1 + `scenario-challenges-pe-phase-a.md`.
  */
