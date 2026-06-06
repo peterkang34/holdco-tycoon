@@ -20,6 +20,7 @@ import {
   type ScenarioSummary, ApiError, fetchScenarios, fetchScenario, createScenario,
   updateScenario, deleteScenario, openScenarioPreview,
 } from '../../services/scenarioAdminApi';
+import { SCENARIO_TEMPLATES } from '../../data/scenarioBuilder/templates';
 
 const toM = (thousands: number) => Math.round((thousands / 1000) * 100) / 100;
 const fromM = (m: number) => Math.round(m * 1000);
@@ -62,8 +63,8 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
   const set = useCallback((patch: Partial<ScenarioDraft>) => setDraft((d) => ({ ...d, ...patch })), []);
 
   // ── Manager actions ──
-  function startNew() {
-    setDraft(blankDraft()); setEditingExistingId(null);
+  function startNew(build?: () => ScenarioDraft) {
+    setDraft(build ? build() : blankDraft()); setEditingExistingId(null);
     setSaveErrors([]); setSaveMsg(null); setView('builder');
   }
   async function startEdit(id: string) {
@@ -127,7 +128,8 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
     return (
       <Manager
         scenarios={scenarios} loading={loading} error={listError}
-        onNew={startNew} onEdit={startEdit} onDuplicate={startDuplicate}
+        onNew={() => startNew()} onPickTemplate={(build) => startNew(build)}
+        onEdit={startEdit} onDuplicate={startDuplicate}
         onToggleActive={toggleActive} onDelete={remove}
         onPreview={async (id) => { try { openScenarioPreview(await fetchScenario(token, id)); } catch { /* ignore */ } }}
       />
@@ -464,9 +466,10 @@ function whatPlayerFaces(d: ScenarioDraft): string {
 }
 
 // ── Manager ──
-function Manager({ scenarios, loading, error, onNew, onEdit, onDuplicate, onToggleActive, onDelete, onPreview }: {
+function Manager({ scenarios, loading, error, onNew, onPickTemplate, onEdit, onDuplicate, onToggleActive, onDelete, onPreview }: {
   scenarios: ScenarioSummary[]; loading: boolean; error: string | null;
-  onNew: () => void; onEdit: (id: string) => void; onDuplicate: (id: string) => void;
+  onNew: () => void; onPickTemplate: (build: () => ScenarioDraft) => void;
+  onEdit: (id: string) => void; onDuplicate: (id: string) => void;
   onToggleActive: (s: ScenarioSummary) => void; onDelete: (id: string) => void; onPreview: (id: string) => void;
 }) {
   const now = Date.now();
@@ -474,7 +477,20 @@ function Manager({ scenarios, loading, error, onNew, onEdit, onDuplicate, onTogg
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="text-sm font-semibold text-text-primary">Scenario Challenges</h2>
-        <button onClick={onNew} className="text-xs px-3 py-1.5 rounded-lg bg-accent/20 text-accent border border-accent/30 hover:bg-accent/30">+ New Scenario</button>
+        <button onClick={onNew} className="text-xs px-3 py-1.5 rounded-lg bg-accent/20 text-accent border border-accent/30 hover:bg-accent/30">+ New (blank)</button>
+      </div>
+      <div>
+        <div className="text-[11px] text-text-muted mb-1.5">Start from a template</div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {SCENARIO_TEMPLATES.map((t) => (
+            <button key={t.id} onClick={() => onPickTemplate(t.build)} title={t.blurb}
+              className="text-left rounded-lg border border-white/10 bg-white/[0.02] p-2 hover:border-accent/40 transition-colors">
+              <div className="text-lg">{t.emoji}</div>
+              <div className="text-[11px] font-medium text-text-primary leading-tight mt-0.5">{t.label}</div>
+              <div className="text-[10px] text-text-muted line-clamp-2 mt-0.5">{t.blurb}</div>
+            </button>
+          ))}
+        </div>
       </div>
       {error && <div className="rounded-lg bg-danger/10 border border-danger/20 p-3 text-xs text-danger">{error}</div>}
       {loading ? <p className="text-xs text-text-muted">Loading…</p> : scenarios.length === 0 ? (
