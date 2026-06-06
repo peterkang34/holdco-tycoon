@@ -51,6 +51,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   } = payload;
   const monthKey = getMonthKey();
   const dayKey = getDayKey();
+  // Scenario-challenge plays send isChallenge=true (shared URL plumbing); gameMode
+  // separates them from peer-to-peer challenges so they get their own counters.
+  const isScenario = payload.gameMode === 'scenario_challenge';
 
   try {
     if (event === 'game_start') {
@@ -95,8 +98,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         pipe.incr(`pid:${playerId}:games`);
       }
 
-      // Challenge tracking on start
-      if (isChallenge) {
+      // Challenge / scenario tracking on start.
+      // Scenario-challenge plays also send isChallenge=true (they reuse the challenge URL
+      // plumbing), so route them to their OWN counter — otherwise they inflate the
+      // peer-to-peer challenge k-factor (t:challenge:*). gameMode is the discriminator.
+      if (isScenario) {
+        pipe.incr(`t:scenario:${monthKey}:started`);
+      } else if (isChallenge) {
         pipe.incr(`t:challenge:${monthKey}:started`);
       }
 
@@ -148,8 +156,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         pipe.hincrby(`t:complete_by_nth:${monthKey}`, gameNumber <= 3 ? String(gameNumber) : '4+', 1);
       }
 
-      // Challenge completion
-      if (isChallenge) {
+      // Challenge / scenario completion — same de-conflation as game_start.
+      if (isScenario) {
+        pipe.incr(`t:scenario:${monthKey}:completed`);
+      } else if (isChallenge) {
         pipe.incr(`t:challenge:${monthKey}:completed`);
       }
 

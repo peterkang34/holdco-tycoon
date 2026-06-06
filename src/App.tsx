@@ -12,6 +12,7 @@ import { SectorId, GameDifficulty, GameDuration, formatMoney } from './engine/ty
 import { parseChallengeFromUrl, parseScoreboardFromUrl, cleanChallengeUrl, replaceUrlWithChallenge, type ChallengeParams, type PlayerResult } from './utils/challenge';
 import { parsePlaybookFromUrl, cleanPlaybookUrl } from './utils/playbookShare';
 import { checkFamilyOfficeEligibility } from './engine/familyOffice';
+import { validateScenarioConfig } from './data/scenarioChallenges';
 import { calculateFinalScore, calculatePEFundScore, calculateCarryWaterfall } from './engine/scoring';
 import { trackPageView } from './services/telemetry';
 import { initAnonymousAuth, initAuthListener } from './lib/supabase';
@@ -238,9 +239,16 @@ function App() {
           if (raw) {
             const config = JSON.parse(raw);
             sessionStorage.removeItem(storageKey);
-            startScenarioChallenge(config.name ?? 'Preview', config, true);
-            setScreen('game');
-            return;
+            // Hard-block: never feed an unvalidated config into the engine. The handoff
+            // payload is sessionStorage (could be stale or hand-edited) — validate before
+            // starting, mirroring the server's authority on the public ?se= path.
+            const { errors } = validateScenarioConfig(config);
+            if (errors.length === 0) {
+              startScenarioChallenge(config.name ?? 'Preview', config, true);
+              setScreen('game');
+              return;
+            }
+            console.error('scenario preview config invalid, refusing:', errors);
           }
         }
       } catch (err) {

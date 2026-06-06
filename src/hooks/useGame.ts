@@ -620,6 +620,14 @@ const initialState: Omit<GameState, 'sharedServices'> & { sharedServices: Return
   totalCapitalDeployed: 0,
   lpDistributions: 0,
   dpiMilestones: { half: false, full: false },
+  // Scenario Challenge defaults — MUST be in initialState so every `...initialState`
+  // spread (startGame, resetGame, startBusinessSchool) clears them. Otherwise an
+  // in-session admin preview leaves isAdminPreview:true stale into a later real game
+  // and submit silently drops the genuine leaderboard write (CLAUDE.md incident #9).
+  isScenarioChallengeMode: false,
+  scenarioChallengeId: undefined,
+  scenarioChallengeConfig: null,
+  isAdminPreview: false,
 };
 
 export const useGameStore = create<GameStore>()(

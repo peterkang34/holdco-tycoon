@@ -215,12 +215,19 @@ function readConfigValue(raw: unknown): ScenarioChallengeConfig | null {
 /**
  * Read a stored config from KV and migrate if older schema. Separate from
  * `readConfigValue` because stored KV configs DO benefit from migration.
+ *
+ * ADMIN read path → `validate: false`. Both callers are admin surfaces (single-edit
+ * GET + list GET). A DRAFT saved with validation errors must remain reopenable/listable
+ * — the strict validate-or-null in `migrateScenarioConfig` would 404 it on reopen and
+ * drop it from the list. The builder re-validates client-side and the activation gate
+ * still blocks publishing an invalid config, so nothing unsafe ships. Player-facing
+ * reads keep the default strict validation.
  */
 function readStoredConfig(raw: unknown): ScenarioChallengeConfig | null {
   if (!raw) return null;
   const parsed = typeof raw === 'string' ? tryJsonParse(raw) : raw;
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-  return migrateScenarioConfig(parsed);
+  return migrateScenarioConfig(parsed, { validate: false });
 }
 
 function tryJsonParse(s: string): unknown {
