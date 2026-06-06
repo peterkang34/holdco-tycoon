@@ -20,25 +20,12 @@ import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import {
   SCENARIOS_ARCHIVE_KEY,
   scenarioConfigKey,
-  scenarioLeaderboardKey,
   SCENARIO_KV_TTL_PAST_END_SECONDS,
 } from '../_lib/leaderboard.js';
+import { fetchLeaderboardSnapshot, type ArchiveRow } from '../_lib/scenarioArchive.js';
 
 /** Snapshot when scenario is this close to KV expiry. 10 days gives slack for cron misses. */
 const SNAPSHOT_BUFFER_DAYS = 10;
-/** Entries captured per scenario. Matches leaderboard display cap. */
-const ENTRIES_TO_SNAPSHOT = 50;
-
-interface ArchiveRow {
-  scenario_id: string;
-  name: string;
-  config_json: unknown;
-  final_leaderboard_json: unknown;
-  entry_count: number;
-  top_score: number | null;
-  start_date: string;
-  end_date: string;
-}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
@@ -162,45 +149,4 @@ async function readIdList(key: string): Promise<string[]> {
     console.error(`readIdList(${key}) failed:`, err);
     return [];
   }
-}
-
-async function fetchLeaderboardSnapshot(scenarioId: string): Promise<{
-  entries: Array<Record<string, unknown>>;
-  topScore: number | null;
-  entryCount: number;
-}> {
-  const kvz = kv as unknown as {
-    zcard: (key: string) => Promise<number>;
-    zrange: (
-      key: string,
-      start: number,
-      stop: number,
-      opts?: { rev?: boolean; withScores?: boolean },
-    ) => Promise<unknown[]>;
-  };
-  const lbKey = scenarioLeaderboardKey(scenarioId);
-  const [entryCount, raw] = await Promise.all([
-    kvz.zcard(lbKey),
-    kvz.zrange(lbKey, 0, ENTRIES_TO_SNAPSHOT - 1, { rev: true, withScores: true }),
-  ]);
-
-  const entries: Array<Record<string, unknown>> = [];
-  let topScore: number | null = null;
-
-  for (let i = 0; i < raw.length; i += 2) {
-    const member = raw[i];
-    const sortScore = raw[i + 1];
-    if (typeof member !== 'string' || typeof sortScore !== 'number') continue;
-    try {
-      const parsed = JSON.parse(member);
-      if (parsed && typeof parsed === 'object' && !parsed.isAdminPreview) {
-        entries.push({ ...parsed, rank: entries.length + 1, sortScore });
-        if (topScore == null) topScore = sortScore;
-      }
-    } catch {
-      // Skip malformed entries.
-    }
-  }
-
-  return { entries, topScore, entryCount };
 }

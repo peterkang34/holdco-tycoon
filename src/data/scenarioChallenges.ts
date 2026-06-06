@@ -7,7 +7,7 @@
  * Consumed by:
  *   - `useGame.startScenarioChallenge` (plan Section 3)
  *   - `api/admin/scenario-challenges` (validation before save/activate)
- *   - `api/admin/scenario-challenges/generate` (AI output validation)
+ *   - `data/scenarioBuilder/compileDraft` (GUI builder → config compile target)
  *
  * See `plans/backlog/scenario-challenges.md` v3.1 + `scenario-challenges-pe-phase-a.md`.
  */
@@ -27,6 +27,7 @@ import type {
   QualityRating,
   EventType,
   SectorId,
+  RankingMetric,
 } from '../engine/types';
 import { SECTORS } from './sectors.js';
 
@@ -37,6 +38,14 @@ export const CURRENT_SCENARIO_CONFIG_VERSION = 1;
 
 export const MIN_MAX_ROUNDS = 3;
 export const MAX_MAX_ROUNDS = 30;
+
+/**
+ * Canonical list of leaderboard ranking metrics. Single source of truth consumed by the
+ * validator (below) AND the builder's metric dropdown (builderOptions.ts) so the two can
+ * never drift. The `satisfies` check makes the compiler flag any RankingMetric union member
+ * missing from this array.
+ */
+export const RANKING_METRICS = ['fev', 'moic', 'irr', 'gpCarry', 'cashOnCash'] as const satisfies readonly RankingMetric[];
 
 /** Target byte size above which we warn the admin about save bloat. */
 export const CONFIG_SIZE_WARN_BYTES = 50_000;
@@ -414,9 +423,8 @@ export function validateScenarioConfig(config: ScenarioChallengeConfig): Scenari
   }
 
   // ── Ranking metric ──
-  const validMetrics = ['fev', 'moic', 'irr', 'gpCarry', 'cashOnCash'];
-  if (!validMetrics.includes(config.rankingMetric)) {
-    errors.push(`rankingMetric must be one of ${validMetrics.join(', ')}`);
+  if (!(RANKING_METRICS as readonly string[]).includes(config.rankingMetric)) {
+    errors.push(`rankingMetric must be one of ${RANKING_METRICS.join(', ')}`);
   }
 
   // ── Fund structure (PE Phase A) ──
