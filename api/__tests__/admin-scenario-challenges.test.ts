@@ -142,6 +142,18 @@ describe('admin/scenario-challenges', () => {
       expect(getResponse().body.scenario.id).toBe('test-scenario');
       expect(getResponse().body.scenario.startingBusinesses).toEqual([]);
     });
+
+    it('returns an errored DRAFT editable (200), not 404 — admin read uses validate:false', async () => {
+      // A draft saved with a validation error (maxRounds out of [3,30]) must stay reopenable.
+      // Before the fix, migrateScenarioConfig's validate-or-null 404'd it ("config invalid").
+      const erroredDraft = makeValidConfig({ isActive: false, maxRounds: 999 });
+      vi.mocked(kv.get).mockResolvedValueOnce(erroredDraft as never);
+      const { req, res, getResponse } = createMockReqRes({ method: 'GET', query: { id: 'test-scenario' } });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(200);
+      expect(getResponse().body.scenario.id).toBe('test-scenario');
+      expect(getResponse().body.scenario.maxRounds).toBe(999);
+    });
   });
 
   describe('POST create', () => {

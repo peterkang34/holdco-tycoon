@@ -873,8 +873,18 @@ export function createForcedGameEvent(forced: ForcedEvent, round: number): GameE
  *
  * For version 1 (current), this is essentially a passthrough. Future versions
  * add migration steps keyed on `configVersion` — same pattern as `hooks/migrations.ts`.
+ *
+ * `opts.validate` (default true) runs the full structural validator and returns null
+ * on any error — correct for PLAYER-facing reads (never start a broken scenario). The
+ * ADMIN edit path passes `validate: false` so an errored DRAFT can still be reopened
+ * and fixed (otherwise it 404s and vanishes from the admin list); the activation gate
+ * still blocks publishing an invalid config, so nothing unsafe ships.
  */
-export function migrateScenarioConfig(stored: unknown): ScenarioChallengeConfig | null {
+export function migrateScenarioConfig(
+  stored: unknown,
+  opts: { validate?: boolean } = {}
+): ScenarioChallengeConfig | null {
+  const { validate = true } = opts;
   if (!stored || typeof stored !== 'object') return null;
 
   const candidate = stored as Partial<ScenarioChallengeConfig>;
@@ -898,8 +908,11 @@ export function migrateScenarioConfig(stored: unknown): ScenarioChallengeConfig 
   // Run the migrated config through the full validator — a migrated config that
   // passes type-cast but fails structural validation (missing required fields,
   // invalid bounds, etc.) should be rejected rather than corrupt downstream state.
-  const { errors } = validateScenarioConfig(migrated);
-  if (errors.length > 0) return null;
+  // Skipped for the admin edit path (validate:false) so errored drafts stay reopenable.
+  if (validate) {
+    const { errors } = validateScenarioConfig(migrated);
+    if (errors.length > 0) return null;
+  }
 
   return migrated;
 }

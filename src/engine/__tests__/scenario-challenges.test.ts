@@ -1063,4 +1063,19 @@ describe('migrateScenarioConfig', () => {
     const softlocked = { ...makeValidHoldcoConfig(), startingCash: 0, startingBusinesses: [] };
     expect(migrateScenarioConfig(softlocked)).toBeNull();
   });
+
+  // validate:false — the admin edit read path keeps errored DRAFTS reopenable.
+  it('with {validate:false} returns an errored config instead of null (admin edit path)', () => {
+    const invalidBounds = { ...makeValidHoldcoConfig(), maxRounds: 2 }; // fails validation
+    expect(migrateScenarioConfig(invalidBounds)).toBeNull(); // strict default still rejects
+    const lenient = migrateScenarioConfig(invalidBounds, { validate: false });
+    expect(lenient).not.toBeNull();
+    expect(lenient!.maxRounds).toBe(2);
+    expect(lenient!.configVersion).toBe(CURRENT_SCENARIO_CONFIG_VERSION); // backfill still runs
+  });
+
+  it('with {validate:false} still rejects non-object / future-version input', () => {
+    expect(migrateScenarioConfig(null, { validate: false })).toBeNull();
+    expect(migrateScenarioConfig({ configVersion: 999, id: 'x' }, { validate: false })).toBeNull();
+  });
 });
