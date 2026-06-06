@@ -81,6 +81,9 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
       let newId = `${cfg.id}-copy`, n = 2;
       while (existing.has(newId)) newId = `${cfg.id}-copy-${n++}`;
       d.id = newId; d.name = `${cfg.name} (copy)`; d.isActive = false; d.isFeatured = false;
+      // A copy is a fresh, unpublished draft — never inherit the source's publish stamp
+      // (it rides in passthrough since the GUI doesn't model it).
+      if (d.passthrough) { const { publishedAt: _drop, ...rest } = d.passthrough as Record<string, unknown>; d.passthrough = Object.keys(rest).length ? rest : undefined; }
       setDraft(d); setEditingExistingId(null);
       setSaveErrors([]); setSaveMsg(null); setView('builder');
     } catch (e) { setListError(e instanceof Error ? e.message : 'failed to duplicate'); }
@@ -482,6 +485,8 @@ function Manager({ scenarios, loading, error, onNew, onEdit, onDuplicate, onTogg
             const expired = new Date(s.endDate).getTime() < now;
             const status = expired ? 'Expired' : s.isActive ? (s.isFeatured ? 'Featured' : 'Live') : 'Draft';
             const statusCls = expired ? 'text-text-muted' : s.isActive ? 'text-accent' : 'text-warning';
+            // Published scenarios are immutable — offer Duplicate-to-revise instead of Edit.
+            const published = s.isActive || !!s.publishedAt;
             return (
               <div key={s.id} className="flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.02] p-2 text-xs">
                 <span className="text-lg">{s.theme.emoji}</span>
@@ -491,7 +496,7 @@ function Manager({ scenarios, loading, error, onNew, onEdit, onDuplicate, onTogg
                 </div>
                 <span className={`text-[10px] font-semibold ${statusCls}`}>{status}</span>
                 <div className="flex gap-1">
-                  <RowBtn onClick={() => onEdit(s.id)}>Edit</RowBtn>
+                  {!published && <RowBtn onClick={() => onEdit(s.id)}>Edit</RowBtn>}
                   <RowBtn onClick={() => onDuplicate(s.id)}>Duplicate</RowBtn>
                   <RowBtn onClick={() => onPreview(s.id)}>Preview</RowBtn>
                   <RowBtn onClick={() => onToggleActive(s)}>{s.isActive ? 'Deactivate' : 'Activate'}</RowBtn>

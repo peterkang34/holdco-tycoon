@@ -17,6 +17,7 @@ export interface ScenarioSummary {
   endDate: string;
   isActive: boolean;
   isFeatured: boolean;
+  publishedAt?: string;
   difficulty: string;
   duration: string;
   maxRounds: number;
