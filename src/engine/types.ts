@@ -682,6 +682,8 @@ export interface ScenarioChallengeConfig {
   endDate: string;                    // ISO 8601
   isActive: boolean;                  // playable via direct URL
   isFeatured: boolean;                // shown on home screen banner
+  publishedAt?: string;               // ISO; stamped on FIRST activation. Once set, the config
+                                      // is immutable (revise via Duplicate). Server-managed.
 
   // Game parameters
   seed: number;                       // fixed — deterministic for all players

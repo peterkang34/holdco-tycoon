@@ -8,6 +8,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { kv } from '@vercel/kv';
 import { createMockReqRes } from './helpers.js';
+import { setMockSupabaseAdmin } from './setup.js';
 
 // Mock adminAuth before importing the handler — sets per-test behavior via the mock function.
 vi.mock('../_lib/adminAuth.js', () => ({
@@ -274,6 +275,63 @@ describe('admin/scenario-challenges', () => {
     });
   });
 
+  describe('immutability on publish', () => {
+    const PUBLISHED = '2026-01-01T00:00:00Z';
+
+    it('POST with isActive:true stamps publishedAt', async () => {
+      vi.mocked(kv.get).mockResolvedValue(null as never); // no existing + empty lists
+      const { req, res, getResponse } = createMockReqRes({ method: 'POST', body: makeValidConfig({ isActive: true }) });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(201);
+      expect(typeof getResponse().body.scenario.publishedAt).toBe('string');
+    });
+
+    it('PUT that mutates a frozen field on a published scenario → 409', async () => {
+      vi.mocked(kv.get).mockResolvedValueOnce(makeValidConfig({ isActive: true, publishedAt: PUBLISHED }) as never);
+      const { req, res, getResponse } = createMockReqRes({
+        method: 'PUT',
+        body: makeValidConfig({ isActive: true, publishedAt: PUBLISHED, startingCash: 99999 }), // changed scoring field
+      });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(409);
+    });
+
+    it('PUT that only toggles a lifecycle flag (isFeatured) on a published scenario → 200', async () => {
+      vi.mocked(kv.get)
+        .mockResolvedValueOnce(makeValidConfig({ isActive: true, publishedAt: PUBLISHED, isFeatured: false }) as never)
+        .mockResolvedValueOnce([] as never)
+        .mockResolvedValueOnce([] as never);
+      const { req, res, getResponse } = createMockReqRes({
+        method: 'PUT',
+        body: makeValidConfig({ isActive: true, publishedAt: PUBLISHED, isFeatured: true }),
+      });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(200);
+    });
+
+    it('PUT first-activation of a draft stamps publishedAt → 200', async () => {
+      vi.mocked(kv.get)
+        .mockResolvedValueOnce(makeValidConfig({ isActive: false }) as never) // draft prior, no publishedAt
+        .mockResolvedValueOnce([] as never)
+        .mockResolvedValueOnce([] as never);
+      const { req, res, getResponse } = createMockReqRes({ method: 'PUT', body: makeValidConfig({ isActive: true }) });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(200);
+      expect(typeof getResponse().body.scenario.publishedAt).toBe('string');
+    });
+
+    it('PUT editing a never-published draft is allowed (not frozen) → 200', async () => {
+      vi.mocked(kv.get)
+        .mockResolvedValueOnce(makeValidConfig({ isActive: false, name: 'Old' }) as never)
+        .mockResolvedValueOnce([] as never)
+        .mockResolvedValueOnce([] as never);
+      const { req, res, getResponse } = createMockReqRes({ method: 'PUT', body: makeValidConfig({ isActive: false, name: 'Edited', startingCash: 12345 }) });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(200);
+      expect(getResponse().body.scenario.name).toBe('Edited');
+    });
+  });
+
   describe('DELETE', () => {
     it('returns 400 on invalid id', async () => {
       const { req, res, getResponse } = createMockReqRes({ method: 'DELETE', query: { id: '' } });
@@ -283,8 +341,10 @@ describe('admin/scenario-challenges', () => {
 
     it('deletes config, leaderboard, and removes from both lists', async () => {
       vi.mocked(kv.get)
+        .mockResolvedValueOnce(makeValidConfig() as never)          // prior config (snapshot read)
         .mockResolvedValueOnce(['test-scenario', 'other'] as never) // active
         .mockResolvedValueOnce(['old-one'] as never);               // archive
+      vi.mocked((kv as any).zcard).mockResolvedValue(0); // no entries → snapshot is a no-op
 
       const { req, res, getResponse } = createMockReqRes({
         method: 'DELETE',
@@ -297,6 +357,20 @@ describe('admin/scenario-challenges', () => {
       expect(kv.del).toHaveBeenCalledWith('scenario:test-scenario:leaderboard');
       // active list rewritten WITHOUT test-scenario
       expect(kv.set).toHaveBeenCalledWith('scenarios:active', JSON.stringify(['other']));
+    });
+
+    it('aborts (500) and does NOT delete when archiving an entry-bearing scenario fails', async () => {
+      vi.mocked(kv.get).mockResolvedValueOnce(makeValidConfig() as never); // prior config
+      vi.mocked((kv as any).zcard).mockResolvedValue(3); // has entries → must snapshot first
+      vi.mocked((kv as any).zrange).mockResolvedValue([] as never);
+      // Force the durable archive write to fail.
+      setMockSupabaseAdmin({ from: () => ({ upsert: async () => ({ error: { message: 'boom' } }) }) });
+
+      const { req, res, getResponse } = createMockReqRes({ method: 'DELETE', query: { id: 'test-scenario' } });
+      await handler(req, res);
+
+      expect(getResponse().statusCode).toBe(500);
+      expect(kv.del).not.toHaveBeenCalledWith('scenario:test-scenario:leaderboard');
     });
   });
 });

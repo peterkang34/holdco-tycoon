@@ -32,12 +32,50 @@ import {
   validateScenarioConfig,
   migrateScenarioConfig,
 } from '../../src/data/scenarioChallenges.js';
+import { snapshotScenarioToArchive } from '../_lib/scenarioArchive.js';
 import type { ScenarioChallengeConfig } from '../../src/engine/types.js';
 
 // Lowercase-only slug to match the `generate.ts` prompt spec and keep KV lookups
 // case-consistent (KV is case-sensitive — `My-Scenario` stored would not match
 // a lookup for `my-scenario`). Dara N2.
 const SCENARIO_ID_REGEX = /^[a-z0-9-]{1,60}$/;
+
+// ── Immutability on publish ─────────────────────────────────────────────────
+// A scenario's config is frozen once it has been published (first activation). The only
+// fields editable thereafter are lifecycle flags; revising anything else requires Duplicate.
+// This is the integrity guarantee for live, leaderboard-bearing scenarios.
+const PUBLISH_MUTABLE_KEYS = new Set(['isActive', 'isFeatured', 'publishedAt']);
+
+/** A scenario is "published" once publishedAt is stamped — or (back-compat) if a legacy
+ *  config is already active with no stamp. Frozen against config edits either way. */
+function isPublished(c: ScenarioChallengeConfig): boolean {
+  return !!c.publishedAt || c.isActive === true;
+}
+
+/** Order-insensitive deep equality (objects/arrays/primitives). */
+function deepEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (typeof a !== typeof b || a === null || b === null) return false;
+  if (typeof a !== 'object') return false;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false;
+    return a.every((v, i) => deepEqual(v, b[i]));
+  }
+  const ao = a as Record<string, unknown>, bo = b as Record<string, unknown>;
+  const ak = Object.keys(ao), bk = Object.keys(bo);
+  if (ak.length !== bk.length) return false;
+  return ak.every((k) => Object.prototype.hasOwnProperty.call(bo, k) && deepEqual(ao[k], bo[k]));
+}
+
+/** True if `incoming` changes any frozen (non-lifecycle) field relative to `prior`. */
+function mutatesFrozenFields(incoming: ScenarioChallengeConfig, prior: ScenarioChallengeConfig): boolean {
+  const strip = (c: ScenarioChallengeConfig) => {
+    const o: Record<string, unknown> = { ...c };
+    for (const k of PUBLISH_MUTABLE_KEYS) delete o[k];
+    return o;
+  };
+  return !deepEqual(strip(incoming), strip(prior));
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   const authorized = await verifyAdminToken(req, res);
@@ -127,6 +165,11 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
     });
   }
 
+  // First-activation stamp: a scenario created already-active is published-at-create.
+  if (config.isActive === true && !config.publishedAt) {
+    config.publishedAt = new Date().toISOString();
+  }
+
   await writeConfig(config);
   await rebuildListMemberships(config);
 
@@ -144,9 +187,24 @@ async function handlePut(req: VercelRequest, res: VercelResponse) {
     return res.status(400).json({ error: 'id must be alphanumeric + hyphens, 1-60 chars' });
   }
 
-  const prior = await kv.get<unknown>(scenarioConfigKey(incoming.id));
-  if (!prior) {
+  const priorRaw = await kv.get<unknown>(scenarioConfigKey(incoming.id));
+  if (!priorRaw) {
     return res.status(404).json({ error: `scenario '${incoming.id}' does not exist — use POST to create` });
+  }
+  // Read prior leniently (validate:false) so a legacy/errored stored config can still be
+  // inspected for its publish state.
+  const prior = migrateScenarioConfig(priorRaw, { validate: false });
+
+  // ── Immutability: a published scenario's config is frozen ──
+  if (prior && isPublished(prior)) {
+    if (mutatesFrozenFields(incoming, prior)) {
+      return res.status(409).json({
+        error: 'This scenario is published and can no longer be edited. Duplicate it to make a revised version.',
+      });
+    }
+    // Only lifecycle flags changed (Activate/Deactivate/Feature) — allowed. Carry the
+    // publish stamp forward (back-fill it for legacy active-without-stamp configs).
+    incoming.publishedAt = prior.publishedAt ?? new Date().toISOString();
   }
 
   const { errors, warnings } = validateScenarioConfig(incoming);
@@ -156,6 +214,11 @@ async function handlePut(req: VercelRequest, res: VercelResponse) {
       errors,
       warnings,
     });
+  }
+
+  // First-activation stamp (draft → active for the first time).
+  if (incoming.isActive === true && !incoming.publishedAt) {
+    incoming.publishedAt = new Date().toISOString();
   }
 
   await writeConfig(incoming);
@@ -170,6 +233,21 @@ async function handleDelete(req: VercelRequest, res: VercelResponse) {
   const id = typeof req.query.id === 'string' ? req.query.id.trim() : '';
   if (!id || !SCENARIO_ID_REGEX.test(id)) {
     return res.status(400).json({ error: 'invalid scenario id' });
+  }
+
+  // Snapshot-before-delete: deleting a live, entry-bearing scenario would otherwise
+  // destroy its ranked leaderboard with no durable record (the weekly cron is the only
+  // other snapshot path, and it fires long after endDate). Archive to Postgres first; if
+  // that durable write fails while entries exist, ABORT — don't trade history for a delete.
+  const priorRaw = await kv.get<unknown>(scenarioConfigKey(id));
+  const priorConfig = priorRaw ? migrateScenarioConfig(priorRaw, { validate: false }) : null;
+  if (priorConfig) {
+    const snap = await snapshotScenarioToArchive(priorConfig);
+    if (!snap.ok && snap.entryCount > 0) {
+      return res.status(500).json({
+        error: 'Could not archive the leaderboard before deleting — aborted to protect history. Try again.',
+      });
+    }
   }
 
   // Intentional: does NOT cascade to Postgres `game_history`. Per plan §2,
@@ -315,6 +393,7 @@ function summarizeForAdmin(c: ScenarioChallengeConfig) {
     endDate: c.endDate,
     isActive: c.isActive,
     isFeatured: c.isFeatured,
+    publishedAt: c.publishedAt,
     difficulty: c.difficulty,
     duration: c.duration,
     maxRounds: c.maxRounds,
