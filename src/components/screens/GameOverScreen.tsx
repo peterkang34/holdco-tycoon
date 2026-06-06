@@ -24,6 +24,7 @@ import { ChallengeComparison } from '../ui/ChallengeComparison';
 import { FeedbackModal } from '../ui/FeedbackModal';
 import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { buildPlaybook } from '../../utils/playbookBuilder';
+import { ACQUIRE_ACTION_TYPES, aggregateDealStructureTypes, countRolloverEquityDeals } from '../../utils/strategyAggregation';
 import { ACHIEVEMENT_PREVIEW, type AchievementContext } from '../../data/achievementPreview';
 import { saveEarnedAchievements, getEarnedAchievementIds } from '../../hooks/useUnlocks';
 import { HOLDCO_GRADE_TIPS, PE_GRADE_TIPS } from '../../data/gradeTips';
@@ -246,7 +247,7 @@ export function GameOverScreen({
     const state = useGameStore.getState();
     const allActions = state.roundHistory.flatMap(r => r.actions);
 
-    const acquireTypes = new Set(['acquire', 'acquire_tuck_in']);
+    const acquireTypes = ACQUIRE_ACTION_TYPES;
     const totalAcquisitions = allActions.filter(a => acquireTypes.has(a.type)).length;
     const totalSells = exitedBusinesses.filter(b => b.exitPrice != null && b.exitPrice > 0).length;
     const turnaroundsStarted = allActions.filter(a => a.type === 'start_turnaround').length;
@@ -274,17 +275,8 @@ export function GameOverScreen({
     // All-time sector IDs — used for anti-pattern checks (spray_and_pray uses total sector diversity)
     const allTimeSectorIds = [...new Set(allBiz.map(b => b.sectorId))];
 
-    const dealStructureTypes: Record<string, number> = {};
-    for (const a of allActions) {
-      if (acquireTypes.has(a.type) && a.details?.dealStructure) {
-        const st = String(a.details.dealStructure);
-        dealStructureTypes[st] = (dealStructureTypes[st] || 0) + 1;
-      }
-    }
-
-    const rolloverEquityCount = allActions.filter(a =>
-      acquireTypes.has(a.type) && a.details?.dealStructure === 'rollover_equity'
-    ).length;
+    const dealStructureTypes = aggregateDealStructureTypes(allActions);
+    const rolloverEquityCount = countRolloverEquityDeals(allActions);
 
     const activeCount = businesses.filter(b => b.status === 'active').length;
     const peakActiveCount = Math.max(activeCount, ...state.roundHistory.map(r => r.businessCount));

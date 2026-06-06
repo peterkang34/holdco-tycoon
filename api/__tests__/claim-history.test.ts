@@ -183,45 +183,52 @@ describe('POST /api/player/claim-history', () => {
 
   it('historical claim — matches by composite key', async () => {
     setupAuthUser();
+    // Pin the clock inside the 90-day claim window (closed 2026-05-30). Without
+    // this the test silently expires once real time crosses the window boundary.
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-01T00:00:00Z'));
+    try {
+      const entryDate = '2026-03-02T12:00:00Z';
+      const entry = createKvLeaderboardEntry({
+        initials: 'AB',
+        holdcoName: 'Alpha Beta',
+        score: 77,
+        grade: 'A',
+        difficulty: 'normal',
+        duration: 'standard',
+        date: entryDate,
+        playerId: null,
+      });
+      vi.mocked(kv.zrange).mockResolvedValueOnce([JSON.stringify(entry), 77] as never);
 
-    const entryDate = '2026-03-02T12:00:00Z';
-    const entry = createKvLeaderboardEntry({
-      initials: 'AB',
-      holdcoName: 'Alpha Beta',
-      score: 77,
-      grade: 'A',
-      difficulty: 'normal',
-      duration: 'standard',
-      date: entryDate,
-      playerId: null,
-    });
-    vi.mocked(kv.zrange).mockResolvedValueOnce([JSON.stringify(entry), 77] as never);
+      // insertGameHistory calls
+      vi.mocked(supabaseAdmin!.from)
+        .mockReturnValueOnce(createChain({ data: null, error: null }) as never)
+        .mockReturnValueOnce(createChain({ data: null, error: null }) as never);
 
-    // insertGameHistory calls
-    vi.mocked(supabaseAdmin!.from)
-      .mockReturnValueOnce(createChain({ data: null, error: null }) as never)
-      .mockReturnValueOnce(createChain({ data: null, error: null }) as never);
+      const { req, res, getResponse } = createMockReqRes({
+        method: 'POST',
+        body: {
+          claims: [{
+            type: 'historical',
+            initials: 'AB',
+            holdcoName: 'Alpha Beta',
+            score: 77,
+            grade: 'A',
+            difficulty: 'normal',
+            duration: 'standard',
+            date: entryDate,
+          }],
+        },
+      });
+      await handler(req, res);
 
-    const { req, res, getResponse } = createMockReqRes({
-      method: 'POST',
-      body: {
-        claims: [{
-          type: 'historical',
-          initials: 'AB',
-          holdcoName: 'Alpha Beta',
-          score: 77,
-          grade: 'A',
-          difficulty: 'normal',
-          duration: 'standard',
-          date: entryDate,
-        }],
-      },
-    });
-    await handler(req, res);
-
-    const { statusCode, body } = getResponse();
-    expect(statusCode).toBe(200);
-    expect((body.results as Array<Record<string, unknown>>)[0].status).toBe('claimed');
+      const { statusCode, body } = getResponse();
+      expect(statusCode).toBe(200);
+      expect((body.results as Array<Record<string, unknown>>)[0].status).toBe('claimed');
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('historical claim — outside 90-day window returns not_found', async () => {

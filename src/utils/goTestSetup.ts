@@ -70,10 +70,10 @@ function makeHistory(rounds: number, metrics: Metrics): HistoricalMetrics[] {
 
 function makeRoundHistory(rounds: number, isBankrupt: boolean, metrics: Metrics): RoundHistoryEntry[] {
   const actions: GameAction[] = isBankrupt ? [] : [
-    { type: 'acquire', round: 1, details: { businessId: 'test-1', dealStructure: 'cash' } },
-    { type: 'acquire', round: 3, details: { businessId: 'test-2', dealStructure: 'bank_debt' } },
-    { type: 'acquire', round: 5, details: { businessId: 'test-3', dealStructure: 'seller_note' } },
-    { type: 'acquire', round: 7, details: { businessId: 'test-sold', dealStructure: 'rollover_equity' } },
+    { type: 'acquire', round: 1, details: { businessId: 'test-1', structure: 'all_cash' } },
+    { type: 'acquire', round: 3, details: { businessId: 'test-2', structure: 'bank_debt' } },
+    { type: 'acquire', round: 5, details: { businessId: 'test-3', structure: 'seller_note' } },
+    { type: 'acquire', round: 7, details: { businessId: 'test-sold', structure: 'rollover_equity' } },
     { type: 'sell', round: 12, details: { businessId: 'test-sold' } },
     { type: 'start_turnaround', round: 4, details: { businessId: 'test-3', program: 'operational_excellence' } },
     { type: 'start_turnaround', round: 6, details: { businessId: 'test-2', program: 'revenue_acceleration' } },
