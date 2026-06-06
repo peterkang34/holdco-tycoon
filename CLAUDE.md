@@ -163,15 +163,18 @@ research/                   # GIT-TRACKED — external research
 - `api/_lib/ai.ts` — Anthropic client. Two models: `AI_MODEL` (Haiku 4.5) is the default for high-volume player flows (game debriefs, narrative generation); `AI_MODEL_STRUCTURED` (Sonnet 4.6) is for admin/structured-output flows that need strict schema adherence (scenario generation). Pass model as 5th arg to `callAnthropic`. Do NOT swap Sonnet into player flows — cost compounds at scale.
 - `api/_lib/playerStats.ts` — Pre-computed stats (updatePlayerStats, updateGlobalStats)
 - `api/_lib/adminAuth.ts` — KV-based admin session tokens (NOT env vars)
-- `src/data/scenarioChallenges.ts` — Scenario Challenge config + validation + feature-gating registry
+- `src/data/scenarioChallenges.ts` — Scenario Challenge config + validation + feature-gating registry; exports canonical `RANKING_METRICS`. `migrateScenarioConfig(stored, {validate})` — admin reads pass `validate:false` so errored DRAFTS stay reopenable.
+- `src/data/scenarioBuilder/` — GUI builder seam: `draftModel.ts` (`ScenarioDraft` + `blankDraft`), `compileDraft.ts` (`compileScenarioDraft`/`decompileConfig` — draft⇄`ScenarioChallengeConfig`; `passthrough` preserves unmodeled fields; seed verbatim), `builderOptions.ts` (picker option lists), `templates.ts` (4 starter templates). The builder NEVER hand-edits the 50-field config — it edits the draft and compiles. Keep this seam admin-token-free (future community authoring reuses it).
 - `src/data/modeGating.ts` — Cross-mode `isActionBlocked` (single authority for B-School/PE/Scenario)
 - `src/data/fundStructure.ts` — Parameterized PE fund economics (scenarios can override)
-- `src/utils/featureFlags.ts` — `VITE_SCENARIO_CHALLENGES_ENABLED` gate ('true' | 'false' | 'admin-only')
+- `src/utils/featureFlags.ts` — `VITE_SCENARIO_CHALLENGES_ENABLED` gate ('true' | 'false' | 'admin-only'). Flip to 'true' to reveal player-facing surfaces (home banner + scenarios leaderboard tab).
 - `src/utils/scenarioUrl.ts` — Unified `?se=` / `?tab=scenarios` parser
-- `src/components/admin/ScenarioChallengesTab.tsx` — Admin authoring UI (AI generation + JSON editor)
+- `src/components/admin/ScenarioBuilderTab.tsx` — GUI scenario builder (Manager + sectioned form + live preview). Replaced the old JSON editor + AI-generation (shelved; recover via git tag `scenario-json-authoring-shelved`).
+- `src/services/scenarioAdminApi.ts` — Admin CRUD client for the builder + management list.
 - `src/components/gameover/ScenarioChallengeResultSection.tsx` — Game-over scenario rank + top 10
 - `api/scenario-challenges/{submit,leaderboard,list,active,config}.ts` — Public scenario endpoints (isolated from global leaderboard)
-- `api/admin/scenario-challenges.ts` + `api/admin/scenario-challenges/{generate,clear-preview}.ts` — Admin CRUD
+- `api/admin/scenario-challenges.ts` — Admin CRUD. **Publish-immutability:** `publishedAt` stamped on first activation (handlePost + handlePut); once set, config edits 409 (only `isActive`/`isFeatured` mutable) — revise via Duplicate. Delete snapshots the leaderboard to Postgres first (aborts if that fails).
+- `api/_lib/scenarioArchive.ts` — Shared leaderboard→Postgres snapshot (used by Delete + the cron)
 - `api/cron/scenario-archive-snapshot.ts` — Weekly Postgres snapshot (Sunday 04:00 UTC)
 - `api/_lib/leaderboardCore.ts` — Shared submit core used by both global + scenario leaderboards
 

@@ -497,6 +497,42 @@ export function validateScenarioConfig(config: ScenarioChallengeConfig): Scenari
     errors.push('Softlock: distressed starting businesses + all recovery features (sellBusiness, improveBusiness, restructure, turnaround) disabled = guaranteed bankruptcy');
   }
 
+  // ── Balance warnings (score-inflation / inert-ranking; soft, never block) ──
+
+  // No way to acquire: sourcing off, nothing owned, and not every round has a curated deal.
+  // Player may have cash but no path to build — verify deal availability.
+  if (config.disabledFeatures?.maSourcing && !hasStartingBiz) {
+    const everyRoundCurated = !!config.curatedDeals &&
+      Array.from({ length: config.maxRounds }, (_, i) => i + 1).every(r => (config.curatedDeals?.[r]?.length ?? 0) > 0);
+    if (!everyRoundCurated) {
+      warnings.push('M&A sourcing is disabled with no starting businesses and not every round has a curated deal — players may have no way to acquire. Add starting businesses or curated deals, or re-enable sourcing.');
+    }
+  }
+
+  // Excessive starting position trivializes the capital-allocation decision that IS the skill test.
+  if (!config.fundStructure && config.startingCash > 50_000) {
+    warnings.push('Very high starting cash (>$50M) may trivialize capital allocation — scores will cluster near the achievable max.');
+  }
+  if (hasStartingBiz) {
+    const totalStartEbitda = config.startingBusinesses.reduce((s, b) => s + (typeof b.ebitda === 'number' ? b.ebitda : 0), 0);
+    if (config.startingBusinesses.length > 3 || totalStartEbitda > 5_000) {
+      warnings.push('Large starting portfolio (>3 businesses or >$5M total EBITDA) front-loads score and reduces the build-from-scratch challenge.');
+    }
+  }
+
+  // All-positive forced events = no downside pressure; scores compress upward.
+  const POSITIVE_FORCED_EVENTS = new Set<EventType>(['global_bull_market', 'global_interest_cut', 'global_private_credit_boom']);
+  const forcedList = config.forcedEvents ? Object.values(config.forcedEvents) : [];
+  if (forcedList.length >= 2 && forcedList.every(e => POSITIVE_FORCED_EVENTS.has(e.type))) {
+    warnings.push('All forced events are positive (bull market / rate cut / credit boom) — no downside pressure compresses scores upward. Mix in a downturn for a real test.');
+  }
+
+  // Tiny PE denominator makes MOIC / cash-on-cash ranking variance-driven, not skill-driven.
+  if (config.fundStructure && config.fundStructure.committedCapital < 20_000
+      && (config.rankingMetric === 'moic' || config.rankingMetric === 'cashOnCash')) {
+    warnings.push('Small committed capital (<$20M) with a multiple-based ranking metric makes the leaderboard variance-driven — a single lucky exit dominates. Consider IRR or larger capital.');
+  }
+
   // ── Config size warning ──
   try {
     const size = JSON.stringify(config).length;
