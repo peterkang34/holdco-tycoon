@@ -1079,3 +1079,51 @@ describe('migrateScenarioConfig', () => {
     expect(migrateScenarioConfig({ configVersion: 999, id: 'x' }, { validate: false })).toBeNull();
   });
 });
+
+// ── Balance warnings (soft; never block) ──────────────────────────────────
+
+describe('balance warnings', () => {
+  const hasWarning = (c: ScenarioChallengeConfig, substr: string) =>
+    validateScenarioConfig(c).warnings.some(w => w.includes(substr));
+
+  it('warns on very high starting cash (non-PE)', () => {
+    expect(hasWarning(makeValidHoldcoConfig({ startingCash: 60_000 }), 'trivialize capital allocation')).toBe(true);
+    expect(hasWarning(makeValidHoldcoConfig({ startingCash: 5_000 }), 'trivialize capital allocation')).toBe(false);
+  });
+
+  it('warns on a large starting portfolio (>3 businesses or >$5M EBITDA)', () => {
+    const four = Array.from({ length: 4 }, (_, i) => ({ name: `B${i}`, sectorId: 'agency' as const, ebitda: 500, multiple: 4, quality: 3 as const }));
+    expect(hasWarning(makeValidHoldcoConfig({ startingBusinesses: four }), 'Large starting portfolio')).toBe(true);
+    const bigEbitda = [{ name: 'Whale', sectorId: 'agency' as const, ebitda: 6_000, multiple: 4, quality: 3 as const }];
+    expect(hasWarning(makeValidHoldcoConfig({ startingBusinesses: bigEbitda }), 'Large starting portfolio')).toBe(true);
+  });
+
+  it('warns when all forced events are positive', () => {
+    const c = makeValidHoldcoConfig({
+      forcedEvents: { 2: { type: 'global_bull_market' }, 5: { type: 'global_interest_cut' } },
+    });
+    expect(hasWarning(c, 'no downside pressure')).toBe(true);
+  });
+
+  it('does NOT warn when forced events include a downturn', () => {
+    const c = makeValidHoldcoConfig({
+      forcedEvents: { 2: { type: 'global_bull_market' }, 5: { type: 'global_recession' } },
+    });
+    expect(hasWarning(c, 'no downside pressure')).toBe(false);
+  });
+
+  it('warns on tiny PE capital with a multiple-based ranking metric', () => {
+    const c = makeValidPEConfig({ fundStructure: { ...FUND_STRUCTURE_PRESETS.traditional_pe, committedCapital: 10_000 }, rankingMetric: 'moic' });
+    expect(hasWarning(c, 'variance-driven')).toBe(true);
+  });
+
+  it('warns when M&A sourcing is disabled with no businesses and not every round curated', () => {
+    const c = makeValidHoldcoConfig({ startingCash: 5000, startingBusinesses: [], disabledFeatures: { maSourcing: true }, curatedDeals: { 1: [{ name: 'D', sectorId: 'agency', ebitda: 500, multiple: 4, quality: 3 }] } });
+    expect(hasWarning(c, 'no way to acquire')).toBe(true);
+  });
+
+  it('none of these warnings are errors (they never block)', () => {
+    const c = makeValidHoldcoConfig({ startingCash: 60_000, isActive: false });
+    expect(validateScenarioConfig(c).errors).toEqual([]);
+  });
+});
