@@ -26,6 +26,8 @@ vi.mock('@vercel/kv', () => ({
     zrank: vi.fn(),
     zremrangebyrank: vi.fn(),
     ping: vi.fn(),
+    hincrby: vi.fn(),
+    pipeline: vi.fn(),
   },
 }));
 
@@ -96,6 +98,11 @@ beforeEach(() => {
   vi.mocked((kv as any).zrank).mockResolvedValue(0);
   vi.mocked((kv as any).zremrangebyrank).mockResolvedValue(0);
   vi.mocked((kv as any).ping).mockResolvedValue('PONG');
+  // Telemetry pipeline: chainable hincrby + awaitable exec
+  vi.mocked((kv as any).pipeline).mockReturnValue({
+    hincrby: vi.fn().mockReturnThis(),
+    exec: vi.fn().mockResolvedValue([]),
+  });
 
   // Supabase auth — default: no user
   vi.mocked(supabaseAdmin!.auth.admin.getUserById).mockResolvedValue({

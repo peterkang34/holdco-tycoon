@@ -263,6 +263,38 @@ describe('POST /api/player/claim-history', () => {
     }
   });
 
+  it('records a `historical:window_closed` telemetry counter when the window is closed', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-01T00:00:00Z')); // Past the 90-day window
+
+    try {
+      setupAuthUser();
+      vi.mocked(kv.zrange).mockResolvedValueOnce([] as never);
+
+      const { req, res } = createMockReqRes({
+        method: 'POST',
+        body: {
+          claims: [{
+            type: 'historical',
+            initials: 'AB', holdcoName: 'Alpha Beta', score: 77, grade: 'A',
+            difficulty: 'normal', duration: 'standard', date: '2026-03-02T12:00:00Z',
+          }],
+        },
+      });
+      await handler(req, res);
+
+      // The window-gate rejection should be bucketed distinctly so we can measure it.
+      const pipe = vi.mocked((kv as any).pipeline).mock.results[0]?.value;
+      expect(pipe.hincrby).toHaveBeenCalledWith(
+        expect.stringMatching(/^t:claim:\d{4}-\d{2}$/),
+        'historical:window_closed',
+        1,
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('calls updatePlayerStats + updateGlobalStats after successful claim', async () => {
     setupAuthUser();
 

@@ -5,6 +5,7 @@ import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { getClientIp, isBodyTooLarge } from '../_lib/rateLimit.js';
 import { LEADERBOARD_KEY } from '../_lib/leaderboard.js';
 import { updatePlayerStats, updateGlobalStats } from '../_lib/playerStats.js';
+import { getMonthKey } from '../_lib/telemetry.js';
 
 const RATE_LIMIT_SECONDS = 300; // 5 minutes between claim requests
 const MAX_CLAIMS_PER_REQUEST = 10;
@@ -52,6 +53,24 @@ async function releaseLock(entryId: string): Promise<void> {
   try {
     await kv.del(`lock:claim:${entryId}`);
   } catch { /* best effort */ }
+}
+
+/**
+ * Record claim outcomes to KV telemetry counters under `t:claim:<YYYY-MM>`,
+ * bucketed by `<type>:<outcome>` (e.g. `historical:window_closed`, `token:claimed`).
+ * Lets us measure how often the deprecated composite window actually rejects a
+ * legitimate claim. Best-effort — never throws, never affects the claim response.
+ */
+async function recordClaimOutcomes(outcomes: string[]): Promise<void> {
+  if (outcomes.length === 0) return;
+  try {
+    const monthKey = getMonthKey();
+    const pipe = kv.pipeline();
+    for (const tag of outcomes) {
+      pipe.hincrby(`t:claim:${monthKey}`, tag, 1);
+    }
+    await pipe.exec();
+  } catch { /* telemetry is best-effort */ }
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -218,6 +237,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Wait for game_history inserts (best-effort, don't block response if slow)
     await Promise.allSettled(gameHistoryInserts);
+
+    // Telemetry: outcomes are 1:1 and in-order with claims. A historical claim
+    // that returns not_found while the composite window is closed was rejected
+    // by the window gate (which returns before any match), so tag it distinctly
+    // — that count is the real measure of the closed window's player impact.
+    const windowEndMs = CLAIM_WINDOW_START.getTime() + CLAIM_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+    const windowOpen = Date.now() <= windowEndMs;
+    const outcomes = (claims as Claim[]).map((c, i) => {
+      const status = results[i]?.status ?? 'not_found';
+      if (c.type === 'historical' && status === 'not_found' && !windowOpen) {
+        return 'historical:window_closed';
+      }
+      return `${c?.type ?? 'invalid'}:${status}`;
+    });
+    await recordClaimOutcomes(outcomes);
 
     // Update pre-computed stats after successful claims (non-blocking)
     if (results.some(r => r.status === 'claimed')) {
