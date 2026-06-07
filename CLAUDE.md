@@ -79,6 +79,8 @@ Spawn via Agent tool (background). Always include:
 | 8 | **Atomic dedup at DB level** | SELECT-then-INSERT with application-level dedup | `ON CONFLICT` with UNIQUE index | TOCTOU race between auto-save and leaderboard submit |
 | 9 | **Sync auth state reads** | Async `useEffect` to check `isAnonymous` before OAuth | Read from Zustand store synchronously | User clicked Google before session check completed → wrong auth method |
 | 10 | **Test with real data shapes** | Assume types match without checking DB schema | Verify NOT NULL constraints, FK requirements, CHECK constraints | Trigger needed `public_id` (NOT NULL) and valid initials (CHECK regex) |
+| 11 | **An asset's value and its debt must use the SAME business set** | Score counts a business's VALUE but a different status filter drops its DEBT | If a business's value is in the score, its debt must be too — filter the same `status` set in both | Tuck-ins (`status:'integrated'`) had EBITDA folded into the platform (value counted) but `calculateEnterpriseValue` summed seller notes over `active` only → seller-note debt dropped from FEV for ~4 months, inflating leveraged roll-ups. A Feb fix patched the bank-debt half (`computeTotalDebt`) but missed the seller-note half. |
+| 12 | **Recompute derived totals in EVERY mutator** | A stored/cached total (`state.totalDebt`) is resynced by some actions but not others | Every action that mutates the inputs must recompute the derived field — or compute it live at read time | `merge`/`forge`/`add-to-platform` never resynced `state.totalDebt` (the field the score reads); fine in isolation, but a latent drift in nested sequences. |
 
 ### Code Review Checklist (scan EVERY PR)
 
@@ -92,6 +94,8 @@ Spawn via Agent tool (background). Always include:
 8. **CDN cache on mutable data** — anything that changes (debriefs, stats) should have short cache or cache-bust param
 9. **Supabase query limit defaults** — `.select()` defaults to 1000 rows. Always set explicit `limit` or use count queries.
 10. **Auth token in wrong format** — admin uses KV session tokens (`verifyAdminToken`), not env vars. Player uses JWT (`getPlayerIdFromToken`).
+11. **New business `status`? Audit every `status === 'active'` filter** — a new status (e.g. `integrated`, `merged`) silently changes which businesses are included/excluded in value, debt, EBITDA, and count calcs. Grep all status filters and decide each one deliberately. Scoring/debt code especially: value and debt must agree (principle #11).
+12. **Stored derived totals (`state.totalDebt`) must resync in every action that touches their inputs** — or recompute live at read time. Grep for the field's `:` assignments and confirm every mutating action sets it (principle #12).
 
 ## Project
 - React 19 + Vite 7 + TypeScript + Tailwind CSS 4 + Zustand 5
