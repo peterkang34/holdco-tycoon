@@ -1781,7 +1781,10 @@ export function AllocatePhase({
                     {(!scenarioChallengeConfig?.allowedSectors || scenarioChallengeConfig.allowedSectors.length === 0) && (
                       <option value="">Any Sector</option>
                     )}
-                    {getAvailableSectors(isFamilyOfficeMode, useGameStore.getState().unlockedSectorIds ?? [])
+                    {/* isScenario suspends achievement unlock gates so the scenario's
+                        allowedSectors (which may include normally-gated sectors like
+                        fintech) actually appear in the picker. Parity with deal generation. */}
+                    {getAvailableSectors(isFamilyOfficeMode, useGameStore.getState().unlockedSectorIds ?? [], isScenarioChallengeMode, isScenarioChallengeMode)
                       .filter(sector => {
                         const allowed = scenarioChallengeConfig?.allowedSectors;
                         if (!allowed || allowed.length === 0) return true;
