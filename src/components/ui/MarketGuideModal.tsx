@@ -1,6 +1,7 @@
 import { useState } from 'react';
-import { SECTOR_LIST_STANDARD } from '../../data/sectors';
+import { SECTOR_LIST_STANDARD, getAvailableSectors } from '../../data/sectors';
 import { formatMoney, formatPercent } from '../../engine/types';
+import { useGameStore } from '../../hooks/useGame';
 
 interface MarketGuideModalProps {
   onClose: () => void;
@@ -10,9 +11,23 @@ type SortBy = 'multiple' | 'stability' | 'growth' | 'size';
 
 export function MarketGuideModal({ onClose }: MarketGuideModalProps) {
   const [sortBy, setSortBy] = useState<SortBy>('multiple');
+  const isScenarioChallengeMode = useGameStore((s) => s.isScenarioChallengeMode);
+  const scenarioChallengeConfig = useGameStore((s) => s.scenarioChallengeConfig);
+
+  // In a scenario the unlock gates are suspended, so the guide must surface the
+  // scenario's sectors — including normally-gated ones (fintech, etc.) — and focus
+  // on the scenario's allowedSectors when set. Mirrors the M&A Focus picker. Outside
+  // scenarios, the guide stays the standard-market reference.
+  const guideSectors = isScenarioChallengeMode
+    ? getAvailableSectors(false, [], true, true).filter((sector) => {
+        const allowed = scenarioChallengeConfig?.allowedSectors;
+        if (!allowed || allowed.length === 0) return true;
+        return allowed.includes(sector.id);
+      })
+    : SECTOR_LIST_STANDARD;
 
   // Calculate derived metrics for each sector
-  const sectorsWithMetrics = SECTOR_LIST_STANDARD.map(sector => {
+  const sectorsWithMetrics = guideSectors.map(sector => {
     const avgMultiple = (sector.acquisitionMultiple[0] + sector.acquisitionMultiple[1]) / 2;
     const avgEbitda = (sector.baseEbitda[0] + sector.baseEbitda[1]) / 2;
     const avgGrowth = (sector.organicGrowthRange[0] + sector.organicGrowthRange[1]) / 2;
@@ -69,7 +84,11 @@ export function MarketGuideModal({ onClose }: MarketGuideModalProps) {
         <div className="flex items-start justify-between mb-6">
           <div>
             <h3 className="text-xl font-bold">Market Guide: Sector Multiples</h3>
-            <p className="text-text-muted">Reference for typical acquisition multiples by sector</p>
+            <p className="text-text-muted">
+              {isScenarioChallengeMode && scenarioChallengeConfig?.allowedSectors && scenarioChallengeConfig.allowedSectors.length > 0
+                ? 'Sectors in play for this scenario'
+                : 'Reference for typical acquisition multiples by sector'}
+            </p>
           </div>
           <button
             onClick={onClose}
