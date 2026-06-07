@@ -30,6 +30,7 @@ import type {
   RankingMetric,
 } from '../engine/types';
 import { SECTORS } from './sectors.js';
+import { MIN_FOUNDER_OWNERSHIP } from './gameConfig.js';
 
 // ── Version & bounds ──────────────────────────────────────────────────────
 
@@ -525,6 +526,15 @@ export function validateScenarioConfig(config: ScenarioChallengeConfig): Scenari
   const forcedList = config.forcedEvents ? Object.values(config.forcedEvents) : [];
   if (forcedList.length >= 2 && forcedList.every(e => POSITIVE_FORCED_EVENTS.has(e.type))) {
     warnings.push('All forced events are positive (bull market / rate cut / credit boom) — no downside pressure compresses scores upward. Mix in a downturn for a real test.');
+  }
+
+  // Sub-51% starting ownership disables equity raises from turn 1 (the 51% majority-control
+  // floor). Valid for a deliberate "claw back via buybacks" scenario, but the admin should know.
+  if (!config.fundStructure && config.sharesOutstanding > 0) {
+    const ownership = config.founderShares / config.sharesOutstanding;
+    if (ownership < MIN_FOUNDER_OWNERSHIP) {
+      warnings.push(`Founder ownership starts at ${Math.round(ownership * 100)}% — below the ${Math.round(MIN_FOUNDER_OWNERSHIP * 100)}% majority-control floor. Equity raises will be DISABLED until the player buys back above ${Math.round(MIN_FOUNDER_OWNERSHIP * 100)}%. Ownership also multiplies the final score (FEV = enterprise value × ownership%).`);
+    }
   }
 
   // Tiny PE denominator makes MOIC / cash-on-cash ranking variance-driven, not skill-driven.

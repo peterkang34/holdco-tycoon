@@ -1122,6 +1122,14 @@ describe('balance warnings', () => {
     expect(hasWarning(c, 'no way to acquire')).toBe(true);
   });
 
+  it('warns (but does not block) when founder ownership starts below 51%', () => {
+    const sub = makeValidHoldcoConfig({ founderShares: 350, sharesOutstanding: 1000, isActive: false });
+    expect(hasWarning(sub, 'majority-control floor')).toBe(true);
+    expect(validateScenarioConfig(sub).errors).toEqual([]); // allowed, just warned
+    const ok = makeValidHoldcoConfig({ founderShares: 800, sharesOutstanding: 1000 });
+    expect(hasWarning(ok, 'majority-control floor')).toBe(false);
+  });
+
   it('none of these warnings are errors (they never block)', () => {
     const c = makeValidHoldcoConfig({ startingCash: 60_000, isActive: false });
     expect(validateScenarioConfig(c).errors).toEqual([]);
