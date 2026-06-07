@@ -71,6 +71,19 @@ export const SECTOR_OPTIONS: Option<SectorId>[] = Object.values(SECTORS).map((s)
   label: s.name,
 }));
 
+/** Sub-types (sub-sectors) valid for a given sector, e.g. agency → "Performance Media Agency". */
+export function subTypesForSector(sectorId: SectorId): string[] {
+  return (SECTORS[sectorId]?.subTypes ?? []) as string[];
+}
+
+/** Deal-flow strength tiers — how many acquisition targets surface each year. */
+export const SOURCING_STRENGTH_OPTIONS: Option<0 | 1 | 2 | 3>[] = [
+  { value: 0, label: '0 — Lean (≈1–3 deals/yr)' },
+  { value: 1, label: '1 — Steady (≈3–4 deals/yr)' },
+  { value: 2, label: '2 — Active (≈4–6 deals/yr)' },
+  { value: 3, label: '3 — Flooded (≈5–8 deals/yr)' },
+];
+
 // ── Forced events (Twists) ──────────────────────────────────────────────────
 // Only the runtime's forceable event types are offered — never the portfolio events that
 // would silently no-op if forced.
