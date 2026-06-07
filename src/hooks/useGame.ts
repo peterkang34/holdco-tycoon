@@ -3045,6 +3045,9 @@ export const useGameStore = create<GameStore>()(
           cash: state.cash - totalMergeCost,
           totalInvestedCapital: state.totalInvestedCapital + totalMergeCost,
           businesses: [...updatedBusinesses, mergedBusiness],
+          // Resync stored debt from the post-merge business list — the merged entity carries
+          // biz1+biz2 debt; without this, state.totalDebt (which the score reads) can drift stale.
+          totalDebt: computeTotalDebt([...updatedBusinesses, mergedBusiness], state.holdcoLoanBalance),
           integratedPlatforms: updatedIntegratedPlatforms,
           lastIntegrationOutcome: outcome,
           exitedBusinesses: [
@@ -6042,6 +6045,9 @@ export const useGameStore = create<GameStore>()(
 
         set({
           businesses: updatedBusinesses,
+          // Defensive resync — forge doesn't change debt, but keeps the stored total honest
+          // so a nested platform sequence can't leave it stale for the score.
+          totalDebt: computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance),
           integratedPlatforms: [...state.integratedPlatforms, platform],
           cash: state.cash - integrationCost,
           totalInvestedCapital: state.totalInvestedCapital + integrationCost,
@@ -6118,6 +6124,8 @@ export const useGameStore = create<GameStore>()(
 
         set({
           businesses: updatedBusinesses,
+          // Defensive resync (see forge/merge) — keep stored debt honest for the score.
+          totalDebt: computeTotalDebt(updatedBusinesses, state.holdcoLoanBalance),
           integratedPlatforms: updatedPlatforms,
           cash: state.cash - integrationCost,
           actionsThisRound: [
