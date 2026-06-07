@@ -19,6 +19,7 @@ vi.mock('../../../services/scenarioAdminApi', () => ({
   updateScenario: vi.fn(),
   deleteScenario: vi.fn(),
   openScenarioPreview: vi.fn(),
+  draftNarrative: vi.fn(),
 }));
 
 import { ScenarioBuilderTab } from '../ScenarioBuilderTab';

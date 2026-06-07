@@ -99,6 +99,18 @@ export async function clearPreviewRows(token: string, id: string): Promise<numbe
   return data.deletedCount ?? 0;
 }
 
+export interface NarrativeDraft { name?: string; tagline: string; description: string }
+
+/** Ask the AI to draft narrative TEXT (tagline/description/name) from a scenario's vectors. */
+export async function draftNarrative(token: string, summary: Record<string, unknown>): Promise<NarrativeDraft> {
+  const res = await fetch(`${BASE}/draft-narrative`, {
+    method: 'POST', headers: authHeaders(token), body: JSON.stringify(summary),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `draft failed: ${res.status}`);
+  return data;
+}
+
 /**
  * Open an admin preview of a compiled config in a new tab. Uses a per-UUID sessionStorage
  * handoff (inherited by same-origin window.open) so rapid clicks don't collide; App.tsx

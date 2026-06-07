@@ -15,12 +15,14 @@ import { compileScenarioDraft, decompileConfig } from '../../data/scenarioBuilde
 import {
   SECTOR_OPTIONS, rankingMetricOptions, MA_SOURCING_MODE_OPTIONS, FEATURE_TOGGLE_OPTIONS,
   CONSTRAINT_PACKS, FORCED_EVENT_OPTIONS, EVENT_REQUIRES_SECTOR,
+  subTypesForSector, SOURCING_STRENGTH_OPTIONS,
 } from '../../data/scenarioBuilder/builderOptions';
 import {
   type ScenarioSummary, ApiError, fetchScenarios, fetchScenario, createScenario,
-  updateScenario, deleteScenario, openScenarioPreview,
+  updateScenario, deleteScenario, openScenarioPreview, draftNarrative,
 } from '../../services/scenarioAdminApi';
 import { SCENARIO_TEMPLATES } from '../../data/scenarioBuilder/templates';
+import { getRandomBusinessName } from '../../data/names';
 
 const toM = (thousands: number) => Math.round((thousands / 1000) * 100) / 100;
 const fromM = (m: number) => Math.round(m * 1000);
@@ -61,6 +63,35 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
   const isPE = !!draft.fundStructure;
 
   const set = useCallback((patch: Partial<ScenarioDraft>) => setDraft((d) => ({ ...d, ...patch })), []);
+
+  // ── AI: draft narrative TEXT only (tagline/description/name) from the chosen vectors ──
+  const [aiBusy, setAiBusy] = useState(false);
+  async function draftAI() {
+    setAiBusy(true); setSaveErrors([]);
+    try {
+      const sectorLabel = (id: SectorId) => SECTOR_OPTIONS.find((o) => o.value === id)?.label ?? id;
+      const summary = {
+        name: draft.name,
+        difficulty: draft.difficulty,
+        durationYears: draft.maxRounds,
+        isPE: !!draft.fundStructure,
+        sectors: (draft.allowedSectors ?? []).map(sectorLabel),
+        interestRatePct: draft.startingInterestRate != null ? Math.round(draft.startingInterestRate * 100) : undefined,
+        startingBusinesses: draft.startingBusinesses.map((b) => `Q${b.quality} ${b.subType ?? sectorLabel(b.sectorId)}, $${toM(b.ebitda)}M EBITDA`),
+        forcedEvents: Object.entries(draft.forcedEvents ?? {}).map(([r, e]) => `${e.type} in year ${r}`),
+        rankingMetric: draft.rankingMetric,
+      };
+      const out = await draftNarrative(token, summary);
+      set({
+        tagline: out.tagline || draft.tagline,
+        description: out.description || draft.description,
+        // Only adopt an AI name if the admin hasn't named it (or left the default).
+        ...(out.name && (!draft.name || draft.name === 'New Scenario') ? { name: out.name, id: editingExistingId ? draft.id : slugify(out.name) } : {}),
+      });
+    } catch (e) {
+      setSaveErrors([e instanceof Error ? e.message : 'AI draft failed']);
+    } finally { setAiBusy(false); }
+  }
 
   // ── Manager actions ──
   function startNew(build?: () => ScenarioDraft) {
@@ -159,6 +190,12 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
         {saveMsg && <div className="rounded-lg bg-accent/10 border border-accent/20 p-3 text-xs text-accent">{saveMsg}</div>}
 
         <Section title="① Identity & Run">
+          <div className="flex justify-end mb-2">
+            <button type="button" onClick={() => void draftAI()} disabled={aiBusy}
+              className="text-[11px] px-2.5 py-1 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 disabled:opacity-50">
+              {aiBusy ? 'Drafting…' : '✨ Draft tagline + description with AI'}
+            </button>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Name"><input className={inputCls} value={draft.name}
               onChange={(e) => set({ name: e.target.value, id: editingExistingId ? draft.id : slugify(e.target.value) })} /></Field>
@@ -223,8 +260,12 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
                 {MA_SOURCING_MODE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
               </select>
             </Field>
-            <Field label="Sourcing strength (0–3)"><input type="number" min={0} max={3} className={inputCls}
-              value={draft.startingMaSourcingTier ?? 0} onChange={(e) => set({ startingMaSourcingTier: Number(e.target.value) as MASourcingTier })} /></Field>
+            <Field label="Deal flow strength (targets/year)">
+              <select className={inputCls} value={draft.startingMaSourcingTier ?? 0}
+                onChange={(e) => set({ startingMaSourcingTier: Number(e.target.value) as MASourcingTier })}>
+                {SOURCING_STRENGTH_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+              </select>
+            </Field>
             <Field label="Ranking metric">
               <select className={inputCls} value={draft.rankingMetric} onChange={(e) => set({ rankingMetric: e.target.value as RankingMetric })}>
                 {rankingMetricOptions(isPE).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -314,19 +355,37 @@ function StartingBusinesses({ draft, set }: { draft: ScenarioDraft; set: (p: Par
       <span className={labelCls}>Starting portfolio ({biz.length})</span>
       <div className="space-y-2">
         {biz.map((b, i) => (
-          <div key={i} className="grid grid-cols-2 sm:grid-cols-6 gap-2 items-end rounded-lg border border-white/10 p-2">
-            <Field label="Name"><input className={inputCls} value={b.name} onChange={(e) => update(i, { name: e.target.value })} /></Field>
-            <Field label="Sector">
-              <select className={inputCls} value={b.sectorId} onChange={(e) => update(i, { sectorId: e.target.value as SectorId })}>
-                {SECTOR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </Field>
-            <Field label="EBITDA ($M)"><input type="number" step={0.1} className={inputCls} value={toM(b.ebitda)} onChange={(e) => update(i, { ebitda: fromM(Number(e.target.value)) })} /></Field>
-            <Field label="Multiple"><input type="number" step={0.5} className={inputCls} value={b.multiple} onChange={(e) => update(i, { multiple: Number(e.target.value) })} /></Field>
-            <Field label="Quality"><select className={inputCls} value={b.quality} onChange={(e) => update(i, { quality: Number(e.target.value) as 1 | 2 | 3 | 4 | 5 })}>
-              {[1, 2, 3, 4, 5].map((q) => <option key={q} value={q}>Q{q}</option>)}</select></Field>
+          <div key={i} className="rounded-lg border border-white/10 p-2 space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <Field label="Name">
+                <div className="flex gap-1">
+                  <input className={inputCls} value={b.name} onChange={(e) => update(i, { name: e.target.value })} />
+                  <button type="button" title="Generate a name for this sector/sub-sector"
+                    onClick={() => update(i, { name: getRandomBusinessName(b.sectorId, b.subType) })}
+                    className="shrink-0 px-2 rounded-lg border border-white/10 hover:border-accent hover:text-accent">🎲</button>
+                </div>
+              </Field>
+              <Field label="Sector">
+                <select className={inputCls} value={b.sectorId}
+                  onChange={(e) => update(i, { sectorId: e.target.value as SectorId, subType: undefined })}>
+                  {SECTOR_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+              <Field label="Sub-sector">
+                <select className={inputCls} value={b.subType ?? ''} onChange={(e) => update(i, { subType: e.target.value || undefined })}>
+                  <option value="">— any —</option>
+                  {subTypesForSector(b.sectorId).map((st) => <option key={st} value={st}>{st}</option>)}
+                </select>
+              </Field>
+              <Field label="EBITDA ($M)"><input type="number" step={0.1} className={inputCls} value={toM(b.ebitda)} onChange={(e) => update(i, { ebitda: fromM(Number(e.target.value)) })} /></Field>
+              <Field label="Multiple"><input type="number" step={0.5} className={inputCls} value={b.multiple} onChange={(e) => update(i, { multiple: Number(e.target.value) })} /></Field>
+              <Field label="Quality"><select className={inputCls} value={b.quality} onChange={(e) => update(i, { quality: Number(e.target.value) as 1 | 2 | 3 | 4 | 5 })}>
+                {[1, 2, 3, 4, 5].map((q) => <option key={q} value={q}>Q{q}</option>)}</select></Field>
+            </div>
             <button type="button" onClick={() => set({ startingBusinesses: biz.filter((_, k) => k !== i) })}
-              className="text-[11px] px-2 py-2 rounded border border-danger/30 text-danger">Remove</button>
+              className="text-[11px] px-2 py-1 rounded border border-danger/30 text-danger">Remove business</button>
           </div>
         ))}
       </div>
