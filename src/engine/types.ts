@@ -645,6 +645,8 @@ export interface StartingBusinessConfig {
   status?: 'active' | 'distressed';
   ebitdaMargin?: number;
   backstory?: string;
+  bankDebt?: number;                  // in thousands — existing bank debt on the opco (LBO)
+  sellerNote?: number;                // in thousands — existing seller-note balance on the opco
 }
 
 /** A curated deal in a scenario — only non-default fields stored. */

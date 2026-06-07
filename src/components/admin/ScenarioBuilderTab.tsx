@@ -31,6 +31,27 @@ const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-'
 const inputCls = 'w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-text-primary focus:outline-none focus:border-accent transition-colors';
 const labelCls = 'block text-xs font-medium text-text-secondary mb-1';
 
+/**
+ * Number input that doesn't trap a leading 0. While focused it shows a raw text buffer (so you
+ * can clear it and type fresh, including decimals); when blurred it shows the canonical value
+ * (0 renders as empty with a "0" placeholder). Selects all on focus so a click-and-type replaces.
+ */
+function NumInput({ value, onChange, step, min, max, disabled }: {
+  value: number; onChange: (n: number) => void; step?: number; min?: number; max?: number; disabled?: boolean;
+}) {
+  const [text, setText] = useState('');
+  const [editing, setEditing] = useState(false);
+  const display = editing ? text : (value === 0 ? '' : String(value));
+  return (
+    <input type="number" step={step} min={min} max={max} disabled={disabled} placeholder="0" className={inputCls}
+      value={display}
+      onFocus={(e) => { setEditing(true); setText(value === 0 ? '' : String(value)); e.currentTarget.select(); }}
+      onBlur={() => setEditing(false)}
+      onChange={(e) => { setText(e.target.value); onChange(e.target.value === '' ? 0 : Number(e.target.value)); }}
+    />
+  );
+}
+
 export function ScenarioBuilderTab({ token }: { token: string }) {
   const [view, setView] = useState<'list' | 'builder'>('list');
   const [scenarios, setScenarios] = useState<ScenarioSummary[]>([]);
@@ -222,10 +243,8 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
               </select>
             </Field>
             <Field label={`Years: ${draft.maxRounds}`}><input type="range" min={3} max={30} className="w-full" value={draft.maxRounds} onChange={(e) => set({ maxRounds: Number(e.target.value) })} /></Field>
-            <Field label="Starting cash ($M)"><input type="number" step={0.5} className={inputCls} value={toM(draft.startingCash)} disabled={isPE}
-              onChange={(e) => set({ startingCash: fromM(Number(e.target.value)) })} /></Field>
-            <Field label="Starting debt ($M)"><input type="number" step={0.5} className={inputCls} value={toM(draft.startingDebt)} disabled={isPE}
-              onChange={(e) => set({ startingDebt: fromM(Number(e.target.value)) })} /></Field>
+            <Field label="Starting cash ($M)"><NumInput step={0.5} disabled={isPE} value={toM(draft.startingCash)} onChange={(n) => set({ startingCash: fromM(n) })} /></Field>
+            <Field label="Holdco starting debt ($M)"><NumInput step={0.5} disabled={isPE} value={toM(draft.startingDebt)} onChange={(n) => set({ startingDebt: fromM(n) })} /></Field>
             <Field label={`Your starting ownership: ${ownershipPct(draft)}%`}>
               <input type="range" min={1} max={100} className="w-full" value={ownershipPct(draft)}
                 onChange={(e) => set({ founderShares: Math.round((Number(e.target.value) / 100) * draft.sharesOutstanding) })} />
@@ -315,6 +334,10 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
 
 // ── helpers (pure) ──
 function ownershipPct(d: ScenarioDraft) { return Math.round((d.founderShares / d.sharesOutstanding) * 100); }
+/** Total starting debt: holdco loan + opco bank debt + opco seller notes (in thousands). */
+function startingDebtTotal(d: ScenarioDraft) {
+  return d.startingDebt + d.startingBusinesses.reduce((s, b) => s + (b.bankDebt ?? 0) + (b.sellerNote ?? 0), 0);
+}
 function toLocalInput(iso: string) { try { return new Date(iso).toISOString().slice(0, 16); } catch { return ''; } }
 function fromLocalInput(v: string) { return v ? new Date(v).toISOString() : new Date().toISOString(); }
 function toggleSector(d: ScenarioDraft, set: (p: Partial<ScenarioDraft>) => void, id: SectorId) {
@@ -379,10 +402,14 @@ function StartingBusinesses({ draft, set }: { draft: ScenarioDraft; set: (p: Par
                   {subTypesForSector(b.sectorId).map((st) => <option key={st} value={st}>{st}</option>)}
                 </select>
               </Field>
-              <Field label="EBITDA ($M)"><input type="number" step={0.1} className={inputCls} value={toM(b.ebitda)} onChange={(e) => update(i, { ebitda: fromM(Number(e.target.value)) })} /></Field>
-              <Field label="Multiple"><input type="number" step={0.5} className={inputCls} value={b.multiple} onChange={(e) => update(i, { multiple: Number(e.target.value) })} /></Field>
+              <Field label="EBITDA ($M)"><NumInput step={0.1} value={toM(b.ebitda)} onChange={(n) => update(i, { ebitda: fromM(n) })} /></Field>
+              <Field label="Multiple"><NumInput step={0.5} value={b.multiple} onChange={(n) => update(i, { multiple: n })} /></Field>
               <Field label="Quality"><select className={inputCls} value={b.quality} onChange={(e) => update(i, { quality: Number(e.target.value) as 1 | 2 | 3 | 4 | 5 })}>
                 {[1, 2, 3, 4, 5].map((q) => <option key={q} value={q}>Q{q}</option>)}</select></Field>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end">
+              <Field label="Bank debt ($M)"><NumInput step={0.5} value={toM(b.bankDebt ?? 0)} onChange={(n) => update(i, { bankDebt: n === 0 ? undefined : fromM(n) })} /></Field>
+              <Field label="Seller note ($M)"><NumInput step={0.5} value={toM(b.sellerNote ?? 0)} onChange={(n) => update(i, { sellerNote: n === 0 ? undefined : fromM(n) })} /></Field>
             </div>
             <button type="button" onClick={() => set({ startingBusinesses: biz.filter((_, k) => k !== i) })}
               className="text-[11px] px-2 py-1 rounded border border-danger/30 text-danger">Remove business</button>
@@ -409,19 +436,12 @@ function PEFundMode({ draft, set }: { draft: ScenarioDraft; set: (p: Partial<Sce
       </label>
       {on && draft.fundStructure && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 mt-2">
-          <Field label="Committed ($M)"><input type="number" className={inputCls} value={toM(draft.fundStructure.committedCapital)}
-            onChange={(e) => set({ fundStructure: { ...draft.fundStructure!, committedCapital: fromM(Number(e.target.value)) } })} /></Field>
-          <Field label="Mgmt fee %"><input type="number" step={0.5} className={inputCls} value={draft.fundStructure.mgmtFeePercent * 100}
-            onChange={(e) => set({ fundStructure: { ...draft.fundStructure!, mgmtFeePercent: Number(e.target.value) / 100 } })} /></Field>
-          <Field label="Hurdle %"><input type="number" step={0.5} className={inputCls} value={draft.fundStructure.hurdleRate * 100}
-            onChange={(e) => set({ fundStructure: { ...draft.fundStructure!, hurdleRate: Number(e.target.value) / 100 } })} /></Field>
-          <Field label="Carry %"><input type="number" step={1} className={inputCls} value={draft.fundStructure.carryRate * 100}
-            onChange={(e) => set({ fundStructure: { ...draft.fundStructure!, carryRate: Number(e.target.value) / 100 } })} /></Field>
-          <Field label="Liquidation year"><input type="number" min={2} max={draft.maxRounds} className={inputCls}
-            value={draft.fundStructure.forcedLiquidationYear ?? draft.maxRounds}
-            onChange={(e) => set({ fundStructure: { ...draft.fundStructure!, forcedLiquidationYear: Number(e.target.value) } })} /></Field>
-          <Field label="Liquidation haircut (×)"><input type="number" step={0.05} min={0.5} max={1} className={inputCls} value={draft.fundStructure.forcedLiquidationDiscount}
-            onChange={(e) => set({ fundStructure: { ...draft.fundStructure!, forcedLiquidationDiscount: Number(e.target.value) } })} /></Field>
+          <Field label="Committed ($M)"><NumInput value={toM(draft.fundStructure.committedCapital)} onChange={(n) => set({ fundStructure: { ...draft.fundStructure!, committedCapital: fromM(n) } })} /></Field>
+          <Field label="Mgmt fee %"><NumInput step={0.5} value={draft.fundStructure.mgmtFeePercent * 100} onChange={(n) => set({ fundStructure: { ...draft.fundStructure!, mgmtFeePercent: n / 100 } })} /></Field>
+          <Field label="Hurdle %"><NumInput step={0.5} value={draft.fundStructure.hurdleRate * 100} onChange={(n) => set({ fundStructure: { ...draft.fundStructure!, hurdleRate: n / 100 } })} /></Field>
+          <Field label="Carry %"><NumInput step={1} value={draft.fundStructure.carryRate * 100} onChange={(n) => set({ fundStructure: { ...draft.fundStructure!, carryRate: n / 100 } })} /></Field>
+          <Field label="Liquidation year"><NumInput min={2} max={draft.maxRounds} value={draft.fundStructure.forcedLiquidationYear ?? draft.maxRounds} onChange={(n) => set({ fundStructure: { ...draft.fundStructure!, forcedLiquidationYear: n } })} /></Field>
+          <Field label="Liquidation haircut (×)"><NumInput step={0.05} min={0.5} max={1} value={draft.fundStructure.forcedLiquidationDiscount} onChange={(n) => set({ fundStructure: { ...draft.fundStructure!, forcedLiquidationDiscount: n } })} /></Field>
         </div>
       )}
     </div>
@@ -447,8 +467,8 @@ function ForcedEvents({ draft, set }: { draft: ScenarioDraft; set: (p: Partial<S
       <div className="space-y-2">
         {rounds.map((round) => (
           <div key={round} className="grid grid-cols-2 sm:grid-cols-4 gap-2 items-end rounded-lg border border-white/10 p-2">
-            <Field label="Year"><input type="number" min={1} max={draft.maxRounds} className={inputCls} value={round}
-              onChange={(e) => { const nr = Number(e.target.value); const ev = events[round]; const next = { ...events }; delete next[round]; next[nr] = ev; set({ forcedEvents: next }); }} /></Field>
+            <Field label="Year"><NumInput min={1} max={draft.maxRounds} value={round}
+              onChange={(nr) => { if (nr < 1 || nr === round) return; const ev = events[round]; const next = { ...events }; delete next[round]; next[nr] = ev; set({ forcedEvents: next }); }} /></Field>
             <div className="sm:col-span-2"><Field label="Event">
               <select className={inputCls} value={events[round].type} onChange={(e) => updateEvent(round, { type: e.target.value as EventType })}>
                 {FORCED_EVENT_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -484,6 +504,7 @@ function PreviewRail({ draft, compiled, validation, onPreviewPlay }: {
           <Cell label="Mode" value={draft.fundStructure ? 'PE Fund' : 'Holdco'} />
           <Cell label="Length" value={`${draft.maxRounds} yrs`} />
           <Cell label="Start cash" value={draft.fundStructure ? `$${toM(draft.fundStructure.committedCapital)}M LP` : `$${toM(draft.startingCash)}M`} />
+          <Cell label="Start debt" value={draft.fundStructure ? '—' : `$${toM(startingDebtTotal(draft))}M`} />
           <Cell label="Ranked by" value={draft.rankingMetric.toUpperCase()} />
           <Cell label="Ownership" value={`${ownershipPct(draft)}%`} />
           <Cell label="Businesses" value={`${draft.startingBusinesses.length}`} />

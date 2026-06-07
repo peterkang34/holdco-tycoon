@@ -971,6 +971,22 @@ describe('createBusinessFromConfig', () => {
     expect(biz.revenue).toBe(8000); // 2000 / 0.25
   });
 
+  it('owns the business free-and-clear by default (no opco debt)', () => {
+    const biz = createBusinessFromConfig(override, 'biz-clean');
+    expect(biz.bankDebtBalance).toBe(0);
+    expect(biz.sellerNoteBalance).toBe(0);
+  });
+
+  it('applies opco-level starting debt (bankDebt / sellerNote) with serviceable rates+terms', () => {
+    const biz = createBusinessFromConfig({ ...override, bankDebt: 5000, sellerNote: 1500 }, 'biz-lbo');
+    expect(biz.bankDebtBalance).toBe(5000);
+    expect(biz.bankDebtRate).toBeGreaterThan(0);
+    expect(biz.bankDebtRoundsRemaining).toBeGreaterThan(0);
+    expect(biz.sellerNoteBalance).toBe(1500);
+    expect(biz.sellerNoteRate).toBeGreaterThan(0);
+    expect(biz.sellerNoteRoundsRemaining).toBeGreaterThan(0);
+  });
+
   it('uses sector default margin when ebitdaMargin omitted', () => {
     const biz = createBusinessFromConfig(override, 'biz-3');
     expect(biz.ebitdaMargin).toBeGreaterThan(0);

@@ -910,7 +910,8 @@ export const useGameStore = create<GameStore>()(
           phase: 'collect',
           businesses,
           cash: startingCash,
-          totalDebt: isPEScenario ? 0 : config.startingDebt,
+          // Holdco loan (startingDebt) + any opco-level debt on starting businesses.
+          totalDebt: isPEScenario ? 0 : computeTotalDebt(businesses, config.startingDebt),
           totalInvestedCapital: totalInvested,
           founderShares: isPEScenario ? 0 : config.founderShares,
           sharesOutstanding: isPEScenario ? 1000 : config.sharesOutstanding,
@@ -920,9 +921,14 @@ export const useGameStore = create<GameStore>()(
             : (config.sharesOutstanding > 0 ? config.founderShares / config.sharesOutstanding : 1.0),
           interestRate: config.startingInterestRate ?? initialState.interestRate ?? 0.07,
           holdcoDebtStartRound: 0,
-          holdcoLoanBalance: 0,
-          holdcoLoanRate: 0,
-          holdcoLoanRoundsRemaining: 0,
+          // Scenario starting debt is a REAL serviced holdco loan (interest + principal),
+          // mirroring Normal mode — not phantom debt. PE scenarios start debt-free.
+          holdcoLoanBalance: isPEScenario ? 0 : config.startingDebt,
+          holdcoLoanRate: (!isPEScenario && config.startingDebt > 0)
+            ? (config.startingInterestRate ?? STARTING_INTEREST_RATE) : 0,
+          holdcoLoanRoundsRemaining: (!isPEScenario && config.startingDebt > 0)
+            ? (config.duration === 'quick' ? config.maxRounds : Math.max(4, Math.ceil(config.maxRounds * 0.5)))
+            : 0,
           sharedServices: initializeSharedServices(),
           dealPipeline: initialDealPipeline,
           maSourcing: {

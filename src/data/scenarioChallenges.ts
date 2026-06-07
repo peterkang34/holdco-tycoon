@@ -177,6 +177,12 @@ export function validateScenarioConfig(config: ScenarioChallengeConfig): Scenari
       if (biz.ebitdaMargin !== undefined && (biz.ebitdaMargin <= 0 || biz.ebitdaMargin >= 1)) {
         errors.push(`startingBusinesses[${i}].ebitdaMargin must be in (0, 1)`);
       }
+      if (biz.bankDebt !== undefined && (typeof biz.bankDebt !== 'number' || biz.bankDebt < 0)) {
+        errors.push(`startingBusinesses[${i}].bankDebt must be a non-negative number`);
+      }
+      if (biz.sellerNote !== undefined && (typeof biz.sellerNote !== 'number' || biz.sellerNote < 0)) {
+        errors.push(`startingBusinesses[${i}].sellerNote must be a non-negative number`);
+      }
     });
   }
 
@@ -759,12 +765,14 @@ export function createBusinessFromConfig(
     integrationRoundsRemaining: 0,
     integrationGrowthDrag: 0,
     improvements: [],
-    sellerNoteBalance: 0,
-    sellerNoteRate: 0,
-    sellerNoteRoundsRemaining: 0,
-    bankDebtBalance: 0,
-    bankDebtRate: 0,
-    bankDebtRoundsRemaining: 0,
+    // Opco-level starting debt (LBO'd starting business). Default rates/terms when present;
+    // the engine services these like any acquired-business debt. Balance 0 = owned free & clear.
+    sellerNoteBalance: override.sellerNote ?? 0,
+    sellerNoteRate: (override.sellerNote ?? 0) > 0 ? 0.08 : 0,
+    sellerNoteRoundsRemaining: (override.sellerNote ?? 0) > 0 ? 5 : 0,
+    bankDebtBalance: override.bankDebt ?? 0,
+    bankDebtRate: (override.bankDebt ?? 0) > 0 ? 0.07 : 0,
+    bankDebtRoundsRemaining: (override.bankDebt ?? 0) > 0 ? 7 : 0,
     earnoutRemaining: 0,
     earnoutTarget: 0,
     // TODO (Step 2): propagate `override.status === 'distressed'` to the engine.
