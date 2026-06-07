@@ -156,6 +156,19 @@ describe('isActionBlocked — Scenario Challenge mode', () => {
     }
   });
 
+  it('integratedPlatforms blocks ONLY recipe forging — regular platforms stay available', () => {
+    const s = state({
+      isScenarioChallengeMode: true,
+      scenarioChallengeConfig: scenarioWith({ integratedPlatforms: true }),
+    });
+    expect(isActionBlocked(s, 'forge_integrated_platform').blocked).toBe(true);
+    expect(isActionBlocked(s, 'add_to_integrated_platform').blocked).toBe(true);
+    // Narrower than platformForge — these stay allowed:
+    for (const action of ['designate_platform', 'merge_businesses', 'acquire_tuck_in', 'sell_platform'] as GameActionType[]) {
+      expect(isActionBlocked(s, action).blocked).toBe(false);
+    }
+  });
+
   it('disabledFeatures: { key: false } does NOT block (explicit falsy)', () => {
     const s = state({
       isScenarioChallengeMode: true,
@@ -250,7 +263,7 @@ function featureState(overrides: Partial<FeatureState> = {}): FeatureState {
 
 const ALL_FEATURES: FeatureKey[] = [
   'improveBusiness', 'equityRaise', 'buybackShares', 'distributions',
-  'payDownDebt', 'sellBusiness', 'sharedServices', 'platformForge',
+  'payDownDebt', 'sellBusiness', 'sharedServices', 'platformForge', 'integratedPlatforms',
   'turnaround', 'maSourcing', 'ipo', 'designatePlatform',
 ];
 
@@ -391,7 +404,7 @@ describe('isFeatureAvailable — exhaustiveness tripwires', () => {
   it('every FeatureKey that appears in ALL_FEATURES is in the test list (no drift)', () => {
     // If someone adds a new FeatureKey to the union, they must add it to ALL_FEATURES here.
     // Detected via tripwire: cast to ensure the length assertion stays honest.
-    expect(ALL_FEATURES.length).toBe(12);
+    expect(ALL_FEATURES.length).toBe(13);
     expect(new Set(ALL_FEATURES).size).toBe(ALL_FEATURES.length);
   });
 });

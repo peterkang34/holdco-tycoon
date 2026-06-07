@@ -117,6 +117,7 @@ export type FeatureKey =
   | 'sellBusiness'
   | 'sharedServices'
   | 'platformForge'
+  | 'integratedPlatforms'
   | 'turnaround'
   | 'maSourcing'
   | 'ipo'
@@ -147,6 +148,7 @@ const FEATURE_REPRESENTATIVE_ACTION = {
   sellBusiness:      'sell',
   sharedServices:    'unlock_shared_service',
   platformForge:     'forge_integrated_platform',
+  integratedPlatforms: 'forge_integrated_platform',
   turnaround:        'start_turnaround',
   maSourcing:        'source_deals',
   ipo:               'ipo',
