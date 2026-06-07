@@ -6,7 +6,7 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import type {
-  ScenarioChallengeConfig, SectorId, GameDuration, RankingMetric, MaSourcingMode,
+  ScenarioChallengeConfig, SectorId, RankingMetric, MaSourcingMode,
   DisabledFeatureKey, MASourcingTier, EventType, StartingBusinessConfig, ForcedEvent,
 } from '../../engine/types';
 import { validateScenarioConfig, FUND_STRUCTURE_PRESETS } from '../../data/scenarioChallenges';
@@ -237,17 +237,25 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
         <Section title="② The Setup">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Length">
-              <select className={inputCls} value={draft.duration}
-                onChange={(e) => { const dur = e.target.value as GameDuration; set({ duration: dur, maxRounds: dur === 'quick' ? 10 : 20 }); }}>
+              <select className={inputCls}
+                value={draft.maxRounds === 10 ? 'quick' : draft.maxRounds === 20 ? 'standard' : 'custom'}
+                onChange={(e) => {
+                  const v = e.target.value;
+                  if (v === 'quick') set({ duration: 'quick', maxRounds: 10 });
+                  else if (v === 'standard') set({ duration: 'standard', maxRounds: 20 });
+                  else set({ duration: 'standard', maxRounds: 15 }); // Custom — fine-tune with the slider
+                }}>
                 <option value="quick">Quick (10 years)</option>
                 <option value="standard">Standard (20 years)</option>
+                <option value="custom">Custom (use slider)</option>
               </select>
             </Field>
             <Field label="Score multiplier (×)">
               <NumInput step={0.1} min={0.1} max={10} value={draft.scoreMultiplier ?? 1}
                 onChange={(n) => set({ scoreMultiplier: (n <= 0 || n === 1) ? undefined : n })} />
             </Field>
-            <Field label={`Years: ${draft.maxRounds}`}><input type="range" min={3} max={30} className="w-full" value={draft.maxRounds} onChange={(e) => set({ maxRounds: Number(e.target.value) })} /></Field>
+            <Field label={`Years: ${draft.maxRounds}`}><input type="range" min={3} max={30} className="w-full" value={draft.maxRounds}
+              onChange={(e) => { const n = Number(e.target.value); set({ maxRounds: n, duration: n >= 15 ? 'standard' : 'quick' }); }} /></Field>
             <Field label="Starting cash ($M)"><NumInput step={0.5} disabled={isPE} value={toM(draft.startingCash)} onChange={(n) => set({ startingCash: fromM(n) })} /></Field>
             <Field label="Holdco starting debt ($M)"><NumInput step={0.5} disabled={isPE} value={toM(draft.startingDebt)} onChange={(n) => set({ startingDebt: fromM(n) })} /></Field>
             <Field label={`Your starting ownership: ${ownershipPct(draft)}%`}>
