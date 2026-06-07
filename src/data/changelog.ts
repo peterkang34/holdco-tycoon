@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'June 6, 2026',
+    title: 'Scoring Fix: Tuck-In Debt',
+    sections: [
+      {
+        heading: 'Leveraged Tuck-Ins',
+        items: [
+          'Fixed a scoring bug where seller-note debt used to finance a tuck-in / bolt-on acquisition (a business folded into an integrated platform) was not subtracted from your final score, making leveraged tuck-ins look like all-cash purchases and inflating Founder Equity Value. The debt is now correctly deducted in the score, the end-game waterfall, and the value drilldowns. Bank-debt-financed tuck-ins and standalone acquisitions were already correct.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'June 4, 2026',
     title: 'Achievement Fixes',
     sections: [

@@ -433,7 +433,10 @@ export function computePEMoicBreakdown(state: GameState, ctx: DrilldownContext):
     return sum + b.ebitda * valuation.totalMultiple;
   }, 0);
 
-  const opcoSellerNotesPE = activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+  // Include integrated (tuck-in) seller notes — matches calculateEnterpriseValue.
+  const opcoSellerNotesPE = state.businesses
+    .filter(b => b.status === 'active' || b.status === 'integrated')
+    .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
   const totalDebtPE = state.totalDebt + opcoSellerNotesPE;
 
   return {
@@ -528,7 +531,10 @@ export function computeNavBreakdown(state: GameState, ctx: DrilldownContext): Na
     return sum + b.ebitda * valuation.totalMultiple;
   }, 0);
 
-  const opcoSellerNotesNav = activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+  // Include integrated (tuck-in) seller notes — matches calculateEnterpriseValue.
+  const opcoSellerNotesNav = state.businesses
+    .filter(b => b.status === 'active' || b.status === 'integrated')
+    .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
   const totalDebtNav = state.totalDebt + opcoSellerNotesNav;
 
   return {

@@ -646,7 +646,11 @@ export function GameOverScreen({
 
   const fevBreakdown = useMemo(() => {
     const currentOwnership = sharesOutstanding > 0 ? founderShares / sharesOutstanding : 1;
-    const opcoDebt = activeBusinesses.reduce((sum, b) => sum + b.sellerNoteBalance, 0);
+    // Seller notes from active AND integrated (tuck-in) businesses — mirror the engine EV calc
+    // (calculateEnterpriseValue) so the waterfall doesn't drop debt-financed tuck-in seller notes.
+    const opcoDebt = businesses
+      .filter(b => b.status === 'active' || b.status === 'integrated')
+      .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
     const businessValues = activeBusinesses.map(business => {
       const valuation = calculateExitValuation(business, maxRounds, undefined, undefined, integratedPlatforms);
       const value = Math.round(business.ebitda * valuation.totalMultiple);
@@ -683,7 +687,7 @@ export function GameOverScreen({
       isPublic, sentimentPct, sentimentDollars, publicPremiumPct, publicPremiumDollars,
       privateCounterfactualEV,
     };
-  }, [activeBusinesses, sharesOutstanding, founderShares, maxRounds, enterpriseValue, initialOwnershipPct, integratedPlatforms, ipoState, cash, totalDebt]);
+  }, [activeBusinesses, businesses, sharesOutstanding, founderShares, maxRounds, enterpriseValue, initialOwnershipPct, integratedPlatforms, ipoState, cash, totalDebt]);
 
   // ── Leaderboard ──
   useEffect(() => {
