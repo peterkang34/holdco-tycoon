@@ -694,6 +694,11 @@ export const UNLOCKABLE_SECTORS: Partial<Record<SectorId, {
   },
 };
 
+/** All achievement-gated sector ids. In scenarios the player effectively has every
+ *  prestige sector unlocked, so pass these as `unlockedSectorIds` to the deal-flow
+ *  weighting (getSectorWeightsForRound) so gated sectors aren't zero-weighted. */
+export const UNLOCKABLE_SECTOR_IDS = Object.keys(UNLOCKABLE_SECTORS) as SectorId[];
+
 /** Standard sector list (excludes FO-exclusive and unlockable sectors) */
 export const SECTOR_LIST_STANDARD = Object.values(SECTORS).filter(
   s => !FO_EXCLUSIVE_SECTORS.includes(s.id) && !(s.id in UNLOCKABLE_SECTORS)
@@ -702,13 +707,22 @@ export const SECTOR_LIST_STANDARD = Object.values(SECTORS).filter(
 /** Full sector list (includes all sectors) */
 export const SECTOR_LIST = Object.values(SECTORS);
 
+/** Scenario sector list: all sectors EXCEPT FO-exclusive. Achievement unlock gates are
+ *  suspended in scenarios — the scenario's own `allowedSectors` is the authority, so an
+ *  admin can include normally-gated sectors (fintech, aerospace, etc.). */
+export const SECTOR_LIST_SCENARIO = Object.values(SECTORS).filter(
+  s => !FO_EXCLUSIVE_SECTORS.includes(s.id)
+);
+
 /** Get available sectors based on mode, unlock state, and challenge flag */
 export function getAvailableSectors(
   isFamilyOffice: boolean,
   unlockedSectorIds: SectorId[] = [],
   isChallenge: boolean = false,
+  isScenario: boolean = false,
 ): SectorDefinition[] {
   if (isFamilyOffice) return SECTOR_LIST;
+  if (isScenario) return SECTOR_LIST_SCENARIO; // suspend achievement gates in scenarios
   if (isChallenge) return SECTOR_LIST_STANDARD;
   const unlocked = Object.values(SECTORS).filter(
     s => s.id in UNLOCKABLE_SECTORS && unlockedSectorIds.includes(s.id)

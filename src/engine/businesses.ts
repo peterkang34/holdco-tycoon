@@ -1147,6 +1147,7 @@ export function generateDealPipeline(
   ownedProSportsSubTypes: string[] = [],
   unlockedSectorIds: SectorId[] = [],
   isChallenge: boolean = false,
+  isScenario: boolean = false,
 ): Deal[] {
   // Age existing deals first
   let pipeline = currentPipeline.map(deal => ({
@@ -1163,7 +1164,7 @@ export function generateDealPipeline(
   // Track sectors already in pipeline to ensure variety
   const sectorsInPipeline = new Set(pipeline.map(d => d.business.sectorId));
   // FO mode includes proSports; normal mode excludes FO-exclusive + unlockable (unless earned)
-  const sectorList = getAvailableSectors(isFamilyOfficeMode, unlockedSectorIds, isChallenge);
+  const sectorList = getAvailableSectors(isFamilyOfficeMode, unlockedSectorIds, isChallenge, isScenario);
   const allSectorIds = sectorList.map(s => s.id);
 
   // Compute affordability and tier weights

@@ -19,6 +19,21 @@ export function getEarnedAchievementIds(): string[] {
   }
 }
 
+/**
+ * Whether a completed game should persist global achievements.
+ *
+ * Scenario Challenges (including admin previews, which run in scenario mode) are a
+ * SEALED SANDBOX: admin-authored starting economy, suspended sector unlock gates, and
+ * isolated leaderboards. They must NOT earn global achievements — that would be a
+ * backdoor for farming the achievements that gate sectors (fintech, etc.) in normal
+ * play. This is the symmetric half of suspending the unlock gates on the availability
+ * side (see getAvailableSectors `isScenario`): scenarios neither respect the gates nor
+ * feed them.
+ */
+export function shouldEarnAchievements(opts: { isScenarioChallengeMode?: boolean }): boolean {
+  return !opts.isScenarioChallengeMode;
+}
+
 /** Persist newly earned achievements (additive — never overwrites existing) */
 export function saveEarnedAchievements(newIds: string[]): void {
   try {

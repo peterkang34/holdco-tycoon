@@ -20,7 +20,7 @@ import {
   FUND_STRUCTURE_PRESETS,
   type FundStructurePresetId,
 } from '../scenarioChallenges';
-import { SECTORS } from '../sectors';
+import { SECTORS, FO_EXCLUSIVE_SECTORS } from '../sectors';
 
 export interface Option<T> {
   value: T;
@@ -66,10 +66,16 @@ export function rankingMetricOptions(isPE: boolean): Option<RankingMetric>[] {
 
 // ── Sectors ────────────────────────────────────────────────────────────────
 
-export const SECTOR_OPTIONS: Option<SectorId>[] = Object.values(SECTORS).map((s) => ({
-  value: s.id as SectorId,
-  label: s.name,
-}));
+// Offer exactly what scenarios can generate: all sectors EXCEPT FO-exclusive
+// (proSports). Achievement-gated sectors (fintech, etc.) ARE offered — scenarios
+// suspend the unlock gates, so the scenario's allowedSectors is the authority.
+// See SECTOR_LIST_SCENARIO / getAvailableSectors(isScenario) in sectors.ts.
+export const SECTOR_OPTIONS: Option<SectorId>[] = Object.values(SECTORS)
+  .filter((s) => !FO_EXCLUSIVE_SECTORS.includes(s.id))
+  .map((s) => ({
+    value: s.id as SectorId,
+    label: s.name,
+  }));
 
 /** Sub-types (sub-sectors) valid for a given sector, e.g. agency → "Performance Media Agency". */
 export function subTypesForSector(sectorId: SectorId): string[] {

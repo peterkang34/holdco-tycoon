@@ -75,7 +75,7 @@ import { ROUTE_DENSITY_CAPEX_REDUCTION, CROSS_SAAS_SERVICES_ACHIEVEMENT_GATE } f
 import { useAuthStore } from './useAuth';
 import { calculateFinalScore, generatePostGameInsights, calculateEnterpriseValue, calculateFounderEquityValue, calculateFounderPersonalWealth } from '../engine/scoring';
 import { getDistressRestrictions } from '../engine/distress';
-import { SECTORS } from '../data/sectors';
+import { SECTORS, UNLOCKABLE_SECTOR_IDS } from '../data/sectors';
 
 import type { GameDifficulty, GameDuration, GameActionType, DealHeat, LPComment, ScenarioChallengeConfig, ScenarioTrigger } from '../engine/types';
 import { isActionBlocked } from '../data/modeGating';
@@ -877,7 +877,7 @@ export const useGameStore = create<GameStore>()(
           initialDealPipeline = generateDealPipeline(
             [], 1, undefined, undefined, undefined, 0, 0, false, undefined,
             config.maxRounds, false, round1Streams.deals, 0, startingCash, null,
-            false, false, config.difficulty, [], [], true,
+            false, false, config.difficulty, [], UNLOCKABLE_SECTOR_IDS, true, true, // unlockedSectorIds=all (scenario), isChallenge, isScenario
           );
           // Round-1 allowedSectors/allowedSubTypes filter. Same pattern as the round
           // advance path (advanceToAllocate) so the scenario's restrictions apply
@@ -1683,8 +1683,10 @@ export const useGameStore = create<GameStore>()(
           state.isFamilyOfficeMode ?? false,
           state.difficulty,
           ownedProSportsSubTypes,
-          state.unlockedSectorIds ?? [],
+          // Scenarios suspend unlock gates → weight all prestige sectors into deal flow.
+          state.isScenarioChallengeMode ? UNLOCKABLE_SECTOR_IDS : (state.unlockedSectorIds ?? []),
           state.isChallenge,
+          state.isScenarioChallengeMode ?? false,
         );
 
         // Scenario Challenge sector/sub-type filter + deal floor guarantee.
@@ -1724,10 +1726,13 @@ export const useGameStore = create<GameStore>()(
             for (let attempt = 0; attempt < MAX_FLOOR_RETRIES && postFilterPipeline.length === 0; attempt++) {
               const pickIdx = Math.floor(dealFloorFork.next() * sectorIds.length);
               const floorSectorId = sectorIds[pickIdx];
+              // isScenario=true makes the sector POOL all-sectors; [floorSectorId] here
+              // only BIASES the weighted picker toward this round's target sector. The
+              // actual restriction is the .filter(allowedSectors) below.
               const floorDeals = generateDealPipeline(
                 [], state.round, undefined, undefined, undefined, 0, 0, false,
                 undefined, state.maxRounds, false, dealFloorFork, dealInflationAdder,
-                state.cash, null, false, false, state.difficulty, [], [floorSectorId], true,
+                state.cash, null, false, false, state.difficulty, [], [floorSectorId], true, true, // isChallenge, isScenario
               );
               postFilterPipeline = floorDeals.filter(d => {
                 if (allowedSectors && !allowedSectors.has(d.business.sectorId)) return false;
