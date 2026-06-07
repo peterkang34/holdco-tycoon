@@ -73,11 +73,14 @@ export function calculateEnterpriseValue(state: GameState): number {
     portfolioValue *= (1 + state.ipoState.marketSentiment);
   }
 
-  // Total debt: state.totalDebt (holdco loan + per-business bank debt) + seller notes
-  const opcoSellerNotes = activeBusinesses.reduce(
-    (sum, b) => sum + b.sellerNoteBalance,
-    0
-  );
+  // Total debt: state.totalDebt (holdco loan + per-business bank debt, incl. integrated tuck-ins)
+  // + seller notes. Seller notes must include INTEGRATED (tuck-in/bolt-on) businesses too —
+  // their bank debt is already in state.totalDebt via computeTotalDebt, but their seller-note
+  // financing was being dropped here, inflating EV for debt-financed tuck-ins. (Matches
+  // calculateMetrics, which already sums active+integrated seller notes.)
+  const opcoSellerNotes = state.businesses
+    .filter(b => b.status === 'active' || b.status === 'integrated')
+    .reduce((sum, b) => sum + b.sellerNoteBalance, 0);
   const totalDebt = state.totalDebt + opcoSellerNotes;
 
   // EV = Portfolio Value + Cash - All Debt - Rollover Claims (no distribution add-back)

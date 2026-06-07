@@ -90,6 +90,20 @@ describe('calculateEnterpriseValue', () => {
     expect(evWithDebt).toBeLessThan(evNoDebt);
   });
 
+  it('deducts seller-note debt on INTEGRATED (tuck-in) businesses too (regression)', () => {
+    // A debt-financed tuck-in is status:'integrated'. Its seller-note balance must still be
+    // subtracted from EV — previously it was dropped, inflating the score for bolt-ons.
+    const lead = createMockBusiness({ id: 'platform', status: 'active', sellerNoteBalance: 0, bankDebtBalance: 0 });
+    const tuckInNoNote = createMockBusiness({ id: 'bolt', status: 'integrated', sellerNoteBalance: 0, bankDebtBalance: 0 });
+    const tuckInWithNote = createMockBusiness({ id: 'bolt', status: 'integrated', sellerNoteBalance: 3000, bankDebtBalance: 0 });
+
+    const evClean = calculateEnterpriseValue(createMockGameState({ totalDebt: 0, businesses: [lead, tuckInNoNote] }));
+    const evSellerNote = calculateEnterpriseValue(createMockGameState({ totalDebt: 0, businesses: [lead, tuckInWithNote] }));
+
+    // The $3M tuck-in seller note must reduce EV by ~$3M (same portfolio value, more debt).
+    expect(evClean - evSellerNote).toBe(3000);
+  });
+
   it('should apply quality premium to multiples', () => {
     const highQuality = createMockGameState({
       businesses: [createMockBusiness({ qualityRating: 5, ebitda: 2000 })],
