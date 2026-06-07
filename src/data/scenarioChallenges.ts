@@ -88,6 +88,9 @@ export const DISABLED_FEATURE_ACTIONS: Record<DisabledFeatureKey, readonly GameA
   familyOffice:    [], // mode transition; scenarios always disable FO unlock via plan rules
   sharedServices:  ['unlock_shared_service', 'deactivate_shared_service'],
   platformForge:   ['forge_integrated_platform', 'add_to_integrated_platform', 'sell_platform', 'designate_platform'],
+  // Narrower than platformForge: blocks only the integrated platform RECIPE forging (and
+  // adding to one) — regular platforms (designate/merge/tuck-in) stay available.
+  integratedPlatforms: ['forge_integrated_platform', 'add_to_integrated_platform'],
   turnaround:      ['unlock_turnaround_tier', 'start_turnaround'],
   maSourcing:      ['source_deals', 'upgrade_ma_sourcing', 'toggle_ma_sourcing', 'proactive_outreach', 'smb_broker'],
   ipo:             ['ipo'],

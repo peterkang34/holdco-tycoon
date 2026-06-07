@@ -22,20 +22,9 @@ export function PortfolioBonuses({ businesses, isMobile }: PortfolioBonusesProps
   );
 
   const hasAnyBonus = routeDensity || subTypeSpec;
-  if (!hasAnyBonus) {
-    // Dormant state — show hint for discoverability
-    const activeCount = businesses.filter(b => b.status === 'active').length;
-    if (activeCount < 2) return null; // Too early to show hints
-
-    return (
-      <div className="card bg-gray-500/5 border-gray-500/20 mb-6">
-        <h3 className="font-bold text-text-muted mb-1 text-sm">Portfolio Synergies</h3>
-        <p className="text-xs text-text-muted">
-          Own 2+ adjacent distribution businesses or 3+ same sub-type businesses to unlock synergy bonuses.
-        </p>
-      </div>
-    );
-  }
+  // Only render when there's an ACTUAL synergy to show — no dormant nudge (it crowded the
+  // allocate screen for most of the game). The mechanic is documented in the manual instead.
+  if (!hasAnyBonus) return null;
 
   if (isMobile && collapsed) {
     return (

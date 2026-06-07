@@ -133,10 +133,10 @@ describe('DISABLED_FEATURE_ACTIONS mapping', () => {
     expect(DISABLED_FEATURE_ACTIONS.familyOffice).toEqual([]);
   });
 
-  it('covers all 13 disabledFeatures keys', () => {
+  it('covers all 14 disabledFeatures keys', () => {
     expect(Object.keys(DISABLED_FEATURE_ACTIONS).sort()).toEqual([
       'buybackShares', 'distributions', 'equityRaise', 'familyOffice', 'improveBusiness',
-      'ipo', 'maSourcing', 'payDownDebt', 'platformForge', 'restructure',
+      'integratedPlatforms', 'ipo', 'maSourcing', 'payDownDebt', 'platformForge', 'restructure',
       'sellBusiness', 'sharedServices', 'turnaround',
     ]);
   });

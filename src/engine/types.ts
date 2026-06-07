@@ -618,6 +618,7 @@ export type DisabledFeatureKey =
   | 'familyOffice'
   | 'sharedServices'
   | 'platformForge'
+  | 'integratedPlatforms'
   | 'turnaround'
   | 'maSourcing'
   | 'ipo';
