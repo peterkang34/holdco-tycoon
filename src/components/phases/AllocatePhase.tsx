@@ -693,14 +693,17 @@ export function AllocatePhase({
   const mergeableSectors = getMergeableSectors();
 
   // Integrated Platform eligibility
+  // When platform-recipe forging is disabled (scenario `platformForge`/`integratedPlatforms`),
+  // suppress ALL recipe-availability surfaces — eligible, near-eligible, and the cross-sector
+  // hint below — so the portfolio page doesn't advertise an action the player can't take.
   const eligiblePlatformRecipes = useMemo(
-    () => checkPlatformEligibility(businesses, integratedPlatforms, difficulty, duration),
-    [businesses, integratedPlatforms, difficulty, duration]
+    () => canPlatformForge ? checkPlatformEligibility(businesses, integratedPlatforms, difficulty, duration) : [],
+    [canPlatformForge, businesses, integratedPlatforms, difficulty, duration]
   );
 
   const nearEligibleRecipes = useMemo(
-    () => checkNearEligiblePlatforms(businesses, integratedPlatforms, difficulty, duration),
-    [businesses, integratedPlatforms, difficulty, duration]
+    () => canPlatformForge ? checkNearEligiblePlatforms(businesses, integratedPlatforms, difficulty, duration) : [],
+    [canPlatformForge, businesses, integratedPlatforms, difficulty, duration]
   );
 
   const tabs: { id: AllocateTab; label: string; badge?: number }[] = [
@@ -1630,7 +1633,8 @@ export function AllocatePhase({
                 services sector). Showing it there is pure noise since the player can never
                 unlock it within the scenario's sector constraints. */}
             {(() => {
-              if (hasCrossSectorRecipeUnlock || activeBusinesses.length < 3) return null;
+              // Hidden when forging recipes is disabled, or it can't fulfill the scenario's sectors.
+              if (!canPlatformForge || hasCrossSectorRecipeUnlock || activeBusinesses.length < 3) return null;
               const allowed = scenarioChallengeConfig?.allowedSectors;
               if (allowed && allowed.length > 0) {
                 const recipePossible = allowed.length >= 2 && allowed.includes('saas');
