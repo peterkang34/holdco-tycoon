@@ -21,7 +21,8 @@ interface NarrativeRequest {
 
 const SYSTEM = `You write punchy flavor copy for a business-strategy game's "scenario challenges".
 Given a scenario's parameters, return JSON ONLY (no prose, no markdown fences) with exactly these keys:
-{"name": string, "tagline": string, "description": string}
+{"name": string, "emoji": string, "tagline": string, "description": string}
+- emoji: a SINGLE emoji that captures the scenario's theme (e.g. 📉 for a downturn, 🏦 for a PE fund, 🔍 for a search fund, 🏗️ for a roll-up). Exactly one emoji character, nothing else.
 - name: a short, evocative title (<= 40 chars). Only suggest one if the given name is empty or generic ("New Scenario"); otherwise echo the given name.
 - tagline: one punchy hook, <= 90 chars, no period needed.
 - description: 2-3 sentences (<= 400 chars) that set the stakes and the lesson. Concrete, grounded in real holdco/PE/search-fund dynamics. No hype words like "embark", "unleash", "dive in".
@@ -43,7 +44,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     v.forcedEvents && v.forcedEvents.length ? `Scripted events: ${v.forcedEvents.join('; ')}` : '',
     `Ranked by: ${v.rankingMetric ?? 'FEV'}`,
   ].filter(Boolean);
-  const prompt = `Write the title/tagline/description for this scenario:\n${lines.join('\n')}`;
+  const prompt = `Write the emoji/title/tagline/description for this scenario:\n${lines.join('\n')}`;
 
   const { content, error } = await callAnthropic(prompt, 500, SYSTEM, 15000, AI_MODEL);
   if (!content) return res.status(502).json({ error: error || 'AI returned nothing' });
@@ -55,6 +56,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const parsed = JSON.parse(content.slice(start, end + 1));
     return res.status(200).json({
       name: typeof parsed.name === 'string' ? parsed.name.slice(0, 80) : undefined,
+      emoji: typeof parsed.emoji === 'string' && parsed.emoji.trim() ? parsed.emoji.trim().slice(0, 16) : undefined,
       tagline: typeof parsed.tagline === 'string' ? parsed.tagline.slice(0, 120) : '',
       description: typeof parsed.description === 'string' ? parsed.description.slice(0, 500) : '',
     });

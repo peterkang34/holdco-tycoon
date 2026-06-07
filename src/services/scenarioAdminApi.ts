@@ -99,7 +99,7 @@ export async function clearPreviewRows(token: string, id: string): Promise<numbe
   return data.deletedCount ?? 0;
 }
 
-export interface NarrativeDraft { name?: string; tagline: string; description: string }
+export interface NarrativeDraft { name?: string; emoji?: string; tagline: string; description: string }
 
 /** Ask the AI to draft narrative TEXT (tagline/description/name) from a scenario's vectors. */
 export async function draftNarrative(token: string, summary: Record<string, unknown>): Promise<NarrativeDraft> {

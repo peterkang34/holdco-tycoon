@@ -106,6 +106,7 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
       set({
         tagline: out.tagline || draft.tagline,
         description: out.description || draft.description,
+        ...(out.emoji ? { themeEmoji: out.emoji } : {}),
         // Only adopt an AI name if the admin hasn't named it (or left the default).
         ...(out.name && (!draft.name || draft.name === 'New Scenario') ? { name: out.name, id: editingExistingId ? draft.id : slugify(out.name) } : {}),
       });
@@ -214,7 +215,7 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
           <div className="flex justify-end mb-2">
             <button type="button" onClick={() => void draftAI()} disabled={aiBusy}
               className="text-[11px] px-2.5 py-1 rounded-lg border border-accent/30 text-accent hover:bg-accent/10 disabled:opacity-50">
-              {aiBusy ? 'Drafting…' : '✨ Draft tagline + description with AI'}
+              {aiBusy ? 'Drafting…' : '✨ Draft emoji + tagline + description with AI'}
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
