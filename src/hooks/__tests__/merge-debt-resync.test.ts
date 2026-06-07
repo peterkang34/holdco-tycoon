@@ -107,4 +107,41 @@ describe('merge resyncs totalDebt (debt-drift regression)', () => {
     //                                + bolt-on bank 1500 + bolt-on seller 700 = 6500.
     expect(debtFreeEV(after) - calculateEnterpriseValue(after)).toBe(6500);
   });
+
+  it('forging a recipe over a merged+tucked platform + a second platform keeps ALL debt in EV', () => {
+    // Full reported shape: merge → tuck-in → forge an integrated platform (recipe) wrapping
+    // the merged/tucked platform AND a second debt-laden platform.
+    const biz1 = createMockBusiness({ id: 'b1', status: 'active', sectorId: 'homeServices', subType: 'HVAC Services', ebitda: 1000, revenue: 4000, qualityRating: 4, bankDebtBalance: 1000, sellerNoteBalance: 500, rolloverEquityPct: 0 });
+    const biz2 = createMockBusiness({ id: 'b2', status: 'active', sectorId: 'homeServices', subType: 'Plumbing Services', ebitda: 1500, revenue: 6000, qualityRating: 4, bankDebtBalance: 2000, sellerNoteBalance: 800, rolloverEquityPct: 0 });
+    // Second platform constituent (stays active through the forge).
+    const p2 = createMockBusiness({ id: 'p2', status: 'active', sectorId: 'homeServices', subType: 'Plumbing Services', ebitda: 1200, revenue: 5000, qualityRating: 3, bankDebtBalance: 1200, sellerNoteBalance: 400, rolloverEquityPct: 0 });
+    useGameStore.setState(createMockGameState({
+      businesses: [biz1, biz2, p2], cash: 200_000, totalDebt: 4200, holdcoLoanBalance: 0,
+      acquisitionsThisRound: 0, maxAcquisitionsPerRound: 5, requiresRestructuring: false,
+    }));
+
+    // merge → P1
+    useGameStore.getState().mergeBusinesses('b1', 'b2', 'Merged HomeServices');
+    const p1 = useGameStore.getState().businesses.find(b => b.status === 'active' && b.isPlatform)!;
+
+    // tuck-in into P1
+    const base = createMockDeal();
+    const deal = createMockDeal({ id: 'tuckin_deal', effectivePrice: 3000, business: { ...base.business, sectorId: 'homeServices', subType: 'Electrical Services', ebitda: 800, revenue: 3200, qualityRating: 3 } });
+    useGameStore.getState().acquireTuckIn(deal, createMockDealStructure({ cashRequired: 800, bankDebt: { amount: 1500, rate: 0.07, termRounds: 5 }, sellerNote: { amount: 700, rate: 0.08, termRounds: 5 } }), p1.id);
+
+    // forge an integrated platform (recipe) over the merged/tucked platform + the second platform
+    useGameStore.getState().forgeIntegratedPlatform('home_multi_trade', [p1.id, 'p2']);
+
+    const after = useGameStore.getState();
+    // The integrated platform exists and both constituents stayed active (debt still counted).
+    expect(after.integratedPlatforms.some(ip => ip.recipeId === 'home_multi_trade')).toBe(true);
+    expect(after.businesses.find(b => b.id === p1.id)?.status).toBe('active');
+    expect(after.businesses.find(b => b.id === 'p2')?.status).toBe('active');
+
+    // Bank debt across everything: merged 3000 + bolt-on 1500 + p2 1200 = 5700.
+    expect(after.totalDebt).toBe(5700);
+
+    // EV subtracts ALL of it: 5700 bank + (merged 1300 + bolt-on 700 + p2 400 = 2400) seller = 8100.
+    expect(debtFreeEV(after) - calculateEnterpriseValue(after)).toBe(8100);
+  });
 });
