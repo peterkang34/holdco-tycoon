@@ -26,7 +26,7 @@ import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { buildPlaybook } from '../../utils/playbookBuilder';
 import { ACQUIRE_ACTION_TYPES, aggregateDealStructureTypes, countRolloverEquityDeals } from '../../utils/strategyAggregation';
 import { ACHIEVEMENT_PREVIEW, type AchievementContext } from '../../data/achievementPreview';
-import { saveEarnedAchievements, getEarnedAchievementIds } from '../../hooks/useUnlocks';
+import { saveEarnedAchievements, getEarnedAchievementIds, shouldEarnAchievements } from '../../hooks/useUnlocks';
 import { HOLDCO_GRADE_TIPS, PE_GRADE_TIPS } from '../../data/gradeTips';
 import { checkFamilyOfficeEligibility } from '../../engine/familyOffice';
 
@@ -435,6 +435,9 @@ export function GameOverScreen({
 
   // ── Achievement Preview (must be above submitGameCompletion so it can reference earnedAchievements) ──
   const earnedAchievements = useMemo(() => {
+    // Scenario Challenges are a sealed sandbox — no global achievements earned.
+    // See shouldEarnAchievements() for the full rationale (backdoor prevention).
+    if (!shouldEarnAchievements({ isScenarioChallengeMode })) return [];
     const initialCapital = DIFFICULTY_CONFIG[difficulty]?.initialCash ?? 20000;
     // PE fund mode uses lpDistributions instead of totalDistributions
     const effectiveDistributions = isFundManagerMode ? (lpDistributions || 0) : totalDistributions;
@@ -458,7 +461,7 @@ export function GameOverScreen({
       bSchoolCompleted: (() => { try { return localStorage.getItem('holdco-tycoon-bschool-completed') === 'true'; } catch { return false; } })(),
     };
     return ACHIEVEMENT_PREVIEW.filter(a => a.check(ctx));
-  }, [strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions, lpDistributions, founderEquityValue, difficulty, duration, bankruptRound, hasRestructured, isFundManagerMode, carryWaterfallData, lpSatisfactionScore, metrics.cashConversion]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [strategyData, score, businesses, exitedBusinesses, totalDebt, totalDistributions, lpDistributions, founderEquityValue, difficulty, duration, bankruptRound, hasRestructured, isFundManagerMode, carryWaterfallData, lpSatisfactionScore, metrics.cashConversion, isScenarioChallengeMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Capture pre-existing achievements BEFORE saving, then persist
   const preSaveIdsRef = useRef<Set<string> | null>(null);
@@ -987,14 +990,25 @@ export function GameOverScreen({
         />
       )}
 
-      {/* ── Section 2: Achievements + Profile (merged section) ── */}
-      <ProfileAchievementSection
-        earnedAchievements={earnedAchievements}
-        newlyEarned={newlyEarned}
-        allAchievements={ACHIEVEMENT_PREVIEW}
-        isLoggedIn={isLoggedIn}
-        onSignUp={() => openAccountModal()}
-      />
+      {/* ── Section 2: Achievements + Profile (merged section) ──
+          Hidden for Scenario Challenges — they don't earn global achievements
+          (sealed sandbox; see earnedAchievements gate above). */}
+      {!isScenarioChallengeMode && (
+        <ProfileAchievementSection
+          earnedAchievements={earnedAchievements}
+          newlyEarned={newlyEarned}
+          allAchievements={ACHIEVEMENT_PREVIEW}
+          isLoggedIn={isLoggedIn}
+          onSignUp={() => openAccountModal()}
+        />
+      )}
+      {isScenarioChallengeMode && (
+        <div className="bg-amber-500/5 border border-amber-500/10 rounded-xl p-4 sm:p-5">
+          <p className="text-xs text-text-muted text-center">
+            Achievements aren't earned in Scenario Challenges — scenarios run their own rules and leaderboards, so they stay separate from your main progression.
+          </p>
+        </div>
+      )}
 
       {/* ── Sections 4+ only for non-bankruptcy ── */}
       {!isBankruptcy && (

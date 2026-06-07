@@ -19,6 +19,14 @@ const INITIAL_CAPITAL: Record<string, number> = {
 function evaluateGameAchievements(game: Record<string, unknown>): string[] {
   const earned: string[] = [];
 
+  // Scenario Challenges are a sealed sandbox — they must NOT contribute global
+  // achievements. Admin-rigged starting conditions + suspended sector unlock gates
+  // would otherwise be a server-side backdoor for farming the achievements that gate
+  // sectors (fintech, etc.) in normal play. This single chokepoint also neutralizes
+  // any legacy scenario rows that stored `earnedAchievementIds` before the client gate
+  // shipped. Mirrors GameOverScreen's shouldEarnAchievements() on the write side.
+  if (game.scenario_challenge_id != null) return earned;
+
   const grade = game.grade as string | undefined;
   const difficulty = game.difficulty as string | undefined;
   const duration = game.duration as string | undefined;

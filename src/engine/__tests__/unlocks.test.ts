@@ -1,5 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { getAvailableSectors, SECTOR_LIST_STANDARD, SECTORS, UNLOCKABLE_SECTORS } from '../../data/sectors';
+import { getAvailableSectors, SECTOR_LIST_STANDARD, SECTOR_LIST_SCENARIO, SECTORS, UNLOCKABLE_SECTORS, UNLOCKABLE_SECTOR_IDS } from '../../data/sectors';
+import { generateDealPipeline } from '../businesses';
+import { createRngStreams } from '../rng';
 import type { SectorId } from '../types';
 
 // Mock localStorage
@@ -16,7 +18,7 @@ const localStorageMock = (() => {
 Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock });
 
 // Import after mocking localStorage
-import { getEarnedAchievementIds, saveEarnedAchievements, getUnlockedSectorIds, isAchievementEarned } from '../../hooks/useUnlocks';
+import { getEarnedAchievementIds, saveEarnedAchievements, getUnlockedSectorIds, isAchievementEarned, shouldEarnAchievements } from '../../hooks/useUnlocks';
 
 describe('Achievement Unlock Gating', () => {
   beforeEach(() => {
@@ -125,6 +127,89 @@ describe('Achievement Unlock Gating', () => {
       const standardIds = SECTOR_LIST_STANDARD.map(s => s.id);
       for (const sectorId of Object.keys(UNLOCKABLE_SECTORS)) {
         expect(standardIds).not.toContain(sectorId);
+      }
+    });
+
+    it('scenario mode suspends achievement gates — includes unlockable sectors with NO unlocks', () => {
+      // isScenario=true, isChallenge=true (scenarios pass both), no unlocked ids.
+      const sectors = getAvailableSectors(false, [], true, true);
+      const ids = sectors.map(s => s.id);
+      for (const sectorId of Object.keys(UNLOCKABLE_SECTORS)) {
+        expect(ids).toContain(sectorId); // fintech, aerospace, privateCredit, mediaEntertainment
+      }
+      expect(ids).toContain('fintech'); // the sector from Peter's report
+    });
+
+    it('scenario mode still excludes FO-exclusive sectors (proSports)', () => {
+      const sectors = getAvailableSectors(false, [], true, true);
+      expect(sectors.map(s => s.id)).not.toContain('proSports');
+    });
+  });
+
+  describe('shouldEarnAchievements (scenario sandbox)', () => {
+    it('returns FALSE for scenario challenge games — no global achievement farming', () => {
+      expect(shouldEarnAchievements({ isScenarioChallengeMode: true })).toBe(false);
+    });
+
+    it('returns TRUE for normal/PE/FO games', () => {
+      expect(shouldEarnAchievements({ isScenarioChallengeMode: false })).toBe(true);
+      expect(shouldEarnAchievements({})).toBe(true);
+    });
+  });
+
+  describe('SECTOR_LIST_SCENARIO composition', () => {
+    it('contains every unlockable sector and excludes proSports', () => {
+      const ids = SECTOR_LIST_SCENARIO.map(s => s.id);
+      for (const sectorId of Object.keys(UNLOCKABLE_SECTORS)) {
+        expect(ids).toContain(sectorId);
+      }
+      expect(ids).not.toContain('proSports');
+    });
+
+    it('UNLOCKABLE_SECTOR_IDS matches the UNLOCKABLE_SECTORS keys', () => {
+      expect([...UNLOCKABLE_SECTOR_IDS].sort()).toEqual(Object.keys(UNLOCKABLE_SECTORS).sort());
+    });
+  });
+
+  describe('generateDealPipeline scenario gate suspension (integration)', () => {
+    // Mirrors how useGame's scenario call sites invoke the pipeline: isChallenge=true,
+    // isScenario=true, with all unlockables passed as unlockedSectorIds so gated sectors
+    // are weighted into deal flow (not just reachable via the variety step).
+    const runScenarioPipeline = (seed: number) => {
+      const streams = createRngStreams(seed, 1);
+      return generateDealPipeline(
+        [], 1, undefined, undefined, undefined, 0, 0, false, undefined, 20,
+        false, streams.deals, 0, 50000, null, false, false, 'easy',
+        [], UNLOCKABLE_SECTOR_IDS, true, true, // unlockedSectorIds, isChallenge, isScenario
+      );
+    };
+    const runPeerChallengePipeline = (seed: number) => {
+      const streams = createRngStreams(seed, 1);
+      return generateDealPipeline(
+        [], 1, undefined, undefined, undefined, 0, 0, false, undefined, 20,
+        false, streams.deals, 0, 50000, null, false, false, 'easy',
+        [], [], true, false, // unlockedSectorIds=[], isChallenge=true, isScenario=false
+      );
+    };
+
+    it('scenario pipeline surfaces every achievement-gated sector across seeds', () => {
+      // If isScenario were broken (standard list), these would NEVER appear in any seed.
+      const seen = new Set<string>();
+      for (let seed = 1; seed <= 40; seed++) {
+        for (const d of runScenarioPipeline(seed)) seen.add(d.business.sectorId);
+      }
+      for (const sectorId of Object.keys(UNLOCKABLE_SECTORS)) {
+        expect(seen).toContain(sectorId); // fintech, aerospace, privateCredit, mediaEntertainment
+      }
+    });
+
+    it('peer-challenge pipeline (isScenario=false) never surfaces gated sectors — fairness preserved', () => {
+      const seen = new Set<string>();
+      for (let seed = 1; seed <= 40; seed++) {
+        for (const d of runPeerChallengePipeline(seed)) seen.add(d.business.sectorId);
+      }
+      for (const sectorId of Object.keys(UNLOCKABLE_SECTORS)) {
+        expect(seen).not.toContain(sectorId);
       }
     });
   });
