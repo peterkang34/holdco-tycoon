@@ -106,7 +106,9 @@ export function ScenarioChallengeResultSection({
   const fevMultiplier = config.rankingMetric === 'fev'
     ? computeFevMultiplier(config, triggerFireRounds)
     : 1;
-  const adjustedFEV = Math.round(founderEquityValue * fevMultiplier);
+  // Flat per-scenario score multiplier (config-defined, default 1×). Matches the server.
+  const scoreMultiplier = typeof config.scoreMultiplier === 'number' && config.scoreMultiplier > 0 ? config.scoreMultiplier : 1;
+  const adjustedFEV = Math.round(founderEquityValue * fevMultiplier * scoreMultiplier);
 
   const playerMetric = formatRankingMetric(config.rankingMetric, {
     founderEquityValue: adjustedFEV,

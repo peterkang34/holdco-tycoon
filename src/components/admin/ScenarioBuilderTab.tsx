@@ -243,15 +243,9 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
                 <option value="standard">Standard (20 years)</option>
               </select>
             </Field>
-            <Field label="Difficulty">
-              <div className="flex gap-2">
-                {([['easy', 'Easy (E)'], ['normal', 'Hard (H)']] as const).map(([d, label]) => (
-                  <button key={d} type="button" onClick={() => set({ difficulty: d })}
-                    className={`flex-1 text-xs px-2 py-2 rounded-lg border transition-colors ${draft.difficulty === d ? 'border-accent bg-accent/10 text-accent' : 'border-white/10 bg-white/5 text-text-muted hover:border-white/30'}`}>
-                    {label}
-                  </button>
-                ))}
-              </div>
+            <Field label="Score multiplier (×)">
+              <NumInput step={0.1} min={0.1} max={10} value={draft.scoreMultiplier ?? 1}
+                onChange={(n) => set({ scoreMultiplier: (n <= 0 || n === 1) ? undefined : n })} />
             </Field>
             <Field label={`Years: ${draft.maxRounds}`}><input type="range" min={3} max={30} className="w-full" value={draft.maxRounds} onChange={(e) => set({ maxRounds: Number(e.target.value) })} /></Field>
             <Field label="Starting cash ($M)"><NumInput step={0.5} disabled={isPE} value={toM(draft.startingCash)} onChange={(n) => set({ startingCash: fromM(n) })} /></Field>
@@ -268,8 +262,7 @@ export function ScenarioBuilderTab({ token }: { token: string }) {
           </div>
           <StartingBusinesses draft={draft} set={set} />
           <p className="text-[10px] text-text-muted mt-2 leading-relaxed">
-            <strong>Difficulty</strong> affects deal flow and run difficulty (and a few normal-only mechanics) — it does <em>not</em> change your starting economy, which you set above.
-            This scenario's leaderboard ranks on <strong>raw {draft.rankingMetric.toUpperCase()}</strong>; the Easy/Hard leaderboard multiplier is <em>not</em> applied, because every player in a scenario faces the same difficulty (so it would scale everyone equally and change nothing).
+            <strong>Score multiplier</strong> scales this scenario's {draft.rankingMetric === 'fev' ? 'FEV' : 'FEV-based'} score by a flat factor (default 1×) — e.g. set 1.5× to weight a harder scenario's leaderboard higher. It applies to every player equally.
           </p>
         </Section>
 
@@ -517,7 +510,7 @@ function PreviewRail({ draft, compiled, validation, onPreviewPlay }: {
         {draft.tagline && <p className="text-xs text-text-secondary mb-2">{draft.tagline}</p>}
         <div className="grid grid-cols-2 gap-2 text-[11px]">
           <Cell label="Mode" value={draft.fundStructure ? 'PE Fund' : 'Holdco'} />
-          <Cell label="Difficulty" value={draft.difficulty === 'easy' ? 'Easy (E)' : 'Hard (H)'} />
+          <Cell label="Score ×" value={`${draft.scoreMultiplier ?? 1}×`} />
           <Cell label="Length" value={`${draft.maxRounds} yrs`} />
           <Cell label="Start cash" value={draft.fundStructure ? `$${toM(draft.fundStructure.committedCapital)}M LP` : `$${toM(draft.startingCash)}M`} />
           <Cell label="Start debt" value={draft.fundStructure ? '—' : `$${toM(startingDebtTotal(draft))}M`} />

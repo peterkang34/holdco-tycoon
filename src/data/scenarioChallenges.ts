@@ -433,6 +433,10 @@ export function validateScenarioConfig(config: ScenarioChallengeConfig): Scenari
   if (!(RANKING_METRICS as readonly string[]).includes(config.rankingMetric)) {
     errors.push(`rankingMetric must be one of ${RANKING_METRICS.join(', ')}`);
   }
+  if (config.scoreMultiplier !== undefined &&
+      (typeof config.scoreMultiplier !== 'number' || config.scoreMultiplier < 0.1 || config.scoreMultiplier > 10)) {
+    errors.push('scoreMultiplier must be a number in [0.1, 10] (default 1)');
+  }
 
   // ── Fund structure (PE Phase A) ──
   if (config.fundStructure) {

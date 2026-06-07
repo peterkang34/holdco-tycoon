@@ -443,6 +443,22 @@ describe('POST /api/scenario-challenges/submit', () => {
       expect(scoreArg).toBe(15_000_000);
     });
 
+    it('applies the flat scenario scoreMultiplier to the FEV score', async () => {
+      const config = MOCK_CONFIG({ scoreMultiplier: 2 });
+      vi.mocked(kv.get).mockResolvedValueOnce(config as never);
+      vi.mocked((kv as unknown as { zadd: ReturnType<typeof vi.fn> }).zadd).mockResolvedValue(1);
+      vi.mocked((kv as unknown as { zcard: ReturnType<typeof vi.fn> }).zcard).mockResolvedValue(5);
+      vi.mocked((kv as unknown as { zrank: ReturnType<typeof vi.fn> }).zrank).mockResolvedValue(2);
+
+      const { req, res, getResponse } = createMockReqRes({ method: 'POST', body: validBody({ founderEquityValue: 10_000_000 }) });
+      await handler(req, res);
+
+      expect(getResponse().statusCode).toBe(200);
+      const zaddCalls = vi.mocked((kv as unknown as { zadd: ReturnType<typeof vi.fn> }).zadd).mock.calls;
+      const scoreArg = (zaddCalls[zaddCalls.length - 1][1] as { score: number }).score;
+      expect(scoreArg).toBe(20_000_000); // 10M raw × 2× scenario multiplier
+    });
+
     it('stacks multiple fired multipliers multiplicatively', async () => {
       const config = MOCK_CONFIG({
         triggers: [
