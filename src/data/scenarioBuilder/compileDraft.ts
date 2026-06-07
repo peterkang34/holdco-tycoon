@@ -19,7 +19,7 @@ const asRec = (o: object): Record<string, unknown> => o as unknown as Record<str
 /** Optional GUI-owned fields — emitted only when defined on the draft (presence semantics). */
 const OPTIONAL_GUI_FIELDS = [
   'allowedSectors', 'maSourcingMode', 'startingMaSourcingTier', 'maxAcquisitionsPerRound',
-  'startingInterestRate', 'disabledFeatures', 'forcedEvents', 'fundStructure', 'scenarioNarrative',
+  'startingInterestRate', 'disabledFeatures', 'scoreMultiplier', 'forcedEvents', 'fundStructure', 'scenarioNarrative',
 ] as const;
 
 /** Resolve the ranking metric so it always agrees with PE/holdco mode (the validator's hard rule). */

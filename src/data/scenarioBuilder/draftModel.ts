@@ -62,6 +62,7 @@ export interface ScenarioDraft {
   startingInterestRate?: number;
   disabledFeatures?: DisabledFeatures;
   rankingMetric: RankingMetric;
+  scoreMultiplier?: number;       // flat per-scenario score multiplier (default/omit = 1×)
 
   // ── Twists (v1) ──
   forcedEvents?: Record<number, ForcedEvent>;
@@ -83,7 +84,7 @@ export const GUI_OWNED_CONFIG_KEYS: ReadonlyArray<keyof ScenarioChallengeConfig>
   'seed', 'difficulty', 'duration', 'maxRounds', 'startingCash', 'startingDebt',
   'founderShares', 'sharesOutstanding', 'startingBusinesses',
   'allowedSectors', 'maSourcingMode', 'startingMaSourcingTier', 'maxAcquisitionsPerRound',
-  'startingInterestRate', 'disabledFeatures', 'rankingMetric',
+  'startingInterestRate', 'disabledFeatures', 'rankingMetric', 'scoreMultiplier',
   'forcedEvents', 'fundStructure', 'scenarioNarrative',
 ];
 

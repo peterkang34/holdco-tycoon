@@ -198,6 +198,13 @@ describe('validateScenarioConfig — game parameters', () => {
     expect(errors.some(e => e.includes('maxRounds'))).toBe(true);
   });
 
+  it('accepts a valid scoreMultiplier and rejects out-of-range values', () => {
+    expect(validateScenarioConfig(makeValidHoldcoConfig({ scoreMultiplier: 1.5 })).errors).toEqual([]);
+    expect(validateScenarioConfig(makeValidHoldcoConfig({ scoreMultiplier: undefined })).errors).toEqual([]); // default 1×
+    expect(validateScenarioConfig(makeValidHoldcoConfig({ scoreMultiplier: 0.05 })).errors.some(e => e.includes('scoreMultiplier'))).toBe(true);
+    expect(validateScenarioConfig(makeValidHoldcoConfig({ scoreMultiplier: 11 })).errors.some(e => e.includes('scoreMultiplier'))).toBe(true);
+  });
+
   it(`accepts exact boundary values maxRounds=${MIN_MAX_ROUNDS}, ${MAX_MAX_ROUNDS}`, () => {
     expect(validateScenarioConfig(makeValidHoldcoConfig({ maxRounds: MIN_MAX_ROUNDS })).errors).toEqual([]);
     expect(validateScenarioConfig(makeValidHoldcoConfig({ maxRounds: MAX_MAX_ROUNDS })).errors).toEqual([]);

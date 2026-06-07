@@ -179,7 +179,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       ? body.triggeredTriggerIds.filter((t: unknown): t is string => typeof t === 'string')
       : [];
     const fevMultiplier = computeFevMultiplier(c, submittedTriggerIds);
-    const adjustedFEV = Math.round(validFEV * fevMultiplier);
+    // Flat per-scenario score multiplier (config-defined, default 1×). Server-authoritative.
+    const scoreMultiplier = typeof c.scoreMultiplier === 'number' && c.scoreMultiplier > 0 ? c.scoreMultiplier : 1;
+    const adjustedFEV = Math.round(validFEV * fevMultiplier * scoreMultiplier);
 
     // ── Compute sort score from rankingMetric ────────────────────────
 

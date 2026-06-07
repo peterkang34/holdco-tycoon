@@ -729,6 +729,7 @@ export interface ScenarioChallengeConfig {
 
   // Scoring
   rankingMetric: RankingMetric;       // required; 'fev' for holdco, PE options for fundStructure scenarios
+  scoreMultiplier?: number;           // flat per-scenario score multiplier on FEV (default 1.0)
 
   // PE Phase A — optional fund structure (presence implies scenario runs in PE mode)
   fundStructure?: FundStructure;
