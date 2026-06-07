@@ -21,8 +21,17 @@ vi.hoisted(() => {
 });
 
 import { useGameStore } from '../useGame';
-import { createMockBusiness, createMockGameState } from '../../engine/__tests__/helpers';
+import { createMockBusiness, createMockGameState, createMockDeal, createMockDealStructure } from '../../engine/__tests__/helpers';
 import { calculateEnterpriseValue } from '../../engine/scoring';
+
+/** EV with ALL debt stripped — same portfolio value, zero debt — so the gap == total debt. */
+function debtFreeEV(state: ReturnType<typeof useGameStore.getState>): number {
+  return calculateEnterpriseValue({
+    ...state,
+    totalDebt: 0,
+    businesses: state.businesses.map(b => ({ ...b, bankDebtBalance: 0, sellerNoteBalance: 0 })),
+  });
+}
 
 beforeEach(() => { useGameStore.getState().resetGame(); });
 
@@ -55,12 +64,47 @@ describe('merge resyncs totalDebt (debt-drift regression)', () => {
     expect(after.totalDebt).toBe(3000); // holdcoLoan 0 + merged bank 3000
 
     // (c) EV subtracts ALL of it: 3000 bank (via totalDebt) + 1300 seller notes
-    const evWithDebt = calculateEnterpriseValue(after);
-    const evNoDebt = calculateEnterpriseValue({
-      ...after,
-      totalDebt: 0,
-      businesses: after.businesses.map(b => ({ ...b, bankDebtBalance: 0, sellerNoteBalance: 0 })),
+    expect(debtFreeEV(after) - calculateEnterpriseValue(after)).toBe(4300);
+  });
+
+  it('tuck-in INTO a merged entity keeps all four debt components in EV (the reported nested path)', () => {
+    // Step 1: merge two debt-financed businesses into a platform.
+    const biz1 = createMockBusiness({ id: 'b1', status: 'active', sectorId: 'homeServices', subType: 'HVAC Services', ebitda: 1000, revenue: 4000, bankDebtBalance: 1000, sellerNoteBalance: 500, rolloverEquityPct: 0 });
+    const biz2 = createMockBusiness({ id: 'b2', status: 'active', sectorId: 'homeServices', subType: 'Plumbing Services', ebitda: 1500, revenue: 6000, bankDebtBalance: 2000, sellerNoteBalance: 800, rolloverEquityPct: 0 });
+    useGameStore.setState(createMockGameState({
+      businesses: [biz1, biz2], cash: 80_000, totalDebt: 3000, holdcoLoanBalance: 0,
+      acquisitionsThisRound: 0, maxAcquisitionsPerRound: 5, requiresRestructuring: false,
+    }));
+    useGameStore.getState().mergeBusinesses('b1', 'b2', 'Merged HomeServices');
+
+    const mergedPlatform = useGameStore.getState().businesses.find(b => b.status === 'active' && b.isPlatform);
+    expect(mergedPlatform).toBeDefined();
+
+    // Step 2: tuck a debt-financed bolt-on INTO the merged entity.
+    const base = createMockDeal();
+    const deal = createMockDeal({
+      id: 'tuckin_deal', effectivePrice: 3000,
+      business: { ...base.business, sectorId: 'homeServices', subType: 'Electrical Services', ebitda: 800, revenue: 3200, qualityRating: 3 },
     });
-    expect(evNoDebt - evWithDebt).toBe(4300);
+    const structure = createMockDealStructure({
+      cashRequired: 800,
+      bankDebt: { amount: 1500, rate: 0.07, termRounds: 5 },
+      sellerNote: { amount: 700, rate: 0.08, termRounds: 5 },
+    });
+    useGameStore.getState().acquireTuckIn(deal, structure, mergedPlatform!.id);
+
+    const after = useGameStore.getState();
+    // The bolt-on exists as an integrated child carrying its own debt.
+    const boltOn = after.businesses.find(b => b.status === 'integrated' && b.parentPlatformId === mergedPlatform!.id);
+    expect(boltOn).toBeDefined();
+    expect(boltOn!.bankDebtBalance).toBe(1500);
+    expect(boltOn!.sellerNoteBalance).toBe(700);
+
+    // state.totalDebt = merged bank (3000) + bolt-on bank (1500).
+    expect(after.totalDebt).toBe(4500);
+
+    // EV subtracts ALL four components: merged bank 3000 + merged seller 1300
+    //                                + bolt-on bank 1500 + bolt-on seller 700 = 6500.
+    expect(debtFreeEV(after) - calculateEnterpriseValue(after)).toBe(6500);
   });
 });
