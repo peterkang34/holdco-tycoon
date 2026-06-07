@@ -23,7 +23,7 @@ beforeEach(() => {
 describe('admin/scenario-challenges/draft-narrative', () => {
   it('returns parsed tagline/description from the model', async () => {
     vi.mocked(callAnthropic).mockResolvedValue({
-      content: 'Sure!\n{"name":"Tight Money","tagline":"Survive the squeeze","description":"Rates are in double digits."}',
+      content: 'Sure!\n{"name":"Tight Money","emoji":"📉","tagline":"Survive the squeeze","description":"Rates are in double digits."}',
     } as never);
     const { req, res, getResponse } = createMockReqRes({ method: 'POST', body: { isPE: false, durationYears: 10 } });
     await handler(req, res);
@@ -31,6 +31,7 @@ describe('admin/scenario-challenges/draft-narrative', () => {
     expect(getResponse().body.tagline).toBe('Survive the squeeze');
     expect(getResponse().body.description).toContain('double digits');
     expect(getResponse().body.name).toBe('Tight Money');
+    expect(getResponse().body.emoji).toBe('📉');
   });
 
   it('405s on non-POST', async () => {
