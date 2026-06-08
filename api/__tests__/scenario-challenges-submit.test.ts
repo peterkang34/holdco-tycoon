@@ -429,6 +429,18 @@ describe('POST /api/scenario-challenges/submit', () => {
       expect(kv.zadd).toHaveBeenCalled();
     });
 
+    it('returns rank null when the new entry is pruned off a full board', async () => {
+      // No prior entry; after the write the board is full of higher scores → zrank null.
+      vi.mocked((kv as unknown as { zrank: ReturnType<typeof vi.fn> }).zrank).mockResolvedValue(null);
+      vi.mocked(kv.get)
+        .mockResolvedValueOnce(MOCK_CONFIG({ rankingMetric: 'fev' }) as never)
+        .mockResolvedValueOnce(null as never);
+      const { req, res, getResponse } = createMockReqRes({ method: 'POST', body: validBody() });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(200);
+      expect(getResponse().body.rank).toBeNull();
+    });
+
     it('keeps the prior member (no new zadd) when the new run is worse', async () => {
       const priorMember = JSON.stringify({ id: 'old', playerId: 'test-player-id' });
       vi.mocked((kv as unknown as { hget: ReturnType<typeof vi.fn> }).hget)

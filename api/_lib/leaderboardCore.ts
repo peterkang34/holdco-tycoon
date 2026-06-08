@@ -200,11 +200,14 @@ export async function writeLeaderboardEntry(opts: {
  * on a worse-or-equal run, the board is untouched (prior best stays — tie keeps the
  * earlier entry). Returns the player's current descending rank either way.
  *
- * Race note (CLAUDE.md #8): this is a read-modify-write on KV, not atomic. It's
- * bounded by the 60s per-IP submit rate-limit (a player can't land two scenario
- * submits concurrently), so the TOCTOU window is effectively closed in practice.
+ * Race note (CLAUDE.md #8): this is a read-modify-write on KV, not atomic. The
+ * per-IP submit rate-limit closes it in the common case (one player ≈ one IP);
+ * a determined user submitting from two IPs concurrently could momentarily
+ * double-write, which self-heals on their next strictly-better run. Full
+ * atomicity (Lua/transaction) is deferred — the 500-cap bounds the blast radius.
  *
- * Requires a non-empty `playerId` (scenario submits are account-gated upstream).
+ * Returns `rank: null` when the entry didn't make the board (pruned below the
+ * cap). Requires a non-empty `playerId` (scenario submits are account-gated upstream).
  */
 export async function writePlayerBestEntry(opts: {
   kvKey: string;
@@ -213,7 +216,7 @@ export async function writePlayerBestEntry(opts: {
   entryJson: string;
   sortScore: number;
   maxEntries: number;
-}): Promise<{ rank: number; replaced: boolean }> {
+}): Promise<{ rank: number | null; replaced: boolean }> {
   const rankOf = async (member: string): Promise<number> => {
     const ascRank = await kvz.zrank(opts.kvKey, member);
     const count = await kvz.zcard(opts.kvKey);
@@ -256,7 +259,12 @@ export async function writePlayerBestEntry(opts: {
     [opts.playerId]: JSON.stringify({ score: opts.sortScore, member: opts.entryJson }),
   });
 
-  return { rank: await rankOf(opts.entryJson), replaced: true };
+  // If the new entry was pruned out (board already full of higher scores), it's
+  // not on the board — report rank null rather than a misleading rank 1.
+  const ascRank = await kvz.zrank(opts.kvKey, opts.entryJson);
+  if (ascRank === null) return { rank: null, replaced: true };
+  const currentCount = await kvz.zcard(opts.kvKey);
+  return { rank: currentCount - ascRank, replaced: true };
 }
 
 // ─── game_history enrich-or-insert ────────────────────────────────────────
