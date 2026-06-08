@@ -48,8 +48,10 @@ function App() {
       // Supabase auto-processes hash tokens on client init.
       // Wait for processing, then clean URL and show intro screen.
       const timer = setTimeout(() => {
-        // Replace the hash URL with a clean one (no reload needed)
-        window.history.replaceState(null, '', window.location.pathname);
+        // Strip the auth token hash but PRESERVE the query string — a scenario
+        // account-wall sets redirectTo=/?se={id}, and IntroScreen's ?se= effect needs
+        // that param intact to resume the player into the scenario after sign-in.
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
         setAuthCallbackPending(false);
       }, 1500);
       return () => clearTimeout(timer);
@@ -272,6 +274,13 @@ function App() {
       setScreen('intro');
       return;
     }
+    // A pending scenario resume (?se=) takes priority over auto-resuming a saved game.
+    // Otherwise a returning player who signed in (account wall → OAuth redirect to
+    // /?se={id}) lands back in their old in-progress game and the scenario they came to
+    // play is silently abandoned. Leaving screen='intro' lets IntroScreen's ?se= effect
+    // open the scenario setup. (Jake PR3 review.)
+    if (parseScenarioUrl(window.location.search)?.intent === 'play') return;
+
     const currentState = useGameStore.getState();
     if (holdcoName && round > 0 && !gameOver) {
       // Both normal games and FO-mode games resume at GameScreen

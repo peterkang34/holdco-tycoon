@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react';
 import { fetchScenarioList, formatRankingMetric, type ScenarioListSummary } from '../../services/scenarioLeaderboard';
 import { ScenarioDetail } from '../ui/LeaderboardModal';
 import { ProfileModal } from '../ui/ProfileModal';
+import { useAuthStore } from '../../hooks/useAuth';
 import { formatCountdown, formatEndedDate, isScenarioEnded } from '../../utils/scenarioCountdown';
 
 interface ScenariosScreenProps {
@@ -49,6 +50,18 @@ export function ScenariosScreen({ onPlay, onBack }: ScenariosScreenProps) {
     const t = setInterval(() => setNowTick((n) => n + 1), 60_000);
     return () => clearInterval(t);
   }, []);
+
+  // Account gate (Decision #1): playing a scenario requires a non-anonymous account.
+  // Read auth synchronously at click (CLAUDE.md #9). Anonymous players get the account
+  // wall (which resumes them into ?se={id} after sign-in); the server 401 is the real gate.
+  const handlePlay = (s: ScenarioListSummary) => {
+    const isAnon = useAuthStore.getState().player?.isAnonymous ?? true;
+    if (isAnon) {
+      useAuthStore.getState().openScenarioAccountWall({ scenarioId: s.id, name: s.name, emoji: s.theme?.emoji ?? '🎯' });
+    } else {
+      onPlay(s.id);
+    }
+  };
 
   const hasNone = list && list.active.length === 0 && list.archived.length === 0;
 
@@ -94,7 +107,7 @@ export function ScenariosScreen({ onPlay, onBack }: ScenariosScreenProps) {
               <h2 className="text-sm font-bold text-accent uppercase tracking-wide mb-3">Live Now</h2>
               <div className="space-y-3">
                 {list.active.map((s) => (
-                  <ScenarioLandingCard key={s.id} summary={s} ended={false} onPlay={() => onPlay(s.id)} onProfileClick={setProfileId} />
+                  <ScenarioLandingCard key={s.id} summary={s} ended={false} onPlay={() => handlePlay(s)} onProfileClick={setProfileId} />
                 ))}
               </div>
             </section>
@@ -104,7 +117,7 @@ export function ScenariosScreen({ onPlay, onBack }: ScenariosScreenProps) {
               <h2 className="text-sm font-bold text-text-muted uppercase tracking-wide mb-3">Past Challenges</h2>
               <div className="space-y-3">
                 {list.archived.map((s) => (
-                  <ScenarioLandingCard key={s.id} summary={s} ended onPlay={() => onPlay(s.id)} onProfileClick={setProfileId} />
+                  <ScenarioLandingCard key={s.id} summary={s} ended onPlay={() => handlePlay(s)} onProfileClick={setProfileId} />
                 ))}
               </div>
             </section>

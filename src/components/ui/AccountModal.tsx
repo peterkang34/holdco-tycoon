@@ -6,9 +6,16 @@ import { useToastStore } from '../../hooks/useToast';
 
 export function AccountModal() {
   const { showAccountModal, accountModalMode, closeAccountModal } = useAuthStore();
+  const scenarioWall = useAuthStore((s) => s.scenarioWall);
   const addToast = useToastStore((s) => s.addToast);
   // Read isAnonymous synchronously from auth store (avoids async race condition)
   const isAnonymous = useAuthStore((s) => s.player?.isAnonymous ?? null);
+
+  // When opened as a Scenario Challenge account wall, redirect back into the scenario
+  // (`/?se={id}`) after sign-in so the player resumes where they were. Otherwise origin.
+  const redirectUrl = scenarioWall
+    ? `${window.location.origin}/?se=${encodeURIComponent(scenarioWall.scenarioId)}`
+    : window.location.origin;
 
   const [mode, setMode] = useState<'create' | 'signin'>('create');
   const [email, setEmail] = useState('');
@@ -32,14 +39,14 @@ export function AccountModal() {
         // Link Google identity to the existing anonymous session (preserves UUID)
         const { error: linkError } = await supabase.auth.linkIdentity({
           provider: 'google',
-          options: { redirectTo: window.location.origin },
+          options: { redirectTo: redirectUrl },
         });
         if (linkError) throw linkError;
       } else {
         // Standard OAuth sign-in (new or returning user)
         const { error: oauthError } = await supabase.auth.signInWithOAuth({
           provider: 'google',
-          options: { redirectTo: window.location.origin },
+          options: { redirectTo: redirectUrl },
         });
         if (oauthError) throw oauthError;
       }
@@ -59,13 +66,13 @@ export function AccountModal() {
       if (mode === 'create' && isAnonymous) {
         // updateUser preserves the anonymous UUID (important for game history linking)
         // but sends a "confirm email change" email — we set expectations in the UI copy
-        const { error: updateError } = await supabase.auth.updateUser({ email: email.trim() });
+        const { error: updateError } = await supabase.auth.updateUser({ email: email.trim() }, { emailRedirectTo: redirectUrl });
         if (updateError) throw updateError;
         setEmailSent(true);
         addToast({ message: 'Check your email to verify your account', type: 'info' });
       } else {
         // Sign-in mode (returning user) or non-anonymous: use signInWithOtp
-        const { error: otpError } = await supabase.auth.signInWithOtp({ email: email.trim() });
+        const { error: otpError } = await supabase.auth.signInWithOtp({ email: email.trim(), options: { emailRedirectTo: redirectUrl } });
         if (otpError) throw otpError;
         setEmailSent(true);
         addToast({ message: 'Check your email for a sign-in link', type: 'info' });
@@ -104,6 +111,17 @@ export function AccountModal() {
         </div>
       ) : (
         <div className="space-y-4">
+          {/* Scenario Challenge context — frames the sign-in as the gateway to competing, not a toll. */}
+          {scenarioWall && (
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-center">
+              <span className="text-2xl" aria-hidden>{scenarioWall.emoji}</span>
+              <p className="font-bold text-sm mt-1">{scenarioWall.name}</p>
+              <p className="text-xs text-text-muted mt-0.5">
+                Create a free account to play this challenge and put your run on the leaderboard. We'll drop you right back in.
+              </p>
+            </div>
+          )}
+
           {/* Google OAuth */}
           <button
             type="button"

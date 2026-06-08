@@ -112,6 +112,11 @@ export function initAuthListener(): (() => void) | undefined {
       const wasAnonymous = store.player?.isAnonymous ?? true;
       store.setPlayer(player);
 
+      // When signing in to resume a Scenario Challenge (?se= in the URL), suppress the
+      // celebration / claim-games popups so the player lands on the scenario setup, not a
+      // stack of modals over it. Linking still runs — only the modal opens are skipped.
+      const resumingScenario = new URLSearchParams(window.location.search).has('se');
+
       // User just upgraded from anonymous to real account
       // USER_UPDATED fires for in-session upgrades (e.g. updateUser with email)
       // SIGNED_IN fires after email verification redirect or OAuth link
@@ -122,7 +127,7 @@ export function initAuthListener(): (() => void) | undefined {
           await syncAchievementsFromServer();
           const achievementCount = getEarnedAchievementIds().length;
           if (achievementCount > 0 || gamesLinked > 0) {
-            store.openCelebrationModal({ achievementCount, gamesLinked });
+            if (!resumingScenario) store.openCelebrationModal({ achievementCount, gamesLinked });
           }
         })();
 
@@ -132,7 +137,7 @@ export function initAuthListener(): (() => void) | undefined {
           if (localEntries) {
             const entries = JSON.parse(localEntries);
             if (Array.isArray(entries) && entries.length > 0) {
-              store.openClaimModal();
+              if (!resumingScenario) store.openClaimModal();
               return;
             }
           }
@@ -151,7 +156,7 @@ export function initAuthListener(): (() => void) | undefined {
             await syncAchievementsFromServer();
             const achievementCount = getEarnedAchievementIds().length;
             if (achievementCount > 0 || gamesLinked > 0) {
-              store.openCelebrationModal({ achievementCount, gamesLinked });
+              if (!resumingScenario) store.openCelebrationModal({ achievementCount, gamesLinked });
             }
           })();
 
@@ -161,7 +166,7 @@ export function initAuthListener(): (() => void) | undefined {
             if (localEntries) {
               const entries = JSON.parse(localEntries);
               if (Array.isArray(entries) && entries.length > 0) {
-                store.openClaimModal();
+                if (!resumingScenario) store.openClaimModal();
               }
             }
           } catch { /* ignore parse errors */ }
