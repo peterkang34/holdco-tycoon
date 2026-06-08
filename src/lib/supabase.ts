@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { useAuthStore, type Player } from '../hooks/useAuth';
+import { useAuthStore, getPendingScenario, type Player } from '../hooks/useAuth';
 import { useToastStore } from '../hooks/useToast';
 import { syncAchievementsFromServer, getEarnedAchievementIds } from '../hooks/useUnlocks';
 
@@ -112,10 +112,13 @@ export function initAuthListener(): (() => void) | undefined {
       const wasAnonymous = store.player?.isAnonymous ?? true;
       store.setPlayer(player);
 
-      // When signing in to resume a Scenario Challenge (?se= in the URL), suppress the
-      // celebration / claim-games popups so the player lands on the scenario setup, not a
-      // stack of modals over it. Linking still runs — only the modal opens are skipped.
-      const resumingScenario = new URLSearchParams(window.location.search).has('se');
+      // When signing in to resume a Scenario Challenge, suppress the celebration /
+      // claim-games popups so the player lands on the scenario setup, not a stack of
+      // modals over it. The scenario is carried via the pending-scenario key now (the
+      // OAuth redirect is the bare origin, so there's no ?se= in the URL on return) —
+      // check both. Linking still runs; only the modal opens are skipped.
+      const resumingScenario = new URLSearchParams(window.location.search).has('se')
+        || getPendingScenario() !== null;
 
       // User just upgraded from anonymous to real account
       // USER_UPDATED fires for in-session upgrades (e.g. updateUser with email)

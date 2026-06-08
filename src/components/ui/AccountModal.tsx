@@ -11,11 +11,11 @@ export function AccountModal() {
   // Read isAnonymous synchronously from auth store (avoids async race condition)
   const isAnonymous = useAuthStore((s) => s.player?.isAnonymous ?? null);
 
-  // When opened as a Scenario Challenge account wall, redirect back into the scenario
-  // (`/?se={id}`) after sign-in so the player resumes where they were. Otherwise origin.
-  const redirectUrl = scenarioWall
-    ? `${window.location.origin}/?se=${encodeURIComponent(scenarioWall.scenarioId)}`
-    : window.location.origin;
+  // Always redirect to the bare origin — it's the only URL guaranteed to be in the
+  // Supabase allow-list (same as the footer sign-in). A scenario-wall sign-in resumes
+  // via the localStorage pending-scenario key (set in openScenarioAccountWall), NOT via
+  // the redirect URL, so it works regardless of Supabase redirect-URL configuration.
+  const redirectUrl = window.location.origin;
 
   const [mode, setMode] = useState<'create' | 'signin'>('create');
   const [email, setEmail] = useState('');

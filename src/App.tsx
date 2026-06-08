@@ -31,6 +31,7 @@ import { setupGoTest, getGoTestVariant } from './utils/goTestSetup';
 import { syncAchievementsFromServer } from './hooks/useUnlocks';
 import { isScenarioChallengesPlayerFacingEnabled } from './utils/featureFlags';
 import { parseScenarioUrl, buildScenarioPlayUrl, cleanScenarioUrl } from './utils/scenarioUrl';
+import { getPendingScenario } from './hooks/useAuth';
 // B-School test shortcut uses startBusinessSchool from the store (no direct data imports needed)
 
 type Screen = 'intro' | 'game' | 'gameOver' | 'graduation' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard' | 'playbook' | 'scenarios';
@@ -274,12 +275,12 @@ function App() {
       setScreen('intro');
       return;
     }
-    // A pending scenario resume (?se=) takes priority over auto-resuming a saved game.
-    // Otherwise a returning player who signed in (account wall → OAuth redirect to
-    // /?se={id}) lands back in their old in-progress game and the scenario they came to
-    // play is silently abandoned. Leaving screen='intro' lets IntroScreen's ?se= effect
-    // open the scenario setup. (Jake PR3 review.)
-    if (parseScenarioUrl(window.location.search)?.intent === 'play') return;
+    // A pending scenario resume takes priority over auto-resuming a saved game —
+    // whether it arrived as a ?se= deep-link OR a localStorage pending key (a player
+    // who just signed in via the account wall). Otherwise a returning player with a
+    // game in progress lands back in their old game and the scenario is abandoned.
+    // Leaving screen='intro' lets IntroScreen's ?se= effect open the scenario setup.
+    if (parseScenarioUrl(window.location.search)?.intent === 'play' || getPendingScenario()) return;
 
     const currentState = useGameStore.getState();
     if (holdcoName && round > 0 && !gameOver) {
