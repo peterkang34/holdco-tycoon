@@ -40,6 +40,17 @@ describe('GET /api/player/history', () => {
     expect(body.total).toBe(5);
   });
 
+  it('selects scenario_challenge_id so the UI can label scenario rows', async () => {
+    vi.mocked(getPlayerIdFromToken).mockResolvedValue('test-player-id');
+    const dataChain = createChain({ data: [], error: null });
+    vi.mocked(supabaseAdmin!.from)
+      .mockReturnValueOnce(createChain({ count: 0 }) as never)
+      .mockReturnValueOnce(dataChain as never);
+    const { req, res } = createMockReqRes();
+    await handler(req, res);
+    expect(dataChain.select).toHaveBeenCalledWith(expect.stringContaining('scenario_challenge_id'));
+  });
+
   it('returns empty array when no games', async () => {
     vi.mocked(getPlayerIdFromToken).mockResolvedValue('test-player-id');
 

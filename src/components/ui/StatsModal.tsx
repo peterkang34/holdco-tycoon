@@ -4,7 +4,9 @@ import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { fetchWithAuth } from '../../lib/supabase';
 import { useToastStore } from '../../hooks/useToast';
 import { formatMoney } from '../../engine/types';
-import { getGradeColor } from '../../utils/gradeColors';
+import { getGradeColor, getRankColor } from '../../utils/gradeColors';
+import { fetchScenarioRecords, fetchScenarioList, formatRankingMetric, type ScenarioRecord, type ScenarioListSummary } from '../../services/scenarioLeaderboard';
+import type { RankingMetric } from '../../engine/types';
 import SparklineChart from './SparklineChart';
 import { ScoreRadar } from '../admin/ScoreRadar';
 import { ACHIEVEMENT_PREVIEW } from '../../data/achievementPreview';
@@ -343,6 +345,8 @@ export function StatsModal() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [refetchKey, setRefetchKey] = useState(0);
+  // Per-scenario records joined with the scenario list (for name + ranking metric).
+  const [scenarioRows, setScenarioRows] = useState<(ScenarioRecord & { name: string; rankingMetric: RankingMetric })[]>([]);
 
   const handleLinkGames = useCallback(async () => {
     setLinking(true);
@@ -403,9 +407,11 @@ export function StatsModal() {
 
     const fetchData = async () => {
       try {
-        const [statsRes, historyRes] = await Promise.all([
+        const [statsRes, historyRes, scenarioRecords, scenarioList] = await Promise.all([
           fetchWithAuth('/api/player/stats'),
           fetchWithAuth(`/api/player/history?limit=${PAGE_SIZE}`),
+          fetchScenarioRecords().catch(() => null),       // null if logged-out / transient
+          fetchScenarioList().catch(() => null),           // names + ranking metric per scenario
         ]);
 
         if (cancelled) return;
@@ -433,6 +439,19 @@ export function StatsModal() {
         setStats(statsData);
         setHistory(historyData.games ?? []);
         setHistoryTotal(historyData.total ?? 0);
+
+        // Join scenario records with the list (for name + ranking metric); newest first.
+        if (scenarioRecords && scenarioRecords.length > 0) {
+          const meta = new Map<string, ScenarioListSummary>();
+          for (const s of [...(scenarioList?.active ?? []), ...(scenarioList?.archived ?? [])]) meta.set(s.id, s);
+          setScenarioRows(scenarioRecords.map((r: ScenarioRecord) => ({
+            ...r,
+            name: meta.get(r.scenarioId)?.name ?? r.scenarioId,
+            rankingMetric: (meta.get(r.scenarioId)?.rankingMetric ?? 'fev') as RankingMetric,
+          })));
+        } else {
+          setScenarioRows([]);
+        }
         setLoading(false);
       } catch {
         if (!cancelled) {
@@ -469,6 +488,40 @@ export function StatsModal() {
 
   const hasMoreHistory = historyTotal > history.length;
 
+  // "My Scenario Record" — extracted so it can render for scenario-only players too
+  // (whose global total_games is 0 and would otherwise hit the empty-state gate).
+  const scenarioRecordSection = scenarioRows.length > 0 ? (
+    <div>
+      <h3 className="text-sm font-bold text-text-muted mb-2">My Scenario Record</h3>
+      <div className="space-y-1.5">
+        {scenarioRows.map((r) => {
+          // Use the leaderboard value (KV sortScore) so it matches the displayed rank;
+          // fall back to the raw FEV only for archived scenarios (KV expired → null).
+          const value = formatRankingMetric(r.rankingMetric, { sortScore: r.bestRankingValue ?? r.bestRawFev });
+          return (
+            <div key={r.scenarioId} className="flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{r.name}</p>
+                <p className="text-[11px] text-text-muted tabular-nums">
+                  {r.attempts} {r.attempts === 1 ? 'attempt' : 'attempts'} · best {value.label} {value.display}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                {r.bestRank != null ? (
+                  <p className={`text-sm font-bold tabular-nums ${getRankColor(r.bestRank)}`}>
+                    #{r.bestRank}{r.entryCount ? <span className="text-text-muted font-normal"> of {r.entryCount}</span> : null}
+                  </p>
+                ) : (
+                  <p className="text-xs text-text-muted">Unranked</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
+
   // Achievements from localStorage (cross-game, no API needed)
   const earnedIds = useMemo(() => new Set(getEarnedAchievementIds()), [showStatsModal]);
   const earnedAchievements = ACHIEVEMENT_PREVIEW.filter(a => earnedIds.has(a.id));
@@ -491,7 +544,13 @@ export function StatsModal() {
         </div>
       )}
 
-      {!loading && !errorMsg && stats && stats.total_games === 0 && (
+      {/* Scenario-only players: global total_games is 0 (scenarios are isolated from
+          global stats), so surface their scenario record instead of the empty-state. */}
+      {!loading && !errorMsg && stats && stats.total_games === 0 && scenarioRows.length > 0 && (
+        <div className="space-y-6">{scenarioRecordSection}</div>
+      )}
+
+      {!loading && !errorMsg && stats && stats.total_games === 0 && scenarioRows.length === 0 && (
         <div className="text-center py-12 min-h-[300px] flex flex-col items-center justify-center">
           <span className="text-4xl block mb-3">📊</span>
           <p className="text-text-secondary font-medium mb-1">No games tracked yet</p>
@@ -546,6 +605,9 @@ export function StatsModal() {
               </div>
             </div>
           </div>
+
+          {/* My Scenario Record — per scenario the player has competed in. */}
+          {scenarioRecordSection}
 
           {/* vs Community */}
           {stats.global && (

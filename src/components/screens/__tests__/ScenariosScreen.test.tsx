@@ -25,9 +25,10 @@ vi.hoisted(() => {
 });
 
 const mockFetchScenarioList = vi.fn();
+const mockFetchScenarioRecords = vi.fn();
 vi.mock('../../../services/scenarioLeaderboard', async (orig) => {
   const actual = await orig() as Record<string, unknown>;
-  return { ...actual, fetchScenarioList: () => mockFetchScenarioList() };
+  return { ...actual, fetchScenarioList: () => mockFetchScenarioList(), fetchScenarioRecords: () => mockFetchScenarioRecords() };
 });
 
 // The inline scoreboard + profile modal are exercised elsewhere — stub them so this
@@ -55,7 +56,7 @@ const summary = (over: Partial<ScenarioListSummary> = {}): ScenarioListSummary =
 });
 
 describe('ScenariosScreen', () => {
-  beforeEach(() => { vi.clearAllMocks(); setPlayer(null); });
+  beforeEach(() => { vi.clearAllMocks(); setPlayer(null); mockFetchScenarioRecords.mockResolvedValue(null); });
 
   it('shows a loading skeleton while fetching', () => {
     mockFetchScenarioList.mockReturnValue(new Promise(() => {})); // never resolves
@@ -112,6 +113,17 @@ describe('ScenariosScreen', () => {
     await screen.findByText('Past Challenges');
     expect(screen.getByText('View scoreboard')).toBeInTheDocument();
     expect(screen.queryByText('Play ▶')).not.toBeInTheDocument();
+  });
+
+  it('hydrates "Your best: #rank" on cards from the records batch', async () => {
+    setPlayer(false);
+    mockFetchScenarioList.mockResolvedValueOnce({ active: [summary()], archived: [] });
+    mockFetchScenarioRecords.mockResolvedValueOnce([
+      { scenarioId: 'recession', attempts: 2, bestScore: 88, bestRawFev: 3_000_000, bestRankingValue: 3_000_000, bestRank: 3, entryCount: 42, lastPlayedAt: '2026-05-01T00:00:00Z' },
+    ]);
+    render(<ScenariosScreen onPlay={vi.fn()} onBack={vi.fn()} />);
+    await screen.findByText('Live Now');
+    await screen.findByText(/Your best: #3 of 42/i);
   });
 
   it('expands the inline scoreboard on toggle', async () => {

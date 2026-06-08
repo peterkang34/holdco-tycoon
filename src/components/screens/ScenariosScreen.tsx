@@ -14,7 +14,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { fetchScenarioList, formatRankingMetric, type ScenarioListSummary } from '../../services/scenarioLeaderboard';
+import { fetchScenarioList, fetchScenarioRecords, formatRankingMetric, type ScenarioListSummary, type ScenarioRecord } from '../../services/scenarioLeaderboard';
 import { ScenarioDetail } from '../ui/LeaderboardModal';
 import { ProfileModal } from '../ui/ProfileModal';
 import { useAuthStore } from '../../hooks/useAuth';
@@ -31,6 +31,9 @@ export function ScenariosScreen({ onPlay, onBack }: ScenariosScreenProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [profileId, setProfileId] = useState<string | null>(null);
+  // Signed-in player's per-scenario records (best rank/score), keyed by scenarioId.
+  // Empty for logged-out players (the endpoint 401s → fetchScenarioRecords returns null).
+  const [records, setRecords] = useState<Record<string, ScenarioRecord>>({});
   // Re-render every 60s so countdowns stay fresh.
   const [, setNowTick] = useState(0);
 
@@ -49,6 +52,13 @@ export function ScenariosScreen({ onPlay, onBack }: ScenariosScreenProps) {
   useEffect(() => {
     const t = setInterval(() => setNowTick((n) => n + 1), 60_000);
     return () => clearInterval(t);
+  }, []);
+  useEffect(() => {
+    let cancelled = false;
+    fetchScenarioRecords()
+      .then((recs) => { if (!cancelled && recs) setRecords(Object.fromEntries(recs.map((r) => [r.scenarioId, r]))); })
+      .catch(() => { /* logged-out / transient — cards just omit "Your best" */ });
+    return () => { cancelled = true; };
   }, []);
 
   // Account gate (Decision #1): playing a scenario requires a non-anonymous account.
@@ -107,7 +117,8 @@ export function ScenariosScreen({ onPlay, onBack }: ScenariosScreenProps) {
               <h2 className="text-sm font-bold text-accent uppercase tracking-wide mb-3">Live Now</h2>
               <div className="space-y-3">
                 {list.active.map((s) => (
-                  <ScenarioLandingCard key={s.id} summary={s} ended={false} onPlay={() => handlePlay(s)} onProfileClick={setProfileId} />
+                  <ScenarioLandingCard key={s.id} summary={s} ended={false} onPlay={() => handlePlay(s)} onProfileClick={setProfileId}
+                    myRank={records[s.id] ? { rank: records[s.id].bestRank, entryCount: records[s.id].entryCount ?? 0 } : undefined} />
                 ))}
               </div>
             </section>
@@ -117,7 +128,8 @@ export function ScenariosScreen({ onPlay, onBack }: ScenariosScreenProps) {
               <h2 className="text-sm font-bold text-text-muted uppercase tracking-wide mb-3">Past Challenges</h2>
               <div className="space-y-3">
                 {list.archived.map((s) => (
-                  <ScenarioLandingCard key={s.id} summary={s} ended onPlay={() => handlePlay(s)} onProfileClick={setProfileId} />
+                  <ScenarioLandingCard key={s.id} summary={s} ended onPlay={() => handlePlay(s)} onProfileClick={setProfileId}
+                    myRank={records[s.id] ? { rank: records[s.id].bestRank, entryCount: records[s.id].entryCount ?? 0 } : undefined} />
                 ))}
               </div>
             </section>
