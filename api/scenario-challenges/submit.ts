@@ -27,6 +27,7 @@ import { isBodyTooLarge } from '../_lib/rateLimit.js';
 import {
   scenarioConfigKey,
   scenarioLeaderboardKey,
+  scenarioPlayerBestKey,
   MAX_SCENARIO_ENTRIES,
 } from '../_lib/leaderboard.js';
 import { updatePlayerStats, updateGlobalStats } from '../_lib/playerStats.js';
@@ -34,7 +35,7 @@ import {
   checkSubmitRateLimit,
   resolvePlayerIdentity,
   upsertPlayerProfile,
-  writeLeaderboardEntry,
+  writePlayerBestEntry,
   upsertGameHistoryRow,
 } from '../_lib/leaderboardCore.js';
 
@@ -147,6 +148,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(410).json({ error: 'Scenario ended more than 24h ago — submissions closed' });
     }
 
+    // ── Locked-parameter cross-check ─────────────────────────────────
+    // Difficulty/duration are fixed by the scenario config (all players face
+    // identical conditions). The client submits the config's values; reject any
+    // mismatch so a tampered payload can't record a wrong difficulty/duration.
+    if (typeof c.difficulty === 'string' && c.difficulty !== validDifficulty) {
+      return res.status(400).json({ error: 'difficulty does not match the scenario configuration' });
+    }
+    if (typeof c.duration === 'string' && c.duration !== validDuration) {
+      return res.status(400).json({ error: 'duration does not match the scenario configuration' });
+    }
+
     // ── Rate limit ───────────────────────────────────────────────────
 
     if (await checkSubmitRateLimit(req, { namespace: 'scenario-challenges', windowSeconds: RATE_LIMIT_SECONDS })) {
@@ -156,10 +168,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── Player identity ──────────────────────────────────────────────
 
     const { playerId, verifiedPlayerId } = await resolvePlayerIdentity(req);
+
+    // ── Account gate (server-authoritative) ──────────────────────────
+    // Scenario Challenges require a verified account to play/submit. The client
+    // shows a sign-in wall, but the real enforcement is here: an anonymous or
+    // token-less submission (verifiedPlayerId === undefined) never reaches the
+    // board. This also guarantees every entry is attributable (records, "you"
+    // highlighting, one-best-per-player dedup all key on verifiedPlayerId).
+    if (!verifiedPlayerId) {
+      return res.status(401).json({ error: 'A verified account is required to submit a scenario score' });
+    }
+
     const entryDate = new Date().toISOString();
-    const { publicProfileId } = playerId
-      ? await upsertPlayerProfile({ playerId, verifiedPlayerId, initials, entryDate })
-      : { publicProfileId: undefined };
+    const { publicProfileId } = await upsertPlayerProfile({ playerId: verifiedPlayerId, verifiedPlayerId, initials, entryDate });
 
     // ── Phase 5: milestone FEV multiplier (server-authoritative) ─────
     // Client sends raw founderEquityValue + triggeredTriggerIds. Server reads
@@ -186,6 +207,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // ── Compute sort score from rankingMetric ────────────────────────
 
     const rankingMetric = String(c.rankingMetric ?? 'fev');
+
+    // Reject submissions that can't produce a real score on the scenario's metric
+    // (would land at sortScore 0 and clutter the board with inert entries).
+    if ((rankingMetric === 'moic' || rankingMetric === 'cashOnCash') && typeof grossMoic !== 'number') {
+      return res.status(400).json({ error: `grossMoic is required for the '${rankingMetric}' ranking metric` });
+    }
+    if (rankingMetric === 'irr' && typeof netIrr !== 'number') {
+      return res.status(400).json({ error: "netIrr is required for the 'irr' ranking metric" });
+    }
+    if (rankingMetric === 'gpCarry' && typeof carryEarned !== 'number') {
+      return res.status(400).json({ error: "carryEarned is required for the 'gpCarry' ranking metric" });
+    }
+
     const sortScore = computeSortScore(
       rankingMetric,
       {
@@ -231,51 +265,54 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     const entryJson = JSON.stringify(entry);
-    const { rank } = await writeLeaderboardEntry({
+    // One-best-entry-per-player: a strictly-better run replaces the player's prior
+    // board entry; a worse run leaves their best in place. Keyed on verifiedPlayerId
+    // (guaranteed non-null by the account gate above).
+    const { rank } = await writePlayerBestEntry({
       kvKey: scenarioLeaderboardKey(scenarioChallengeId),
+      playerIndexKey: scenarioPlayerBestKey(scenarioChallengeId),
+      playerId: verifiedPlayerId,
       entryJson,
       sortScore,
       maxEntries: MAX_SCENARIO_ENTRIES,
     });
 
-    // ── Dual-write to game_history (if authenticated) ────────────────
+    // ── Dual-write to game_history (always authenticated here) ───────
 
-    if (playerId) {
-      await upsertGameHistoryRow({
-        playerId,
-        match: { score, grade, difficulty: validDifficulty, scenario_challenge_id: scenarioChallengeId },
-        enrichFields: {
-          leaderboard_entry_id: id,
-          initials,
-          holdco_name: holdcoName.trim(),
-          scenario_challenge_id: scenarioChallengeId,
-        },
-        insertRow: {
-          player_id: playerId,
-          holdco_name: holdcoName.trim(),
-          initials,
-          difficulty: validDifficulty,
-          duration: validDuration,
-          enterprise_value: Math.round(enterpriseValue),
-          founder_equity_value: validFEV,
-          founder_personal_wealth: validPersonalWealth,
-          adjusted_fev: validFEV, // no difficulty multiplier — all scenario players face identical conditions
-          score,
-          grade,
-          submitted_multiplier: 1.0,
-          business_count: businessCount,
-          strategy: sanitizeStrategy(strategy),
-          scenario_challenge_id: scenarioChallengeId,
-          is_admin_preview: false,
-          leaderboard_entry_id: id,
-          completed_at: entryDate,
-        },
-      });
+    await upsertGameHistoryRow({
+      playerId: verifiedPlayerId,
+      match: { score, grade, difficulty: validDifficulty, scenario_challenge_id: scenarioChallengeId },
+      enrichFields: {
+        leaderboard_entry_id: id,
+        initials,
+        holdco_name: holdcoName.trim(),
+        scenario_challenge_id: scenarioChallengeId,
+      },
+      insertRow: {
+        player_id: verifiedPlayerId,
+        holdco_name: holdcoName.trim(),
+        initials,
+        difficulty: validDifficulty,
+        duration: validDuration,
+        enterprise_value: Math.round(enterpriseValue),
+        founder_equity_value: validFEV,
+        founder_personal_wealth: validPersonalWealth,
+        adjusted_fev: validFEV, // no difficulty multiplier — all scenario players face identical conditions
+        score,
+        grade,
+        submitted_multiplier: 1.0,
+        business_count: businessCount,
+        strategy: sanitizeStrategy(strategy),
+        scenario_challenge_id: scenarioChallengeId,
+        is_admin_preview: false,
+        leaderboard_entry_id: id,
+        completed_at: entryDate,
+      },
+    });
 
-      // Pre-computed stats refresh (non-blocking)
-      updatePlayerStats(playerId).catch(console.error);
-      updateGlobalStats().catch(console.error);
-    }
+    // Pre-computed stats refresh (non-blocking)
+    updatePlayerStats(verifiedPlayerId).catch(console.error);
+    updateGlobalStats().catch(console.error);
 
     return res.status(200).json({ success: true, id, rank });
   } catch (err) {

@@ -23,6 +23,16 @@ export function scenarioLeaderboardKey(scenarioId: string): string {
   return `scenario:${scenarioId}:leaderboard`;
 }
 
+/**
+ * Per-scenario player→best-entry index hash (field = verifiedPlayerId,
+ * value = JSON `{score, member}`). Enables one-best-entry-per-player dedup:
+ * a player's prior sorted-set member is removed before a strictly-better run
+ * is added, so a single player never occupies multiple board slots.
+ */
+export function scenarioPlayerBestKey(scenarioId: string): string {
+  return `scenario:${scenarioId}:player_best`;
+}
+
 /** String (JSON array of ids) — featured scenarios shown on the home banner. */
 export const SCENARIOS_ACTIVE_KEY = 'scenarios:active';
 

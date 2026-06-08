@@ -90,6 +90,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .from('game_history')
       .select('holdco_name, grade, score, adjusted_fev, difficulty, duration, strategy, completed_at, family_office_completed, score_value_creation, score_fcf_share_growth, score_portfolio_roic, score_capital_deployment, score_balance_sheet, score_strategic_discipline')
       .eq('player_id', playerId)
+      // Public profile shows main-mode games only — scenario plays are self-only
+      // (and admin-preview rows never surface).
+      .is('scenario_challenge_id', null)
+      .not('is_admin_preview', 'is', true)
       .order('completed_at', { ascending: false })
       .limit(10);
 

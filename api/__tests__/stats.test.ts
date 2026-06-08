@@ -77,6 +77,24 @@ describe('GET /api/player/stats', () => {
     expect(body.grade_distribution).toEqual({ B: 1, A: 1 });
   });
 
+  it('fallback excludes scenario + admin-preview rows from global stats (isolation)', async () => {
+    vi.mocked(getPlayerIdFromToken).mockResolvedValue('test-player-id');
+
+    const gameHistoryChain = createChain({ data: [createGameHistoryRow({ score: 70, grade: 'B' })], error: null });
+    vi.mocked(supabaseAdmin!.from)
+      .mockReturnValueOnce(createChain({ data: null, error: { code: 'PGRST116' } }) as never) // player_stats miss
+      .mockReturnValueOnce(gameHistoryChain as never)                                          // game_history
+      .mockReturnValueOnce(createChain({ data: null, error: { code: 'PGRST116' } }) as never); // global_stats
+
+    const { req, res } = createMockReqRes();
+    await handler(req, res);
+
+    // The game_history query must filter out scenario rows and admin-preview rows so a
+    // scenario run can never become the player's global best score.
+    expect(gameHistoryChain.is).toHaveBeenCalledWith('scenario_challenge_id', null);
+    expect(gameHistoryChain.not).toHaveBeenCalledWith('is_admin_preview', 'is', true);
+  });
+
   it('returns EMPTY_STATS when no game_history rows', async () => {
     vi.mocked(getPlayerIdFromToken).mockResolvedValue('test-player-id');
 

@@ -23,7 +23,10 @@ const kvz = kv as unknown as {
   zadd: (key: string, entry: { score: number; member: string }) => Promise<number>;
   zcard: (key: string) => Promise<number>;
   zrank: (key: string, member: string) => Promise<number | null>;
+  zrem: (key: string, member: string) => Promise<number>;
   zremrangebyrank: (key: string, min: number, max: number) => Promise<number>;
+  hget: (key: string, field: string) => Promise<string | null>;
+  hset: (key: string, obj: Record<string, string>) => Promise<number>;
 };
 
 // ─── Rate limit ────────────────────────────────────────────────────────────
@@ -188,6 +191,80 @@ export async function writeLeaderboardEntry(opts: {
   const rank = ascRank !== null ? currentCount - ascRank : 1;
 
   return { rank };
+}
+
+/**
+ * One-best-entry-per-player write. Keeps only a player's BEST run on the board:
+ * a `playerIndexKey` hash maps `playerId → {score, member}`. On a strictly-better
+ * run, the player's prior sorted-set member is removed before the new one is added;
+ * on a worse-or-equal run, the board is untouched (prior best stays — tie keeps the
+ * earlier entry). Returns the player's current descending rank either way.
+ *
+ * Race note (CLAUDE.md #8): this is a read-modify-write on KV, not atomic. The
+ * per-IP submit rate-limit closes it in the common case (one player ≈ one IP);
+ * a determined user submitting from two IPs concurrently could momentarily
+ * double-write, which self-heals on their next strictly-better run. Full
+ * atomicity (Lua/transaction) is deferred — the 500-cap bounds the blast radius.
+ *
+ * Returns `rank: null` when the entry didn't make the board (pruned below the
+ * cap). Requires a non-empty `playerId` (scenario submits are account-gated upstream).
+ */
+export async function writePlayerBestEntry(opts: {
+  kvKey: string;
+  playerIndexKey: string;
+  playerId: string;
+  entryJson: string;
+  sortScore: number;
+  maxEntries: number;
+}): Promise<{ rank: number | null; replaced: boolean }> {
+  const rankOf = async (member: string): Promise<number> => {
+    const ascRank = await kvz.zrank(opts.kvKey, member);
+    const count = await kvz.zcard(opts.kvKey);
+    return ascRank !== null ? count - ascRank : 1;
+  };
+
+  // Look up the player's prior best (if any).
+  let priorMember: string | null = null;
+  let priorScore = Number.NEGATIVE_INFINITY;
+  try {
+    const raw = await kvz.hget(opts.playerIndexKey, opts.playerId);
+    if (raw) {
+      const parsed = JSON.parse(raw) as { score?: unknown; member?: unknown };
+      if (typeof parsed.member === 'string' && typeof parsed.score === 'number') {
+        priorMember = parsed.member;
+        priorScore = parsed.score;
+      }
+    }
+  } catch (err) {
+    console.error('writePlayerBestEntry: player-index read failed:', err);
+  }
+
+  // Worse-or-equal run AND the prior entry is still on the board → keep prior.
+  if (priorMember !== null && opts.sortScore <= priorScore) {
+    const stillPresent = (await kvz.zrank(opts.kvKey, priorMember)) !== null;
+    if (stillPresent) return { rank: await rankOf(priorMember), replaced: false };
+    // else: prior was pruned below the cap — fall through and (re)add the new run.
+  }
+
+  // Strictly-better (or no live prior) → swap.
+  if (priorMember !== null) await kvz.zrem(opts.kvKey, priorMember);
+  await kvz.zadd(opts.kvKey, { score: opts.sortScore, member: opts.entryJson });
+
+  const totalCount = await kvz.zcard(opts.kvKey);
+  if (totalCount > opts.maxEntries) {
+    await kvz.zremrangebyrank(opts.kvKey, 0, totalCount - opts.maxEntries - 1);
+  }
+
+  await kvz.hset(opts.playerIndexKey, {
+    [opts.playerId]: JSON.stringify({ score: opts.sortScore, member: opts.entryJson }),
+  });
+
+  // If the new entry was pruned out (board already full of higher scores), it's
+  // not on the board — report rank null rather than a misleading rank 1.
+  const ascRank = await kvz.zrank(opts.kvKey, opts.entryJson);
+  if (ascRank === null) return { rank: null, replaced: true };
+  const currentCount = await kvz.zcard(opts.kvKey);
+  return { rank: currentCount - ascRank, replaced: true };
 }
 
 // ─── game_history enrich-or-insert ────────────────────────────────────────

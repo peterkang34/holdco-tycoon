@@ -246,6 +246,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .from('game_history')
         .select('player_id, strategy')
         .in('player_id', playerIds)
+        // Scenario + admin-preview rows excluded so per-player game COUNTS aren't
+        // inflated by sandbox plays (achievements here are already zeroed at write-time).
+        .is('scenario_challenge_id', null)
+        .not('is_admin_preview', 'is', true)
         .range(0, 4999);
 
       for (const row of gameRows || []) {
