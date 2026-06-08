@@ -741,6 +741,11 @@ export function GameOverScreen({
         },
         {
           completionId,
+          // Defense-in-depth: tag preview/scenario games so the global endpoint can
+          // reject them server-side even if some path reaches it (the save UI is also
+          // hidden in scenario/preview mode). Both are undefined for normal games.
+          isAdminPreview: isAdminPreview || undefined,
+          scenarioChallengeId: scenarioChallengeId ?? undefined,
           totalRounds: maxRounds,
           totalInvestedCapital,
           totalRevenue: metrics.totalRevenue,
