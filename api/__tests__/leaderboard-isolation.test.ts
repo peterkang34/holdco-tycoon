@@ -11,6 +11,50 @@ import { describe, it, expect } from 'vitest';
 import globalSubmit from '../leaderboard/submit.js';
 import { createMockReqRes } from './helpers.js';
 
+describe('Admin preview isolation — global leaderboard rejects preview games', () => {
+  it('returns 400 when isAdminPreview is true', async () => {
+    const { req, res, getResponse } = createMockReqRes({
+      method: 'POST',
+      body: {
+        isAdminPreview: true,
+        holdcoName: 'X',
+        initials: 'XX',
+        enterpriseValue: 1_000_000,
+        score: 50,
+        grade: 'C',
+        businessCount: 3,
+        totalRounds: 10,
+        difficulty: 'easy',
+        duration: 'quick',
+      },
+    });
+    await globalSubmit(req, res);
+    const { statusCode, body } = getResponse();
+    expect(statusCode).toBe(400);
+    expect(body.error).toMatch(/preview/i);
+  });
+
+  it('isAdminPreview: false (a real game) is NOT rejected by the preview guard', async () => {
+    const { req, res, getResponse } = createMockReqRes({
+      method: 'POST',
+      body: {
+        isAdminPreview: false,
+        holdcoName: 'X',
+        initials: 'XX',
+        enterpriseValue: 1_000_000,
+        score: 50,
+        grade: 'C',
+        businessCount: 3,
+        totalRounds: 10,
+        difficulty: 'easy',
+        duration: 'quick',
+      },
+    });
+    await globalSubmit(req, res);
+    expect(getResponse().statusCode).not.toBe(400);
+  });
+});
+
 describe('Scenario isolation — global leaderboard rejects scenario payloads', () => {
   it('returns 400 when scenarioChallengeId is present', async () => {
     const { req, res, getResponse } = createMockReqRes({

@@ -56,6 +56,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Scenario submissions must use /api/scenario-challenges/submit' });
     }
 
+    // --- Admin preview guard ---
+    // Admin/scenario preview games must NEVER be counted on the global leaderboard.
+    // The client hides the save control in preview mode, but enforce it server-side
+    // too so no refactor or alternate path can leak a preview onto the board. Mirrors
+    // the admin-preview drop in api/scenario-challenges/submit.ts.
+    if (body?.isAdminPreview === true) {
+      return res.status(400).json({ error: 'Admin preview games are not eligible for the global leaderboard' });
+    }
+
     // --- Validation ---
     const {
       holdcoName,
