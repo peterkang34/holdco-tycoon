@@ -36,6 +36,15 @@ interface ScenarioSummary {
   topScore: number | null;
   isFeatured: boolean;
   isActive: boolean;
+  /** First-activation timestamp (Phase 4). null = never published (a draft). Used to
+   *  classify public visibility; harmless extra field for clients that ignore it. */
+  publishedAt: string | null;
+}
+
+/** True once the scenario's window has closed. */
+function isExpired(endDate: string): boolean {
+  const ms = Date.parse(endDate);
+  return Number.isFinite(ms) && Date.now() > ms;
 }
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -44,22 +53,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const [activeIds, archivedIds] = await Promise.all([
+    const [activeIds, archivedIds, postgresArchived] = await Promise.all([
       readIdList(SCENARIOS_ACTIVE_KEY),
       readIdList(SCENARIOS_ARCHIVE_KEY),
-    ]);
-
-    const [active, kvArchived, postgresArchived] = await Promise.all([
-      Promise.all(activeIds.map(buildSummary)).then(filterNulls),
-      Promise.all(archivedIds.map(buildSummary)).then(filterNulls),
       // Postgres archive: scenarios whose KV keys were TTL'd out after the snapshot
-      // cron ran. Merged in so the Scenarios tab stays populated indefinitely.
+      // cron ran. These are by construction published+ended → always Past Challenges.
       fetchPostgresArchive(),
     ]);
 
-    // KV wins on dedup — if a scenario is both in KV archive and Postgres archive
-    // (e.g., snapshot just ran but KV key hasn't expired yet), use the KV copy
-    // since it has fresher entry counts.
+    // Re-classify from the ACTUAL config state rather than trusting the KV list
+    // membership (the admin membership logic files drafts + deactivated scenarios into
+    // the archive list, which must NOT surface to players). Union both lists so every
+    // known scenario is considered exactly once.
+    const allIds = [...new Set([...activeIds, ...archivedIds])];
+    const summaries = filterNulls(await Promise.all(allIds.map(buildSummary)));
+
+    const active: ScenarioSummary[] = [];
+    const kvArchived: ScenarioSummary[] = [];
+    for (const s of summaries) {
+      const expired = isExpired(s.endDate);
+      if (s.isActive && !expired) {
+        active.push(s); // Live Now — currently playable
+      } else if (expired && (s.publishedAt != null || s.entryCount > 0)) {
+        kvArchived.push(s); // Past Challenge — was published and has ended
+      }
+      // Excluded: drafts (never published, not expired) and deactivated-but-not-ended.
+    }
+
+    // KV wins on dedup — fresher entry counts than a just-written Postgres snapshot.
     const kvIds = new Set(kvArchived.map(s => s.id));
     const archived = [
       ...kvArchived,
@@ -113,6 +134,7 @@ async function fetchPostgresArchive(): Promise<ScenarioSummary[]> {
         topScore: typeof row.top_score === 'number' ? row.top_score : null,
         isFeatured: false, // Postgres archive is always non-featured.
         isActive: false,
+        publishedAt: typeof config.publishedAt === 'string' ? config.publishedAt : null,
       };
     }).filter((x): x is ScenarioSummary => x !== null);
   } catch (err) {
@@ -160,6 +182,7 @@ async function buildSummary(scenarioId: string): Promise<ScenarioSummary | null>
       topScore,
       isFeatured: c.isFeatured === true,
       isActive: c.isActive === true,
+      publishedAt: typeof c.publishedAt === 'string' ? c.publishedAt : null,
     };
   } catch (err) {
     console.error(`scenario '${scenarioId}' list summary failed:`, err);
