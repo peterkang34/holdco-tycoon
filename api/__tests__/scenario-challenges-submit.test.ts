@@ -9,7 +9,7 @@
  *   - scenario_challenge_id threaded through game_history dual-write
  */
 
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import handler from '../scenario-challenges/submit.js';
 import { createMockReqRes, createChain } from './helpers.js';
 import { getPlayerIdFromToken } from '../_lib/playerAuth.js';
@@ -54,6 +54,37 @@ function setupAuthUser(playerId = 'test-player-id') {
 }
 
 describe('POST /api/scenario-challenges/submit', () => {
+  // Scenario submits now require a verified account (account gate). Authenticate by
+  // default so write-path tests exercise the real flow; gate tests override to anon.
+  beforeEach(() => setupAuthUser());
+
+  describe('Account gate', () => {
+    it('returns 401 for an anonymous / token-less submission', async () => {
+      vi.mocked(getPlayerIdFromToken).mockResolvedValue(null); // override → anonymous
+      vi.mocked(kv.get)
+        .mockResolvedValueOnce(MOCK_CONFIG() as never)
+        .mockResolvedValueOnce(null as never);
+      const { req, res, getResponse } = createMockReqRes({ method: 'POST', body: validBody() });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(401);
+      expect(kv.zadd).not.toHaveBeenCalled();
+      expect(supabaseAdmin!.from).not.toHaveBeenCalled();
+    });
+
+    it('returns 401 when the token belongs to an anonymous session', async () => {
+      vi.mocked(getPlayerIdFromToken).mockResolvedValue('anon-id');
+      vi.mocked(supabaseAdmin!.auth.admin.getUserById).mockResolvedValue({
+        data: { user: { id: 'anon-id', is_anonymous: true } }, error: null,
+      } as never);
+      vi.mocked(kv.get)
+        .mockResolvedValueOnce(MOCK_CONFIG() as never)
+        .mockResolvedValueOnce(null as never);
+      const { req, res, getResponse } = createMockReqRes({ method: 'POST', body: validBody() });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(401);
+    });
+  });
+
   describe('Method + body gates', () => {
     it('returns 405 for non-POST', async () => {
       const { req, res, getResponse } = createMockReqRes({ method: 'GET' });
@@ -331,17 +362,89 @@ describe('POST /api/scenario-challenges/submit', () => {
       expect((zaddCall[1] as { score: number }).score).toBe(42_000);
     });
 
-    it('missing metric input falls back to 0', async () => {
+    it('rejects a moic submission missing grossMoic (400 — no inert score-0 entry)', async () => {
       vi.mocked(kv.get)
         .mockResolvedValueOnce(MOCK_CONFIG({ rankingMetric: 'moic' }) as never)
         .mockResolvedValueOnce(null as never);
-      const { req, res } = createMockReqRes({
+      const { req, res, getResponse } = createMockReqRes({
         method: 'POST',
         body: validBody(), // no grossMoic
       });
       await handler(req, res);
-      const zaddCall = vi.mocked(kv.zadd).mock.calls[0];
-      expect((zaddCall[1] as { score: number }).score).toBe(0);
+      expect(getResponse().statusCode).toBe(400);
+      expect(getResponse().body.error).toMatch(/grossMoic/);
+      expect(kv.zadd).not.toHaveBeenCalled();
+    });
+
+    it('rejects an irr submission missing netIrr (400)', async () => {
+      vi.mocked(kv.get)
+        .mockResolvedValueOnce(MOCK_CONFIG({ rankingMetric: 'irr' }) as never)
+        .mockResolvedValueOnce(null as never);
+      const { req, res, getResponse } = createMockReqRes({ method: 'POST', body: validBody() });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(400);
+      expect(getResponse().body.error).toMatch(/netIrr/);
+    });
+  });
+
+  describe('Locked-parameter cross-check', () => {
+    it('rejects a difficulty that does not match the scenario config (400)', async () => {
+      vi.mocked(kv.get)
+        .mockResolvedValueOnce(MOCK_CONFIG({ difficulty: 'easy' }) as never)
+        .mockResolvedValueOnce(null as never);
+      const { req, res, getResponse } = createMockReqRes({
+        method: 'POST',
+        body: validBody({ difficulty: 'normal' }), // config says easy
+      });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(400);
+      expect(getResponse().body.error).toMatch(/difficulty/);
+    });
+
+    it('accepts a difficulty matching the config', async () => {
+      vi.mocked(kv.get)
+        .mockResolvedValueOnce(MOCK_CONFIG({ difficulty: 'normal', duration: 'quick' }) as never)
+        .mockResolvedValueOnce(null as never);
+      const { req, res, getResponse } = createMockReqRes({ method: 'POST', body: validBody() });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(200);
+    });
+  });
+
+  describe('One-best-entry-per-player dedup', () => {
+    it('replaces the prior member when the new run is strictly better', async () => {
+      const priorMember = JSON.stringify({ id: 'old', playerId: 'test-player-id' });
+      vi.mocked((kv as unknown as { hget: ReturnType<typeof vi.fn> }).hget)
+        .mockResolvedValue(JSON.stringify({ score: 5_000_000, member: priorMember }));
+      vi.mocked(kv.get)
+        .mockResolvedValueOnce(MOCK_CONFIG({ rankingMetric: 'fev' }) as never)
+        .mockResolvedValueOnce(null as never);
+      const { req, res, getResponse } = createMockReqRes({
+        method: 'POST',
+        body: validBody({ founderEquityValue: 9_000_000 }), // beats prior 5M
+      });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(200);
+      expect(kv.zrem).toHaveBeenCalledWith('scenario:recession-gauntlet:leaderboard', priorMember);
+      expect(kv.zadd).toHaveBeenCalled();
+    });
+
+    it('keeps the prior member (no new zadd) when the new run is worse', async () => {
+      const priorMember = JSON.stringify({ id: 'old', playerId: 'test-player-id' });
+      vi.mocked((kv as unknown as { hget: ReturnType<typeof vi.fn> }).hget)
+        .mockResolvedValue(JSON.stringify({ score: 9_000_000, member: priorMember }));
+      vi.mocked((kv as unknown as { zrank: ReturnType<typeof vi.fn> }).zrank).mockResolvedValue(0); // prior still present
+      vi.mocked(kv.get)
+        .mockResolvedValueOnce(MOCK_CONFIG({ rankingMetric: 'fev' }) as never)
+        .mockResolvedValueOnce(null as never);
+      const { req, res, getResponse } = createMockReqRes({
+        method: 'POST',
+        body: validBody({ founderEquityValue: 4_000_000 }), // worse than prior 9M
+      });
+      await handler(req, res);
+      expect(getResponse().statusCode).toBe(200);
+      expect(kv.zrem).not.toHaveBeenCalled();
+      expect(kv.zadd).not.toHaveBeenCalled();
     });
   });
 
@@ -371,15 +474,15 @@ describe('POST /api/scenario-challenges/submit', () => {
       );
     });
 
-    it('skips game_history write when unauthenticated', async () => {
-      // getPlayerIdFromToken returns null by default in setup.ts
+    it('rejects (401) and writes nothing when unauthenticated', async () => {
+      vi.mocked(getPlayerIdFromToken).mockResolvedValue(null); // override → anonymous
       vi.mocked(kv.get)
         .mockResolvedValueOnce(MOCK_CONFIG() as never)
         .mockResolvedValueOnce(null as never);
       const { req, res, getResponse } = createMockReqRes({ method: 'POST', body: validBody() });
       await handler(req, res);
 
-      expect(getResponse().statusCode).toBe(200);
+      expect(getResponse().statusCode).toBe(401);
       expect(supabaseAdmin!.from).not.toHaveBeenCalled();
     });
   });

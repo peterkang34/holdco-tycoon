@@ -25,6 +25,8 @@ vi.mock('@vercel/kv', () => ({
     zcard: vi.fn(),
     zrank: vi.fn(),
     zremrangebyrank: vi.fn(),
+    hget: vi.fn(),
+    hset: vi.fn(),
     ping: vi.fn(),
     hincrby: vi.fn(),
     pipeline: vi.fn(),
@@ -97,6 +99,8 @@ beforeEach(() => {
   vi.mocked((kv as any).zcard).mockResolvedValue(0);
   vi.mocked((kv as any).zrank).mockResolvedValue(0);
   vi.mocked((kv as any).zremrangebyrank).mockResolvedValue(0);
+  vi.mocked((kv as any).hget).mockResolvedValue(null); // no prior player-best entry
+  vi.mocked((kv as any).hset).mockResolvedValue(1);
   vi.mocked((kv as any).ping).mockResolvedValue('PONG');
   // Telemetry pipeline: chainable hincrby + awaitable exec
   vi.mocked((kv as any).pipeline).mockReturnValue({

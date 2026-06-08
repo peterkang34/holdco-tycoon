@@ -65,6 +65,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .from('game_history')
         .select('score, grade, adjusted_fev, difficulty, duration, business_count, strategy, completed_at')
         .eq('player_id', playerId)
+        // Match the precomputed path: scenario + admin-preview rows excluded from
+        // global personal stats (best score, %ile, etc.).
+        .is('scenario_challenge_id', null)
+        .not('is_admin_preview', 'is', true)
         .order('completed_at', { ascending: false });
 
       if (error) {

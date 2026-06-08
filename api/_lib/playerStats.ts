@@ -17,6 +17,11 @@ async function fetchAllGames(playerId: string) {
       .from('game_history')
       .select('*')
       .eq('player_id', playerId)
+      // Scenario plays are a sealed sandbox — excluded from global player stats so a
+      // scenario run can't become someone's global best score (mirrors the achievement
+      // exclusion in achievementBackfill.ts). Admin-preview rows excluded too.
+      .is('scenario_challenge_id', null)
+      .not('is_admin_preview', 'is', true)
       .order('completed_at', { ascending: true })
       .range(offset, offset + PAGE_SIZE - 1);
 
@@ -210,6 +215,10 @@ export async function updateGlobalStats(): Promise<void> {
       const { data, error } = await supabaseAdmin
         .from('game_history')
         .select('score, grade, adjusted_fev, strategy')
+        // Exclude scenario + admin-preview rows from the community-comparison
+        // aggregates (avg score, %ile, grade distribution) — same sandbox rule.
+        .is('scenario_challenge_id', null)
+        .not('is_admin_preview', 'is', true)
         .range(offset, offset + PAGE_SIZE - 1);
 
       if (error || !data) break;
