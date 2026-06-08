@@ -17,6 +17,10 @@ interface AuthState {
   // Transient (modal toggles)
   showAccountModal: boolean;
   accountModalMode: 'create' | 'signin';
+  /** When set, the account modal shows scenario context and, on success, redirects
+   *  back to `/?se={scenarioId}` so the player resumes into the scenario they tried
+   *  to play (the account gate for Scenario Challenges). Null for a generic sign-in. */
+  scenarioWall: { scenarioId: string; name: string; emoji: string } | null;
   showStatsModal: boolean;
   showClaimModal: boolean;
   showPrivacyModal: boolean;
@@ -29,6 +33,7 @@ interface AuthState {
   setPlayer: (player: Player | null) => void;
   signOut: () => void;
   openAccountModal: (mode?: 'create' | 'signin') => void;
+  openScenarioAccountWall: (ctx: { scenarioId: string; name: string; emoji: string }) => void;
   closeAccountModal: () => void;
   openStatsModal: () => void;
   closeStatsModal: () => void;
@@ -55,6 +60,7 @@ export const useAuthStore = create<AuthState>()(
       signupNudgeDismissals: 0,
       showAccountModal: false,
       accountModalMode: 'create',
+      scenarioWall: null,
       showStatsModal: false,
       showClaimModal: false,
       showPrivacyModal: false,
@@ -65,8 +71,9 @@ export const useAuthStore = create<AuthState>()(
 
       setPlayer: (player) => set({ player }),
       signOut: () => set({ player: null }),
-      openAccountModal: (mode = 'create') => set({ showAccountModal: true, accountModalMode: mode }),
-      closeAccountModal: () => set({ showAccountModal: false }),
+      openAccountModal: (mode = 'create') => set({ showAccountModal: true, accountModalMode: mode, scenarioWall: null }),
+      openScenarioAccountWall: (ctx) => set({ showAccountModal: true, accountModalMode: 'create', scenarioWall: ctx }),
+      closeAccountModal: () => set({ showAccountModal: false, scenarioWall: null }),
       openStatsModal: () => set({ showStatsModal: true }),
       closeStatsModal: () => set({ showStatsModal: false }),
       openClaimModal: () => set({ showClaimModal: true }),

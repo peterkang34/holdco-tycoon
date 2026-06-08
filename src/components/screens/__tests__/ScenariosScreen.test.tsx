@@ -9,6 +9,21 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import type { ScenarioListSummary } from '../../../services/scenarioLeaderboard';
 
+// The auth store is persisted (zustand persist) — give it an in-memory localStorage
+// before the store module loads (jsdom about:blank has no working localStorage).
+vi.hoisted(() => {
+  const mem = new Map<string, string>();
+  Object.defineProperty(globalThis, 'localStorage', {
+    value: {
+      getItem: (k: string) => (mem.has(k) ? mem.get(k)! : null),
+      setItem: (k: string, v: string) => void mem.set(k, String(v)),
+      removeItem: (k: string) => void mem.delete(k),
+      clear: () => mem.clear(), key: () => null, get length() { return mem.size; },
+    },
+    configurable: true, writable: true,
+  });
+});
+
 const mockFetchScenarioList = vi.fn();
 vi.mock('../../../services/scenarioLeaderboard', async (orig) => {
   const actual = await orig() as Record<string, unknown>;
@@ -21,6 +36,14 @@ vi.mock('../../ui/LeaderboardModal', () => ({ ScenarioDetail: () => <div data-te
 vi.mock('../../ui/ProfileModal', () => ({ ProfileModal: () => null }));
 
 import { ScenariosScreen } from '../ScenariosScreen';
+import { useAuthStore } from '../../../hooks/useAuth';
+
+const setPlayer = (isAnonymous: boolean | null) =>
+  useAuthStore.setState({
+    player: isAnonymous === null ? null : { id: 'p1', initials: 'AA', isAnonymous, createdAt: '2026-01-01' },
+    showAccountModal: false,
+    scenarioWall: null,
+  });
 
 const summary = (over: Partial<ScenarioListSummary> = {}): ScenarioListSummary => ({
   id: 'recession', name: 'Recession Gauntlet', tagline: 'Survive the downturn',
@@ -32,7 +55,7 @@ const summary = (over: Partial<ScenarioListSummary> = {}): ScenarioListSummary =
 });
 
 describe('ScenariosScreen', () => {
-  beforeEach(() => { vi.clearAllMocks(); });
+  beforeEach(() => { vi.clearAllMocks(); setPlayer(null); });
 
   it('shows a loading skeleton while fetching', () => {
     mockFetchScenarioList.mockReturnValue(new Promise(() => {})); // never resolves
@@ -55,7 +78,8 @@ describe('ScenariosScreen', () => {
     await screen.findByText(/No live challenges right now/i);
   });
 
-  it('renders Live Now with a Play CTA and fires onPlay', async () => {
+  it('fires onPlay directly when the player has an account', async () => {
+    setPlayer(false); // verified account
     mockFetchScenarioList.mockResolvedValueOnce({ active: [summary()], archived: [] });
     const onPlay = vi.fn();
     render(<ScenariosScreen onPlay={onPlay} onBack={vi.fn()} />);
@@ -63,6 +87,20 @@ describe('ScenariosScreen', () => {
     expect(screen.getByText('Recession Gauntlet')).toBeInTheDocument();
     fireEvent.click(screen.getByText('Play ▶'));
     expect(onPlay).toHaveBeenCalledWith('recession');
+    expect(useAuthStore.getState().showAccountModal).toBe(false);
+  });
+
+  it('opens the scenario account wall (not onPlay) for an anonymous player', async () => {
+    setPlayer(true); // anonymous session
+    mockFetchScenarioList.mockResolvedValueOnce({ active: [summary()], archived: [] });
+    const onPlay = vi.fn();
+    render(<ScenariosScreen onPlay={onPlay} onBack={vi.fn()} />);
+    await screen.findByText('Live Now');
+    fireEvent.click(screen.getByText('Play ▶'));
+    expect(onPlay).not.toHaveBeenCalled();
+    const st = useAuthStore.getState();
+    expect(st.showAccountModal).toBe(true);
+    expect(st.scenarioWall).toEqual({ scenarioId: 'recession', name: 'Recession Gauntlet', emoji: '📉' });
   });
 
   it('renders Past Challenges with View scoreboard (no Play) for ended scenarios', async () => {

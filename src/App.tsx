@@ -48,8 +48,10 @@ function App() {
       // Supabase auto-processes hash tokens on client init.
       // Wait for processing, then clean URL and show intro screen.
       const timer = setTimeout(() => {
-        // Replace the hash URL with a clean one (no reload needed)
-        window.history.replaceState(null, '', window.location.pathname);
+        // Strip the auth token hash but PRESERVE the query string — a scenario
+        // account-wall sets redirectTo=/?se={id}, and IntroScreen's ?se= effect needs
+        // that param intact to resume the player into the scenario after sign-in.
+        window.history.replaceState(null, '', window.location.pathname + window.location.search);
         setAuthCallbackPending(false);
       }, 1500);
       return () => clearTimeout(timer);

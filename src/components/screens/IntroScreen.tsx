@@ -847,6 +847,17 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, onSta
               }}
               onEnter={() => {
                 if (!scenarioSetup || !scenarioName.trim() || !onStartScenarioChallenge) return;
+                // Account gate (defense-in-depth — also covers the ?se= cold-load and
+                // banner paths that bypass the landing-page Play gate). Anonymous → wall,
+                // which resumes back into this scenario after sign-in.
+                if (useAuthStore.getState().player?.isAnonymous ?? true) {
+                  useAuthStore.getState().openScenarioAccountWall({
+                    scenarioId: scenarioSetup.id,
+                    name: scenarioSetup.name,
+                    emoji: scenarioSetup.theme.emoji,
+                  });
+                  return;
+                }
                 guardedStart(() => {
                   onStartScenarioChallenge(scenarioName.trim(), scenarioSetup);
                   cleanScenarioUrl();
