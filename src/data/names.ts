@@ -342,6 +342,46 @@ export function getRandomBusinessName(sectorId: string, subType?: string, rng?: 
   return name;
 }
 
+// ── Holding-company name generator ──────────────────────────────────────────
+// Composes a HOLDCO name (not an operating-company name) that fits a sector's
+// flavor by reusing the sector word banks above with holdco-style suffixes.
+// Used by the Scenario Challenge setup randomizer (🎲). Math.random-based — these
+// are cosmetic player choices, not part of the deterministic game seed.
+
+// Universally holdco-appropriate suffixes (no industry-specific words like
+// "Industries", which clash on restaurant/SaaS scenarios — the sector flavor
+// comes from the prefix/core instead).
+const HOLDCO_SUFFIXES = [
+  'Holdings', 'Holdco', 'Group', 'Partners', 'Capital', 'Ventures',
+  'Holdings Group', 'Holding Co', 'Collective',
+];
+
+// Neutral, holdco-flavored bank for scenarios with no clear sector (or sectors
+// without an operating-name bank, e.g. fintech/aerospace/proSports).
+const GENERIC_HOLDCO_PARTS: NameParts = {
+  prefixes: ['Apex', 'Summit', 'Keystone', 'Atlas', 'Meridian', 'Sterling', 'Vanguard',
+    'Ironwood', 'Hawthorne', 'Granite', 'Cedar', 'Harbor', 'Beacon', 'Cornerstone',
+    'Pinnacle', 'Anchor', 'Evergreen', 'Sequoia', 'Banyan', 'Redwood'],
+  cores: ['Peak', 'Ridge', 'Point', 'Crest', 'Gate', 'Stone', 'Field', 'Bridge',
+    'Park', 'Bay', 'Crossing', 'Landing', 'Vale', 'Grove', 'Bluff', 'Hollow'],
+  suffixes: HOLDCO_SUFFIXES,
+};
+
+/**
+ * Generate a holding-company name fitting `sectorId`'s flavor (generic if the
+ * sector is unknown / has no bank). ~40% two-word (Prefix + Suffix), else
+ * three-word (Prefix + Core + Suffix) for variety.
+ */
+export function randomHoldcoName(sectorId?: string): string {
+  const parts = (sectorId && SECTOR_NAME_PARTS[sectorId]) || GENERIC_HOLDCO_PARTS;
+  const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)];
+  const prefix = pick(parts.prefixes);
+  const suffix = pick(HOLDCO_SUFFIXES);
+  const name = Math.random() < 0.4 ? `${prefix} ${suffix}` : `${prefix} ${pick(parts.cores)} ${suffix}`;
+  // Respect the 30-char input cap; fall back to the two-word form if too long.
+  return name.length <= 30 ? name : `${prefix} ${suffix}`.slice(0, 30);
+}
+
 // Backwards compatibility — not used anymore but kept for any external references
 export const BUSINESS_NAMES: Record<string, string[]> = Object.fromEntries(
   Object.entries(SECTOR_NAME_PARTS).map(([sector, parts]) => [
