@@ -488,6 +488,40 @@ export function StatsModal() {
 
   const hasMoreHistory = historyTotal > history.length;
 
+  // "My Scenario Record" — extracted so it can render for scenario-only players too
+  // (whose global total_games is 0 and would otherwise hit the empty-state gate).
+  const scenarioRecordSection = scenarioRows.length > 0 ? (
+    <div>
+      <h3 className="text-sm font-bold text-text-muted mb-2">My Scenario Record</h3>
+      <div className="space-y-1.5">
+        {scenarioRows.map((r) => {
+          // Use the leaderboard value (KV sortScore) so it matches the displayed rank;
+          // fall back to the raw FEV only for archived scenarios (KV expired → null).
+          const value = formatRankingMetric(r.rankingMetric, { sortScore: r.bestRankingValue ?? r.bestRawFev });
+          return (
+            <div key={r.scenarioId} className="flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3 py-2">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">{r.name}</p>
+                <p className="text-[11px] text-text-muted tabular-nums">
+                  {r.attempts} {r.attempts === 1 ? 'attempt' : 'attempts'} · best {value.label} {value.display}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                {r.bestRank != null ? (
+                  <p className={`text-sm font-bold tabular-nums ${getRankColor(r.bestRank)}`}>
+                    #{r.bestRank}{r.entryCount ? <span className="text-text-muted font-normal"> of {r.entryCount}</span> : null}
+                  </p>
+                ) : (
+                  <p className="text-xs text-text-muted">Unranked</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  ) : null;
+
   // Achievements from localStorage (cross-game, no API needed)
   const earnedIds = useMemo(() => new Set(getEarnedAchievementIds()), [showStatsModal]);
   const earnedAchievements = ACHIEVEMENT_PREVIEW.filter(a => earnedIds.has(a.id));
@@ -510,7 +544,13 @@ export function StatsModal() {
         </div>
       )}
 
-      {!loading && !errorMsg && stats && stats.total_games === 0 && (
+      {/* Scenario-only players: global total_games is 0 (scenarios are isolated from
+          global stats), so surface their scenario record instead of the empty-state. */}
+      {!loading && !errorMsg && stats && stats.total_games === 0 && scenarioRows.length > 0 && (
+        <div className="space-y-6">{scenarioRecordSection}</div>
+      )}
+
+      {!loading && !errorMsg && stats && stats.total_games === 0 && scenarioRows.length === 0 && (
         <div className="text-center py-12 min-h-[300px] flex flex-col items-center justify-center">
           <span className="text-4xl block mb-3">📊</span>
           <p className="text-text-secondary font-medium mb-1">No games tracked yet</p>
@@ -567,38 +607,7 @@ export function StatsModal() {
           </div>
 
           {/* My Scenario Record — per scenario the player has competed in. */}
-          {scenarioRows.length > 0 && (
-            <div>
-              <h3 className="text-sm font-bold text-text-muted mb-2">My Scenario Record</h3>
-              <div className="space-y-1.5">
-                {scenarioRows.map((r) => {
-                  const value = formatRankingMetric(r.rankingMetric, {
-                    sortScore: r.bestRankingValue ?? undefined,
-                    founderEquityValue: r.bestRawFev,
-                  });
-                  return (
-                    <div key={r.scenarioId} className="flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3 py-2">
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium truncate">{r.name}</p>
-                        <p className="text-[11px] text-text-muted tabular-nums">
-                          {r.attempts} {r.attempts === 1 ? 'attempt' : 'attempts'} · best {value.label} {value.display}
-                        </p>
-                      </div>
-                      <div className="text-right shrink-0">
-                        {r.bestRank != null ? (
-                          <p className={`text-sm font-bold tabular-nums ${getRankColor(r.bestRank)}`}>
-                            #{r.bestRank}{r.entryCount ? <span className="text-text-muted font-normal"> of {r.entryCount}</span> : null}
-                          </p>
-                        ) : (
-                          <p className="text-xs text-text-muted">Unranked</p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          {scenarioRecordSection}
 
           {/* vs Community */}
           {stats.global && (
