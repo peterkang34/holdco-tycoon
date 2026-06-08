@@ -303,3 +303,30 @@ describe('Coverage Tripwires — Distress Level Coverage', () => {
     ).toBe(true);
   });
 });
+
+// ── App `Screen` render-branch coverage ──
+// App.tsx's `Screen` union is rendered with `screen === '...'` conditionals, NOT an
+// exhaustive switch — so adding a Screen value without a render branch is a silent
+// blank page (no TS error). This tripwire fails until every member has a branch.
+describe('Coverage Tripwires — App Screen render branches', () => {
+  const appSource = readFile(resolve(__dirname, '../../App.tsx'));
+  const unionMatch = appSource.match(/type Screen\s*=\s*([^;]+);/);
+  const screenValues = unionMatch
+    ? [...unionMatch[1].matchAll(/'([^']+)'/g)].map(m => m[1])
+    : [];
+
+  it('Screen union is parseable and non-empty', () => {
+    expect(screenValues.length).toBeGreaterThan(0);
+  });
+
+  // Only screens that can actually be entered via setScreen('x') need a render branch.
+  // (A never-set union member is dead but harmless — it can't produce a blank page.)
+  const settableScreens = screenValues.filter(v => appSource.includes(`setScreen('${v}')`));
+
+  it.each(settableScreens)('settable Screen "%s" has a `screen === ...` render branch', (value) => {
+    expect(
+      appSource.includes(`screen === '${value}'`),
+      `Screen '${value}' is set via setScreen('${value}') but has no \`screen === '${value}'\` render branch — blank page.`,
+    ).toBe(true);
+  });
+});

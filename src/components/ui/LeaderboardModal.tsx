@@ -652,7 +652,8 @@ function ScenarioDetail({
   onProfileClick,
 }: {
   scenarioId: string;
-  onBack: () => void;
+  /** Optional — when omitted (e.g. inline on the Scenarios page), no back button renders. */
+  onBack?: () => void;
   onProfileClick: (pubId: string) => void;
 }) {
   const [data, setData] = useState<{
@@ -699,12 +700,14 @@ function ScenarioDetail({
 
   return (
     <div className="min-h-[300px] sm:min-h-[400px]">
-      <button
-        onClick={onBack}
-        className="text-sm text-text-muted hover:text-text-primary mb-3 flex items-center gap-1"
-      >
-        ← All scenarios
-      </button>
+      {onBack && (
+        <button
+          onClick={onBack}
+          className="text-sm text-text-muted hover:text-text-primary mb-3 flex items-center gap-1"
+        >
+          ← All scenarios
+        </button>
+      )}
 
       {loading && (
         <div className="space-y-2">
@@ -815,3 +818,8 @@ function ScenarioDetailRow({
 
 export { TABS, TAB_DISPLAY_CAP, filterAndSort, getDisplayValue, getDisplayLabel, getGhostValue, getAdjustedFEV };
 export type { LeaderboardTab };
+
+// Reused by the full-screen Scenarios landing page (src/components/screens/ScenariosScreen.tsx)
+// for the inline scoreboard. v1 imports in place; a clean extraction to
+// src/components/scenarios/ is a v2 follow-up.
+export { ScenarioDetail };

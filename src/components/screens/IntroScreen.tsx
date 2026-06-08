@@ -5,6 +5,7 @@ import { getUnlockedSectorIds, getEarnedAchievementIds } from '../../hooks/useUn
 import { LeaderboardModal } from '../ui/LeaderboardModal';
 import { parseScenarioUrl, cleanScenarioUrl } from '../../utils/scenarioUrl';
 import { isScenarioChallengesPlayerFacingEnabled, isScenarioChallengesPublicEntryEnabled } from '../../utils/featureFlags';
+import { formatCountdown } from '../../utils/scenarioCountdown';
 import { ChangelogModal } from '../ui/ChangelogModal';
 import { UserManualModal } from '../ui/UserManualModal';
 import { FeedbackModal } from '../ui/FeedbackModal';
@@ -59,6 +60,8 @@ interface IntroScreenProps {
   onStartFund: (fundName: string) => void;
   onStartBusinessSchool?: (holdcoName: string) => void;
   onStartScenarioChallenge?: (holdcoName: string, config: ScenarioChallengeConfig) => void;
+  /** Open the full-screen Scenario Challenges landing page (flag-gated). */
+  onOpenScenarios?: () => void;
   challengeData?: ChallengeParams | null;
   /** True when the player has an active game in progress that would be replaced by a new start. */
   hasGameInProgress?: boolean;
@@ -83,21 +86,7 @@ interface ScenarioBannerSummary {
   topScore: number | null;
 }
 
-/** Compute a human-readable countdown to `endDate` (e.g. "5d left", "3h left"). */
-function formatCountdown(endDate: string): string {
-  const endMs = Date.parse(endDate);
-  if (!Number.isFinite(endMs)) return '';
-  const diffMs = endMs - Date.now();
-  if (diffMs <= 0) return 'Ended';
-  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000));
-  if (days >= 2) return `${days}d left`;
-  const hours = Math.floor(diffMs / (60 * 60 * 1000));
-  if (hours >= 2) return `${hours}h left`;
-  const mins = Math.floor(diffMs / (60 * 1000));
-  return `${mins}m left`;
-}
-
-export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, onStartScenarioChallenge, challengeData, hasGameInProgress }: IntroScreenProps) {
+export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, onStartScenarioChallenge, onOpenScenarios, challengeData, hasGameInProgress }: IntroScreenProps) {
   const isChallenge = !!challengeData;
   const isLoggedIn = useIsLoggedIn();
   const openStatsModal = useAuthStore((s) => s.openStatsModal);
@@ -578,6 +567,30 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, onSta
                   <span className="text-text-muted text-lg">→</span>
                 </div>
               </button>
+
+              {/* ═══ Scenario Challenges — themed, time-limited, ranked ═══ */}
+              {onOpenScenarios && isScenarioChallengesPlayerFacingEnabled() && (
+                <button
+                  type="button"
+                  onClick={onOpenScenarios}
+                  className="w-full p-4 mt-4 rounded-lg border border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-transparent hover:border-amber-500/50 transition-all text-left"
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-lg">🎯</span>
+                        <span className="font-bold text-amber-400">Scenario Challenges</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300">Live Events</span>
+                      </div>
+                      <p className="text-xs text-text-muted">
+                        Themed, time-limited challenges. Compete on a live leaderboard.
+                        {isAnonymous && <span className="text-amber-400/80"> Sign in to compete.</span>}
+                      </p>
+                    </div>
+                    <span className="text-text-muted text-lg">→</span>
+                  </div>
+                </button>
+              )}
             </div>
           </>
         ) : step === 'bschool_setup' ? (

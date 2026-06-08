@@ -26,11 +26,14 @@ import { DeleteAccountModal } from './components/ui/DeleteAccountModal';
 import { StrategyLibraryModal } from './components/ui/StrategyLibraryModal';
 import { CelebrationModal } from './components/ui/CelebrationModal';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { ScenariosScreen } from './components/screens/ScenariosScreen';
 import { setupGoTest, getGoTestVariant } from './utils/goTestSetup';
 import { syncAchievementsFromServer } from './hooks/useUnlocks';
+import { isScenarioChallengesPlayerFacingEnabled } from './utils/featureFlags';
+import { parseScenarioUrl, buildScenarioPlayUrl, cleanScenarioUrl } from './utils/scenarioUrl';
 // B-School test shortcut uses startBusinessSchool from the store (no direct data imports needed)
 
-type Screen = 'intro' | 'game' | 'gameOver' | 'graduation' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard' | 'playbook';
+type Screen = 'intro' | 'game' | 'gameOver' | 'graduation' | 'familyOffice' | 'familyOfficeBridge' | 'familyOfficeResults' | 'scoreboard' | 'playbook' | 'scenarios';
 
 function App() {
   // Auth callback: Supabase returns tokens in hash after Google OAuth or magic link.
@@ -159,6 +162,16 @@ function App() {
     if (scoreboard) {
       setScoreboardParams(scoreboard);
       setScreen('scoreboard');
+      return;
+    }
+
+    // ?tab=scenarios → the full-screen Scenarios landing page (App owns this deep-link;
+    // flag-gated). IntroScreen's legacy handler stays as a fallback but won't fire because
+    // we set screen='scenarios' here before IntroScreen mounts. The ?se= play deep-link is
+    // intentionally NOT handled here — IntroScreen's existing effect owns it (→ se_setup).
+    const scenarioUrl = parseScenarioUrl(window.location.search);
+    if (scenarioUrl?.intent === 'leaderboard' && isScenarioChallengesPlayerFacingEnabled()) {
+      setScreen('scenarios');
       return;
     }
 
@@ -499,8 +512,27 @@ function App() {
             startScenarioChallenge(name, config, false);
             setScreen('game');
           }}
+          onOpenScenarios={() => {
+            window.history.replaceState({}, '', '/?tab=scenarios');
+            setScreen('scenarios');
+          }}
           challengeData={challengeData}
           hasGameInProgress={!!(holdcoName && round > 0 && !gameOver)}
+        />
+      )}
+      {screen === 'scenarios' && (
+        <ScenariosScreen
+          onPlay={(scenarioId) => {
+            // Route into the existing scenario setup flow via the ?se= deep-link that
+            // IntroScreen already handles (config fetch → se_setup). The account wall
+            // (PR3) fires there for anonymous players.
+            window.history.replaceState({}, '', buildScenarioPlayUrl(scenarioId));
+            setScreen('intro');
+          }}
+          onBack={() => {
+            cleanScenarioUrl();
+            setScreen('intro');
+          }}
         />
       )}
       {screen === 'game' && <ErrorBoundary><GameScreen onGameOver={handleGameOver} onResetGame={handlePlayAgain} showTutorial={isNewGame} isChallenge={!!challengeData} /></ErrorBoundary>}
