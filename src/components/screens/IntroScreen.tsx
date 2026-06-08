@@ -3,7 +3,7 @@ import { SectorId, GameDifficulty, GameDuration, ScenarioChallengeConfig } from 
 import { SECTOR_LIST_STANDARD, SECTORS, UNLOCKABLE_SECTORS, getAvailableSectors } from '../../data/sectors';
 import { getUnlockedSectorIds, getEarnedAchievementIds } from '../../hooks/useUnlocks';
 import { LeaderboardModal } from '../ui/LeaderboardModal';
-import { parseScenarioUrl, cleanScenarioUrl } from '../../utils/scenarioUrl';
+import { parseScenarioUrl, cleanScenarioUrl, buildScenarioPlayUrl } from '../../utils/scenarioUrl';
 import { isScenarioChallengesPlayerFacingEnabled, isScenarioChallengesPublicEntryEnabled } from '../../utils/featureFlags';
 import { formatCountdown } from '../../utils/scenarioCountdown';
 import { ChangelogModal } from '../ui/ChangelogModal';
@@ -16,7 +16,7 @@ import type { ChallengeParams } from '../../utils/challenge';
 import { generateRandomSeed } from '../../engine/rng';
 import { buildChallengeUrl, shareChallenge, encodeChallengeParams, generateToken, setHostToken } from '../../utils/challenge';
 import { trackChallengeCreate, trackChallengeShare } from '../../services/telemetry';
-import { useIsLoggedIn } from '../../hooks/useAuth';
+import { useIsLoggedIn, getPendingScenario, clearPendingScenario } from '../../hooks/useAuth';
 import { useAuthStore } from '../../hooks/useAuth';
 import { VideoModal } from '../ui/VideoModal';
 
@@ -223,9 +223,24 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, onSta
   // Public `?se=` entries gate on the feature flag; admin previews (`?se=X&preview=1`)
   // always work regardless so authors can test without flipping rollout state.
   useEffect(() => {
-    if (isChallenge) return;
+    if (isChallenge || scenarioSetup) return;
+    // Resolve the scenario to open: a ?se= deep-link, OR — for a player who just
+    // signed in via the account wall — the localStorage pending key (only once
+    // verified). The pending path makes resume work regardless of the OAuth redirect
+    // URL (which is the bare origin now), fixing the sign-in loop.
+    let scenarioId: string | null = null;
     const parsed = parseScenarioUrl(window.location.search);
-    if (!parsed || parsed.intent !== 'play' || !parsed.scenarioId) return;
+    if (parsed?.intent === 'play' && parsed.scenarioId) {
+      scenarioId = parsed.scenarioId;
+    } else if (isLoggedIn) {
+      const pending = getPendingScenario();
+      if (pending) {
+        scenarioId = pending;
+        clearPendingScenario();
+        window.history.replaceState({}, '', buildScenarioPlayUrl(scenarioId));
+      }
+    }
+    if (!scenarioId) return;
     if (!isScenarioChallengesPublicEntryEnabled()) {
       // Feature flag off — clean URL silently so the player lands on the normal home.
       cleanScenarioUrl();
@@ -234,7 +249,7 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, onSta
     }
 
     let cancelled = false;
-    fetch(`/api/scenario-challenges/config?id=${encodeURIComponent(parsed.scenarioId)}`)
+    fetch(`/api/scenario-challenges/config?id=${encodeURIComponent(scenarioId)}`)
       .then(res => {
         if (res.status === 404 || res.status === 410) {
           throw new Error('ended');
@@ -245,8 +260,10 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, onSta
       .then(data => {
         if (cancelled) return;
         if (!data?.config) throw new Error('missing config');
-        setScenarioSetup(data.config as ScenarioChallengeConfig);
-        setScenarioName(data.config.name ?? '');
+        const cfg = data.config as ScenarioChallengeConfig;
+        setScenarioSetup(cfg);
+        // Themed holdco name (NOT the scenario's title — that's how "B2B Tech" leaked in).
+        setScenarioName(randomHoldcoName(scenarioHoldcoSector(cfg)));
         setStep('se_setup');
       })
       .catch(err => {
@@ -263,7 +280,8 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, onSta
         if (!cancelled) setScenarioLoading(false);
       });
     return () => { cancelled = true; };
-  }, [isChallenge]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isChallenge, isLoggedIn]);
 
   /**
    * Wrap any start action with the save-in-progress confirmation when a game
@@ -396,7 +414,7 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, onSta
                 .then(data => {
                   if (data?.config) {
                     setScenarioSetup(data.config as ScenarioChallengeConfig);
-                    setScenarioName(data.config.name ?? '');
+                    setScenarioName(randomHoldcoName(scenarioHoldcoSector(data.config as ScenarioChallengeConfig)));
                     setStep('se_setup');
                   }
                 })

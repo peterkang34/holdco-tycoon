@@ -71,9 +71,22 @@ export const useAuthStore = create<AuthState>()(
 
       setPlayer: (player) => set({ player }),
       signOut: () => set({ player: null }),
-      openAccountModal: (mode = 'create') => set({ showAccountModal: true, accountModalMode: mode, scenarioWall: null }),
-      openScenarioAccountWall: (ctx) => set({ showAccountModal: true, accountModalMode: 'create', scenarioWall: ctx }),
-      closeAccountModal: () => set({ showAccountModal: false, scenarioWall: null }),
+      openAccountModal: (mode = 'create') => {
+        clearPendingScenario(); // a generic sign-in must not resume a stale scenario
+        set({ showAccountModal: true, accountModalMode: mode, scenarioWall: null });
+      },
+      openScenarioAccountWall: (ctx) => {
+        // Persist the pending scenario so we can resume into it after the full-page
+        // OAuth/magic-link redirect — independent of whether the redirect URL carries
+        // ?se= (which depends on the Supabase allow-list). The redirect itself uses the
+        // bare origin (always allow-listed), same as the footer sign-in.
+        try { localStorage.setItem(PENDING_SCENARIO_KEY, ctx.scenarioId); } catch { /* private mode */ }
+        set({ showAccountModal: true, accountModalMode: 'create', scenarioWall: ctx });
+      },
+      closeAccountModal: () => {
+        clearPendingScenario(); // cancelled the wall → drop the pending scenario
+        set({ showAccountModal: false, scenarioWall: null });
+      },
       openStatsModal: () => set({ showStatsModal: true }),
       closeStatsModal: () => set({ showStatsModal: false }),
       openClaimModal: () => set({ showClaimModal: true }),
@@ -107,4 +120,13 @@ export const useAuthStore = create<AuthState>()(
 /** Derived helper — true when player has a real (non-anonymous) account */
 export function useIsLoggedIn(): boolean {
   return useAuthStore((s) => s.player !== null && !s.player.isAnonymous);
+}
+
+/** localStorage key for the scenario a player signed in to play (resume-after-auth). */
+export const PENDING_SCENARIO_KEY = 'holdco-pending-scenario';
+export function getPendingScenario(): string | null {
+  try { return localStorage.getItem(PENDING_SCENARIO_KEY); } catch { return null; }
+}
+export function clearPendingScenario(): void {
+  try { localStorage.removeItem(PENDING_SCENARIO_KEY); } catch { /* no-op */ }
 }

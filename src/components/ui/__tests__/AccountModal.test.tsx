@@ -34,7 +34,22 @@ vi.mock('../../../lib/supabase', () => ({
 }));
 
 import { AccountModal } from '../AccountModal';
-import { useAuthStore } from '../../../hooks/useAuth';
+import { useAuthStore, getPendingScenario } from '../../../hooks/useAuth';
+
+describe('pending-scenario resume key', () => {
+  it('openScenarioAccountWall sets it; openAccountModal + closeAccountModal clear it', () => {
+    useAuthStore.getState().openScenarioAccountWall({ scenarioId: 'recession', name: 'R', emoji: '📉' });
+    expect(getPendingScenario()).toBe('recession');
+
+    useAuthStore.getState().closeAccountModal();
+    expect(getPendingScenario()).toBeNull();
+
+    useAuthStore.getState().openScenarioAccountWall({ scenarioId: 'gauntlet', name: 'G', emoji: '🔥' });
+    expect(getPendingScenario()).toBe('gauntlet');
+    useAuthStore.getState().openAccountModal(); // a generic sign-in must not resume a stale scenario
+    expect(getPendingScenario()).toBeNull();
+  });
+});
 
 describe('AccountModal — scenario account wall', () => {
   beforeEach(() => {
@@ -58,27 +73,29 @@ describe('AccountModal — scenario account wall', () => {
     expect(screen.getAllByText(/put your run on the leaderboard/i).length).toBeGreaterThan(0);
   });
 
-  it('Google link-identity redirects back to ?se={id} after sign-in', async () => {
+  it('Google sign-in redirects to the bare origin (allow-list-safe), NOT a ?se= URL', async () => {
     render(<AccountModal />);
     fireEvent.click(screen.getAllByText('Continue with Google')[0]);
     await waitFor(() => expect(linkIdentity).toHaveBeenCalled());
-    expect(linkIdentity.mock.calls[0][0].options.redirectTo).toContain('?se=recession');
+    // The scenario is carried via the localStorage pending key, not the redirect URL —
+    // so the redirect always matches the footer sign-in (which is allow-listed).
+    expect(linkIdentity.mock.calls[0][0].options.redirectTo).toBe(window.location.origin);
   });
 
-  it('magic link carries the scenario redirect (emailRedirectTo)', async () => {
+  it('magic link also redirects to the bare origin', async () => {
     render(<AccountModal />);
     fireEvent.change(screen.getAllByPlaceholderText('your@email.com')[0], { target: { value: 'a@b.com' } });
     fireEvent.click(screen.getAllByText('Send Magic Link')[0]);
     await waitFor(() => expect(updateUser).toHaveBeenCalled());
-    expect(updateUser.mock.calls[0][1].emailRedirectTo).toContain('?se=recession');
+    expect(updateUser.mock.calls[0][1].emailRedirectTo).toBe(window.location.origin);
   });
 
-  it('a generic (non-scenario) sign-in redirects to origin, no scenario context', async () => {
+  it('a generic (non-scenario) sign-in shows no scenario context', async () => {
     useAuthStore.setState({ scenarioWall: null });
     render(<AccountModal />);
     expect(screen.queryAllByText('Recession Gauntlet').length).toBe(0);
     fireEvent.click(screen.getAllByText('Continue with Google')[0]);
     await waitFor(() => expect(linkIdentity).toHaveBeenCalled());
-    expect(linkIdentity.mock.calls[0][0].options.redirectTo).not.toContain('?se=');
+    expect(linkIdentity.mock.calls[0][0].options.redirectTo).toBe(window.location.origin);
   });
 });
