@@ -11,6 +11,7 @@ import { UserManualModal } from '../ui/UserManualModal';
 import { FeedbackModal } from '../ui/FeedbackModal';
 import { AccountBadge } from '../ui/AccountBadge';
 import { DIFFICULTY_CONFIG, DURATION_CONFIG, DURATION_SUBTITLE, PE_FUND_CONFIG } from '../../data/gameConfig';
+import { randomHoldcoName } from '../../data/names';
 import type { ChallengeParams } from '../../utils/challenge';
 import { generateRandomSeed } from '../../engine/rng';
 import { buildChallengeUrl, shareChallenge, encodeChallengeParams, generateToken, setHostToken } from '../../utils/challenge';
@@ -47,6 +48,12 @@ function randomFundName(): string {
   const geo = FUND_GEO[Math.floor(Math.random() * FUND_GEO.length)];
   const suffix = FUND_SUFFIX[Math.floor(Math.random() * FUND_SUFFIX.length)];
   return `${prefix} ${geo} ${suffix} Fund I`;
+}
+
+/** The sector that best characterizes a scenario (its starting business, else its
+ *  first allowed sector) — drives the themed holdco-name randomizer. */
+function scenarioHoldcoSector(config: ScenarioChallengeConfig): string | undefined {
+  return config.startingBusinesses?.[0]?.sectorId ?? config.allowedSectors?.[0];
 }
 
 import { BSCHOOL_COMPLETED_KEY } from '../tutorial/BusinessSchoolGraduation';
@@ -140,6 +147,16 @@ export function IntroScreen({ onStart, onStartFund, onStartBusinessSchool, onSta
   const [showCarryTooltip, setShowCarryTooltip] = useState(false);
   const [showVideo, setShowVideo] = useState(false);
   const [showLockedSectors, setShowLockedSectors] = useState(false);
+
+  // Pre-fill a themed holdco name when a scenario setup loads (so the field isn't
+  // empty and there's no unfitting default). Only fills once on load; never clobbers
+  // a name the player has typed. They can reroll with the 🎲 button.
+  useEffect(() => {
+    if (scenarioSetup && !scenarioName.trim()) {
+      setScenarioName(randomHoldcoName(scenarioHoldcoSector(scenarioSetup)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenarioSetup]);
 
   // Compute available sectors (includes unlocked prestige sectors for non-challenge)
   const isAnonymous = useAuthStore((s) => s.player?.isAnonymous ?? true);
@@ -1378,16 +1395,26 @@ function ScenarioSetupView({
       <label className="block text-left mb-2 text-sm text-text-muted">
         Name your {config.fundStructure ? 'fund' : 'holding company'} <span className="text-danger">*</span>
       </label>
-      <input
-        type="text"
-        value={name}
-        onChange={(e) => onNameChange(e.target.value)}
-        placeholder={config.fundStructure ? 'e.g. Beacon Capital Fund' : 'e.g. Apex Holdings'}
-        className="w-full bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-amber-500 transition-colors mb-4"
-        maxLength={30}
-        autoFocus
-        required
-      />
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => onNameChange(e.target.value)}
+          placeholder={config.fundStructure ? 'e.g. Beacon Capital Fund' : 'e.g. Apex Holdings'}
+          className="flex-1 bg-white/5 border border-white/10 rounded-lg px-4 py-3 text-text-primary placeholder:text-text-muted focus:outline-none focus:border-amber-500 transition-colors"
+          maxLength={30}
+          autoFocus
+          required
+        />
+        <button
+          type="button"
+          onClick={() => onNameChange(randomHoldcoName(scenarioHoldcoSector(config)))}
+          className="min-h-[44px] min-w-[44px] px-3 rounded-lg border border-white/10 bg-white/5 hover:border-amber-500/50 text-text-muted hover:text-text-secondary transition-colors text-sm"
+          title="Suggest a name"
+        >
+          🎲
+        </button>
+      </div>
 
       <button
         type="submit"
