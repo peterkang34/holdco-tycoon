@@ -4,7 +4,9 @@ import { useAuthStore, useIsLoggedIn } from '../../hooks/useAuth';
 import { fetchWithAuth } from '../../lib/supabase';
 import { useToastStore } from '../../hooks/useToast';
 import { formatMoney } from '../../engine/types';
-import { getGradeColor } from '../../utils/gradeColors';
+import { getGradeColor, getRankColor } from '../../utils/gradeColors';
+import { fetchScenarioRecords, fetchScenarioList, formatRankingMetric, type ScenarioRecord, type ScenarioListSummary } from '../../services/scenarioLeaderboard';
+import type { RankingMetric } from '../../engine/types';
 import SparklineChart from './SparklineChart';
 import { ScoreRadar } from '../admin/ScoreRadar';
 import { ACHIEVEMENT_PREVIEW } from '../../data/achievementPreview';
@@ -343,6 +345,8 @@ export function StatsModal() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [linking, setLinking] = useState(false);
   const [refetchKey, setRefetchKey] = useState(0);
+  // Per-scenario records joined with the scenario list (for name + ranking metric).
+  const [scenarioRows, setScenarioRows] = useState<(ScenarioRecord & { name: string; rankingMetric: RankingMetric })[]>([]);
 
   const handleLinkGames = useCallback(async () => {
     setLinking(true);
@@ -403,9 +407,11 @@ export function StatsModal() {
 
     const fetchData = async () => {
       try {
-        const [statsRes, historyRes] = await Promise.all([
+        const [statsRes, historyRes, scenarioRecords, scenarioList] = await Promise.all([
           fetchWithAuth('/api/player/stats'),
           fetchWithAuth(`/api/player/history?limit=${PAGE_SIZE}`),
+          fetchScenarioRecords().catch(() => null),       // null if logged-out / transient
+          fetchScenarioList().catch(() => null),           // names + ranking metric per scenario
         ]);
 
         if (cancelled) return;
@@ -433,6 +439,19 @@ export function StatsModal() {
         setStats(statsData);
         setHistory(historyData.games ?? []);
         setHistoryTotal(historyData.total ?? 0);
+
+        // Join scenario records with the list (for name + ranking metric); newest first.
+        if (scenarioRecords && scenarioRecords.length > 0) {
+          const meta = new Map<string, ScenarioListSummary>();
+          for (const s of [...(scenarioList?.active ?? []), ...(scenarioList?.archived ?? [])]) meta.set(s.id, s);
+          setScenarioRows(scenarioRecords.map((r: ScenarioRecord) => ({
+            ...r,
+            name: meta.get(r.scenarioId)?.name ?? r.scenarioId,
+            rankingMetric: (meta.get(r.scenarioId)?.rankingMetric ?? 'fev') as RankingMetric,
+          })));
+        } else {
+          setScenarioRows([]);
+        }
         setLoading(false);
       } catch {
         if (!cancelled) {
@@ -546,6 +565,40 @@ export function StatsModal() {
               </div>
             </div>
           </div>
+
+          {/* My Scenario Record — per scenario the player has competed in. */}
+          {scenarioRows.length > 0 && (
+            <div>
+              <h3 className="text-sm font-bold text-text-muted mb-2">My Scenario Record</h3>
+              <div className="space-y-1.5">
+                {scenarioRows.map((r) => {
+                  const value = formatRankingMetric(r.rankingMetric, {
+                    sortScore: r.bestRankingValue ?? undefined,
+                    founderEquityValue: r.bestRawFev,
+                  });
+                  return (
+                    <div key={r.scenarioId} className="flex items-center justify-between gap-3 bg-white/5 rounded-lg px-3 py-2">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{r.name}</p>
+                        <p className="text-[11px] text-text-muted tabular-nums">
+                          {r.attempts} {r.attempts === 1 ? 'attempt' : 'attempts'} · best {value.label} {value.display}
+                        </p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        {r.bestRank != null ? (
+                          <p className={`text-sm font-bold tabular-nums ${getRankColor(r.bestRank)}`}>
+                            #{r.bestRank}{r.entryCount ? <span className="text-text-muted font-normal"> of {r.entryCount}</span> : null}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-text-muted">Unranked</p>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* vs Community */}
           {stats.global && (

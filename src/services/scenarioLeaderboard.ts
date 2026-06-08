@@ -159,6 +159,34 @@ export async function fetchScenarioList(): Promise<ScenarioListResponse> {
   return res.json() as Promise<ScenarioListResponse>;
 }
 
+/** A signed-in player's record for one scenario (best run + live rank). */
+export interface ScenarioRecord {
+  scenarioId: string;
+  attempts: number;
+  bestScore: number;
+  bestRawFev: number;
+  bestRankingValue: number | null;
+  bestRank: number | null;
+  entryCount: number | null;
+  lastPlayedAt: string;
+}
+
+/**
+ * Fetch the signed-in player's per-scenario records. Returns `null` when the
+ * player isn't signed in (401) — callers render a "sign in to track" nudge.
+ */
+export async function fetchScenarioRecords(): Promise<ScenarioRecord[] | null> {
+  const token = await getAccessToken().catch(() => null);
+  if (!token) return null;
+  const res = await fetch('/api/player/scenario-records', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401) return null;
+  if (!res.ok) throw new Error(`Load failed (${res.status})`);
+  const data = await res.json() as { records?: ScenarioRecord[] };
+  return data.records ?? [];
+}
+
 /**
  * Resolve the display value + label + unit for a ranking metric, given an
  * entry's raw fields. Mirrors `computeSortScore` in submit.ts but returns the

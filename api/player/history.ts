@@ -27,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Get paginated games
     const { data: games, error } = await supabaseAdmin
       .from('game_history')
-      .select('id, holdco_name, initials, difficulty, duration, enterprise_value, founder_equity_value, adjusted_fev, score, grade, business_count, has_restructured, family_office_completed, strategy, completed_at')
+      .select('id, holdco_name, initials, difficulty, duration, enterprise_value, founder_equity_value, adjusted_fev, score, grade, business_count, has_restructured, family_office_completed, strategy, completed_at, scenario_challenge_id, is_admin_preview')
       .eq('player_id', playerId)
       .order('completed_at', { ascending: false })
       .range(offset, offset + limit - 1);
