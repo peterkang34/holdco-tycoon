@@ -17,7 +17,7 @@ import { useState, useEffect } from 'react';
 import { fetchScenarioList, formatRankingMetric, type ScenarioListSummary } from '../../services/scenarioLeaderboard';
 import { ScenarioDetail } from '../ui/LeaderboardModal';
 import { ProfileModal } from '../ui/ProfileModal';
-import { formatCountdown, formatEndedDate } from '../../utils/scenarioCountdown';
+import { formatCountdown, formatEndedDate, isScenarioEnded } from '../../utils/scenarioCountdown';
 
 interface ScenariosScreenProps {
   /** Start a scenario. Gated to a signed-in account in PR3 (anonymous → sign-in wall). */
@@ -33,15 +33,18 @@ export function ScenariosScreen({ onPlay, onBack }: ScenariosScreenProps) {
   // Re-render every 60s so countdowns stay fresh.
   const [, setNowTick] = useState(0);
 
-  const load = () => {
+  // `retryToken` bump forces the fetch effect to re-run (used by the error-state Retry).
+  const [retryToken, setRetryToken] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     setError(false);
     fetchScenarioList()
-      .then((res) => { setList({ active: res.active, archived: res.archived }); setLoading(false); })
-      .catch(() => { setError(true); setLoading(false); });
-  };
-
-  useEffect(() => { load(); }, []);
+      .then((res) => { if (!cancelled) { setList({ active: res.active, archived: res.archived }); setLoading(false); } })
+      .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
+    return () => { cancelled = true; }; // guard against StrictMode double-fire / unmount races
+  }, [retryToken]);
+  const load = () => setRetryToken((n) => n + 1);
   useEffect(() => {
     const t = setInterval(() => setNowTick((n) => n + 1), 60_000);
     return () => clearInterval(t);
@@ -127,8 +130,11 @@ interface ScenarioLandingCardProps {
   myRank?: { rank: number | null; entryCount: number } | null;
 }
 
-function ScenarioLandingCard({ summary, ended, onPlay, onProfileClick, myRank }: ScenarioLandingCardProps) {
+function ScenarioLandingCard({ summary, ended: endedProp, onPlay, onProfileClick, myRank }: ScenarioLandingCardProps) {
   const [showBoard, setShowBoard] = useState(false);
+  // Reclassify live → ended if the window closes mid-session (the parent's 60s tick
+  // re-renders this card, so an active scenario that crosses endDate hides Play).
+  const ended = endedProp || isScenarioEnded(summary.endDate);
   const accent = summary.theme?.color || (ended ? '#64748b' : '#f59e0b');
   const top = formatRankingMetric(summary.rankingMetric, { sortScore: summary.topScore ?? undefined });
   const durationLabel = `${summary.maxRounds}yr · ${summary.duration === 'quick' ? 'Quick' : 'Standard'}`;
@@ -167,7 +173,7 @@ function ScenarioLandingCard({ summary, ended, onPlay, onProfileClick, myRank }:
           {!ended ? (
             <button
               onClick={onPlay}
-              className="px-4 py-2 rounded-lg text-sm font-bold text-bg-primary transition-opacity hover:opacity-90"
+              className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-bold text-bg-primary transition-opacity hover:opacity-90"
               style={{ backgroundColor: accent }}
             >
               Play ▶
@@ -175,7 +181,7 @@ function ScenarioLandingCard({ summary, ended, onPlay, onProfileClick, myRank }:
           ) : null}
           <button
             onClick={() => setShowBoard((v) => !v)}
-            className="px-3 py-2 rounded-lg text-sm bg-white/5 hover:bg-white/10 text-text-secondary transition-colors"
+            className="min-h-[44px] px-3 py-2 rounded-lg text-sm bg-white/5 hover:bg-white/10 text-text-secondary transition-colors"
           >
             {showBoard ? 'Hide scoreboard' : (ended ? 'View scoreboard' : 'Scoreboard')}
           </button>
@@ -183,7 +189,7 @@ function ScenarioLandingCard({ summary, ended, onPlay, onProfileClick, myRank }:
       </div>
 
       {showBoard && (
-        <div className="border-t border-white/10 px-4 pb-4 pt-3 bg-black/20">
+        <div className="border-t border-white/10 px-4 pb-4 pt-3 bg-black/20 max-h-[420px] overflow-y-auto">
           <ScenarioDetail scenarioId={summary.id} onProfileClick={onProfileClick} />
         </div>
       )}
