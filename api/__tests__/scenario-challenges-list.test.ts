@@ -39,13 +39,15 @@ describe('GET /api/scenario-challenges/list', () => {
     expect(getResponse().body).toEqual({ active: [], archived: [] });
   });
 
-  it('returns both active and archived lists populated', async () => {
+  const ENDED = { isActive: false, isFeatured: false, endDate: '2020-01-01T00:00:00Z', publishedAt: '2019-06-01T00:00:00Z' };
+
+  it('returns Live Now (active) + Past Challenges (published & ended)', async () => {
     vi.mocked(kv.get)
-      .mockResolvedValueOnce(['active-1'] as never)        // scenarios:active
+      .mockResolvedValueOnce(['active-1'] as never)            // scenarios:active
       .mockResolvedValueOnce(['archived-1', 'archived-2'] as never) // scenarios:archive
-      .mockResolvedValueOnce(MOCK_CONFIG('active-1') as never)
-      .mockResolvedValueOnce(MOCK_CONFIG('archived-1', { isActive: false, isFeatured: false }) as never)
-      .mockResolvedValueOnce(MOCK_CONFIG('archived-2', { isActive: false, isFeatured: false }) as never);
+      .mockResolvedValueOnce(MOCK_CONFIG('active-1', { publishedAt: '2026-05-01T00:00:00Z' }) as never)
+      .mockResolvedValueOnce(MOCK_CONFIG('archived-1', ENDED) as never)
+      .mockResolvedValueOnce(MOCK_CONFIG('archived-2', ENDED) as never);
     vi.mocked((kv as any).zcard).mockResolvedValue(5);
     vi.mocked((kv as any).zrange).mockResolvedValue([]);
 
@@ -57,6 +59,43 @@ describe('GET /api/scenario-challenges/list', () => {
     expect(body.archived).toHaveLength(2);
     expect(body.active[0].isActive).toBe(true);
     expect(body.archived[0].isActive).toBe(false);
+  });
+
+  it('EXCLUDES drafts and deactivated-not-ended scenarios from the landing page', async () => {
+    vi.mocked(kv.get)
+      .mockResolvedValueOnce([] as never)                                   // scenarios:active (empty)
+      .mockResolvedValueOnce(['draft', 'deactivated', 'ended'] as never)    // scenarios:archive (admin dumps non-live here)
+      // draft: never published, future endDate
+      .mockResolvedValueOnce(MOCK_CONFIG('draft', { isActive: false, isFeatured: false, publishedAt: undefined }) as never)
+      // deactivated: published once, pulled early, NOT yet expired
+      .mockResolvedValueOnce(MOCK_CONFIG('deactivated', { isActive: false, publishedAt: '2026-05-01T00:00:00Z' }) as never)
+      // ended: published and past its endDate → legitimately a Past Challenge
+      .mockResolvedValueOnce(MOCK_CONFIG('ended', ENDED) as never);
+    vi.mocked((kv as any).zcard).mockResolvedValue(0);
+    vi.mocked((kv as any).zrange).mockResolvedValue([]);
+
+    const { req, res, getResponse } = createMockReqRes({ method: 'GET' });
+    await handler(req, res);
+
+    const { body } = getResponse();
+    expect(body.active).toHaveLength(0);
+    expect(body.archived).toHaveLength(1);
+    expect(body.archived[0].id).toBe('ended');
+  });
+
+  it('does NOT show an active scenario that was wrongly placed in the archive list', async () => {
+    // Defense: even if list membership is stale, classification is by config state.
+    vi.mocked(kv.get)
+      .mockResolvedValueOnce([] as never)
+      .mockResolvedValueOnce(['live-but-in-archive-list'] as never)
+      .mockResolvedValueOnce(MOCK_CONFIG('live-but-in-archive-list', { publishedAt: '2026-05-01T00:00:00Z' }) as never);
+    vi.mocked((kv as any).zcard).mockResolvedValue(0);
+    vi.mocked((kv as any).zrange).mockResolvedValue([]);
+
+    const { req, res, getResponse } = createMockReqRes({ method: 'GET' });
+    await handler(req, res);
+    expect(getResponse().body.active).toHaveLength(1); // reclassified to Live Now
+    expect(getResponse().body.archived).toHaveLength(0);
   });
 
   it('drops entries whose config is missing', async () => {
