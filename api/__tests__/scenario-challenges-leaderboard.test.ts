@@ -74,6 +74,49 @@ describe('GET /api/scenario-challenges/leaderboard', () => {
     expect(body.entries[1]).toMatchObject({ rank: 2, sortScore: 300_000, score: 72, holdcoName: 'Beta' });
   });
 
+  it('renders members returned as already-parsed OBJECTS (Upstash auto-deserialize)', async () => {
+    // PROD REGRESSION: @vercel/kv auto-deserializes JSON-shaped sorted-set members
+    // on zrange, so a member can come back as an object rather than a string. The
+    // old read did `if (typeof member !== 'string') continue`, silently dropping
+    // every entry — entryCount said 1 but entries was []. Members must render
+    // whether the client hands them back as strings or objects.
+    const obj1 = { id: 'e1', holdcoName: 'Acme', initials: 'PTK', score: 88 };
+    const obj2 = { id: 'e2', holdcoName: 'Beta', initials: 'BE', score: 70 };
+
+    vi.mocked(kv.get).mockResolvedValueOnce(MOCK_CONFIG as never);
+    vi.mocked((kv as any).zcard).mockResolvedValueOnce(2);
+    vi.mocked((kv as any).zrange).mockResolvedValueOnce([
+      obj1, 21_847_215,
+      obj2, 300_000,
+    ]);
+
+    const { req, res, getResponse } = createMockReqRes({ method: 'GET', query: { id: 'sprint-5yr' } });
+    await handler(req, res);
+
+    const { body } = getResponse();
+    expect(body.entries).toHaveLength(2);
+    expect(body.entries[0]).toMatchObject({ rank: 1, sortScore: 21_847_215, initials: 'PTK', holdcoName: 'Acme' });
+    expect(body.entries[1]).toMatchObject({ rank: 2, sortScore: 300_000, initials: 'BE' });
+  });
+
+  it('excludes OBJECT members flagged isAdminPreview (auto-deserialized form)', async () => {
+    const real = { id: 'real', score: 80 };
+    const preview = { id: 'preview', score: 99, isAdminPreview: true };
+
+    vi.mocked(kv.get).mockResolvedValueOnce(MOCK_CONFIG as never);
+    vi.mocked((kv as any).zcard).mockResolvedValueOnce(2);
+    vi.mocked((kv as any).zrange).mockResolvedValueOnce([
+      preview, 9_900_000,
+      real, 800_000,
+    ]);
+
+    const { req, res, getResponse } = createMockReqRes({ method: 'GET', query: { id: 'sprint-5yr' } });
+    await handler(req, res);
+
+    expect(getResponse().body.entries).toHaveLength(1);
+    expect(getResponse().body.entries[0].id).toBe('real');
+  });
+
   it('excludes entries with isAdminPreview: true', async () => {
     const real = { id: 'real', score: 80 };
     const preview = { id: 'preview', score: 99, isAdminPreview: true };

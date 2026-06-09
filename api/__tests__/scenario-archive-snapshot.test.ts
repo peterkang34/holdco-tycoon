@@ -150,6 +150,36 @@ describe('cron /api/cron/scenario-archive-snapshot', () => {
     expect(entries.every(e => !e.isAdminPreview)).toBe(true);
   });
 
+  it('snapshots members returned as OBJECTS (Upstash auto-deserialize)', async () => {
+    // PROD REGRESSION: if zrange hands members back as objects, the old
+    // `typeof member !== 'string'` guard dropped them all → empty snapshot
+    // for an entry-bearing scenario (silent data loss on archival).
+    const cutoffDays = (SCENARIO_KV_TTL_PAST_END_SECONDS / 86400) - 5;
+    const endedLongAgo = new Date(Date.now() - cutoffDays * 86400 * 1000).toISOString();
+
+    vi.mocked(kv.get)
+      .mockResolvedValueOnce(['obj-1'] as never)
+      .mockResolvedValueOnce(mkConfig('obj-1', endedLongAgo) as never)
+      .mockResolvedValueOnce(['obj-1'] as never);
+
+    vi.mocked((kv as unknown as { zcard: ReturnType<typeof vi.fn> }).zcard).mockResolvedValue(2);
+    vi.mocked((kv as unknown as { zrange: ReturnType<typeof vi.fn> }).zrange).mockResolvedValue([
+      { id: 'e1', holdcoName: 'P1', initials: 'AB', founderEquityValue: 5000 }, 5000,
+      { id: 'e2', holdcoName: 'P2', initials: 'CD', founderEquityValue: 3000 }, 3000,
+    ]);
+
+    const upsertMock = vi.fn().mockResolvedValue({ error: null });
+    (supabaseAdmin as unknown as { from: ReturnType<typeof vi.fn> }).from = vi.fn().mockReturnValue({ upsert: upsertMock });
+
+    const { req, res } = createMockReqRes({ method: 'POST', headers: VALID_AUTH });
+    await handler(req, res);
+
+    const payload = upsertMock.mock.calls[0][0];
+    expect(payload.entry_count).toBe(2);
+    expect(payload.top_score).toBe(5000);
+    expect((payload.final_leaderboard_json as unknown[]).length).toBe(2);
+  });
+
   it('prunes ids with already-dead KV config (orphans in archive list)', async () => {
     vi.mocked(kv.get)
       .mockResolvedValueOnce(['orphan'] as never) // scenarios:archive

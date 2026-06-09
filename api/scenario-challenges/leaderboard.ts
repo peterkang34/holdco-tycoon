@@ -18,6 +18,7 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
 import { scenarioConfigKey, scenarioLeaderboardKey, MAX_SCENARIO_ENTRIES } from '../_lib/leaderboard.js';
+import { parseLeaderboardMember } from '../_lib/leaderboardCore.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 
 const DEFAULT_LIMIT = 50;
@@ -73,16 +74,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // the ZSET's score (the ranking metric value) as `sortScore` to avoid collision.
     const entries: Array<Record<string, unknown>> = [];
     for (let i = 0; i < rawEntries.length; i += 2) {
-      const member = rawEntries[i];
       const sortScore = rawEntries[i + 1];
-      if (typeof member !== 'string' || typeof sortScore !== 'number') continue;
-      try {
-        const parsed = JSON.parse(member);
-        if (parsed && typeof parsed === 'object' && !parsed.isAdminPreview) {
-          entries.push({ ...parsed, rank: entries.length + 1, sortScore });
-        }
-      } catch {
-        // Skip malformed entries — shouldn't happen but defensive.
+      if (typeof sortScore !== 'number') continue;
+      // Member may be a raw string OR an auto-deserialized object (Upstash quirk).
+      const parsed = parseLeaderboardMember(rawEntries[i]);
+      if (parsed && !parsed.isAdminPreview) {
+        entries.push({ ...parsed, rank: entries.length + 1, sortScore });
       }
     }
 
