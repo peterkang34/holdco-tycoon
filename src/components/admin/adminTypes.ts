@@ -172,6 +172,7 @@ export interface CommunityPlayer {
   last_played_at: string | null;
   created_at: string;
   is_anonymous: boolean;
+  email_unsubscribed?: boolean;
 }
 
 export interface CommunityData {

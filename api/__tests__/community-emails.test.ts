@@ -9,7 +9,7 @@ vi.mock('../_lib/adminAuth.js', () => ({ verifyAdminToken: vi.fn() }));
 
 import { verifyAdminToken } from '../_lib/adminAuth.js';
 import handler from '../admin/community.js';
-import { createMockReqRes } from './helpers.js';
+import { createMockReqRes, createChain } from './helpers.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 
 const mockUsers = (users: unknown[]) =>
@@ -18,9 +18,14 @@ const mockUsers = (users: unknown[]) =>
     .mockResolvedValueOnce({ data: { users }, error: null } as never)
     .mockResolvedValue({ data: { users: [] }, error: null } as never);
 
+/** Mock the player_profiles unsubscribed-ids query (the only `.from` call in emails mode). */
+const mockUnsubscribed = (ids: string[]) =>
+  vi.mocked(supabaseAdmin!.from).mockReturnValue(createChain({ data: ids.map((id) => ({ id })) }) as never);
+
 describe('GET /api/admin/community?emails=1', () => {
   beforeEach(() => {
     vi.mocked(verifyAdminToken).mockResolvedValue(true as never);
+    mockUnsubscribed([]); // default: nobody unsubscribed
   });
 
   it('requires admin auth', async () => {
@@ -54,5 +59,17 @@ describe('GET /api/admin/community?emails=1', () => {
     await handler(req, res);
     expect(getResponse().body.emails).toEqual([]);
     expect(getResponse().body.count).toBe(0);
+  });
+
+  it('excludes manually-unsubscribed players from the BCC list', async () => {
+    mockUsers([
+      { id: 'a', email: 'keep@example.com', is_anonymous: false, created_at: '2026-01-01T00:00:00Z', app_metadata: {} },
+      { id: 'b', email: 'optout@example.com', is_anonymous: false, created_at: '2026-01-02T00:00:00Z', app_metadata: {} },
+    ]);
+    mockUnsubscribed(['b']); // player b asked to unsubscribe
+    const { req, res, getResponse } = createMockReqRes({ method: 'GET', query: { emails: '1' } });
+    await handler(req, res);
+    expect(getResponse().body.emails).toEqual(['keep@example.com']);
+    expect(getResponse().body.count).toBe(1);
   });
 });

@@ -71,6 +71,9 @@ export function CommunityTab({ token }: { token: string }) {
   const [copyingEmails, setCopyingEmails] = useState(false);
   const [copyEmailsResult, setCopyEmailsResult] = useState<string | null>(null);
 
+  // Per-player email-unsubscribe toggle
+  const [unsubBusyId, setUnsubBusyId] = useState<string | null>(null);
+
   // Merge state
   const [mergeMode, setMergeMode] = useState(false);
   const [mergeSource, setMergeSource] = useState<string | null>(null);
@@ -126,6 +129,23 @@ export function CommunityTab({ token }: { token: string }) {
       setDetailLoading(false);
     }
   }, [token, selectedPlayerId]);
+
+  // Toggle a player's email opt-out (excluded from "Copy All Emails").
+  const toggleUnsubscribe = useCallback(async (playerId: string, unsubscribed: boolean) => {
+    setUnsubBusyId(playerId);
+    try {
+      const res = await fetch('/api/admin/player-unsubscribe', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ playerId, unsubscribed }),
+      });
+      if (res.ok) fetchData(); // refresh the list so the badge reflects the new state
+    } catch {
+      /* ignore — the badge stays as-is and can be retried */
+    } finally {
+      setUnsubBusyId(null);
+    }
+  }, [token, fetchData]);
 
   // Sort handler
   const handleSort = (col: SortField) => {
@@ -488,8 +508,28 @@ export function CommunityTab({ token }: { token: string }) {
                             : 'hover:bg-white/5'
                     }`}
                   >
-                    <td className="py-2 px-2 text-text-primary truncate max-w-[200px]">
-                      {player.email || <span className="text-text-muted italic">{player.display_name || 'anonymous'}</span>}
+                    <td className="py-2 px-2 text-text-primary max-w-[220px]">
+                      <div className="flex items-center gap-1.5">
+                        <span className="truncate">
+                          {player.email || <span className="text-text-muted italic">{player.display_name || 'anonymous'}</span>}
+                        </span>
+                        {player.email && (
+                          <button
+                            onClick={(e) => { e.stopPropagation(); toggleUnsubscribe(player.id, !player.email_unsubscribed); }}
+                            disabled={unsubBusyId === player.id}
+                            className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded transition-colors disabled:opacity-50 ${
+                              player.email_unsubscribed
+                                ? 'bg-danger/20 text-danger hover:bg-danger/30'
+                                : 'bg-white/5 text-text-muted hover:bg-white/10'
+                            }`}
+                            title={player.email_unsubscribed
+                              ? 'Unsubscribed — excluded from Copy All Emails. Click to re-subscribe.'
+                              : 'Mark unsubscribed (exclude from Copy All Emails)'}
+                          >
+                            {player.email_unsubscribed ? 'Unsubscribed' : 'Unsub'}
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="py-2 px-2 font-mono text-text-secondary">{player.initials}</td>
                     <td className="py-2 px-2 text-right font-mono text-text-secondary">{player.total_games}</td>
