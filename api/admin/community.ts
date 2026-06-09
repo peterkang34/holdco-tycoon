@@ -100,8 +100,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Short-circuit before the heavy player-stats queries: return every verified
     // player's email (deduped, sorted) for the admin to BCC. emailMap only ever holds
     // non-anonymous users (anonymous sessions have no email). Admin-gated above.
+    // Manually-unsubscribed players (player_profiles.email_unsubscribed = true) are
+    // excluded so the BCC list honors opt-outs.
     if (req.query.emails === '1') {
-      const emails = [...new Set(emailMap.values())].sort((a, b) => a.localeCompare(b));
+      const { data: unsubRows } = await supabaseAdmin
+        .from('player_profiles')
+        .select('id')
+        .eq('email_unsubscribed', true);
+      const unsubbed = new Set((unsubRows ?? []).map((r: { id: string }) => r.id));
+      const emails = [...new Set(
+        [...emailMap.entries()].filter(([id]) => !unsubbed.has(id)).map(([, email]) => email),
+      )].sort((a, b) => a.localeCompare(b));
       return res.status(200).json({ emails, count: emails.length });
     }
 
@@ -198,7 +207,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (playerIds.length > 0) {
         const { data: profiles } = await supabaseAdmin
           .from('player_profiles')
-          .select('id, display_name, initials, created_at, last_played_at')
+          .select('id, display_name, initials, created_at, last_played_at, email_unsubscribed')
           .in('id', playerIds);
         for (const p of profiles || []) {
           profilesById.set(p.id, p);
@@ -308,6 +317,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           created_at: p.created_at,
           auth_provider: providerMap.get(id) ?? null,
           is_anonymous: anonMap.get(id) ?? false,
+          email_unsubscribed: p.email_unsubscribed === true,
         };
       })
       .filter(Boolean);
