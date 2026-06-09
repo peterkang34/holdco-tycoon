@@ -67,6 +67,10 @@ export function CommunityTab({ token }: { token: string }) {
   const [syncing, setSyncing] = useState(false);
   const [syncResult, setSyncResult] = useState<string | null>(null);
 
+  // Copy-all-emails state
+  const [copyingEmails, setCopyingEmails] = useState(false);
+  const [copyEmailsResult, setCopyEmailsResult] = useState<string | null>(null);
+
   // Merge state
   const [mergeMode, setMergeMode] = useState(false);
   const [mergeSource, setMergeSource] = useState<string | null>(null);
@@ -275,6 +279,41 @@ export function CommunityTab({ token }: { token: string }) {
             </button>
             {syncResult && (
               <span className="text-[10px] text-text-muted">{syncResult}</span>
+            )}
+            <button
+              onClick={async () => {
+                setCopyingEmails(true);
+                setCopyEmailsResult(null);
+                try {
+                  const res = await fetch('/api/admin/community?emails=1', {
+                    headers: { Authorization: `Bearer ${token}` },
+                  });
+                  const json = await res.json();
+                  if (!res.ok) {
+                    setCopyEmailsResult(json.error || 'Failed');
+                    return;
+                  }
+                  const emails: string[] = json.emails ?? [];
+                  if (emails.length === 0) {
+                    setCopyEmailsResult('No emails found');
+                    return;
+                  }
+                  await navigator.clipboard.writeText(emails.join(', '));
+                  setCopyEmailsResult(`Copied ${emails.length} email${emails.length === 1 ? '' : 's'}`);
+                } catch {
+                  setCopyEmailsResult('Clipboard/network error');
+                } finally {
+                  setCopyingEmails(false);
+                }
+              }}
+              disabled={copyingEmails}
+              className="text-[10px] bg-accent/20 text-accent px-2 py-0.5 rounded hover:bg-accent/30 transition-colors disabled:opacity-50"
+              title="Copy all verified player emails (comma-separated) to the clipboard for a BCC email"
+            >
+              {copyingEmails ? 'Copying...' : 'Copy All Emails'}
+            </button>
+            {copyEmailsResult && (
+              <span className="text-[10px] text-text-muted">{copyEmailsResult}</span>
             )}
             <button
               onClick={() => {
