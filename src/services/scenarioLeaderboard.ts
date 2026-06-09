@@ -139,9 +139,14 @@ export async function submitScenarioChallenge(
 export async function fetchScenarioLeaderboard(
   scenarioId: string,
   limit = 50,
+  /** Bypass the 30s CDN cache — used right after a submit so the player's own
+   *  entry shows immediately instead of after the cache expires. */
+  cacheBust = false,
 ): Promise<ScenarioLeaderboardResponse> {
+  const bust = cacheBust ? `&_=${Date.now()}` : '';
   const res = await fetch(
-    `/api/scenario-challenges/leaderboard?id=${encodeURIComponent(scenarioId)}&limit=${limit}`,
+    `/api/scenario-challenges/leaderboard?id=${encodeURIComponent(scenarioId)}&limit=${limit}${bust}`,
+    cacheBust ? { cache: 'no-store' } : undefined,
   );
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));

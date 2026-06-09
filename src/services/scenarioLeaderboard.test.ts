@@ -113,7 +113,14 @@ describe('fetchScenarioLeaderboard', () => {
     fetchMock.mockResolvedValue({ ok: true, json: async () => payload });
     const res = await fetchScenarioLeaderboard('recession-gauntlet', 25);
     expect(res).toEqual(payload);
-    expect(fetchMock).toHaveBeenCalledWith('/api/scenario-challenges/leaderboard?id=recession-gauntlet&limit=25');
+    expect(fetchMock.mock.calls[0][0]).toBe('/api/scenario-challenges/leaderboard?id=recession-gauntlet&limit=25');
+  });
+
+  it('cache-busts (unique URL + no-store) when requested', async () => {
+    fetchMock.mockResolvedValue({ ok: true, json: async () => ({ scenario: {}, entries: [] }) });
+    await fetchScenarioLeaderboard('x', 50, true);
+    expect(fetchMock.mock.calls[0][0]).toMatch(/&_=\d+$/);
+    expect(fetchMock.mock.calls[0][1]).toEqual({ cache: 'no-store' });
   });
 
   it('throws with server error message on non-ok', async () => {

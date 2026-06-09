@@ -634,9 +634,17 @@ export function GameOverScreen({
     [businesses]
   );
 
-  const difficultyMultiplier = DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0;
-  const restructuringMultiplier = hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0;
-  const foMultiplier = familyOfficeState?.foMultiplier ?? 1.0;
+  // Scenario Challenges do NOT use the global difficulty/restructuring/FO multipliers —
+  // the scenario leaderboard ranks on raw FEV × the scenario's flat scoreMultiplier
+  // (default 1×). Applying the difficulty multiplier (1.4× on 'normal') here showed an
+  // inflated FEV that didn't match the board. In scenario mode, swap in scoreMultiplier.
+  const scenarioScoreMultiplier = isScenarioChallengeMode && scenarioChallengeConfig
+    ? (typeof scenarioChallengeConfig.scoreMultiplier === 'number' && scenarioChallengeConfig.scoreMultiplier > 0
+        ? scenarioChallengeConfig.scoreMultiplier : 1)
+    : null;
+  const difficultyMultiplier = scenarioScoreMultiplier ?? (DIFFICULTY_CONFIG[difficulty]?.leaderboardMultiplier ?? 1.0);
+  const restructuringMultiplier = scenarioScoreMultiplier != null ? 1.0 : (hasRestructured ? RESTRUCTURING_FEV_PENALTY : 1.0);
+  const foMultiplier = scenarioScoreMultiplier != null ? 1.0 : (familyOfficeState?.foMultiplier ?? 1.0);
   const adjustedFEV = Math.round(founderEquityValue * difficultyMultiplier * restructuringMultiplier * foMultiplier);
   const peEntries = leaderboard.filter(e => e.isFundManager);
   const myCarry = carryWaterfallData?.carry ?? 0;
