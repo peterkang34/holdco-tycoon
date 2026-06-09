@@ -19,7 +19,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { kv } from '@vercel/kv';
-import { resolvePlayerIdentity } from '../_lib/leaderboardCore.js';
+import { resolvePlayerIdentity, parseLeaderboardMember } from '../_lib/leaderboardCore.js';
 import { scenarioLeaderboardKey } from '../_lib/leaderboard.js';
 import { supabaseAdmin } from '../_lib/supabaseAdmin.js';
 import { checkRateLimit } from '../_lib/rateLimit.js';
@@ -128,12 +128,10 @@ async function scanPlayerRank(
 
     let rank = 0; // 1-based, counting only non-preview entries (matches leaderboard read)
     for (let i = 0; i < raw.length; i += 2) {
-      const member = raw[i];
       const sortScore = raw[i + 1];
-      if (typeof member !== 'string') continue;
-      let parsed: Record<string, unknown>;
-      try { parsed = JSON.parse(member); } catch { continue; }
-      if (parsed.isAdminPreview) continue;
+      // Member may be a raw string OR an auto-deserialized object (Upstash quirk).
+      const parsed = parseLeaderboardMember(raw[i]);
+      if (!parsed || parsed.isAdminPreview) continue;
       rank += 1;
       if (parsed.playerId === playerId) {
         return { bestRank: rank, bestRankingValue: typeof sortScore === 'number' ? sortScore : null, entryCount };

@@ -7,6 +7,7 @@
 import { kv } from '@vercel/kv';
 import { supabaseAdmin } from './supabaseAdmin.js';
 import { scenarioLeaderboardKey } from './leaderboard.js';
+import { parseLeaderboardMember } from './leaderboardCore.js';
 
 /** Entries captured per scenario. Matches the leaderboard display cap. */
 export const ENTRIES_TO_SNAPSHOT = 50;
@@ -44,16 +45,14 @@ export async function fetchLeaderboardSnapshot(scenarioId: string): Promise<{
   const entries: Array<Record<string, unknown>> = [];
   let topScore: number | null = null;
   for (let i = 0; i < raw.length; i += 2) {
-    const member = raw[i];
     const sortScore = raw[i + 1];
-    if (typeof member !== 'string' || typeof sortScore !== 'number') continue;
-    try {
-      const parsed = JSON.parse(member);
-      if (parsed && typeof parsed === 'object' && !parsed.isAdminPreview) {
-        entries.push({ ...parsed, rank: entries.length + 1, sortScore });
-        if (topScore == null) topScore = sortScore;
-      }
-    } catch { /* skip malformed */ }
+    if (typeof sortScore !== 'number') continue;
+    // Member may be a raw string OR an auto-deserialized object (Upstash quirk).
+    const parsed = parseLeaderboardMember(raw[i]);
+    if (parsed && !parsed.isAdminPreview) {
+      entries.push({ ...parsed, rank: entries.length + 1, sortScore });
+      if (topScore == null) topScore = sortScore;
+    }
   }
   return { entries, topScore, entryCount };
 }

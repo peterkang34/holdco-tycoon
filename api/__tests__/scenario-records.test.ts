@@ -82,6 +82,25 @@ describe('GET /api/player/scenario-records', () => {
     expect(a.entryCount).toBe(3);
   });
 
+  it('enriches bestRank when members come back as OBJECTS (Upstash auto-deserialize)', async () => {
+    // PROD REGRESSION: members may be auto-deserialized to objects on zrange.
+    // The old scan did `if (typeof member !== 'string') continue` → never found
+    // the player → bestRank always null.
+    vi.mocked(supabaseAdmin!.from).mockReturnValue(createChain({ data: [row({ scenario_challenge_id: 'a' })], error: null }) as never);
+    vi.mocked((kv as unknown as { zcard: ReturnType<typeof vi.fn> }).zcard).mockResolvedValue(3);
+    vi.mocked((kv as unknown as { zrange: ReturnType<typeof vi.fn> }).zrange).mockResolvedValue([
+      { playerId: 'other' }, 9_000_000,
+      { playerId: 'admin', isAdminPreview: true }, 8_000_000,
+      { playerId: 'p1' }, 5_000_000,
+    ]);
+    const { req, res, getResponse } = createMockReqRes({ method: 'GET' });
+    await handler(req, res);
+    const a = getResponse().body.records.find((r: { scenarioId: string }) => r.scenarioId === 'a');
+    expect(a.bestRank).toBe(2);
+    expect(a.bestRankingValue).toBe(5_000_000);
+    expect(a.entryCount).toBe(3);
+  });
+
   it('bestRank null when the player is not in the top-500 set', async () => {
     vi.mocked(supabaseAdmin!.from).mockReturnValue(createChain({ data: [row({ scenario_challenge_id: 'a' })], error: null }) as never);
     vi.mocked((kv as unknown as { zcard: ReturnType<typeof vi.fn> }).zcard).mockResolvedValue(1);

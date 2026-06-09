@@ -29,6 +29,35 @@ const kvz = kv as unknown as {
   hset: (key: string, obj: Record<string, string>) => Promise<number>;
 };
 
+/**
+ * Normalize a sorted-set member returned by `zrange` into an entry object.
+ *
+ * @vercel/kv (Upstash) auto-deserializes JSON-shaped members on read, so a
+ * member written as a JSON string can come back EITHER as an already-parsed
+ * object OR as a raw string (depends on client version / value shape). Readers
+ * that assume one form silently drop the other — this normalizer accepts both
+ * and returns null for anything that isn't a usable entry record.
+ *
+ * The global leaderboard read (api/leaderboard/get.ts) has always handled both
+ * forms; the scenario readers originally assumed strings only, which made a
+ * stored entry count toward `zcard` but never render. See parseLeaderboardMember
+ * usage in api/scenario-challenges/leaderboard.ts.
+ */
+export function parseLeaderboardMember(member: unknown): Record<string, unknown> | null {
+  if (member && typeof member === 'object' && !Array.isArray(member)) {
+    return member as Record<string, unknown>;
+  }
+  if (typeof member === 'string') {
+    try {
+      const parsed = JSON.parse(member);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch { /* malformed — fall through */ }
+  }
+  return null;
+}
+
 // ─── Rate limit ────────────────────────────────────────────────────────────
 
 /**

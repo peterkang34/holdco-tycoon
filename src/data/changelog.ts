@@ -13,6 +13,18 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    date: 'June 9, 2026',
+    title: 'Scenario Leaderboards: Scores Now Appear',
+    sections: [
+      {
+        heading: 'Scenario Challenges',
+        items: [
+          'Fixed a bug where a completed Scenario Challenge run could be counted on the board (the entry total went up) but never actually appear in the rankings. Your scores now show correctly — including runs you submitted before this fix. The same fix restores per-account scenario records and the archived past-challenge boards.',
+        ],
+      },
+    ],
+  },
+  {
     date: 'June 6, 2026',
     title: 'Scoring Fix: Tuck-In Debt',
     sections: [
