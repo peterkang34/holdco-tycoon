@@ -70,6 +70,7 @@ beforeEach(() => {
       admin: {
         getUserById: vi.fn(),
         deleteUser: vi.fn(),
+        listUsers: vi.fn(),
       },
       getUser: vi.fn(),
     },

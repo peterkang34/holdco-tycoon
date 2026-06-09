@@ -96,6 +96,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }
     }
 
+    // ── "Copy all emails" mode ──
+    // Short-circuit before the heavy player-stats queries: return every verified
+    // player's email (deduped, sorted) for the admin to BCC. emailMap only ever holds
+    // non-anonymous users (anonymous sessions have no email). Admin-gated above.
+    if (req.query.emails === '1') {
+      const emails = [...new Set(emailMap.values())].sort((a, b) => a.localeCompare(b));
+      return res.status(200).json({ emails, count: emails.length });
+    }
+
     // Build sorted arrays
     const signUpsByDay = Object.entries(dailyCounts)
       .map(([date, count]) => ({ date, count }))
