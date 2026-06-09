@@ -73,6 +73,7 @@ export function CommunityTab({ token }: { token: string }) {
 
   // Per-player email-unsubscribe toggle
   const [unsubBusyId, setUnsubBusyId] = useState<string | null>(null);
+  const [unsubError, setUnsubError] = useState<string | null>(null);
 
   // Merge state
   const [mergeMode, setMergeMode] = useState(false);
@@ -133,15 +134,22 @@ export function CommunityTab({ token }: { token: string }) {
   // Toggle a player's email opt-out (excluded from "Copy All Emails").
   const toggleUnsubscribe = useCallback(async (playerId: string, unsubscribed: boolean) => {
     setUnsubBusyId(playerId);
+    setUnsubError(null);
     try {
       const res = await fetch('/api/admin/player-unsubscribe', {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
         body: JSON.stringify({ playerId, unsubscribed }),
       });
-      if (res.ok) fetchData(); // refresh the list so the badge reflects the new state
+      if (res.ok) {
+        fetchData(); // refresh the list so the badge reflects the new state
+      } else {
+        const json = await res.json().catch(() => ({}));
+        // Most likely cause if this fires: migration 008 (email_unsubscribed) not applied yet.
+        setUnsubError(json.error || `Update failed (${res.status}) — is migration 008 applied?`);
+      }
     } catch {
-      /* ignore — the badge stays as-is and can be retried */
+      setUnsubError('Network error');
     } finally {
       setUnsubBusyId(null);
     }
@@ -335,6 +343,9 @@ export function CommunityTab({ token }: { token: string }) {
             {copyEmailsResult && (
               <span className="text-[10px] text-text-muted">{copyEmailsResult}</span>
             )}
+            {unsubError && (
+              <span className="text-[10px] text-danger">{unsubError}</span>
+            )}
             <button
               onClick={() => {
                 setMergeMode(m => !m);
@@ -508,25 +519,25 @@ export function CommunityTab({ token }: { token: string }) {
                             : 'hover:bg-white/5'
                     }`}
                   >
-                    <td className="py-2 px-2 text-text-primary max-w-[220px]">
+                    <td className="py-2 px-2 text-text-primary max-w-[260px]">
                       <div className="flex items-center gap-1.5">
-                        <span className="truncate">
+                        <span className={`truncate ${player.email_unsubscribed ? 'line-through text-text-muted' : ''}`}>
                           {player.email || <span className="text-text-muted italic">{player.display_name || 'anonymous'}</span>}
                         </span>
                         {player.email && (
                           <button
                             onClick={(e) => { e.stopPropagation(); toggleUnsubscribe(player.id, !player.email_unsubscribed); }}
                             disabled={unsubBusyId === player.id}
-                            className={`shrink-0 text-[9px] px-1.5 py-0.5 rounded transition-colors disabled:opacity-50 ${
+                            className={`shrink-0 text-[9px] px-2 py-0.5 rounded-full font-semibold tracking-wide transition-colors disabled:opacity-50 ${
                               player.email_unsubscribed
-                                ? 'bg-danger/20 text-danger hover:bg-danger/30'
-                                : 'bg-white/5 text-text-muted hover:bg-white/10'
+                                ? 'bg-danger text-white hover:bg-danger/80'                       // loud: opted out
+                                : 'border border-white/15 text-text-muted hover:bg-white/10 hover:text-text-secondary' // quiet: subscribed
                             }`}
                             title={player.email_unsubscribed
-                              ? 'Unsubscribed — excluded from Copy All Emails. Click to re-subscribe.'
-                              : 'Mark unsubscribed (exclude from Copy All Emails)'}
+                              ? 'UNSUBSCRIBED — excluded from Copy All Emails. Click to re-subscribe.'
+                              : 'Subscribed — click to mark unsubscribed (exclude from Copy All Emails)'}
                           >
-                            {player.email_unsubscribed ? 'Unsubscribed' : 'Unsub'}
+                            {unsubBusyId === player.id ? '…' : player.email_unsubscribed ? '🚫 Unsubscribed' : 'Unsub'}
                           </button>
                         )}
                       </div>
