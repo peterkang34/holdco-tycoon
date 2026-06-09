@@ -122,10 +122,10 @@ export function ScenarioChallengeResultSection({
   const mountedRef = useRef(true);
   useEffect(() => () => { mountedRef.current = false; }, []);
 
-  const loadEntries = useCallback(() => {
+  const loadEntries = useCallback((cacheBust = false) => {
     setLeaderboardLoading(true);
     setLeaderboardError(false);
-    fetchScenarioLeaderboard(config.id, TOP_N)
+    fetchScenarioLeaderboard(config.id, TOP_N, cacheBust)
       .then(res => {
         if (!mountedRef.current) return;
         setEntries(res.entries);
@@ -173,8 +173,9 @@ export function ScenarioChallengeResultSection({
       });
       setHasSaved(true);
       setSavedRank(typeof res.rank === 'number' ? res.rank : null);
-      // Refresh — save bumps the ranking; admin preview never lands an entry.
-      if (!res.previewed) loadEntries();
+      // Refresh with a cache-bust — the leaderboard read is CDN-cached 30s, so without
+      // this the player's just-submitted entry wouldn't appear until the cache expired.
+      if (!res.previewed) loadEntries(true);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : 'Submit failed');
     } finally {
@@ -269,7 +270,7 @@ export function ScenarioChallengeResultSection({
         {leaderboardError && !leaderboardLoading && (
           <div className="text-center text-text-muted py-4">
             <p className="text-sm">Failed to load scenario leaderboard.</p>
-            <button onClick={loadEntries} className="btn-secondary text-sm mt-2">
+            <button onClick={() => loadEntries(true)} className="btn-secondary text-sm mt-2">
               Retry
             </button>
           </div>
