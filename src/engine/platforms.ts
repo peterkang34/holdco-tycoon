@@ -25,18 +25,41 @@ export function getScaledThreshold(
 }
 
 /**
+ * Some recipes sit behind a meta-progression unlock. Today that's only the
+ * cross-sector SaaS+Services platform (`cross_saas_services_vertical`), unlocked
+ * by the Vertical Integrator achievement or 14+ achievements. This predicate is
+ * the SINGLE SOURCE OF TRUTH for that gate — both the UI eligibility list
+ * (checkPlatformEligibility) and the store action (forgeIntegratedPlatform) MUST
+ * use it. If they disagree the Forge button renders but the click silently
+ * no-ops ("the forge wouldn't take" bug).
+ *
+ * Scenario Challenge mode is a sealed sandbox that earns no achievements, so the
+ * caller passes `crossSaasUnlocked = unlocked || isScenarioChallengeMode` —
+ * suspending the gate there, mirroring how getAvailableSectors suspends sector
+ * unlock gates for scenarios (the scenario's business mix is the authority).
+ */
+export function isPlatformRecipeUnlocked(recipeId: string, crossSaasUnlocked: boolean): boolean {
+  if (recipeId === 'cross_saas_services_vertical') return crossSaasUnlocked;
+  return true;
+}
+
+/**
  * Check which platform recipes a player is eligible to forge.
  * Returns recipes where:
  * 1. Player owns active businesses with the required sub-types
  * 2. Player meets the minSubTypes requirement
  * 3. Combined EBITDA in the relevant sector(s) meets the scaled threshold
  * 4. The recipe hasn't already been forged
+ * 5. The recipe is unlocked (see isPlatformRecipeUnlocked) — `crossSaasUnlocked`
+ *    defaults to true so non-UI callers (tests, archival) are unaffected; the UI
+ *    passes the real unlock|scenario state so locked recipes don't render a dead button.
  */
 export function checkPlatformEligibility(
   businesses: Business[],
   existingPlatforms: IntegratedPlatform[],
   difficulty: GameDifficulty,
-  duration: GameDuration
+  duration: GameDuration,
+  crossSaasUnlocked = true
 ): { recipe: PlatformRecipe; eligibleBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number }[] {
   const activeBusinesses = businesses.filter(b => b.status === 'active' || b.status === 'integrated');
   const alreadyForgedIds = new Set(existingPlatforms.map(p => p.recipeId));
@@ -48,6 +71,10 @@ export function checkPlatformEligibility(
   for (const recipe of PLATFORM_RECIPES) {
     // Skip already forged (unless allowMultipleForges — e.g., one per vertical)
     if (alreadyForgedIds.has(recipe.id) && !recipe.allowMultipleForges) continue;
+
+    // Skip achievement-gated recipes the player hasn't unlocked (must match the
+    // store's forgeIntegratedPlatform gate, or the button no-ops on click).
+    if (!isPlatformRecipeUnlocked(recipe.id, crossSaasUnlocked)) continue;
 
     // Find businesses that match this recipe's required sub-types
     let matchingBusinesses: Business[];
@@ -134,7 +161,8 @@ export function checkNearEligiblePlatforms(
   businesses: Business[],
   existingPlatforms: IntegratedPlatform[],
   difficulty: GameDifficulty,
-  duration: GameDuration
+  duration: GameDuration,
+  crossSaasUnlocked = true
 ): { recipe: PlatformRecipe; matchingBusinesses: Business[]; sectorEbitda: number; scaledThreshold: number; qualityBlockers: Business[] }[] {
   const activeBusinesses = businesses.filter(b => b.status === 'active' || b.status === 'integrated');
   const alreadyForgedIds = new Set(existingPlatforms.map(p => p.recipeId));
@@ -147,6 +175,10 @@ export function checkNearEligiblePlatforms(
   for (const recipe of PLATFORM_RECIPES) {
     // Skip already forged (unless allowMultipleForges)
     if (alreadyForgedIds.has(recipe.id) && !recipe.allowMultipleForges) continue;
+
+    // Don't tease a locked recipe as "in progress" — it would graduate to an
+    // un-forgeable button. Matches checkPlatformEligibility's unlock gate.
+    if (!isPlatformRecipeUnlocked(recipe.id, crossSaasUnlocked)) continue;
 
     // Find businesses that match this recipe's required sub-types (including Q1/Q2)
     let matchingBusinesses: Business[];
