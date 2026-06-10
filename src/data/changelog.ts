@@ -14,12 +14,18 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     date: 'June 10, 2026',
-    title: 'Scenario Fix: Vertical SaaS + Services Platform',
+    title: 'Platform Fixes',
     sections: [
       {
         heading: 'Platform Forging',
         items: [
           'Fixed a bug where the "Forge Platform" button for the Vertical SaaS + Services integration would silently do nothing in Scenario Challenges. The recipe was gated behind an achievement that scenario runs can never earn, so the button appeared but the click never took. Scenario Challenges now suspend that gate — if your businesses qualify, you can forge it. (Other platform recipes were unaffected.)',
+        ],
+      },
+      {
+        heading: 'Add to Platform',
+        items: [
+          'Fixed the "Add to platform" button so it no longer appears in Business School mode, where adding businesses to an existing platform isn\'t part of the curriculum — previously the button showed but the click silently did nothing.',
         ],
       },
     ],
