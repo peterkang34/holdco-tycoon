@@ -6091,6 +6091,10 @@ export const useGameStore = create<GameStore>()(
       addToIntegratedPlatform: (platformId: string, businessId: string) => {
         const state = get();
         if (state.phase !== 'allocate') return;
+        // Engine gate (principle #6): add_to_integrated_platform ∈ BS_BLOCKED_ACTIONS
+        // and is scenario-disablable. Now mirrored by the UI's canAddToPlatform, so the
+        // two agree in every mode (B-School/scenario block; PE/FO/normal allow).
+        if (isActionBlocked(state, 'add_to_integrated_platform').blocked) return;
 
         const platform = state.integratedPlatforms.find(p => p.id === platformId);
         if (!platform) return;

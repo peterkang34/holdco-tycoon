@@ -107,7 +107,10 @@ export function isActionBlocked(
 /** UI-level feature keys. Mirrors DisabledFeatureKey minus `restructure` (no UI surface —
  * restructure is system-triggered via distress pipeline) and `familyOffice` (no button,
  * transition-only). Adds `designatePlatform` which has no disabledFeatures key but IS
- * PE/BS-gated via GameActionType and needs UI coverage. */
+ * PE/BS-gated via GameActionType and needs UI coverage. Also adds `addToPlatform`: its
+ * action (`add_to_integrated_platform`) DIVERGES from `forge_integrated_platform` in
+ * Business School (add is BS-blocked, forge isn't), so reusing `platformForge` for the
+ * add-to UI would leave a dead button in B-School — it needs its own representative action. */
 export type FeatureKey =
   | 'improveBusiness'
   | 'equityRaise'
@@ -118,6 +121,7 @@ export type FeatureKey =
   | 'sharedServices'
   | 'platformForge'
   | 'integratedPlatforms'
+  | 'addToPlatform'
   | 'turnaround'
   | 'maSourcing'
   | 'ipo'
@@ -149,6 +153,7 @@ const FEATURE_REPRESENTATIVE_ACTION = {
   sharedServices:    'unlock_shared_service',
   platformForge:     'forge_integrated_platform',
   integratedPlatforms: 'forge_integrated_platform',
+  addToPlatform:     'add_to_integrated_platform',
   turnaround:        'start_turnaround',
   maSourcing:        'source_deals',
   ipo:               'ipo',

@@ -264,7 +264,7 @@ function featureState(overrides: Partial<FeatureState> = {}): FeatureState {
 const ALL_FEATURES: FeatureKey[] = [
   'improveBusiness', 'equityRaise', 'buybackShares', 'distributions',
   'payDownDebt', 'sellBusiness', 'sharedServices', 'platformForge', 'integratedPlatforms',
-  'turnaround', 'maSourcing', 'ipo', 'designatePlatform',
+  'addToPlatform', 'turnaround', 'maSourcing', 'ipo', 'designatePlatform',
 ];
 
 describe('isFeatureAvailable — default (no modes)', () => {
@@ -293,6 +293,28 @@ describe('isFeatureAvailable — Business School mode', () => {
       }
     }
     expect(blockedCount).toBeGreaterThan(0); // at least ipo, turnaround are blocked in BS
+  });
+});
+
+describe('isFeatureAvailable — addToPlatform diverges from platformForge in B-School', () => {
+  it('blocks addToPlatform but NOT platformForge in Business School (the silent-no-op bug)', () => {
+    // add_to_integrated_platform ∈ BS_BLOCKED_ACTIONS; forge_integrated_platform is NOT.
+    // Reusing platformForge for the add-to UI would leave a dead "Add" button in B-School.
+    const s = featureState({ isBusinessSchoolMode: true });
+    expect(isFeatureAvailable(s, 'addToPlatform')).toMatchObject({ available: false, reason: 'bschool' });
+    expect(isFeatureAvailable(s, 'platformForge').available).toBe(true);
+  });
+
+  it('addToPlatform is blocked when a scenario disables platformForge or integratedPlatforms', () => {
+    for (const key of ['platformForge', 'integratedPlatforms'] as const) {
+      const s = featureState({ isScenarioChallengeMode: true, scenarioChallengeConfig: scenarioWith({ [key]: true }) });
+      expect(isFeatureAvailable(s, 'addToPlatform'), `disabledFeatures.${key}`).toMatchObject({ available: false, reason: 'scenario' });
+    }
+  });
+
+  it('addToPlatform is available in PE and Family Office (neither blocks add-to)', () => {
+    expect(isFeatureAvailable(featureState({ isFundManagerMode: true }), 'addToPlatform').available).toBe(true);
+    expect(isFeatureAvailable(featureState({ isFamilyOfficeMode: true }), 'addToPlatform').available).toBe(true);
   });
 });
 
@@ -404,7 +426,7 @@ describe('isFeatureAvailable — exhaustiveness tripwires', () => {
   it('every FeatureKey that appears in ALL_FEATURES is in the test list (no drift)', () => {
     // If someone adds a new FeatureKey to the union, they must add it to ALL_FEATURES here.
     // Detected via tripwire: cast to ensure the length assertion stays honest.
-    expect(ALL_FEATURES.length).toBe(13);
+    expect(ALL_FEATURES.length).toBe(14);
     expect(new Set(ALL_FEATURES).size).toBe(ALL_FEATURES.length);
   });
 });

@@ -256,6 +256,9 @@ export function AllocatePhase({
   const canTurnaround     = isFeatureAvailable(modeContext, 'turnaround').available;
   const canPayDownDebt    = isFeatureAvailable(modeContext, 'payDownDebt').available;
   const canPlatformForge  = isFeatureAvailable(modeContext, 'platformForge').available;
+  // Separate from platformForge: add-to-platform is blocked in B-School even though
+  // forging isn't, so it needs its own gate or the "Add" button silently no-ops.
+  const canAddToPlatform  = isFeatureAvailable(modeContext, 'addToPlatform').available;
 
   // Scenario `allowedSectors` with a single entry auto-selects as the M&A focus.
   // Without this, the Target Sector dropdown shows only that one option but
@@ -1462,7 +1465,7 @@ export function AllocatePhase({
                             </span>
                           )}
                         </div>
-                        {eligibleToAdd.length > 0 && (
+                        {canAddToPlatform && eligibleToAdd.length > 0 && (
                           <div className="mt-3 border-t border-white/10 pt-2">
                             <p className="text-xs text-purple-300 mb-2">Add to platform:</p>
                             <div className="space-y-1">
