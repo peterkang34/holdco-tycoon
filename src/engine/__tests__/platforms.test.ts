@@ -3,6 +3,7 @@ import {
   getIntegrationThresholdMultiplier,
   getScaledThreshold,
   checkPlatformEligibility,
+  checkNearEligiblePlatforms,
   calculateIntegrationCost,
   forgePlatform,
   getPlatformBonuses,
@@ -11,6 +12,7 @@ import {
   checkPlatformDissolution,
   getEligibleBusinessesForExistingPlatform,
   calculateAddToPlatformCost,
+  isPlatformRecipeUnlocked,
 } from '../platforms';
 import { calculateExitValuation } from '../simulation';
 import { clampMargin, capGrowthRate, MAX_MARGIN, MAX_ORGANIC_GROWTH_RATE } from '../helpers';
@@ -988,6 +990,51 @@ describe('3-Sector Financial Services Conglomerate', () => {
     const eligible = checkPlatformEligibility(businesses, [], 'easy', 'standard');
     const conglomerate = eligible.find(e => e.recipe.id === 'cross_financial_conglomerate');
     expect(conglomerate).toBeUndefined();
+  });
+
+  describe('cross-sector SaaS+Services unlock gate (forge-wouldn\'t-take regression)', () => {
+    // SaaS + 2 home-services businesses → satisfies cross_saas_services_vertical
+    // (hasSaas + 2 from one non-SaaS sector; sectorEbitda 12000 ≥ 10000 easy/standard).
+    const crossSaasBusinesses = (): Business[] => [
+      createMockBusiness({ id: 's1', sectorId: 'saas', subType: 'Vertical-Market SaaS', ebitda: 4000, status: 'active' }),
+      createMockBusiness({ id: 'h1', sectorId: 'homeServices', subType: 'HVAC Services', ebitda: 4000, status: 'active' }),
+      createMockBusiness({ id: 'h2', sectorId: 'homeServices', subType: 'Plumbing Services', ebitda: 4000, status: 'active' }),
+    ];
+
+    it('isPlatformRecipeUnlocked gates only the cross-saas recipe', () => {
+      expect(isPlatformRecipeUnlocked('cross_saas_services_vertical', false)).toBe(false);
+      expect(isPlatformRecipeUnlocked('cross_saas_services_vertical', true)).toBe(true);
+      // Any other recipe is always unlocked, regardless of the flag.
+      expect(isPlatformRecipeUnlocked('cross_financial_conglomerate', false)).toBe(true);
+    });
+
+    it('EXCLUDES cross_saas_services_vertical when crossSaasUnlocked=false (must match store gate)', () => {
+      const eligible = checkPlatformEligibility(crossSaasBusinesses(), [], 'easy', 'standard', false);
+      expect(eligible.find(e => e.recipe.id === 'cross_saas_services_vertical')).toBeUndefined();
+    });
+
+    it('includes it when crossSaasUnlocked=true', () => {
+      const eligible = checkPlatformEligibility(crossSaasBusinesses(), [], 'easy', 'standard', true);
+      expect(eligible.find(e => e.recipe.id === 'cross_saas_services_vertical')).toBeDefined();
+    });
+
+    it('defaults to unlocked when the param is omitted (backward-compat for tests/archival callers)', () => {
+      const eligible = checkPlatformEligibility(crossSaasBusinesses(), [], 'easy', 'standard');
+      expect(eligible.find(e => e.recipe.id === 'cross_saas_services_vertical')).toBeDefined();
+    });
+
+    it('near-eligible list ALSO hides the locked recipe (so it never graduates to a dead button)', () => {
+      // Sub-types met but EBITDA below the 10000 threshold → near-eligible, not yet forgeable.
+      const nearBusinesses: Business[] = [
+        createMockBusiness({ id: 's1', sectorId: 'saas', subType: 'Vertical-Market SaaS', ebitda: 1000, status: 'active' }),
+        createMockBusiness({ id: 'h1', sectorId: 'homeServices', subType: 'HVAC Services', ebitda: 1000, status: 'active' }),
+        createMockBusiness({ id: 'h2', sectorId: 'homeServices', subType: 'Plumbing Services', ebitda: 1000, status: 'active' }),
+      ];
+      const locked = checkNearEligiblePlatforms(nearBusinesses, [], 'easy', 'standard', false);
+      expect(locked.find(e => e.recipe.id === 'cross_saas_services_vertical')).toBeUndefined();
+      const unlocked = checkNearEligiblePlatforms(nearBusinesses, [], 'easy', 'standard', true);
+      expect(unlocked.find(e => e.recipe.id === 'cross_saas_services_vertical')).toBeDefined();
+    });
   });
 
   it('dissolution: dissolves when losing all businesses from one sector', () => {

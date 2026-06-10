@@ -359,7 +359,7 @@ import { clampMargin, capGrowthRate, applyEbitdaFloor } from '../engine/helpers'
 import { runAllMigrations } from './migrations';
 import { buildChronicleContext } from '../services/chronicleContext';
 import { useToastStore } from './useToast';
-import { calculateIntegrationCost, forgePlatform, checkPlatformDissolution, calculateAddToPlatformCost } from '../engine/platforms';
+import { calculateIntegrationCost, forgePlatform, checkPlatformDissolution, calculateAddToPlatformCost, isPlatformRecipeUnlocked } from '../engine/platforms';
 import { getRecipeById } from '../data/platformRecipes';
 import {
   getPlatformSaleBonus, COVENANT_BREACH_ROUNDS_THRESHOLD, EARNOUT_EXPIRATION_YEARS,
@@ -6010,12 +6010,18 @@ export const useGameStore = create<GameStore>()(
       forgeIntegratedPlatform: (recipeId: string, businessIds: string[]) => {
         const state = get();
         if (state.phase !== 'allocate') return;
+        // Engine-side feature gate (principle #6) — mirrors the UI's canPlatformForge
+        // so a scenario that disables forging can't be bypassed via stale button state.
+        if (isActionBlocked(state, 'forge_integrated_platform').blocked) return;
 
         const recipe = getRecipeById(recipeId);
         if (!recipe) return;
 
-        // Achievement-gated recipe check
-        if (recipe.id === 'cross_saas_services_vertical' && !state.unlockedMechanics?.crossSectorSaasServices) return;
+        // Achievement-gated recipe check. Suspended in scenario mode (sealed sandbox
+        // earns no achievements — the scenario's business mix is the authority). MUST
+        // match checkPlatformEligibility's gate or the Forge button silently no-ops.
+        const crossSaasUnlocked = !!state.unlockedMechanics?.crossSectorSaasServices || !!state.isScenarioChallengeMode;
+        if (!isPlatformRecipeUnlocked(recipe.id, crossSaasUnlocked)) return;
 
         const selectedBusinesses = state.businesses.filter(b => businessIds.includes(b.id));
         if (selectedBusinesses.length === 0) return;

@@ -696,14 +696,19 @@ export function AllocatePhase({
   // When platform-recipe forging is disabled (scenario `platformForge`/`integratedPlatforms`),
   // suppress ALL recipe-availability surfaces — eligible, near-eligible, and the cross-sector
   // hint below — so the portfolio page doesn't advertise an action the player can't take.
+  // Cross-sector SaaS+Services recipe is achievement-gated; scenario mode (sealed
+  // sandbox, earns no achievements) suspends the gate. Must match the store's
+  // forgeIntegratedPlatform gate so the Forge button can't render without working.
+  const crossSaasUnlocked = hasCrossSectorRecipeUnlock || isScenarioChallengeMode;
+
   const eligiblePlatformRecipes = useMemo(
-    () => canPlatformForge ? checkPlatformEligibility(businesses, integratedPlatforms, difficulty, duration) : [],
-    [canPlatformForge, businesses, integratedPlatforms, difficulty, duration]
+    () => canPlatformForge ? checkPlatformEligibility(businesses, integratedPlatforms, difficulty, duration, crossSaasUnlocked) : [],
+    [canPlatformForge, businesses, integratedPlatforms, difficulty, duration, crossSaasUnlocked]
   );
 
   const nearEligibleRecipes = useMemo(
-    () => canPlatformForge ? checkNearEligiblePlatforms(businesses, integratedPlatforms, difficulty, duration) : [],
-    [canPlatformForge, businesses, integratedPlatforms, difficulty, duration]
+    () => canPlatformForge ? checkNearEligiblePlatforms(businesses, integratedPlatforms, difficulty, duration, crossSaasUnlocked) : [],
+    [canPlatformForge, businesses, integratedPlatforms, difficulty, duration, crossSaasUnlocked]
   );
 
   const tabs: { id: AllocateTab; label: string; badge?: number }[] = [
@@ -1633,8 +1638,10 @@ export function AllocatePhase({
                 services sector). Showing it there is pure noise since the player can never
                 unlock it within the scenario's sector constraints. */}
             {(() => {
-              // Hidden when forging recipes is disabled, or it can't fulfill the scenario's sectors.
-              if (!canPlatformForge || hasCrossSectorRecipeUnlock || activeBusinesses.length < 3) return null;
+              // Hidden when forging is disabled, already unlocked, OR scenario mode has
+              // suspended the gate (crossSaasUnlocked) — in a scenario the recipe is now
+              // forgeable, so a "🔒 earn 14 achievements" teaser would contradict it.
+              if (!canPlatformForge || crossSaasUnlocked || activeBusinesses.length < 3) return null;
               const allowed = scenarioChallengeConfig?.allowedSectors;
               if (allowed && allowed.length > 0) {
                 const recipePossible = allowed.length >= 2 && allowed.includes('saas');
