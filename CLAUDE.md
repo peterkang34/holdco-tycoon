@@ -198,12 +198,76 @@ research/                   # GIT-TRACKED — external research
 - `src/engine/__tests__/business-school.test.ts` — B-School config, deals, checklist, economy (~26 tests)
 - `src/engine/__tests__/achievement-predicates.test.ts` — Achievement check functions
 
+## Engine, Scoring & Balance Changes — Simulation Protocol (MANDATORY)
+
+**Applies to any change touching `src/engine/` valuation/scoring, `gameConfig.ts` constants, or
+store logic that alters game economics. A green test suite does NOT clear these — the suite
+asserts invariants, not whether a change does what you intended.**
+
+### The rule
+
+**Run a paired before/after simulation BEFORE committing. Not after.**
+
+`npx vitest run` passing means nothing here. A balance change can be fully type-safe, keep
+3,600 tests green, and still invert the incentive it was meant to create.
+
+### The procedure
+
+1. Write a harness **outside the repo** (scratchpad) so it survives `git checkout`. Import
+   `runPlaytest` from `src/engine/__tests__/playtest/simulator` and `ALL_STRATEGIES` from
+   `.../strategies`. Sweep a fixed matrix — strategies × ~12 seeds × all 4 difficulty/duration
+   configs (~288 runs, executes in seconds). Record per run: FEV, EV, total score, grade, and
+   **each score dimension separately**.
+2. Run it on the pre-change commit → `before.json`. Run it on the change → `after.json`.
+   **Same seeds both times** — this is a paired comparison, not two samples.
+3. Diff, and **attribute the delta to a specific dimension and playstyle.**
+
+### What to look for
+
+- **Aggregate movement is not the signal.** "Scores changed" tells you nothing. *Which
+  dimension moved, for which strategy* is the finding.
+- **Does the change hit its intended target hardest?** If a fix aimed at over-leveraged play
+  penalises `ValueInvestor` and `TurnaroundArtist` more than `AggressiveAcquirer`, the
+  instrument is wrong regardless of how sound the reasoning was.
+- **Check for zero movement too.** If the metric you meant to change didn't move at all, the
+  harness isn't exercising that path — write a targeted isolation test instead of concluding
+  the change is safe. (Playtest strategies rarely tuck in, so roll-up valuation needs a direct
+  `calculateExitValuation` comparison.)
+- **Build controls carefully.** A synthetic "control" that fabricates a baseline value measures
+  nothing. Confirm the pre-change code path actually produces the value you're comparing against.
+
+### Incident this comes from
+
+2026-08 relaunch review. A change scoring balance-sheet health on the *median* of run leverage
+rather than the terminal snapshot was shipped on an agent's static analysis — the agent's report
+explicitly said "I did not run the game." A 288-run paired simulation afterwards showed it hit the
+disciplined playstyles harder than the aggressive one it targeted (`ValueInvestor` −0.56,
+`AggressiveAcquirer` −0.44 avg), because early-round leverage against small EBITDA drags the
+median up for everyone. Whole commit reverted. **Ten minutes of simulation would have caught it
+before it was written.**
+
+### Corollaries
+
+- **An agent's stated methodological limit is a work item, not a footnote.** "Static analysis",
+  "code tracing not device testing", "don't read my silence as a pass" — each is an assignment.
+- **Agents are reliable on mechanisms, unreliable on magnitudes.** Any proposed constant, cap or
+  threshold must be checked against real production distributions first — source code contains
+  logic but not distributions, so estimates get invented with misleading confidence. (Same review
+  proposed an `FEV_CAP` 125× below the actual record, which would have deleted the top six
+  leaderboard entries.)
+- **Before "fixing" a grandfather/fallback value, check which records depend on it.**
+  `git log -S"<value>"` against entry dates settles it in two minutes.
+- **Tier commits by blast radius, not theme.** Cosmetic → additive → scoped-behavior →
+  alters-core-economics, committed separately, riskiest last. One bad change in a 41-file bundle
+  makes the whole thing unreviewable and the correct response becomes "revert everything".
+
 ## Deploy Checklist (MANDATORY — do ALL before commit)
 
 ### Phase 1: VERIFY (stop if anything fails)
 1. **`npx tsc -b`** — NOT `tsc --noEmit`. Vercel uses `tsc -b` which is stricter. This has burned us multiple times.
 2. **`npx vitest run`** — Full test suite. Only the pre-existing playtest flaky failure is acceptable.
 3. **`npx vite build`** — Verify production bundle compiles.
+4. **Paired before/after simulation** — REQUIRED if the change touches engine/scoring/balance. See the Simulation Protocol above.
 
 ### Phase 2: DOCUMENT (only after Phase 1 passes)
 4. Update `CLAUDE.md` if new patterns, gotchas, or key files added
