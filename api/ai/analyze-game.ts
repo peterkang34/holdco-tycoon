@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { sanitizeString } from '../_lib/rateLimit.js';
-import { validateAIRequest, callAnthropic, formatMoneyForPrompt } from '../_lib/ai.js';
+import { validateAIRequest, callAnthropic, formatMoneyForPrompt, promptNum, promptStat } from '../_lib/ai.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (await validateAIRequest(req, res)) return;
@@ -9,28 +9,32 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const {
       holdcoName: rawHoldcoName,
       score,
-      enterpriseValue,
-      totalAcquisitions,
-      totalSold,
-      soldWithProfit,
-      totalWoundDown,
-      avgHoldPeriod,
-      avgQuality,
-      totalImprovements,
       platformSummary,
       sectorSummary,
-      totalInvestedCapital,
-      totalDistributions,
-      totalBuybacks,
-      equityRaisesUsed,
-      sharedServicesActive,
-      ebitdaGrowth,
-      finalLeverage,
       totalRounds: rawTotalRounds,
       difficulty: rawDifficulty,
       founderEquityValue: rawFEV,
       founderOwnership: rawOwnership,
     } = req.body;
+
+    // Every field interpolated into the prompt is coerced: money fields → finite numbers,
+    // stat fields → number or ≤12-char string. Raw body values must never reach the prompt.
+    const b = req.body;
+    const enterpriseValue = promptNum(b.enterpriseValue);
+    const totalInvestedCapital = promptNum(b.totalInvestedCapital);
+    const totalDistributions = promptNum(b.totalDistributions);
+    const totalBuybacks = promptNum(b.totalBuybacks);
+    const totalAcquisitions = promptStat(b.totalAcquisitions);
+    const totalSold = promptStat(b.totalSold);
+    const soldWithProfit = promptStat(b.soldWithProfit);
+    const totalWoundDown = promptStat(b.totalWoundDown);
+    const avgHoldPeriod = promptStat(b.avgHoldPeriod);
+    const avgQuality = promptStat(b.avgQuality);
+    const totalImprovements = promptStat(b.totalImprovements);
+    const equityRaisesUsed = promptStat(b.equityRaisesUsed);
+    const sharedServicesActive = promptStat(b.sharedServicesActive);
+    const ebitdaGrowth = promptStat(b.ebitdaGrowth);
+    const finalLeverage = promptStat(b.finalLeverage);
 
     const totalRounds = typeof rawTotalRounds === 'number' ? rawTotalRounds : 20;
     const difficulty = rawDifficulty === 'normal' ? 'Hard (Self-Funded)' : 'Easy (Institutional Fund)';
@@ -55,7 +59,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const deployed = typeof req.body.totalCapitalDeployed === 'number' ? req.body.totalCapitalDeployed : 0;
       const deployPct = fundSize > 0 ? Math.round((deployed / fundSize) * 100) : 0;
       const lpComments = Array.isArray(req.body.lpCommentary) ? req.body.lpCommentary.slice(-6) : [];
-      const lpQuotes = lpComments.map((c: any) => `Y${c.round} ${c.speaker === 'edna' ? 'Edna' : 'Chip'}: "${sanitizeString(c.text, 100)}"`).join('\n');
+      const lpQuotes = lpComments.map((c: any) => `Y${promptStat(c.round)} ${c.speaker === 'edna' ? 'Edna' : 'Chip'}: "${sanitizeString(c.text, 100)}"`).join('\n');
 
       const pePrompt = `You are an experienced PE fund advisor writing a post-mortem analysis of a 10-year PE fund simulation game. This is NOT a holdco — it's a closed-end PE fund with committed capital, a carry waterfall, LP investors, and a fixed fund life. Analyze the GP's performance like a real fund review.
 
@@ -75,13 +79,13 @@ RETURNS & CARRY:
 - LP Distributions: ${formatMoneyForPrompt(typeof cw.lpDistributions === 'number' ? cw.lpDistributions : 0)}
 
 PE SCORE BREAKDOWN (out of 100):
-- Return Generation: ${pe.returnGeneration ?? 'N/A'}/25
-- Capital Efficiency: ${pe.capitalEfficiency ?? 'N/A'}/20
-- Value Creation: ${pe.valueCreation ?? 'N/A'}/15
-- Deployment Discipline: ${pe.deploymentDiscipline ?? 'N/A'}/15
-- Risk Management: ${pe.riskManagement ?? 'N/A'}/15
-- LP Satisfaction: ${pe.lpSatisfaction ?? 'N/A'}/10
-- Overall: ${pe.total ?? 'N/A'}/100 — Grade: ${sanitizeString(pe.grade || 'N/A', 5)} (${sanitizeString(pe.gradeTitle || '', 50)})
+- Return Generation: ${promptStat(pe.returnGeneration)}/25
+- Capital Efficiency: ${promptStat(pe.capitalEfficiency)}/20
+- Value Creation: ${promptStat(pe.valueCreation)}/15
+- Deployment Discipline: ${promptStat(pe.deploymentDiscipline)}/15
+- Risk Management: ${promptStat(pe.riskManagement)}/15
+- LP Satisfaction: ${promptStat(pe.lpSatisfaction)}/10
+- Overall: ${promptStat(pe.total)}/100 — Grade: ${sanitizeString(pe.grade || 'N/A', 5)} (${sanitizeString(pe.gradeTitle || '', 50)})
 
 DEPLOYMENT:
 - Capital Deployed: ${formatMoneyForPrompt(deployed)} (${deployPct}% of fund)

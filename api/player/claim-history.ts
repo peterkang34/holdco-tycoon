@@ -7,6 +7,9 @@ import { LEADERBOARD_KEY } from '../_lib/leaderboard.js';
 import { updatePlayerStats, updateGlobalStats } from '../_lib/playerStats.js';
 import { getMonthKey } from '../_lib/telemetry.js';
 
+// Same shape leaderboard/submit.ts accepts when storing claimToken.
+const CLAIM_TOKEN_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 const RATE_LIMIT_SECONDS = 300; // 5 minutes between claim requests
 const MAX_CLAIMS_PER_REQUEST = 10;
 const CLAIM_LOCK_TTL = 30; // 30 seconds lock TTL
@@ -136,7 +139,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     for (const claim of claims as Claim[]) {
       if (claim.type === 'token') {
-        // Era 2: Match by claimToken
+        // Era 2: Match by claimToken. Require a real token — a missing one would
+        // match (undefined === undefined) the first tokenless entry: someone else's game.
+        if (typeof claim.claimToken !== 'string' || !CLAIM_TOKEN_REGEX.test(claim.claimToken)) {
+          results.push({ status: 'not_found' });
+          continue;
+        }
         const match = kvEntries.find((e) => e.parsed.claimToken === claim.claimToken);
         if (!match) {
           results.push({ status: 'not_found' });

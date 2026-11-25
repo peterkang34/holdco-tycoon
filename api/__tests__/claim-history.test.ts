@@ -113,7 +113,7 @@ describe('POST /api/player/claim-history', () => {
   it('claims entry by token — updates KV, inserts game_history', async () => {
     setupAuthUser();
 
-    const entry = createKvLeaderboardEntry({ claimToken: 'claim-me', playerId: null });
+    const entry = createKvLeaderboardEntry({ claimToken: '11111111-1111-4111-8111-111111111111', playerId: null });
     const entryStr = JSON.stringify(entry);
 
     vi.mocked(kv.zrange).mockResolvedValueOnce([entryStr, 65] as never);
@@ -125,7 +125,7 @@ describe('POST /api/player/claim-history', () => {
 
     const { req, res, getResponse } = createMockReqRes({
       method: 'POST',
-      body: { claims: [{ type: 'token', claimToken: 'claim-me' }] },
+      body: { claims: [{ type: 'token', claimToken: '11111111-1111-4111-8111-111111111111' }] },
     });
     await handler(req, res);
 
@@ -150,12 +150,12 @@ describe('POST /api/player/claim-history', () => {
   it('token claim — already_claimed when playerId set', async () => {
     setupAuthUser();
 
-    const entry = createKvLeaderboardEntry({ claimToken: 'taken', playerId: 'other-player' });
+    const entry = createKvLeaderboardEntry({ claimToken: '22222222-2222-4222-8222-222222222222', playerId: 'other-player' });
     vi.mocked(kv.zrange).mockResolvedValueOnce([JSON.stringify(entry), 65] as never);
 
     const { req, res, getResponse } = createMockReqRes({
       method: 'POST',
-      body: { claims: [{ type: 'token', claimToken: 'taken' }] },
+      body: { claims: [{ type: 'token', claimToken: '22222222-2222-4222-8222-222222222222' }] },
     });
     await handler(req, res);
 
@@ -168,17 +168,36 @@ describe('POST /api/player/claim-history', () => {
     setupAuthUser();
 
     // Return entries but none match the requested token
-    const entry = createKvLeaderboardEntry({ claimToken: 'other-token' });
+    const entry = createKvLeaderboardEntry({ claimToken: '66666666-6666-4666-8666-666666666666' });
     vi.mocked(kv.zrange).mockResolvedValueOnce([JSON.stringify(entry), 65] as never);
 
     const { req, res, getResponse } = createMockReqRes({
       method: 'POST',
-      body: { claims: [{ type: 'token', claimToken: 'no-match' }] },
+      body: { claims: [{ type: 'token', claimToken: '77777777-7777-4777-8777-777777777777' }] },
     });
     await handler(req, res);
 
     const { body } = getResponse();
     expect((body.results as Array<Record<string, unknown>>)[0].status).toBe('not_found');
+  });
+
+  it('token claim — missing/invalid token never matches a tokenless entry (game-theft regression)', async () => {
+    setupAuthUser();
+
+    // An entry with no claimToken — previously matched by `undefined === undefined`.
+    const entry = createKvLeaderboardEntry({ claimToken: undefined, playerId: null });
+    vi.mocked(kv.zrange).mockResolvedValueOnce([JSON.stringify(entry), 65] as never);
+
+    const { req, res, getResponse } = createMockReqRes({
+      method: 'POST',
+      body: { claims: [{ type: 'token' }, { type: 'token', claimToken: 'not-a-uuid' }] },
+    });
+    await handler(req, res);
+
+    const results = getResponse().body.results as Array<Record<string, unknown>>;
+    expect(results.map((r) => r.status)).toEqual(['not_found', 'not_found']);
+    expect(kv.zrem).not.toHaveBeenCalled();
+    expect(kv.zadd).not.toHaveBeenCalled();
   });
 
   it('historical claim — matches by composite key', async () => {
@@ -298,7 +317,7 @@ describe('POST /api/player/claim-history', () => {
   it('calls updatePlayerStats + updateGlobalStats after successful claim', async () => {
     setupAuthUser();
 
-    const entry = createKvLeaderboardEntry({ claimToken: 'stats-test', playerId: null });
+    const entry = createKvLeaderboardEntry({ claimToken: '33333333-3333-4333-8333-333333333333', playerId: null });
     vi.mocked(kv.zrange).mockResolvedValueOnce([JSON.stringify(entry), 65] as never);
 
     vi.mocked(supabaseAdmin!.from)
@@ -307,7 +326,7 @@ describe('POST /api/player/claim-history', () => {
 
     const { req, res } = createMockReqRes({
       method: 'POST',
-      body: { claims: [{ type: 'token', claimToken: 'stats-test' }] },
+      body: { claims: [{ type: 'token', claimToken: '33333333-3333-4333-8333-333333333333' }] },
     });
     await handler(req, res);
 
@@ -320,8 +339,8 @@ describe('POST /api/player/claim-history', () => {
   it('handles KV errors gracefully without crashing', async () => {
     setupAuthUser();
 
-    const entry1 = createKvLeaderboardEntry({ claimToken: 'fail-token', id: 'e1', playerId: null });
-    const entry2 = createKvLeaderboardEntry({ claimToken: 'ok-token', id: 'e2', playerId: null });
+    const entry1 = createKvLeaderboardEntry({ claimToken: '44444444-4444-4444-8444-444444444444', id: 'e1', playerId: null });
+    const entry2 = createKvLeaderboardEntry({ claimToken: '55555555-5555-4555-8555-555555555555', id: 'e2', playerId: null });
 
     vi.mocked(kv.zrange).mockResolvedValueOnce([
       JSON.stringify(entry1), 65,
@@ -342,8 +361,8 @@ describe('POST /api/player/claim-history', () => {
       method: 'POST',
       body: {
         claims: [
-          { type: 'token', claimToken: 'fail-token' },
-          { type: 'token', claimToken: 'ok-token' },
+          { type: 'token', claimToken: '44444444-4444-4444-8444-444444444444' },
+          { type: 'token', claimToken: '55555555-5555-4555-8555-555555555555' },
         ],
       },
     });

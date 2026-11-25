@@ -98,6 +98,7 @@ Spawn via Agent tool (background). Always include:
 10. **Auth token in wrong format** — admin uses KV session tokens (`verifyAdminToken`), not env vars. Player uses JWT (`getPlayerIdFromToken`).
 11. **New business `status`? Audit every `status === 'active'` filter** — a new status (e.g. `integrated`, `merged`) silently changes which businesses are included/excluded in value, debt, EBITDA, and count calcs. Grep all status filters and decide each one deliberately. Scoring/debt code especially: value and debt must agree (principle #11).
 12. **Stored derived totals (`state.totalDebt`) must resync in every action that touches their inputs** — or recompute live at read time. Grep for the field's `:` assignments and confirm every mutating action sets it (principle #12).
+13. **Secret/env comparisons fail CLOSED** — `` header !== `Bearer ${process.env.X}` `` lets `Bearer undefined` through when X is unset. Always guard `!process.env.X ||` first; compare passwords with `timingSafeEqual` on SHA-256 digests (see `api/admin/verify.ts`). Same trap for optional-field matching: `a.token === b.token` matches when both are `undefined` — validate the shape first (`claim-history.ts`).
 
 ## Project
 - React 19 + Vite 7 + TypeScript + Tailwind CSS 4 + Zustand 5
@@ -166,7 +167,7 @@ research/                   # GIT-TRACKED — external research
 - `api/game-history/save.ts` — Auto-save endpoint (completion_id dedup, keepalive-safe)
 - `api/leaderboard/submit.ts` — Leaderboard + game_history dual-write (dedup with auto-save)
 - `api/admin/` — Admin dashboard endpoints (analytics, community, bschool-stats, backfills)
-- `api/_lib/ai.ts` — Anthropic client. Two models: `AI_MODEL` (Haiku 4.5) is the default for high-volume player flows (game debriefs, narrative generation); `AI_MODEL_STRUCTURED` (Sonnet 4.6) is for admin/structured-output flows that need strict schema adherence (scenario generation). Pass model as 5th arg to `callAnthropic`. Do NOT swap Sonnet into player flows — cost compounds at scale.
+- `api/_lib/ai.ts` — Anthropic client. Two models: `AI_MODEL` (Haiku 4.5) is the default for high-volume player flows (game debriefs, narrative generation); `AI_MODEL_STRUCTURED` (Sonnet 4.6) is for admin/structured-output flows that need strict schema adherence (scenario generation). Pass model as 5th arg to `callAnthropic`. Do NOT swap Sonnet into player flows — cost compounds at scale. `validateAIRequest` also enforces a **global daily call cap** (KV `ai:daily:YYYY-MM-DD`, default 20k, env `AI_DAILY_CALL_LIMIT`; 503 → client falls back to non-AI content). **Never interpolate raw `req.body` fields into prompts** — wrap with `promptNum` (money/number fields) or `promptStat` (number-or-short-string stats, capped at 12 chars) or `sanitizeString`.
 - `api/_lib/playerStats.ts` — Pre-computed stats (updatePlayerStats, updateGlobalStats)
 - `api/_lib/adminAuth.ts` — KV-based admin session tokens (NOT env vars)
 - `src/data/scenarioChallenges.ts` — Scenario Challenge config + validation + feature-gating registry; exports canonical `RANKING_METRICS`. `migrateScenarioConfig(stored, {validate})` — admin reads pass `validate:false` so errored DRAFTS stay reopenable.

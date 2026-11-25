@@ -34,6 +34,18 @@ function gradeMatchesScore(grade: Grade, score: number): boolean {
   }
 }
 
+// Mirrors PE_GRADE_THRESHOLDS in src/data/gameConfig.ts (api/ can't import src/).
+const PE_GRADE_MIN_SCORE: Record<Grade, number> = { S: 90, A: 75, B: 60, C: 40, D: 20, F: 0 };
+const GRADE_ORDER: Grade[] = ['F', 'D', 'C', 'B', 'A', 'S'];
+function peGradeWithinScore(grade: Grade, score: number): boolean {
+  const earned = GRADE_ORDER.filter((g) => score >= PE_GRADE_MIN_SCORE[g]).pop() ?? 'F';
+  return GRADE_ORDER.indexOf(grade) <= GRADE_ORDER.indexOf(earned);
+}
+
+const FEV_CAP = 10_000_000_000; // $10T in thousands
+const PE_MAX_GROSS_MOIC = 10_000;
+const PE_MAX_NET_IRR = 10; // 1000%
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -128,6 +140,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'grade does not match score range' });
     }
 
+    if (isPE) {
+      // PE grade may sit BELOW its score band (LP-satisfaction cap, bankruptcy) but never above it.
+      if (!peGradeWithinScore(grade as Grade, score)) {
+        return res.status(400).json({ error: 'grade exceeds score range' });
+      }
+      // grossMoic drives the PE sort score, so it must be finite and bounded. Bounds are deliberately
+      // loose: the live PE board has real entries near 600x (median ~68x), so only absurd values fail.
+      // Optional: the client omits it when carryWaterfallData is missing (sort then falls back to adjustedFEV).
+      if (grossMoic != null && (typeof grossMoic !== 'number' || !Number.isFinite(grossMoic) || grossMoic < 0 || grossMoic > PE_MAX_GROSS_MOIC)) {
+        return res.status(400).json({ error: `grossMoic must be between 0 and ${PE_MAX_GROSS_MOIC}` });
+      }
+      if (netIrr != null && (typeof netIrr !== 'number' || !Number.isFinite(netIrr) || netIrr < -1 || netIrr > PE_MAX_NET_IRR)) {
+        return res.status(400).json({ error: 'netIrr out of range' });
+      }
+      if (carryEarned != null && (typeof carryEarned !== 'number' || !Number.isFinite(carryEarned) || carryEarned < 0 || carryEarned > FEV_CAP)) {
+        return res.status(400).json({ error: 'carryEarned out of range' });
+      }
+    }
+
     // businessCount: integer, 0 ≤ count ≤ 30
     if (typeof businessCount !== 'number' || !Number.isInteger(businessCount) || businessCount < 0 || businessCount > 30) {
       return res.status(400).json({ error: 'businessCount must be an integer between 0 and 30' });
@@ -144,8 +175,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // duration: valid duration
     const validDuration = typeof duration === 'string' && (VALID_DURATIONS as readonly string[]).includes(duration) ? duration : 'standard';
 
-    // founderEquityValue: number, 0 ≤ FEV ≤ 10,000,000,000 ($10T in thousands)
-    const FEV_CAP = 10_000_000_000;
+    // founderEquityValue: number, 0 ≤ FEV ≤ 10,000,000,000 ($10T in thousands) — FEV_CAP is module-level
     const validFEV = typeof founderEquityValue === 'number' && founderEquityValue >= 0 && founderEquityValue <= FEV_CAP
       ? Math.round(founderEquityValue) : Math.round(Math.min(enterpriseValue, FEV_CAP));
 
