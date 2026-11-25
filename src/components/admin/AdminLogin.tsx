@@ -23,6 +23,8 @@ export function AdminLogin({ onLogin }: AdminLoginProps) {
         const { token } = await res.json();
         sessionStorage.setItem('admin_token', token);
         onLogin(token);
+      } else if (res.status === 429) {
+        setError('Too many attempts — try again in 15 minutes');
       } else {
         setError('Invalid password');
       }

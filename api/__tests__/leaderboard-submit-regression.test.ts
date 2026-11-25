@@ -888,3 +888,29 @@ describe('POST /api/leaderboard/submit — regression (pre-extraction behavior)'
     });
   });
 });
+
+describe('POST /api/leaderboard/submit — PE forgery bounds (security hardening)', () => {
+  const submit = async (overrides: Record<string, unknown>) => {
+    const { req, res, getResponse } = createMockReqRes({ method: 'POST', body: validPEBody(overrides) });
+    await handler(req, res);
+    return getResponse();
+  };
+
+  it('accepts a real-world outlier MOIC (~600x seen on the live PE board)', async () => {
+    expect((await submit({ grossMoic: 595.63, netIrr: 0.84, score: 93, grade: 'S' })).statusCode).toBe(200);
+  });
+
+  it('rejects an absurd grossMoic that would pin #1', async () => {
+    expect((await submit({ grossMoic: 1e9 })).statusCode).toBe(400);
+  });
+
+  it('rejects out-of-range netIrr and carryEarned', async () => {
+    expect((await submit({ netIrr: 50 })).statusCode).toBe(400);
+    expect((await submit({ carryEarned: -1 })).statusCode).toBe(400);
+  });
+
+  it('rejects a grade above the PE score band, allows one below it (LP/bankruptcy caps)', async () => {
+    expect((await submit({ score: 50, grade: 'S' })).statusCode).toBe(400);
+    expect((await submit({ score: 95, grade: 'C' })).statusCode).toBe(200);
+  });
+});

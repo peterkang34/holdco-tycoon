@@ -47,6 +47,13 @@ describe('cron /api/cron/scenario-archive-snapshot', () => {
     expect(b.getResponse().statusCode).toBe(401);
   });
 
+  it('fails closed when CRON_SECRET is unset ("Bearer undefined" must not pass)', async () => {
+    delete process.env.CRON_SECRET;
+    const { req, res, getResponse } = createMockReqRes({ method: 'POST', headers: { authorization: 'Bearer undefined' } });
+    await handler(req, res);
+    expect(getResponse().statusCode).toBe(401);
+  });
+
   it('returns 500 when supabaseAdmin not configured', async () => {
     setMockSupabaseAdmin(null);
     const { req, res, getResponse } = createMockReqRes({ method: 'POST', headers: VALID_AUTH });

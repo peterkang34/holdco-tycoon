@@ -8,7 +8,8 @@ const USERS_PER_PAGE = 1000;
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     // Verify cron authorization
-    if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+    // Fail closed: an unset CRON_SECRET must not make "Bearer undefined" a valid credential.
+    if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
       return res.status(401).json({ error: 'Unauthorized' });
     }
 

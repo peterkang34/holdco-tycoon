@@ -1,5 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { checkAIRateLimit, isBodyTooLarge } from './rateLimit.js';
+import { kv } from '@vercel/kv';
+import { checkAIRateLimit, isBodyTooLarge, sanitizeString } from './rateLimit.js';
 
 export const AI_MODEL = 'claude-haiku-4-5-20251001';
 // Sonnet 4.6 — used for tasks that need stricter schema/exact-string adherence
@@ -7,6 +8,45 @@ export const AI_MODEL = 'claude-haiku-4-5-20251001';
 // rate-limited; do NOT swap this in for high-volume player-facing flows.
 export const AI_MODEL_STRUCTURED = 'claude-sonnet-4-6';
 export const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
+
+/**
+ * Global (all-IP) daily cap on AI calls — a cost backstop behind the per-IP limit, so
+ * IP rotation can't turn these public endpoints into an unbounded Anthropic proxy.
+ * Override with AI_DAILY_CALL_LIMIT. Fails open on KV errors, like the per-IP limiter.
+ * Default is generous (a 20-yr game can make 100+ calls via chronicles/business updates/deals,
+ * ~$0.003 each → ~$60/day ceiling). Over the cap, the client falls back to non-AI content.
+ * The `ai:daily:YYYY-MM-DD` counter doubles as real volume data for tuning this.
+ */
+const DEFAULT_AI_DAILY_CALL_LIMIT = 20000;
+
+async function isAIDailyBudgetExceeded(): Promise<boolean> {
+  const envLimit = Number(process.env.AI_DAILY_CALL_LIMIT);
+  const limit = Number.isFinite(envLimit) && envLimit > 0 ? envLimit : DEFAULT_AI_DAILY_CALL_LIMIT;
+  const key = `ai:daily:${new Date().toISOString().slice(0, 10)}`;
+  try {
+    const count = await kv.incr(key);
+    if (count === 1) await kv.expire(key, 2 * 24 * 60 * 60);
+    return count > limit;
+  } catch {
+    return false;
+  }
+}
+
+/** Coerce a client-supplied value to a finite number before it goes into a prompt (blocks free-text injection). */
+export function promptNum(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+/**
+ * For short stat fields the client sends as a number OR a pre-formatted string ("3.2", "N/A").
+ * Numbers pass through; strings are sanitized and capped at 12 chars — enough for any stat,
+ * too short to smuggle a prompt.
+ */
+export function promptStat(value: unknown): string | number {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : 'N/A';
+  if (typeof value === 'string') return sanitizeString(value, 12) || 'N/A';
+  return 'N/A';
+}
 
 /**
  * Validate an incoming AI request: POST-only, API key, rate limit, body size.
@@ -26,6 +66,11 @@ export async function validateAIRequest(req: VercelRequest, res: VercelResponse)
 
   if (await checkAIRateLimit(req)) {
     res.status(429).json({ error: 'Too many requests. Try again in a minute.' });
+    return true;
+  }
+
+  if (await isAIDailyBudgetExceeded()) {
+    res.status(503).json({ error: 'AI features are resting for today. Try again tomorrow.' });
     return true;
   }
 

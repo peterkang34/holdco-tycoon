@@ -28,7 +28,8 @@ import { fetchLeaderboardSnapshot, type ArchiveRow } from '../_lib/scenarioArchi
 const SNAPSHOT_BUFFER_DAYS = 10;
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  if (req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
+  // Fail closed: an unset CRON_SECRET must not make "Bearer undefined" a valid credential.
+  if (!process.env.CRON_SECRET || req.headers.authorization !== `Bearer ${process.env.CRON_SECRET}`) {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
